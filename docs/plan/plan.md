@@ -390,18 +390,129 @@ aide-de-camp/
 
 ---
 
+## Deployment Model
+
+aide-de-camp is a **live web application**, not a static site. The FastAPI server is the intelligence layer — it handles SSE connections, maintains session state, runs the router and synthesize strands, and serves the frontend HTML. There is no CDN path (no CF Pages).
+
+### Why not static
+
+- SSE connections are long-lived; CDNs cannot proxy them
+- WebSocket for the Realtime API voice session requires a persistent backend
+- The session store (SQLite) and artifact store (prompts, registry) require a writable filesystem
+- Hot-reload depends on the running server reading updated files from disk on each invocation
+
+### Phased hosting
+
+**Phase 0 (Hetzner server directly)**
+
+Run FastAPI as a process on the Hetzner server itself, not in k8s. Simplest possible path:
+- NEEDLE workers and the aide-de-camp server share the same filesystem
+- Self-modification agent writes directly to `prompts/` and `config/` — hot-reload works without any coordination
+- Expose via Tailscale (the server is already on the mesh); no ingress config needed
+- SQLite DBs are local files; no PVC required
+
+No container, no CI, no ArgoCD. Just `uvicorn src.main:app` managed by a long-running tmux session or systemd unit.
+
+**Phase 1+ (containerized, ardenone-cluster)**
+
+Once session persistence and multi-surface routing are needed, containerize and move to k8s:
+
+```
+Docker image: ronaldraygun/aide-de-camp
+Deployment: ardenone-cluster, namespace: aide-de-camp
+PVC: /data/ (SATA, ReadWriteOnce)
+  /data/session.db        ← session store
+  /data/components.db     ← component library
+  /data/prompts/          ← hot-reloadable prompt files
+  /data/config/           ← registry.yaml, monitoring.yaml, exceptions.yaml
+```
+
+The artifact store (prompts, registry) moves from the repo's working directory to the PVC. The self-modification agent updates artifacts via the aide-de-camp API (`PATCH /artifacts/{name}`), which writes to the PVC path the server reads from.
+
+### Traefik configuration for SSE and WebSocket
+
+Traefik's default response buffering breaks SSE. The IngressRoute needs:
+
+```yaml
+# IngressRoute annotations
+traefik.ingress.kubernetes.io/router.middlewares: aide-de-camp-strip-prefix@kubernetescrd
+
+# Middleware: disable buffering, extend timeouts
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: aide-de-camp-streaming
+spec:
+  buffering:
+    maxResponseBodyBytes: 0   # disable buffering
+  headers:
+    customResponseHeaders:
+      X-Accel-Buffering: "no"
+```
+
+ServersTransport timeout:
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: aide-de-camp-longlived
+spec:
+  forwardingTimeouts:
+    responseHeaderTimeout: 0    # no timeout on SSE streams
+    dialTimeout: 5s
+```
+
+DUCK-E's existing WebSocket IngressRoute config is the reference implementation for this cluster.
+
+### SQLite concurrency
+
+Multiple writers (bead watcher, background analysis bead, session handler) require WAL mode to avoid lock contention:
+
+```python
+# On DB open
+conn.execute("PRAGMA journal_mode=WAL")
+conn.execute("PRAGMA synchronous=NORMAL")
+```
+
+WAL mode allows concurrent reads during writes and serializes multiple writers without blocking. For a personal single-user app, this is sufficient through Phase 3. A server database (Postgres) is not needed.
+
+### adc CLI connectivity
+
+The `adc` CLI is a thin HTTP client. It talks to the running server over Tailscale:
+
+```bash
+# ~/.config/adc/config
+server_url = "http://aide-de-camp.ardenone.com"   # or localhost in Phase 0
+```
+
+No local inference. The CLI sends requests to the FastAPI backend and streams the SSE response to the terminal. On the Hetzner server in Phase 0, `server_url = "http://localhost:8000"`.
+
+### CI/CD (Phase 1+)
+
+New Argo WorkflowTemplate `aide-de-camp-build` on iad-ci:
+- Docker build → `ronaldraygun/aide-de-camp`
+- Update image tag in `jedarden/declarative-config` (k8s/ardenone-cluster/aide-de-camp/)
+- ArgoCD syncs automatically
+
+Same pattern as every other containerized service in the stack.
+
+---
+
 ## Technology Stack
 
 | Layer | Choice | Reason |
 |-------|--------|--------|
-| Backend | FastAPI (Python) | Reuse DUCK-E scaffolding; SSE support; async-native |
+| Backend | FastAPI (Python) | Reuse DUCK-E scaffolding; SSE + WebSocket support; async-native |
 | STT | Web Speech API → whisper-stt fallback | Zero-latency browser-native; whisper-stt already deployed |
-| Voice session | OpenAI Realtime API (via DUCK-E session handler) | DUCK-E scaffolding is already built on this |
+| Voice session | OpenAI Realtime API (via DUCK-E session handler) | DUCK-E scaffolding already built on this |
 | LLM calls | ZAI proxy (`llm-proxy.ardenone.com`) | Pay-per-token, no subscription pressure on hot path |
 | Task workers | NEEDLE + Claude Code | Existing infrastructure, unchanged |
-| Session store | SQLite | Lightweight, local, additive-only schema |
-| Frontend | Vanilla JS + Web Components | No build pipeline needed for a personal tool |
-| Hosting | ardenone-cluster or iad-options | Behind existing Tailscale ingress |
+| Session store | SQLite (WAL mode) | Lightweight, local, additive-only schema; single-user app |
+| Artifact store | PVC-mounted filesystem (Phase 1+) / local filesystem (Phase 0) | Writable at runtime; hot-reload reads per-invocation |
+| Frontend | Vanilla JS + Web Components | No build pipeline; SSE consumer + client-side card renderer |
+| Phase 0 hosting | Hetzner server, local process | Simplest path; shared filesystem with NEEDLE workers |
+| Phase 1+ hosting | ardenone-cluster, k8s Deployment | Behind existing Traefik + Tailscale ingress |
 
 ---
 
