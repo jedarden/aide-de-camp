@@ -1,0 +1,73 @@
+# aide-de-camp Ambient Monitoring Rules
+
+# This config defines what topics are monitored and how urgent their updates are.
+# Updated by the self-modification agent.
+# Hot-reloaded by the monitoring ticker.
+
+monitoring:
+  # Active topics being watched for state changes
+  active_topics:
+    - topic_id: options-pipeline-status
+      project_slug: options-pipeline
+      intent_type: status
+      check_interval: 60  # seconds
+      urgency: normal
+      filters:
+        - "phase!=Running"
+        - "restarts>0"
+      notification_threshold: "any_change"
+
+    - topic_id: ibkr-mcp-health
+      project_slug: ibkr-mcp
+      intent_type: status
+      check_interval: 300  # 5 minutes
+      urgency: low
+      filters:
+        - "ready!=1/1"
+      notification_threshold: "state_change"
+
+  # Exception-based monitoring (fires only when condition matches)
+  exceptions:
+    - name: pipeline-behind
+      project_slug: options-pipeline
+      condition: "lag_seconds > 1800"  # 30 minutes
+      urgency: high
+      message: "Options pipeline is behind by {lag_seconds} seconds"
+
+    - name: pod-crash-loop
+      condition: "restart_count > 5"
+      urgency: critical
+      message: "Pod {pod_name} is in crash loop ({restart_count} restarts)"
+
+    - name: argocd-out-of-sync
+      condition: "sync_status == 'OutOfSync'"
+      urgency: high
+      message: "{app_name} is out of sync: {sync_reason}"
+
+  # Notification batching rules
+  batching:
+    # Batch low-urgency notifications for up to N minutes
+    low_urgency_batch_seconds: 300
+    # Batch normal-urgency notifications for up to N minutes
+    normal_urgency_batch_seconds: 120
+    # High and critical notifications are never batched (push immediately)
+
+  # Quiet hours (when to suppress non-critical notifications)
+  quiet_hours:
+    enabled: false
+    start: "22:00"  # 10 PM
+    end: "08:00"    # 8 AM
+    timezone: "America/New_York"
+    # Critical notifications still push during quiet hours
+
+  # Notification channels by urgency
+  channels:
+    critical:
+      - canvas
+      - telegram
+    high:
+      - canvas
+    normal:
+      - canvas
+    low:
+      - canvas  # Only if canvas is active

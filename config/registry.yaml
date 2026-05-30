@@ -1,0 +1,137 @@
+# aide-de-camp Project Registry
+
+# This registry defines all projects that the Intent Router knows about.
+# It is hot-reloaded on every router call — no restart required.
+# Updated by the self-modification agent.
+
+projects:
+  options-pipeline:
+    description: "Options data pipeline on apexalgo-iad"
+    aliases:
+      - "the pipeline"
+      - "options"
+      - "options data"
+    cluster: apexalgo-iad
+    namespace: options
+    repo_path: null
+    intent_support:
+      - status
+      - action
+      - brainstorm
+    workflows:
+      deploy:
+        steps:
+          - ci_status
+          - image_tag
+          - argocd_sync
+          - pod_status
+      diagnose:
+        steps:
+          - pod_status
+          - pod_logs
+          - argocd_events
+
+  ibkr-mcp:
+    description: "IBKR MCP server on apexalgo-iad"
+    aliases:
+      - "ibkr"
+      - "the mcp"
+      - "ibkr mcp"
+    cluster: apexalgo-iad
+    namespace: ibkr-mcp
+    repo_path: null
+    intent_support:
+      - status
+      - lookup
+      - brainstorm
+    workflows:
+      status:
+        steps:
+          - pod_status
+          - deployment_info
+
+  kalshi-tape:
+    description: "Kalshi market data tape service on iad-kalshi"
+    aliases:
+      - "kalshi"
+      - "kalshi tape"
+      - "tape"
+    cluster: iad-kalshi
+    namespace: default
+    repo_path: null
+    intent_support:
+      - status
+      - action
+    workflows:
+      deploy:
+        steps:
+          - pod_status
+          - ci_status
+
+  aide-de-camp:
+    description: "aide-de-camp itself (this interface)"
+    aliases:
+      - "adc"
+      - "aide-de-camp"
+      - "this interface"
+    cluster: null
+    namespace: null
+    repo_path: /home/coding/aide-de-camp
+    intent_support:
+      - status
+      - self-modification
+      - brainstorm
+    workflows:
+      status:
+        steps:
+          - git_log
+          - open_beads
+
+  declarative-config:
+    description: "Kubernetes declarative configuration (GitOps)"
+    aliases:
+      - "declarative-config"
+      - "gitops"
+      - "k8s config"
+    cluster: null
+    namespace: null
+    repo_path: /home/coding/declarative-config
+    intent_support:
+      - status
+      - action
+    workflows:
+      status:
+        steps:
+          - git_log
+          - argocd_apps
+
+# Global aliases (not tied to a specific project)
+# These are resolved based on context in multi-project utterances
+global_aliases:
+  the feed: options-pipeline
+  prod: options-pipeline
+  staging: options-pipeline
+
+# Default cluster access
+# Maps cluster names to their kubectl-proxy endpoints
+clusters:
+  apexalgo-iad:
+    proxy: "http://traefik-apexalgo-iad:8001"
+    type: "proxy"
+  ardenone-cluster:
+    proxy: "http://traefik-ardenone-cluster:8001"
+    type: "proxy"
+  iad-kalshi:
+    proxy: "http://kubectl-proxy-iad-kalshi:8001"
+    type: "proxy"
+  ardenone-manager:
+    proxy: "http://traefik-ardenone-manager:8001"
+    type: "proxy"
+  rs-manager:
+    proxy: "http://traefik-rs-manager:8001"
+    type: "proxy"
+
+# ArgoCD read-only API endpoint
+argocd:
+  base_url: "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444"
+  auth: "none"  # Proxy injects bearer token

@@ -15,9 +15,9 @@ from typing import Optional
 
 import httpx
 
-from src.session.store import SessionStore
-from src.sse.broadcaster import EventType, SSEEvent, broadcast_result
-from src.surface.router import SurfaceRouter
+from ..session.store import SessionStore
+from ..sse.broadcaster import EventType, SSEEvent, broadcast_result
+from ..surface.router import SurfaceRouter
 
 logger = logging.getLogger(__name__)
 

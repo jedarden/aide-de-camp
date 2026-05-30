@@ -4,8 +4,11 @@ Audio-to-Canvas Session Continuity
 Handles surface switch events from audio to canvas.
 Ensures pending results are rendered to canvas on switch.
 """
+import asyncio
 import logging
 from typing import Any
+
+from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
 
 
 logger = logging.getLogger(__name__)
@@ -55,14 +58,25 @@ async def handle_surface_switch(
 async def push_to_canvas(
     session_id: str,
     result: dict,
+    exclude_audio_surface_id: str | None = None,
 ) -> None:
     """
     Push a result to the canvas via SSE.
 
     This is called when a result arrives while the user is on canvas.
+    The result is broadcast to all canvas surfaces for the session.
     """
-    # TODO: Implement SSE push to canvas
-    # For Phase 4, results are stored in session store
-    # Canvas polls or SSE pushes will deliver them
-    logger.info(f"Result pushed to canvas: {result.get('intent_id')}")
-    pass
+    broadcaster = get_broadcaster()
+
+    # Create SSE event for the result
+    event = SSEEvent(
+        event_type=EventType.RESULT_CREATED,
+        data=result,
+        target_session_id=session_id,
+        # Exclude the audio surface from receiving canvas updates
+        exclude_surface_id=exclude_audio_surface_id,
+    )
+
+    # Broadcast to canvas surfaces
+    sent_count = await broadcaster.broadcast(event)
+    logger.info(f"Pushed result {result.get('intent_id')} to {sent_count} canvas surfaces")

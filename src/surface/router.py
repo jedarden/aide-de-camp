@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
-from src.session.store import SessionStore
+from ..session.store import SessionStore
 
 
 @dataclass

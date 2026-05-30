@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import uuid4
 
-from src.session.store import SessionStore
+from ..session.store import SessionStore
 
 
 @dataclass

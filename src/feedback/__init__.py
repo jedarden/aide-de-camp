@@ -5,6 +5,12 @@ from .processor import (
     FeedbackProcessor,
     get_feedback_processor,
 )
+from .signals import (
+    SignalType,
+    FeedbackSignal,
+    ImplicitFeedbackTracker,
+    get_feedback_tracker,
+)
 
 __all__ = [
     'FeedbackType',
@@ -12,4 +18,8 @@ __all__ = [
     'FeedbackResponse',
     'FeedbackProcessor',
     'get_feedback_processor',
+    'SignalType',
+    'FeedbackSignal',
+    'ImplicitFeedbackTracker',
+    'get_feedback_tracker',
 ]

@@ -78,38 +78,100 @@ async def dispatch_intent(
 async def result_listener(
     session_id: str,
     voice_session: Any,
+    audio_surface_id: str | None = None,
+    use_batching: bool = True,
 ) -> None:
     """
     Background task that listens for async results and pushes them to the voice session.
 
     Results arrive from the synthesize strand via SSE or direct call.
     This task polls the session store for new results and pushes them.
+
+    If use_batching is True (default for audio mode), results go through the
+    ResultBatcher which applies urgency-based batching rules.
+    Otherwise, results are pushed immediately.
+
+    Tracks successfully pushed result IDs individually to avoid duplicates
+    even if some pushes fail.
     """
+    from .continuity import push_to_canvas
+    from .batching import get_result_batcher
+
     store = get_store()
-    last_check_time = asyncio.get_event_loop().time()
+    batcher = get_result_batcher() if use_batching else None
+    pushed_ids = set()  # Track successfully pushed result IDs in this session
+
+    # Set up batcher callback if using batching
+    if batcher:
+        async def narrate_batch(results: list) -> None:
+            """Callback to narrate a batch of results."""
+            for r in results:
+                try:
+                    result_data = {
+                        "intent_id": r.intent_id,
+                        "topic_id": r.topic_id,
+                        "summary": r.summary,
+                        "urgency": r.urgency.value,
+                        "data": r.data,
+                    }
+                    await voice_session.push_result(result_data)
+                    await push_to_canvas(session_id, result_data, audio_surface_id)
+                    logger.info(f"Narrated result {r.result_id} (batched)")
+                except Exception as e:
+                    logger.warning(f"Failed to narrate result {r.result_id}: {e}")
+
+        batcher.set_narrate_callback(narrate_batch)
 
     while True:
         try:
             # Check for new results
             unsurfed = await store.get_unsurfaced_results(session_id)
 
+            newly_pushed = []
             for result in unsurfed:
-                # Push to voice session for narration
-                await voice_session.push_result({
-                    "intent_id": result["intent_id"],
-                    "topic_id": result["topic_id"],
-                    "summary": result["summary"],
-                    "urgency": result["urgency"],
-                    "data": json.loads(result["data"]),
-                })
+                result_id = result["id"]
 
-                # Mark as surfaced (for canvas; audio will narrate)
-                # Note: we don't mark acked_at here — that's after user acknowledges
-                logger.info(f"Pushed result {result['id']} to voice session")
+                # Skip if already pushed (e.g., from previous iteration after error)
+                if result_id in pushed_ids:
+                    continue
 
-            if unsurfed:
-                # Mark all as surfaced
-                await store.mark_results_surfed(session_id)
+                try:
+                    result_data = {
+                        "intent_id": result["intent_id"],
+                        "topic_id": result["topic_id"],
+                        "summary": result["summary"],
+                        "urgency": result["urgency"],
+                        "data": json.loads(result["data"]),
+                    }
+
+                    if use_batching and batcher:
+                        # Queue with batcher for urgency-based narration
+                        await batcher.queue_result(
+                            result_id=result["id"],
+                            intent_id=result["intent_id"],
+                            topic_id=result["topic_id"],
+                            summary=result["summary"],
+                            data=json.loads(result["data"]),
+                            urgency=result.get("urgency", "normal"),
+                        )
+                        # Push to canvas immediately (canvas doesn't use batching)
+                        await push_to_canvas(session_id, result_data, audio_surface_id)
+                        logger.info(f"Queued result {result_id} for batched audio narration")
+                    else:
+                        # Push directly to voice session (no batching)
+                        await voice_session.push_result(result_data)
+                        await push_to_canvas(session_id, result_data, audio_surface_id)
+
+                    pushed_ids.add(result_id)
+                    newly_pushed.append(result_id)
+
+                except Exception as e:
+                    # Failed to push this result - will retry on next iteration
+                    logger.warning(f"Failed to push result {result_id}: {e}")
+
+            if newly_pushed:
+                # Mark successfully pushed results as surfaced
+                await store.mark_results_surfed_by_ids(session_id, newly_pushed)
 
             # Wait before next check
             await asyncio.sleep(0.5)

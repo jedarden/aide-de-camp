@@ -28,6 +28,15 @@ from .topic.model import TopicManager
 from .watcher.daemon import BeadWatcher
 from .telegram.fallback import get_telegram_fallback
 from .surface.router import SurfaceRouter
+from .feedback.processor import (
+    get_feedback_processor,
+    FeedbackRequest,
+    FeedbackType,
+    FeedbackResponse,
+)
+from .agents.self_modification import ArtifactType
+from .components.library import get_library
+from .components.hot_reload import get_reload_manager
 
 
 logger = getLogger(__name__)
@@ -47,17 +56,22 @@ _broadcaster: Optional[SSEBroadcaster] = None
 _topic_manager: Optional[TopicManager] = None
 _bead_watcher: Optional[BeadWatcher] = None
 _surface_router: Optional[SurfaceRouter] = None
+_feedback_processor = None
+_component_library = None
+_reload_manager = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     global _store, _broadcaster, _topic_manager, _bead_watcher, _surface_router
+    global _feedback_processor, _component_library, _reload_manager
 
     logger.info("Starting aide-de-camp...")
 
     # Initialize data directory
     DB_PATH.parent.mkdir(exist_ok=True)
+    Path("/home/coding/aide-de-camp/data").mkdir(exist_ok=True)
 
     # Initialize session store
     _store = session_store_get_store(DB_PATH)
@@ -77,6 +91,18 @@ async def lifespan(app: FastAPI):
     _surface_router = SurfaceRouter(_store)
     logger.info("Surface router initialized")
 
+    # Initialize component library
+    _component_library = get_library()
+    logger.info("Component library initialized")
+
+    # Initialize hot-reload manager
+    _reload_manager = get_reload_manager()
+    logger.info("Hot-reload manager initialized")
+
+    # Initialize feedback processor
+    _feedback_processor = get_feedback_processor()
+    logger.info("Feedback processor initialized")
+
     # Initialize bead watcher
     try:
         _bead_watcher = BeadWatcher(_store, _surface_router)
@@ -95,6 +121,8 @@ async def lifespan(app: FastAPI):
         await _bead_watcher.stop()
     if _broadcaster:
         await _broadcaster.stop()
+    if _component_library:
+        _component_library.close()
     if _store:
         await _store.close()
     logger.info("aide-de-camp shutdown complete")
@@ -154,7 +182,8 @@ async def voice_session(websocket: WebSocket):
         logger.info(f"Created new session: {session_id}")
 
     # Register audio surface
-    surface_id = await store.register_surface(session_id, "audio")
+    audio_surface_id = await store.register_surface(session_id, "audio")
+    surface_id = audio_surface_id
     logger.info(f"Registered audio surface: {surface_id}")
 
     # Load voice prompt
@@ -193,7 +222,7 @@ async def voice_session(websocket: WebSocket):
     listener_task = None
     try:
         listener_task = asyncio.create_task(
-            result_listener(session_id, voice)
+            result_listener(session_id, voice, audio_surface_id)
         )
 
         # Register dispatch_intent tool
@@ -437,6 +466,547 @@ async def get_topics(session_id: str):
     return {
         "topics": [card.to_dict() for card in cards]
     }
+
+
+# =============================================================================
+# API v1 Endpoints
+# =============================================================================
+
+# Pydantic models for API requests/responses
+class SurfaceRegisterRequest(BaseModel):
+    session_id: str
+    surface_type: str
+
+
+class HeartbeatRequest(BaseModel):
+    session_id: str
+    surface_id: str
+
+
+class FeedbackRequestModel(BaseModel):
+    feedback: str
+    feedback_type: str = "self_modification"
+    context: Optional[dict] = None
+    session_id: Optional[str] = None
+    require_approval: bool = True
+
+
+class ApprovalRequest(BaseModel):
+    approval_id: str
+
+
+class RollbackRequest(BaseModel):
+    artifact_name: str
+    artifact_type: str
+
+
+class ComponentCreateRequest(BaseModel):
+    name: str
+    description: str
+    html_template: str
+    change_note: str = "Initial version"
+
+
+class ComponentUpdateRequest(BaseModel):
+    component_id: str
+    html_template: str
+    change_note: str
+
+
+class ComponentIterateRequest(BaseModel):
+    component_id: str
+    feedback: str
+    result_data: Optional[dict] = None
+
+
+# Canvas and Surface endpoints
+@app.post("/api/v1/surfaces/register")
+async def api_v1_register_surface(request: SurfaceRegisterRequest):
+    """Register a new surface for a session."""
+    store = await get_store()
+
+    # Get or create session
+    session = await store.get_session(request.session_id)
+    if not session:
+        session_id = await store.create_session()
+        logger.info(f"Created new session: {session_id}")
+    else:
+        session_id = request.session_id
+
+    # Register surface
+    surface_id = await store.register_surface(
+        session_id,
+        request.surface_type
+    )
+
+    return {
+        "surface_id": surface_id,
+        "session_id": session_id
+    }
+
+
+@app.post("/api/v1/surfaces/heartbeat")
+async def api_v1_heartbeat(request: HeartbeatRequest):
+    """Update surface heartbeat."""
+    store = await get_store()
+    await store.update_surface_heartbeat(request.surface_id)
+    return {"status": "ok"}
+
+
+@app.get("/api/v1/sessions/{session_id}/topics")
+async def api_v1_get_session_topics(session_id: str):
+    """Get active topic cards for a session (canvas format)."""
+    if not _topic_manager:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Topic manager not initialized"}
+        )
+
+    cards = await _topic_manager.get_active_topic_cards(session_id)
+    return {
+        "cards": [card.to_dict() for card in cards]
+    }
+
+
+@app.get("/api/v1/sse")
+async def api_v1_sse(
+    session_id: str,
+    surface_id: Optional[str] = None,
+    surface_type: str = "canvas"
+):
+    """
+    Server-Sent Events endpoint for canvas connections.
+
+    Provides real-time updates for topics, results, and component updates.
+    """
+    broadcaster = get_broadcaster()
+
+    # Get or create session
+    store = await get_store()
+    session = await store.get_session(session_id)
+    if not session:
+        session_id = await store.create_session()
+        logger.info(f"Created new session: {session_id}")
+
+    # Register or update surface
+    if not surface_id:
+        surface_id = await store.register_surface(session_id, surface_type)
+        logger.info(f"Registered {surface_type} surface: {surface_id}")
+    else:
+        await store.update_surface_heartbeat(surface_id)
+
+    # Create SSE connection
+    connection = broadcaster.register(
+        surface_id=surface_id,
+        session_id=session_id,
+        surface_type=surface_type,
+    )
+
+    # Send workload summary on connect
+    summary = await store.get_workload_summary(session_id)
+
+    async def event_stream():
+        try:
+            # Send initial connection event
+            yield broadcaster._format_sse("connected", {
+                "surface_id": surface_id,
+                "session_id": session_id,
+            })
+
+            yield broadcaster._format_sse("workload_summary", summary)
+
+            # Send initial topic cards
+            if _topic_manager:
+                cards = await _topic_manager.get_active_topic_cards(session_id)
+                yield broadcaster._format_sse("topic_cards", {
+                    "cards": [card.to_dict() for card in cards]
+                })
+
+            # Stream events
+            async for event_data in broadcaster.event_generator(connection):
+                yield event_data
+
+        except asyncio.CancelledError:
+            logger.info(f"SSE stream cancelled for surface {surface_id}")
+            raise
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# Feedback and Self-Modification endpoints
+@app.post("/api/v1/feedback")
+async def api_v1_process_feedback(request: FeedbackRequestModel):
+    """
+    Process user feedback for self-modification or component iteration.
+
+    Returns a diff for approval or confirmation of application.
+    """
+    if not _feedback_processor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Feedback processor not initialized"}
+        )
+
+    # Map string to enum
+    feedback_type_map = {
+        "self_modification": FeedbackType.SELF_MODIFICATION,
+        "component_iteration": FeedbackType.COMPONENT_ITERATION,
+        "routing_correction": FeedbackType.ROUTING_CORRECTION,
+        "behavior_adjustment": FeedbackType.BEHAVIOR_ADJUSTMENT,
+    }
+
+    feedback_type = feedback_type_map.get(
+        request.feedback_type,
+        FeedbackType.SELF_MODIFICATION
+    )
+
+    feedback_req = FeedbackRequest(
+        feedback=request.feedback,
+        feedback_type=feedback_type,
+        context=request.context,
+        session_id=request.session_id,
+        require_approval=request.require_approval
+    )
+
+    response = await _feedback_processor.process_feedback(feedback_req)
+
+    return {
+        "status": response.status,
+        "message": response.message,
+        "confidence": response.confidence,
+        "artifact_name": response.artifact_name,
+        "artifact_type": response.artifact_type.value if response.artifact_type else None,
+        "approval_id": getattr(response, 'approval_id', None),
+        "diff": {
+            "artifact_name": response.diff.artifact_name,
+            "artifact_type": response.diff.artifact_type.value,
+            "change_summary": response.diff.change_summary,
+            "confidence": response.diff.confidence,
+            # Don't include full before/after in response to save space
+            # Client can fetch separately if needed
+        } if response.diff else None
+    }
+
+
+@app.post("/api/v1/feedback/approve")
+async def api_v1_approve_change(request: ApprovalRequest):
+    """Approve and apply a pending change."""
+    if not _feedback_processor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Feedback processor not initialized"}
+        )
+
+    response = await _feedback_processor.approve_change(request.approval_id)
+
+    return {
+        "status": response.status,
+        "message": response.message,
+        "artifact_name": response.artifact_name,
+    }
+
+
+@app.post("/api/v1/feedback/reject")
+async def api_v1_reject_change(request: ApprovalRequest, reason: Optional[str] = None):
+    """Reject a pending change."""
+    if not _feedback_processor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Feedback processor not initialized"}
+        )
+
+    response = await _feedback_processor.reject_change(request.approval_id, reason)
+
+    return {
+        "status": response.status,
+        "message": response.message,
+    }
+
+
+@app.get("/api/v1/feedback/pending")
+async def api_v1_list_pending():
+    """List all pending feedback approvals."""
+    if not _feedback_processor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Feedback processor not initialized"}
+        )
+
+    return {
+        "pending": _feedback_processor.list_pending_approvals()
+    }
+
+
+@app.post("/api/v1/feedback/rollback")
+async def api_v1_rollback(request: RollbackRequest):
+    """Rollback an artifact to its previous version."""
+    if not _feedback_processor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Feedback processor not initialized"}
+        )
+
+    # Map string to enum
+    artifact_type_map = {
+        "prompt": ArtifactType.PROMPT,
+        "config": ArtifactType.CONFIG,
+        "component": ArtifactType.COMPONENT,
+    }
+
+    artifact_type = artifact_type_map.get(
+        request.artifact_type,
+        ArtifactType.PROMPT
+    )
+
+    response = await _feedback_processor.rollback(
+        request.artifact_name,
+        artifact_type
+    )
+
+    return {
+        "status": response.status,
+        "message": response.message,
+    }
+
+
+# Component Library endpoints
+@app.get("/api/v1/components")
+async def api_v1_list_components(limit: int = 50):
+    """List all components in the library."""
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    components = _component_library.list_components(limit=limit)
+    return {
+        "components": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "description": c.description,
+                "version": c.version,
+                "usage_count": c.usage_count,
+                "last_used": c.last_used,
+            }
+            for c in components
+        ]
+    }
+
+
+@app.get("/api/v1/components/{component_id}")
+async def api_v1_get_component(component_id: str):
+    """Get a component by ID."""
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    component = _component_library.get_component(component_id)
+    if not component:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Component not found"}
+        )
+
+    return {
+        "id": component.id,
+        "name": component.name,
+        "description": component.description,
+        "html_template": component.html_template,
+        "version": component.version,
+        "usage_count": component.usage_count,
+        "last_used": component.last_used,
+    }
+
+
+@app.post("/api/v1/components")
+async def api_v1_create_component(request: ComponentCreateRequest):
+    """Create a new component."""
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    component = _component_library.create_component(
+        name=request.name,
+        description=request.description,
+        html_template=request.html_template,
+        change_note=request.change_note
+    )
+
+    return {
+        "id": component.id,
+        "name": component.name,
+        "version": component.version,
+        "message": f"Component '{component.name}' created",
+    }
+
+
+@app.post("/api/v1/components/{component_id}")
+async def api_v1_update_component(component_id: str, request: ComponentUpdateRequest):
+    """Update a component to a new version."""
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    updated = _component_library.update_component(
+        component_id=component_id,
+        html_template=request.html_template,
+        change_note=request.change_note
+    )
+
+    if not updated:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Component not found"}
+        )
+
+    # Broadcast component update via SSE
+    if _feedback_processor:
+        from .sse.events import get_sse_manager
+        sse_mgr = get_sse_manager()
+        await sse_mgr.broadcast_component_update(
+            component_id,
+            updated.version,
+            request.change_note
+        )
+
+    return {
+        "id": updated.id,
+        "name": updated.name,
+        "version": updated.version,
+        "message": f"Component '{updated.name}' updated to version {updated.version}",
+    }
+
+
+@app.post("/api/v1/components/{component_id}/iterate")
+async def api_v1_iterate_component(component_id: str, request: ComponentIterateRequest):
+    """Iterate a component based on user feedback."""
+    if not _feedback_processor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Feedback processor not initialized"}
+        )
+
+    # Use the feedback processor to handle component iteration
+    feedback_req = FeedbackRequest(
+        feedback=request.feedback,
+        feedback_type=FeedbackType.COMPONENT_ITERATION,
+        context={"component_id": component_id, "result_data": request.result_data},
+        require_approval=False  # Auto-apply component iterations
+    )
+
+    response = await _feedback_processor.process_feedback(feedback_req)
+
+    return {
+        "status": response.status,
+        "message": response.message,
+        "component_name": response.artifact_name,
+    }
+
+
+@app.get("/api/v1/components/{component_id}/history")
+async def api_v1_get_component_history(component_id: str):
+    """Get version history for a component."""
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    history = _component_library.get_component_history(component_id)
+    return {
+        "history": [
+            {
+                "component_id": h.component_id,
+                "version": h.version,
+                "created_at": h.created_at,
+                "change_note": h.change_note,
+            }
+            for h in history
+        ]
+    }
+
+
+@app.get("/api/v1/artifacts")
+async def api_v1_list_artifacts():
+    """List all hot-reloadable artifacts."""
+    if not _reload_manager:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Hot-reload manager not initialized"}
+        )
+
+    return {
+        "artifacts": _reload_manager.list_artifacts()
+    }
+
+
+@app.get("/api/v1/artifacts/{artifact_name}")
+async def api_v1_get_artifact(artifact_name: str):
+    """Get an artifact's current content."""
+    if not _reload_manager:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Hot-reload manager not initialized"}
+        )
+
+    try:
+        # Try as prompt first
+        content = _reload_manager.get_prompt(artifact_name)
+        artifact_type = "prompt"
+    except KeyError:
+        try:
+            # Try as config
+            content = _reload_manager.get_config(artifact_name)
+            artifact_type = "config"
+        except KeyError:
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Artifact not found"}
+            )
+
+    return {
+        "name": artifact_name,
+        "type": artifact_type,
+        "content": content if artifact_type == "prompt" else str(content),
+    }
+
+
+@app.post("/api/v1/artifacts/{artifact_name}/reload")
+async def api_v1_reload_artifact(artifact_name: str):
+    """Force reload an artifact from disk."""
+    if not _reload_manager:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Hot-reload manager not initialized"}
+        )
+
+    try:
+        _reload_manager.force_reload(artifact_name)
+        return {
+            "status": "ok",
+            "message": f"Artifact '{artifact_name}' reloaded"
+        }
+    except KeyError:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Artifact not found"}
+        )
 
 
 @app.on_event("startup")

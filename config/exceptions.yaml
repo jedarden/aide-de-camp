@@ -1,0 +1,95 @@
+# aide-de-camp Exception Routing Rules
+
+# This config defines which exceptions auto-approve and which escalate to manual review.
+# Updated by the self-modification agent.
+# Hot-reloaded on every escalate call.
+
+# Auto-approval rules for low-risk actions
+auto_approve:
+  # Read-only operations are always auto-approved
+  read_only:
+    - kubectl_logs
+    - kubectl_describe
+    - kubectl_get
+    - git_status
+    - git_log
+    - argocd_get
+
+  # Low-risk mutations in non-production
+  safe_mutations:
+    - condition: "environment == 'staging'"
+      actions:
+        - kubectl_restart_deployment
+        - kubectl_delete_pod  # if it's not the only replica
+        - kubectl_scale_up
+
+    - condition: "project_slug == 'aide-de-camp'"
+      actions:
+        - git_commit
+        - git_push_feature_branch
+
+# Manual approval required (always escalate to bead)
+manual_approval:
+  # Production mutations
+  - condition: "environment == 'production'"
+    actions:
+      - kubectl_delete
+      - kubectl_apply
+      - kubectl_patch
+
+  # Git main branch
+  - condition: "branch == 'main' || branch == 'master'"
+    actions:
+      - git_push
+      - git_merge
+
+  # High-risk operations
+  - condition: "action == 'kubectl_delete_namespace'"
+    always_approve: false
+
+  - condition: "action == 'argocd_app_delete'"
+    always_approve: false
+
+# Escalation routing (which bead type to create)
+escalation_targets:
+  action:
+    bead_type: "action"
+    requires_approval: true
+    approval_message: "Review and approve this action"
+
+  self_modification:
+    bead_type: "self-modification"
+    requires_approval: true
+    approval_message: "Review this system modification"
+
+  monitoring_config:
+    bead_type: "monitoring"
+    requires_approval: false  # Monitoring config changes are auto-applied
+    approval_message: null
+
+# Approval workflows
+approval:
+  # How long before auto-approval (if user is away)
+  timeout_seconds: 3600  # 1 hour
+
+  # Auto-approve conditions
+  auto_approve_if:
+    - "risk_level == 'low'"
+    - "environment == 'staging' AND action IN ['restart', 'delete_pod']"
+
+  # Never auto-approve these
+  never_auto_approve:
+    - "environment == 'production'"
+    - "risk_level == 'critical'"
+
+# Exception categories
+categories:
+  blocking:
+    urgency: critical
+    auto_push_to_telegram: true
+    notification_sound: true
+
+  non_blocking:
+    urgency: normal
+    auto_push_to_telegram: false
+    notification_sound: false

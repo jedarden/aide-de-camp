@@ -133,6 +133,28 @@ CREATE TABLE IF NOT EXISTS intent_topics (
     FOREIGN KEY (intent_id) REFERENCES intents(id) ON DELETE CASCADE,
     FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
 );
+
+-- Feedback signals: implicit user behavior tracking for background analysis
+CREATE TABLE IF NOT EXISTS feedback_signals (
+    signal_id    TEXT PRIMARY KEY,
+    signal_type  TEXT NOT NULL,
+    session_id   TEXT NOT NULL,
+    result_id    TEXT,
+    topic_id     TEXT,
+    timestamp    INTEGER NOT NULL,
+    data         TEXT NOT NULL,  -- JSON: signal-specific data
+    surface_type TEXT,
+    processed    INTEGER DEFAULT 0 CHECK(processed IN (0, 1)),
+    processed_at INTEGER,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+    FOREIGN KEY (result_id) REFERENCES results(id) ON DELETE SET NULL,
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_signals_session ON feedback_signals(session_id);
+CREATE INDEX IF NOT EXISTS idx_signals_type ON feedback_signals(signal_type);
+CREATE INDEX IF NOT EXISTS idx_signals_processed ON feedback_signals(processed);
+CREATE INDEX IF NOT EXISTS idx_signals_result ON feedback_signals(result_id);
 """
 
 
@@ -384,6 +406,17 @@ class SessionStore:
             )
             await db.commit()
 
+    async def mark_results_surfed_by_ids(self, session_id: str, result_ids: list[str]) -> None:
+        """Mark specific results as surfaced."""
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            for result_id in result_ids:
+                await db.execute(
+                    "UPDATE results SET surfaced_at = ? WHERE id = ? AND session_id = ?",
+                    (now, result_id, session_id)
+                )
+            await db.commit()
+
     # Topic operations
     async def create_topic(
         self,
@@ -586,6 +619,108 @@ class SessionStore:
             ) as cursor:
                 rows = await cursor.fetchall()
                 return [row[0] for row in rows]
+
+    # Feedback signal operations
+    async def create_feedback_signal(
+        self,
+        signal_id: str,
+        signal_type: str,
+        session_id: str,
+        result_id: str | None = None,
+        topic_id: str | None = None,
+        timestamp: int | None = None,
+        data: dict | None = None,
+        surface_type: str | None = None,
+    ) -> str:
+        """Create a new feedback signal and return its ID."""
+        import json
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                """INSERT INTO feedback_signals
+                   (id, signal_type, session_id, result_id, topic_id, timestamp, data, surface_type)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    signal_id, signal_type, session_id, result_id,
+                    topic_id, timestamp or now, json.dumps(data or {}),
+                    surface_type
+                )
+            )
+            await db.commit()
+        return signal_id
+
+    async def get_unprocessed_signals(
+        self,
+        signal_type: str | None = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        """Get unprocessed feedback signals for background analysis."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            query = """SELECT * FROM feedback_signals WHERE processed = 0"""
+            params = []
+
+            if signal_type:
+                query += " AND signal_type = ?"
+                params.append(signal_type)
+
+            query += " ORDER BY timestamp ASC LIMIT ?"
+            params.append(limit)
+
+            async with db.execute(query, params) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def mark_signals_processed(
+        self,
+        signal_ids: list[str],
+    ) -> None:
+        """Mark feedback signals as processed."""
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            for signal_id in signal_ids:
+                await db.execute(
+                    "UPDATE feedback_signals SET processed = 1, processed_at = ? WHERE id = ?",
+                    (now, signal_id)
+                )
+            await db.commit()
+
+    async def get_session_feedback_summary(
+        self,
+        session_id: str,
+        since: int | None = None,
+    ) -> dict:
+        """Get a summary of feedback signals for a session."""
+        one_hour_ago = int(datetime.now().timestamp()) - 3600
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+
+            # Get signal counts by type
+            since_clause = since or one_hour_ago
+            async with db.execute(
+                """SELECT signal_type, COUNT(*) as count
+                   FROM feedback_signals
+                   WHERE session_id = ? AND timestamp >= ?
+                   GROUP BY signal_type""",
+                (session_id, since_clause)
+            ) as cursor:
+                type_counts = {row["signal_type"]: row["count"] for row in await cursor.fetchall()}
+
+            # Get average ack delay
+            async with db.execute(
+                """SELECT AVG(CAST(data->>'ack_delay_seconds' AS INTEGER)) as avg_delay
+                   FROM feedback_signals
+                   WHERE session_id = ? AND signal_type = 'ack_speed' AND timestamp >= ?""",
+                (session_id, since_clause)
+            ) as cursor:
+                row = await cursor.fetchone()
+                avg_ack_delay = row["avg_delay"] if row and row["avg_delay"] else 0
+
+            return {
+                "signal_counts": type_counts,
+                "avg_ack_delay_seconds": avg_ack_delay,
+            }
 
 
 # Global session store instance

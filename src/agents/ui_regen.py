@@ -165,7 +165,7 @@ class UIRegenAgent:
         item_rows = "\n".join([
             f"  <div class='card-item'>"
             f"    <span class='card-field'>{field}</span>"
-            f"    <span class='card-value'>{{{item}.{field}}}}</span>"
+            f"    <span class='card-value'>{{{{item.{field}}}}}</span>"
             f"  </div>"
             for field in fields[:5]  # Limit to 5 fields
         ])

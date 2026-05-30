@@ -24,6 +24,14 @@ AVAILABLE_VOICES = [
 
 URGENCY_LEVELS = ["critical", "high", "normal", "low"]
 
+# Urgency priorities for narration (lower = higher priority)
+URGENCY_PRIORITY = {
+    "critical": 0,
+    "high": 1,
+    "normal": 2,
+    "low": 3,
+}
+
 
 class VoiceSession:
     """
@@ -75,6 +83,8 @@ class VoiceSession:
         # Narration state
         self.last_narration_time = 0.0
         self.narration_batch_window = 5.0  # Seconds to batch normal/low results
+        self._is_speaking = False  # Track if assistant is currently speaking
+        self._user_last_spoke = 0.0  # Track when user last spoke
 
     def register_tool(
         self,
@@ -180,6 +190,115 @@ class VoiceSession:
         self.pending_results.clear()
         return results
 
+    def _should_narrate_now(self, result: dict[str, Any]) -> bool:
+        """
+        Determine if a result should be narrated now based on urgency and state.
+
+        Rules:
+        - Critical: Always interrupt immediately
+        - High: Wait for natural pause (not mid-sentence)
+        - Normal: Batch within ~5s window or at topic transition
+        - Low: Only if conversation is idle
+        """
+        urgency = result.get("urgency", "normal")
+        now = time.time()
+
+        if urgency == "critical":
+            return True  # Always interrupt
+
+        if urgency == "high":
+            # Wait for pause in assistant speaking
+            return not self._is_speaking
+
+        if urgency == "normal":
+            # Batch within window or at topic transition
+            time_since_last = now - self.last_narration_time
+            return time_since_last >= self.narration_batch_window
+
+        if urgency == "low":
+            # Only if idle (no user or assistant activity recently)
+            idle_time = min(
+                now - self._user_last_spoke,
+                now - self.last_narration_time
+            )
+            return idle_time >= 10.0  # 10 seconds of idle
+
+        return False
+
+    async def _collect_results_to_narrate(self) -> list[dict[str, Any]]:
+        """
+        Collect results from the queue that should be narrated now.
+
+        Returns results grouped by urgency, respecting batching rules.
+        """
+        to_narrate = []
+        now = time.time()
+
+        # Drain the queue (non-blocking)
+        while not self.result_queue.empty():
+            try:
+                result = self.result_queue.get_nowait()
+                to_narrate.append(result)
+            except asyncio.QueueEmpty:
+                break
+
+        if not to_narrate:
+            return []
+
+        # Sort by urgency priority (critical first)
+        to_narrate.sort(key=lambda r: URGENCY_PRIORITY.get(r.get("urgency", "normal"), 99))
+
+        # Filter based on what should be narrated now
+        ready = [r for r in to_narrate if self._should_narrate_now(r)]
+
+        # For batching: group normal/low results together
+        if ready:
+            self.last_narration_time = now
+
+        return ready
+
+    async def _send_narration_event(self, results: list[dict[str, Any]]) -> None:
+        """
+        Send a narration event to the client.
+
+        Results are batched by topic for efficient narration.
+        """
+        if not results:
+            return
+
+        # Group by topic_id
+        by_topic: dict[str, list[dict]] = {}
+        for result in results:
+            topic_id = result.get("topic_id", "general")
+            if topic_id not in by_topic:
+                by_topic[topic_id] = []
+            by_topic[topic_id].append(result)
+
+        # Send batched event
+        await self.websocket.send_json({
+            "type": "adc.narrate_results",
+            "results": [
+                {
+                    "intent_id": r.get("intent_id"),
+                    "topic_id": r.get("topic_id"),
+                    "summary": r.get("summary"),
+                    "urgency": r.get("urgency"),
+                }
+                for r in results
+            ],
+            "grouped_by_topic": {
+                topic_id: [r.get("summary") for r in topic_results]
+                for topic_id, topic_results in by_topic.items()
+            },
+        })
+
+        self.logger.info(json.dumps({
+            "event": "narration.sent",
+            "count": len(results),
+            "urgencies": [r.get("urgency") for r in results],
+            "ts": time.time(),
+        }))
+
     async def run(self) -> None:
         """Main session loop."""
         try:
@@ -201,26 +320,46 @@ class VoiceSession:
 
         try:
             while True:
-                data = await self.websocket.receive_json()
-                msg_type = data.get("type", "")
+                # Wait for websocket messages with timeout to check results
+                try:
+                    data = await asyncio.wait_for(
+                        self.websocket.receive_json(),
+                        timeout=0.5  # Check results every 500ms
+                    )
+                    msg_type = data.get("type", "")
 
-                if msg_type == "response.function_call_arguments.done":
-                    await self._handle_tool_call(data)
-                elif msg_type == "adc.annotation":
-                    annotation = data.get("annotation", {})
-                    self.logger.info(f"Annotation: {annotation}")
-                elif msg_type == "adc.turn_done":
-                    if self.on_turn_done:
-                        user_text = data.get("user_text", "")
-                        assistant_text = data.get("assistant_text", "")
-                        asyncio.create_task(
-                            self.on_turn_done(user_text, assistant_text)
-                        )
-                elif msg_type == "adc.surface_switch":
-                    # User switching from audio to canvas
-                    surface_type = data.get("surface", "canvas")
-                    if self.on_surface_switch:
-                        await self.on_surface_switch(surface_type)
+                    if msg_type == "response.function_call_arguments.done":
+                        await self._handle_tool_call(data)
+                    elif msg_type == "adc.annotation":
+                        annotation = data.get("annotation", {})
+                        self.logger.info(f"Annotation: {annotation}")
+                    elif msg_type == "adc.turn_done":
+                        if self.on_turn_done:
+                            user_text = data.get("user_text", "")
+                            assistant_text = data.get("assistant_text", "")
+                            asyncio.create_task(
+                                self.on_turn_done(user_text, assistant_text)
+                            )
+                        # Update user activity tracking
+                        self._user_last_spoke = time.time()
+                    elif msg_type == "adc.surface_switch":
+                        # User switching from audio to canvas
+                        surface_type = data.get("surface", "canvas")
+                        if self.on_surface_switch:
+                            await self.on_surface_switch(surface_type)
+                    elif msg_type == "adc.speaking_started":
+                        self._is_speaking = True
+                    elif msg_type == "adc.speaking_stopped":
+                        self._is_speaking = False
+
+                except asyncio.TimeoutError:
+                    # Timeout is expected - check for results to narrate
+                    pass
+
+                # Check for results to narrate
+                results_to_narrate = await self._collect_results_to_narrate()
+                if results_to_narrate:
+                    await self._send_narration_event(results_to_narrate)
 
         except WebSocketDisconnect:
             pass
