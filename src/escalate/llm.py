@@ -181,6 +181,9 @@ class ZAIClient:
             if e.response.status_code == 429:
                 raise LLMRateLimitError("Rate limited by ZAI proxy") from e
             raise LLMError(f"LLM request failed: {e.response.status_code}") from e
+        except (LLMTimeoutError, LLMRateLimitError, LLMError):
+            # Re-raise our own exceptions without wrapping
+            raise
         except Exception as e:
             raise LLMError(f"LLM request failed: {e}") from e
 

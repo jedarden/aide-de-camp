@@ -30,7 +30,10 @@ logger = getLogger(__name__)
 # Project workspace for beads (where br CLI operates)
 BEADS_WORKSPACE = Path.home() / ".beads"
 
-# Escalate prompt template
+# Escalate prompt path
+ESCALATE_PROMPT_PATH = Path("/home/coding/aide-de-camp/prompts/escalate/task-profile.md")
+
+# Default escalate system prompt (fallback if prompt file not found)
 ESCALATE_SYSTEM_PROMPT = """You are ADC's escalate handler. Your job is to formulate a clear, actionable NEEDLE bead body from a user's intent.
 
 A NEEDLE bead is a task work item with:
@@ -45,6 +48,19 @@ Given the user's intent and any available context, produce a bead body that:
 4. Structures the work for Claude Code execution
 
 Output ONLY the bead body as markdown. Do not include explanations or meta-commentary."""
+
+
+def load_escalate_prompt() -> str:
+    """Load the escalate prompt from the prompts directory."""
+    try:
+        with open(ESCALATE_PROMPT_PATH, "r") as f:
+            content = f.read()
+            # Extract the system prompt section (between "System Prompt:" and "Input Context:")
+            # For now, just use the whole file - the LLM can handle the structure
+            return ESCALATE_SYSTEM_PROMPT  # Use default for now
+    except FileNotFoundError:
+        logger.warning(f"Escalate prompt not found at {ESCALATE_PROMPT_PATH}, using default")
+        return ESCALATE_SYSTEM_PROMPT
 
 
 @dataclass
@@ -137,6 +153,7 @@ class EscalateHandler:
         Takes the intent and context, produces a well-structured bead body.
         """
         client = await self._get_zai_client()
+        system_prompt = load_escalate_prompt()
 
         # Build context for the LLM
         context_parts = [
@@ -170,7 +187,7 @@ class EscalateHandler:
         # Make LLM call
         try:
             bead_body = await client.call_simple(
-                system_prompt=ESCALATE_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
                 max_tokens=4096,
@@ -282,6 +299,14 @@ class EscalateHandler:
         for word in output.split():
             if "-" in word and 3 < len(word) < 20:
                 return word
+
+        # Last resort: try to find a pattern like abc-123 anywhere in output
+        import re
+        # Pattern for bead ID: letters-numbers format like abc-123 (not letters-letters)
+        # This avoids matching words like "def-in" or "some-output"
+        matches = re.findall(r'\b[a-z]{2,4}-[0-9]{2,6}\b', output, re.IGNORECASE)
+        if matches:
+            return min(matches, key=len)
 
         # Last resort: generate a UUID
         logger.warning(f"Could not extract bead ID from br output: {output}")
