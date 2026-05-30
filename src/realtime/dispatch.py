@@ -38,6 +38,7 @@ async def dispatch_intent(
     Phase 3 enhancements:
     - Detects follow-up questions via conversation tracker
     - Triggers prefetch for likely follow-up patterns
+    - Uses pre-fetched data when available
     - Tracks implicit feedback signals
     """
     logger.info(f"Dispatching utterance for session {session_id}: {utterance[:100]}...")
@@ -52,20 +53,36 @@ async def dispatch_intent(
         session_id, utterance, detected_topics
     )
 
+    # Check for pre-fetched data if this is a follow-up
+    prefetch_data = None
+    if is_follow_up and suggested_topic_id:
+        # Check if we have pre-fetched data for likely patterns
+        prefetch_data = prefetcher.get_all_prefetch_data(suggested_topic_id)
+        if prefetch_data:
+            logger.info(f"Found pre-fetched data for topic {suggested_topic_id}: {list(prefetch_data.keys())}")
+
     # Store utterance
     store = get_store()
     utterance_id = await store.create_utterance(session_id, utterance)
 
     # Call router (this will spawn fetch+synthesize workers)
     try:
+        router_request = {
+            "utterance": utterance,
+            "utterance_id": utterance_id,
+            "session_id": session_id,
+        }
+
+        # Include pre-fetched data if available (Phase 3)
+        if prefetch_data:
+            router_request["prefetch_data"] = prefetch_data
+            router_request["is_follow_up"] = is_follow_up
+            router_request["topic_id"] = suggested_topic_id
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 ROUTER_API_URL,
-                json={
-                    "utterance": utterance,
-                    "utterance_id": utterance_id,
-                    "session_id": session_id,
-                },
+                json=router_request,
             )
             resp.raise_for_status()
             router_result = resp.json()

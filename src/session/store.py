@@ -638,7 +638,7 @@ class SessionStore:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """INSERT INTO feedback_signals
-                   (id, signal_type, session_id, result_id, topic_id, timestamp, data, surface_type)
+                   (signal_id, signal_type, session_id, result_id, topic_id, timestamp, data, surface_type)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     signal_id, signal_type, session_id, result_id,
@@ -721,6 +721,72 @@ class SessionStore:
                 "signal_counts": type_counts,
                 "avg_ack_delay_seconds": avg_ack_delay,
             }
+
+    async def create_result_with_diff(
+        self,
+        intent_id: str,
+        topic_id: str,
+        session_id: str,
+        summary: str,
+        data: dict,
+        urgency: str = "normal",
+    ) -> tuple[str, bool]:
+        """
+        Create a new result with automatic diff computation.
+
+        Returns (result_id, has_diff).
+
+        Convenience method that automatically computes the diff against
+        the previous result for the same topic (if one exists).
+        """
+        from ..diff.engine import get_diff_engine
+
+        # Get previous result for this topic
+        previous_result = await self.get_latest_result_for_topic(topic_id)
+
+        # Compute diff if we have a previous result
+        diff_summary = None
+        diff_data = None
+        has_diff = False
+
+        if previous_result:
+            diff_engine = get_diff_engine()
+            diff_result = await diff_engine.compute_diff(
+                topic_id=topic_id,
+                previous_result=previous_result,
+                current_result={"data": data},
+            )
+
+            if diff_result.has_changes:
+                has_diff = True
+                diff_summary = diff_result.change_summary
+                diff_data = {
+                    "fields": [
+                        {
+                            "field_name": f.field_name,
+                            "old_value": f.old_value,
+                            "new_value": f.new_value,
+                            "change_type": f.change_type,
+                        }
+                        for f in diff_result.fields
+                    ],
+                    "summary": diff_result.summary,
+                }
+
+        # Create the result with diff data
+        result_id = await self.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary=summary,
+            data=data,
+            urgency=urgency,
+            previous_result_id=previous_result["id"] if previous_result else None,
+            diff_summary=diff_summary,
+            diff_data=diff_data,
+        )
+
+        return result_id, has_diff
 
 
 # Global session store instance

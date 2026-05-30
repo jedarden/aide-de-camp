@@ -3,6 +3,9 @@ Fetch command executor.
 
 Executes fetch commands (kubectl, git, argocd, etc.) for ambient monitoring
 and context warming.
+
+This module provides backward compatibility with the new fetch strand.
+For new code, use src/fetch/strand.py directly.
 """
 
 import asyncio
