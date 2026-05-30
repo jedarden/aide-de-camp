@@ -55,9 +55,11 @@ def load_escalate_prompt() -> str:
     try:
         with open(ESCALATE_PROMPT_PATH, "r") as f:
             content = f.read()
-            # Extract the system prompt section (between "System Prompt:" and "Input Context:")
-            # For now, just use the whole file - the LLM can handle the structure
-            return ESCALATE_SYSTEM_PROMPT  # Use default for now
+            if content.strip():
+                return content
+            else:
+                logger.warning(f"Escalate prompt file is empty: {ESCALATE_PROMPT_PATH}, using default")
+                return ESCALATE_SYSTEM_PROMPT
     except FileNotFoundError:
         logger.warning(f"Escalate prompt not found at {ESCALATE_PROMPT_PATH}, using default")
         return ESCALATE_SYSTEM_PROMPT
@@ -231,22 +233,30 @@ class EscalateHandler:
 
         # Build br create command
         # Using br CLI to create the bead
+        # Note: br uses --description for the main body content
         try:
-            proc = await asyncio.create_subprocess_exec(
+            # Build command with description (escape bead body for shell)
+            cmd = [
                 "br",
                 "create",
                 "--title", title,
                 "--type", "task",  # task-profile intents create task beads
-                "--metadata", json.dumps(metadata),
-                stdin=asyncio.subprocess.PIPE,
+                "--description", bead_body,
+            ]
+
+            # Add labels for metadata tracking
+            # Labels are simple strings, we'll encode key=value for structured data
+            for key, value in metadata.items():
+                if value is not None:
+                    cmd.extend(["--label", f"{key}={value}"])
+
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            # Send bead body via stdin
-            stdout, stderr = await proc.communicate(
-                input=bead_body.encode("utf-8")
-            )
+            stdout, stderr = await proc.communicate()
 
             if proc.returncode != 0:
                 error_msg = stderr.decode("utf-8", errors="replace")
@@ -283,34 +293,23 @@ class EscalateHandler:
         return title
 
     def _extract_bead_id(self, output: str) -> str:
-        """Extract bead ID from br create output."""
-        # br output format: "Created bead abc-123"
-        # or just the bead ID
-        lines = output.strip().split("\n")
-        for line in lines:
-            if "Created bead" in line or "bead" in line.lower():
-                # Try to extract ID (format: abc-123)
-                parts = line.split()
-                for part in parts:
-                    if "-" in part and len(part) > 5:
-                        return part
+        """Extract bead ID from br create output.
 
-        # Fallback: return first word that looks like a bead ID
-        for word in output.split():
-            if "-" in word and 3 < len(word) < 20:
-                return word
+        br create outputs just the bead ID (e.g., "abc-123").
+        """
+        # br output format: just the bead ID (e.g., "adc-2fs")
+        bead_id = output.strip()
 
-        # Last resort: try to find a pattern like abc-123 anywhere in output
-        import re
-        # Pattern for bead ID: letters-numbers format like abc-123 (not letters-letters)
-        # This avoids matching words like "def-in" or "some-output"
-        matches = re.findall(r'\b[a-z]{2,4}-[0-9]{2,6}\b', output, re.IGNORECASE)
-        if matches:
-            return min(matches, key=len)
+        if not bead_id:
+            logger.warning(f"Empty br create output")
+            return str(uuid.uuid4())
 
-        # Last resort: generate a UUID
-        logger.warning(f"Could not extract bead ID from br output: {output}")
-        return str(uuid.uuid4())
+        # Basic validation: should contain a dash and be reasonable length
+        if "-" not in bead_id or len(bead_id) < 3:
+            logger.warning(f"Unexpected br create output format: {output}")
+            # Still return it - br might have changed format
+
+        return bead_id
 
     def build_pending_card(
         self,

@@ -9,6 +9,22 @@ For intents that need to be tracked as beads:
 The bead watcher bridges bead closure to result delivery.
 """
 
-from .handler import escalate_intent, get_escalate_handler
+from .handler import (
+    escalate_intent,
+    get_escalate_handler,
+    EscalateRequest,
+    EscalateResult,
+    EscalateHandler,
+    EscalateError,
+    BeadCreationError,
+)
 
-__all__ = ["escalate_intent", "get_escalate_handler"]
+__all__ = [
+    "escalate_intent",
+    "get_escalate_handler",
+    "EscalateRequest",
+    "EscalateResult",
+    "EscalateHandler",
+    "EscalateError",
+    "BeadCreationError",
+]

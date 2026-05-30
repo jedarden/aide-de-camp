@@ -40,6 +40,8 @@ from .components.hot_reload import get_reload_manager
 from .monitoring.ambient import get_ambient_monitor
 from .context.warmer import get_context_warmer
 from .feedback.background_analysis import get_background_processor
+from .intent.router import get_router as get_intent_router
+from .escalate import escalate_intent, EscalateRequest
 
 
 logger = getLogger(__name__)
@@ -326,10 +328,11 @@ async def voice_session(websocket: WebSocket):
 @app.post("/router")
 async def route_intent(request: dict):
     """
-    Intent router endpoint (placeholder for Phase 1).
+    Intent router endpoint.
 
-    For now, returns a simple routing result.
-    In full implementation, this calls the intent router LLM.
+    Classifies utterances into intent types and routes to appropriate strands.
+    Task-profile intents are escalated to NEEDLE beads.
+    Other intents are routed to fetch + synthesize strands (TODO).
     """
     utterance = request.get("utterance", "")
     utterance_id = request.get("utterance_id")
@@ -337,44 +340,116 @@ async def route_intent(request: dict):
 
     logger.info(f"Routing utterance: {utterance[:100]}...")
 
-    # Placeholder: return a simple intent
-    # Full implementation will call LLM-based router
     store = await get_store()
+    router = get_intent_router(store)
 
-    # Create a placeholder intent
-    intent_id = await store.create_intent(
-        utterance_id=utterance_id or str(uuid.uuid4()),
+    # Generate utterance ID if not provided
+    if not utterance_id:
+        utterance_id = str(uuid.uuid4())
+
+    # Create utterance record
+    await store.create_utterance(session_id, utterance, utterance_id)
+
+    # Route the utterance
+    try:
+        routed_intents = await router.route_utterance(
+            utterance=utterance,
+            utterance_id=utterance_id,
+            session_id=session_id,
+        )
+
+        # Process each routed intent
+        intent_results = []
+        for routed_intent in routed_intents:
+            # Create intent record in store
+            classification = routed_intent.classification
+            await store.create_intent(
+                utterance_id=utterance_id,
+                session_id=session_id,
+                project_slug=classification.project_slug,
+                intent_type=classification.intent_type.value,
+            )
+
+            # Process the intent (escalate or fetch+synthesize)
+            result = await router.process_intent(routed_intent)
+            intent_results.append(result)
+
+        return {
+            "utterance_id": utterance_id,
+            "intents": intent_results,
+        }
+
+    except Exception as e:
+        logger.error(f"Router error: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Router error: {str(e)}"}
+        )
+
+
+@app.post("/escalate")
+async def escalate_endpoint(request: dict):
+    """
+    Escalate an intent to a NEEDLE bead for durable async handling.
+
+    For task-profile intents that require tracking and async execution:
+    - Formulates bead body via LLM
+    - Creates bead via br CLI
+    - Returns pending-card spec
+    """
+    utterance = request.get("utterance", "")
+    utterance_id = request.get("utterance_id")
+    session_id = request.get("session_id")
+    intent_type = request.get("intent_type", "task-profile")
+    project_slug = request.get("project_slug")
+    topic_id = request.get("topic_id")
+    metadata = request.get("metadata", {})
+    context = request.get("context", {})
+
+    logger.info(f"Escalating intent for session {session_id}: {utterance[:100]}...")
+
+    # Create escalate request
+    escalate_request = EscalateRequest(
+        intent_id=str(uuid.uuid4()),
         session_id=session_id,
-        project_slug=None,
-        intent_type="lookup",  # Placeholder
+        utterance=utterance,
+        intent_type=intent_type,
+        project_slug=project_slug,
+        topic_id=topic_id,
+        context=context,
+        metadata=metadata,
     )
 
-    # For now, create a placeholder result immediately
-    # In full implementation, results arrive from fetch+synthesize
-    result_id = await store.create_result(
-        intent_id=intent_id,
-        topic_id=None,
-        session_id=session_id,
-        summary="This is a placeholder result. The full router will be implemented in Phase 1.",
-        data={"status": "placeholder", "utterance": utterance},
-        urgency="normal"
-    )
+    # Store the intent
+    store = await get_store()
+    if utterance_id:
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug=project_slug,
+            intent_type=intent_type,
+        )
+        escalate_request.intent_id = intent_id
 
-    return {
-        "intents": [
-            {
-                "id": intent_id,
-                "intent_type": "lookup",
-                "status": "resolved"
-            }
-        ],
-        "results": [
-            {
-                "id": result_id,
-                "summary": "Placeholder result"
-            }
-        ]
-    }
+    try:
+        # Escalate to bead
+        result = await escalate_intent(escalate_request)
+
+        logger.info(f"Escalated intent {escalate_request.intent_id} to bead {result.bead_id}")
+
+        return {
+            "intent_id": result.intent_id,
+            "bead_id": result.bead_id,
+            "status": result.status,
+            "pending_card": result.pending_card,
+        }
+
+    except Exception as e:
+        logger.error(f"Escalate failed: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Escalate failed: {str(e)}"}
+        )
 
 
 @app.get("/events")
