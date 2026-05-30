@@ -340,7 +340,7 @@ async def test_escalate_handler_full_flow():
 
     handler.store = mock_store
 
-    with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+    with patch("src.escalate.handler.asyncio.create_subprocess_exec", return_value=mock_proc):
         result = await handler.escalate_intent(sample_request)
 
     assert result.bead_id == "test-bead-456"
@@ -452,7 +452,7 @@ async def test_escalate_bead_creation_failure():
     mock_proc.returncode = 1
     mock_proc.communicate.return_value = (b"", b"br: error: bead creation failed")
 
-    with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+    with patch("src.escalate.handler.asyncio.create_subprocess_exec", return_value=mock_proc):
         try:
             await handler.create_bead(sample_request, "Test bead body")
             print("  ❌ Should have raised BeadCreationError")

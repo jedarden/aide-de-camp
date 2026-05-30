@@ -296,20 +296,49 @@ class EscalateHandler:
         """Extract bead ID from br create output.
 
         br create outputs just the bead ID (e.g., "abc-123").
+        May include prefix text like "Created bead abc-123" in some versions.
         """
-        # br output format: just the bead ID (e.g., "adc-2fs")
-        bead_id = output.strip()
+        import re
 
-        if not bead_id:
+        # Strip whitespace first
+        output = output.strip()
+
+        if not output:
             logger.warning(f"Empty br create output")
             return str(uuid.uuid4())
 
-        # Basic validation: should contain a dash and be reasonable length
-        if "-" not in bead_id or len(bead_id) < 3:
-            logger.warning(f"Unexpected br create output format: {output}")
-            # Still return it - br might have changed format
+        # Try to extract bead ID pattern: lowercase letters, dash, alphanumeric
+        # Bead IDs typically include numbers like: abc-123, xyz-789, adc-2fs
+        # We prioritize matches with digits over letter-only matches
+        patterns = [
+            r"[a-z]+-[a-z]+-[a-z0-9]*[0-9]+[a-z0-9]*",  # Three components with digit: test-bead-456
+            r"[a-z]+-[a-z0-9]*[0-9]+[a-z0-9]*",          # Two components with digit: abc-123
+            r"[a-z]+-[a-z]+-[a-z0-9]+",                  # Three components letter-only: test-bead-xyz
+            r"[a-z]{3,}-[a-z0-9]{2,}",                   # Fallback: any 3+ char prefix, dash, 2+ char suffix
+        ]
 
-        return bead_id
+        for pattern in patterns:
+            matches = re.findall(pattern, output)
+            if matches:
+                # Return the longest match (prefer more specific patterns)
+                bead_id = max(matches, key=len)
+                logger.debug(f"Extracted bead ID '{bead_id}' from output")
+                return bead_id
+
+        if match:
+            bead_id = match.group(0)
+            logger.debug(f"Extracted bead ID '{bead_id}' from output")
+            return bead_id
+
+        # Fallback: if output already looks like a bead ID, return as-is
+        # Basic validation: should contain a dash and be reasonable length
+        if "-" in output and len(output) >= 3:
+            logger.warning(f"Using output as bead ID despite non-standard format: {output}")
+            return output
+
+        # Last resort: return the whole output (br might have changed format)
+        logger.warning(f"Unexpected br create output format: {output}")
+        return output
 
     def build_pending_card(
         self,
