@@ -20,7 +20,6 @@ from .commands import (
     FetchRequest,
     FetchResult,
     FetchSource,
-    FetchType,
     IntentType,
     get_fetch_commands,
     get_required_sources,
@@ -411,10 +410,12 @@ class FetchStrand:
             return {"error": "No valid repo path specified"}
 
         try:
+            # Fetch commits with author and date
             proc = await asyncio.create_subprocess_exec(
                 "git",
                 "-C", repo_path,
-                "log", "-10", "--oneline",
+                "log", "-10",
+                "--pretty=format:%h|%s|%an|%ar",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -427,15 +428,29 @@ class FetchStrand:
             commits = []
             for line in stdout.decode().strip().split("\n"):
                 if line:
-                    parts = line.split(" ", 1)
-                    if len(parts) == 2:
+                    parts = line.split("|", 3)
+                    if len(parts) == 4:
                         commits.append({
                             "hash": parts[0],
                             "message": parts[1],
+                            "author": parts[2],
+                            "date": parts[3],
                         })
+
+            # Get current branch
+            branch_proc = await asyncio.create_subprocess_exec(
+                "git",
+                "-C", repo_path,
+                "branch", "--show-current",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            branch_stdout, _ = await branch_proc.communicate()
+            branch = branch_stdout.decode().strip()
 
             return {
                 "repo": repo_path,
+                "branch": branch,
                 "commits": commits,
                 "count": len(commits),
             }
@@ -450,6 +465,7 @@ class FetchStrand:
             return {"error": "No valid repo path specified"}
 
         try:
+            # Get status output
             proc = await asyncio.create_subprocess_exec(
                 "git",
                 "-C", repo_path,
@@ -463,15 +479,46 @@ class FetchStrand:
             if proc.returncode != 0:
                 return {"error": stderr.decode()}
 
+            # Parse status output - format: XY filename
             changed_files = []
             for line in stdout.decode().strip().split("\n"):
-                if line:
-                    changed_files.append(line)
+                if line and len(line) >= 3:
+                    status_code = line[:2]
+                    filename = line[3:]
+                    changed_files.append({
+                        "status": status_code,
+                        "file": filename,
+                    })
+
+            # Get current branch
+            branch_proc = await asyncio.create_subprocess_exec(
+                "git",
+                "-C", repo_path,
+                "branch", "--show-current",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            branch_stdout, _ = await branch_proc.communicate()
+            branch = branch_stdout.decode().strip()
+
+            # Get last commit
+            log_proc = await asyncio.create_subprocess_exec(
+                "git",
+                "-C", repo_path,
+                "log", "-1", "--oneline",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            log_stdout, _ = await log_proc.communicate()
+            last_commit = log_stdout.decode().strip()
 
             return {
                 "repo": repo_path,
+                "branch": branch,
+                "last_commit": last_commit,
                 "changed_files": changed_files,
                 "count": len(changed_files),
+                "has_changes": len(changed_files) > 0,
             }
 
         except Exception as e:

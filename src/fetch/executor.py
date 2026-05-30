@@ -75,6 +75,15 @@ class FetchExecutor:
             "ord-devimprint": "http://kubectl-proxy-ord-devimprint:8001",
             "iad-kalshi": "http://kubectl-proxy-iad-kalshi:8001",
             "iad-options": "http://traefik-iad-options:8001",
+            "iad-ci": "http://traefik-iad-ci:8001",
+        }
+
+        # Project to repo path mapping
+        self._project_repos = {
+            "options-pipeline": "/home/coding/options-pipeline",
+            "ibkr-mcp": "/home/coding/ibkr-mcp",
+            "aide-de-camp": "/home/coding/aide-de-camp",
+            # Add more mappings as needed
         }
 
         # Project to cluster mapping (simplified)
@@ -302,15 +311,66 @@ class FetchExecutor:
 
     async def _fetch_git_log(self, project_slug: str) -> dict:
         """Fetch git log for a project."""
-        # This would query git for the project
-        # For now, return placeholder
-        return {
-            "project": project_slug,
-            "commit_count": 0,
-            "latest_commit": None,
-            "latest_author": None,
-            "error": "Not implemented",
-        }
+        # Get repo path from project mapping
+        repo_path = self._project_repos.get(project_slug)
+        if not repo_path:
+            return {"error": f"No repo path for project: {project_slug}"}
+
+        if not os.path.exists(repo_path):
+            return {"error": f"Repo path does not exist: {repo_path}"}
+
+        try:
+            # Run git log with author and date
+            proc = await asyncio.create_subprocess_exec(
+                "git",
+                "-C", repo_path,
+                "log", "-10",
+                "--pretty=format:%h|%s|%an|%ar",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await proc.communicate()
+
+            if proc.returncode != 0:
+                return {"error": stderr.decode().strip()}
+
+            # Parse commits
+            commits = []
+            for line in stdout.decode().strip().split("\n"):
+                if line:
+                    parts = line.split("|", 3)
+                    if len(parts) == 4:
+                        commits.append({
+                            "hash": parts[0],
+                            "message": parts[1],
+                            "author": parts[2],
+                            "date": parts[3],
+                        })
+
+            # Get current branch
+            branch_proc = await asyncio.create_subprocess_exec(
+                "git",
+                "-C", repo_path,
+                "branch", "--show-current",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            branch_stdout, _ = await branch_proc.communicate()
+            branch = branch_stdout.decode().strip()
+
+            return {
+                "project": project_slug,
+                "repo": repo_path,
+                "branch": branch,
+                "commits": commits,
+                "commit_count": len(commits),
+            }
+
+        except FileNotFoundError:
+            return {"error": "git command not found"}
+        except Exception as e:
+            return {"error": str(e)}
 
     async def _fetch_bead_list(self, project_slug: str) -> dict:
         """Fetch bead list for a project."""
