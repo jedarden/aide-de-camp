@@ -19,6 +19,7 @@ class IntentType(Enum):
     REMINDER = "reminder"
     SELF_MODIFICATION = "self-modification"
     MONITORING_CONFIG = "monitoring-config"
+    TASK_PROFILE = "task-profile"  # Escalate to NEEDLE bead for durable async handling
 
 
 class FetchSource(Enum):
