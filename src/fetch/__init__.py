@@ -20,6 +20,7 @@ from .commands import (
     get_fetch_commands,
     get_required_sources,
 )
+from .orchestrator import FetchOrchestrator, execute_fetch, get_orchestrator
 
 # Re-export for backward compatibility
 from .executor import FetchExecutor, FetchCommand, get_fetch_executor
@@ -37,6 +38,10 @@ __all__ = [
     "SourceResult",
     "get_fetch_commands",
     "get_required_sources",
+    # Orchestrator API
+    "FetchOrchestrator",
+    "execute_fetch",
+    "get_orchestrator",
     # Legacy executor API
     "FetchExecutor",
     "FetchCommand",
