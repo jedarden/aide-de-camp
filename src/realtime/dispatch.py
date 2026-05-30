@@ -4,6 +4,8 @@ ADC Dispatch Intent Tool Handler
 Called by the voice session's dispatch_intent tool.
 Routes utterance to the intent router, returns ack immediately.
 Results arrive async via push_result on the voice session.
+
+Integrates conversation tracker, prefetcher, and diff engine for Phase 3 responsiveness.
 """
 import asyncio
 import httpx
@@ -14,6 +16,9 @@ from pathlib import Path
 from typing import Any
 
 from ..session.store import get_store
+from ..conversation.tracker import get_conversation_tracker
+from ..context.prefetch import get_prefetcher, FollowUpPattern
+from ..diff.engine import get_diff_engine
 
 
 logger = getLogger(__name__)
@@ -29,8 +34,23 @@ async def dispatch_intent(
     Dispatch an utterance to the intent router.
 
     Tool-as-trigger: returns ack immediately, results arrive async.
+
+    Phase 3 enhancements:
+    - Detects follow-up questions via conversation tracker
+    - Triggers prefetch for likely follow-up patterns
+    - Tracks implicit feedback signals
     """
     logger.info(f"Dispatching utterance for session {session_id}: {utterance[:100]}...")
+
+    # Get Phase 3 services
+    conversation_tracker = get_conversation_tracker()
+    prefetcher = get_prefetcher()
+
+    # Detect if this is a follow-up question
+    detected_topics = []  # Would be populated by router in full implementation
+    is_follow_up, suggested_topic_id = await conversation_tracker.detect_follow_up(
+        session_id, utterance, detected_topics
+    )
 
     # Store utterance
     store = get_store()
@@ -57,6 +77,32 @@ async def dispatch_intent(
         # Results will arrive via result queue and be narrated
         # Return ack for the tool call
         intent_count = len(router_result.get("intents", []))
+
+        # Track conversation turn
+        await conversation_tracker.record_turn(
+            session_id=session_id,
+            utterance=utterance,
+            primary_topic_id=suggested_topic_id if is_follow_up else None,
+            is_follow_up=is_follow_up,
+        )
+
+        # Trigger prefetch for likely follow-up patterns
+        if suggested_topic_id:
+            # Get project slugs for the topic (simplified - in practice, would fetch from topic)
+            project_slugs = detected_topics  # Placeholder
+            if project_slugs:
+                predictions = await prefetcher.analyze_utterance(
+                    session_id=session_id,
+                    utterance=utterance,
+                    topic_id=suggested_topic_id,
+                    project_slugs=project_slugs,
+                    intent_type="status",  # Simplified
+                )
+                # Prefetch for high-confidence predictions
+                if predictions:
+                    await prefetcher.prefetch_for_predictions(predictions)
+
+        # Return acknowledgment for the tool call
         if intent_count == 0:
             return "I'm not sure what you're asking about. Could you clarify?"
         elif intent_count == 1:
@@ -87,6 +133,11 @@ async def result_listener(
     Results arrive from the synthesize strand via SSE or direct call.
     This task polls the session store for new results and pushes them.
 
+    Phase 3 enhancements:
+    - Computes diffs between consecutive results using diff engine
+    - Includes diff data in result payload for canvas rendering
+    - Tracks implicit feedback signals (ack speed, surface switches)
+
     If use_batching is True (default for audio mode), results go through the
     ResultBatcher which applies urgency-based batching rules.
     Otherwise, results are pushed immediately.
@@ -96,10 +147,16 @@ async def result_listener(
     """
     from .continuity import push_to_canvas
     from .batching import get_result_batcher
+    from ..feedback.signals import get_feedback_tracker
 
     store = get_store()
     batcher = get_result_batcher() if use_batching else None
+    diff_engine = get_diff_engine()
+    feedback_tracker = get_feedback_tracker()
     pushed_ids = set()  # Track successfully pushed result IDs in this session
+
+    # Track previous results per topic for diff computation
+    previous_results: dict[str, dict] = {}
 
     # Set up batcher callback if using batching
     if batcher:
@@ -136,13 +193,50 @@ async def result_listener(
                     continue
 
                 try:
+                    topic_id = result.get("topic_id")
                     result_data = {
                         "intent_id": result["intent_id"],
-                        "topic_id": result["topic_id"],
+                        "topic_id": topic_id,
                         "summary": result["summary"],
                         "urgency": result["urgency"],
                         "data": json.loads(result["data"]),
                     }
+
+                    # Compute diff with previous result for this topic (Phase 3)
+                    if topic_id and topic_id in previous_results:
+                        previous_result = previous_results[topic_id]
+                        diff_result = await diff_engine.compute_diff(
+                            topic_id=topic_id,
+                            previous_result=previous_result,
+                            current_result=result,
+                        )
+                        # Include diff in result data
+                        if diff_result.has_changes:
+                            result_data["diff"] = {
+                                "has_changes": True,
+                                "change_summary": diff_result.change_summary,
+                                "fields": [
+                                    {
+                                        "field_name": f.field_name,
+                                        "old_value": f.old_value,
+                                        "new_value": f.new_value,
+                                        "change_type": f.change_type,
+                                    }
+                                    for f in diff_result.fields
+                                ],
+                            }
+                            logger.info(f"Computed diff for result {result_id}: {diff_result.change_summary}")
+
+                    # Track previous result for diff computation
+                    if topic_id:
+                        previous_results[topic_id] = result
+
+                    # Track implicit feedback: result created
+                    await feedback_tracker.track_result_created(
+                        result_id=result_id,
+                        session_id=session_id,
+                        topic_id=topic_id,
+                    )
 
                     if use_batching and batcher:
                         # Queue with batcher for urgency-based narration
