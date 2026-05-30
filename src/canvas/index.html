@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADC (aide-de-camp) - Canvas</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1419;
+            color: #e2e8f0;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+        }
+
+        .status-dot.connecting {
+            background: #f59e0b;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .workload-summary {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .workload-summary.show {
+            display: block;
+        }
+
+        .workload-summary strong {
+            color: #f8fafc;
+        }
+
+        /* Topic cards grid */
+        .topics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 16px;
+        }
+
+        /* Topic card */
+        .topic-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .topic-card:hover {
+            border-color: #475569;
+        }
+
+        .topic-card.stale {
+            border-color: #f59e0b;
+        }
+
+        .topic-card.very-stale {
+            border-color: #ef4444;
+            opacity: 0.8;
+        }
+
+        .topic-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .topic-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        .topic-type {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #334155;
+            color: #94a3b8;
+        }
+
+        .topic-type.project {
+            background: #1e3a5f;
+            color: #60a5fa;
+        }
+
+        .topic-type.exception {
+            background: #3f1f1f;
+            color: #f87171;
+        }
+
+        .staleness-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 8px;
+        }
+
+        .staleness-indicator.stale {
+            color: #f59e0b;
+        }
+
+        .staleness-indicator.very-stale {
+            color: #ef4444;
+        }
+
+        .staleness-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #22c55e;
+        }
+
+        .staleness-dot.stale {
+            background: #f59e0b;
+        }
+
+        .staleness-dot.very-stale {
+            background: #ef4444;
+        }
+
+        /* Result content */
+        .result-content {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #334155;
+        }
+
+        .result-summary {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin-bottom: 8px;
+        }
+
+        .result-data {
+            font-size: 13px;
+            color: #94a3b8;
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #0f1419;
+            padding: 8px;
+            border-radius: 6px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        /* Urgency badges */
+        .urgency-badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .urgency-badge.critical {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+
+        .urgency-badge.high {
+            background: #78350f;
+            color: #fcd34d;
+        }
+
+        .urgency-badge.normal {
+            background: #1e3a5f;
+            color: #93c5fd;
+        }
+
+        .urgency-badge.low {
+            background: #1e293b;
+            color: #94a3b8;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        .empty-state h2 {
+            font-size: 20px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #94a3b8;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+        }
+
+        /* Loading state */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: #64748b;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #334155;
+            border-top-color: #64748b;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ADC Canvas</h1>
+            <div class="status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </header>
+
+        <div class="workload-summary" id="workloadSummary"></div>
+
+        <div id="topicsContainer" class="topics-grid">
+            <div class="loading">
+                <div class="spinner"></div>
+                <span>Loading topics...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Session and surface IDs from URL params or generate new
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id') || generateId();
+        const surfaceType = 'canvas';
+
+        let surfaceId = null;
+        let eventSource = null;
+
+        // Update URL with session_id for reload persistence
+        if (!urlParams.get('session_id')) {
+            urlParams.set('session_id', sessionId);
+            window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
+        }
+
+        function generateId() {
+            return 'adc-' + Math.random().toString(36).substr(2, 16);
+        }
+
+        function formatStaleness(seconds) {
+            if (seconds < 60) return 'just now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            return `${Math.floor(seconds / 86400)}d ago`;
+        }
+
+        function getStalenessLevel(seconds) {
+            if (seconds < 600) return 'fresh';      // 10 minutes
+            if (seconds < 3600) return 'stale';     // 1 hour
+            return 'very-stale';
+        }
+
+        function createTopicCard(cardData) {
+            const topic = cardData.topic;
+            const staleness = cardData.staleness;
+            const latestResult = cardData.latest_result;
+
+            const card = document.createElement('div');
+            card.className = 'topic-card';
+            card.dataset.topicId = topic.id;
+
+            const stalenessLevel = getStalenessLevel(staleness.seconds);
+            card.classList.add(stalenessLevel);
+
+            const typeClass = topic.type || 'adhoc';
+
+            let html = `
+                <div class="topic-header">
+                    <div class="topic-label">${escapeHtml(topic.label)}</div>
+                    <span class="topic-type ${typeClass}">${topic.type || 'adhoc'}</span>
+                </div>
+            `;
+
+            // Add latest result if available
+            if (latestResult) {
+                const urgencyClass = latestResult.urgency || 'normal';
+                html += `
+                    <div class="result-content">
+                        <div class="result-summary">
+                            ${escapeHtml(latestResult.summary)}
+                            <span class="urgency-badge ${urgencyClass}">${urgencyClass}</span>
+                        </div>
+                `;
+
+                if (latestResult.data) {
+                    html += `<div class="result-data">${escapeHtml(JSON.stringify(latestResult.data, null, 2))}</div>`;
+                }
+
+                html += `</div>`;
+            }
+
+            // Add staleness indicator
+            const timeAgo = formatStaleness(staleness.seconds);
+            html += `
+                <div class="staleness-indicator ${stalenessLevel}">
+                    <span class="staleness-dot ${stalenessLevel}"></span>
+                    <span>Updated ${timeAgo}</span>
+                </div>
+            `;
+
+            card.innerHTML = html;
+            return card;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateConnectionStatus(status, text) {
+            const dot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            dot.className = 'status-dot ' + status;
+            statusText.textContent = text;
+        }
+
+        function showWorkloadSummary(summary) {
+            const el = document.getElementById('workloadSummary');
+            const parts = [];
+
+            if (summary.pending_intents > 0) {
+                parts.push(`<strong>${summary.pending_intents}</strong> pending intents`);
+            }
+            if (summary.new_results > 0) {
+                parts.push(`<strong>${summary.new_results}</strong> new results`);
+            }
+            if (summary.unresolved_exceptions > 0) {
+                parts.push(`<strong>${summary.unresolved_exceptions}</strong> unresolved exceptions`);
+            }
+
+            if (parts.length > 0) {
+                el.innerHTML = '📊 While you were away: ' + parts.join(', ');
+                el.classList.add('show');
+            } else {
+                el.classList.remove('show');
+            }
+        }
+
+        async function registerSurface() {
+            try {
+                const response = await fetch('/api/v1/surfaces/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        surface_type: surfaceType
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to register surface');
+
+                const data = await response.json();
+                surfaceId = data.surface_id;
+                return surfaceId;
+            } catch (error) {
+                console.error('Error registering surface:', error);
+                throw error;
+            }
+        }
+
+        async function loadTopics() {
+            try {
+                const response = await fetch(`/api/v1/sessions/${sessionId}/topics`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const container = document.getElementById('topicsContainer');
+
+                if (!data.cards || data.cards.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <h2>No active topics</h2>
+                            <p>Topics will appear here as you interact with ADC.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = '';
+                data.cards.forEach(cardData => {
+                    container.appendChild(createTopicCard(cardData));
+                });
+            } catch (error) {
+                console.error('Error loading topics:', error);
+            }
+        }
+
+        function connectSSE() {
+            updateConnectionStatus('connecting', 'Connecting...');
+
+            const url = `/api/v1/sse?surface_id=${encodeURIComponent(surfaceId)}&session_id=${encodeURIComponent(sessionId)}&surface_type=${encodeURIComponent(surfaceType)}`;
+            eventSource = new EventSource(url);
+
+            eventSource.onopen = () => {
+                updateConnectionStatus('', 'Connected');
+                loadTopics();
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('SSE error:', error);
+                updateConnectionStatus('disconnected', 'Disconnected');
+            };
+
+            eventSource.addEventListener('connected', (event) => {
+                const data = JSON.parse(event.data);
+                console.log('SSE connected:', data);
+            });
+
+            eventSource.addEventListener('workload_summary', (event) => {
+                const summary = JSON.parse(event.data);
+                showWorkloadSummary(summary);
+            });
+
+            eventSource.addEventListener('result_created', (event) => {
+                const result = JSON.parse(event.data);
+                console.log('New result:', result);
+                loadTopics(); // Reload topics to show new result
+            });
+
+            eventSource.addEventListener('topic_updated', (event) => {
+                const topic = JSON.parse(event.data);
+                console.log('Topic updated:', topic);
+                loadTopics();
+            });
+
+            eventSource.addEventListener('disconnect', (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Server disconnect:', data);
+                updateConnectionStatus('disconnected', 'Disconnected');
+                eventSource.close();
+            });
+        }
+
+        // Heartbeat to keep surface alive
+        setInterval(() => {
+            if (surfaceId) {
+                fetch('/api/v1/surfaces/heartbeat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        surface_id: surfaceId,
+                        session_id: sessionId
+                    })
+                }).catch(console.error);
+            }
+        }, 30000); // Every 30 seconds
+
+        // Initialize
+        async function init() {
+            try {
+                await registerSurface();
+                connectSSE();
+            } catch (error) {
+                updateConnectionStatus('disconnected', 'Failed to connect');
+                console.error('Initialization error:', error);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
