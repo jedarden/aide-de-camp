@@ -91,14 +91,9 @@ class TopicManager:
             project_slugs=project_slugs,
         )
 
-        # Fetch full topic data
-        async with self.store as store:
-            if hasattr(store, 'get_topic'):
-                topic_data = await store.get_topic(topic_id)
-            else:
-                # Fallback: get from get_active_topics
-                topics = await store.get_active_topics(session_id)
-                topic_data = next((t for t in topics if t["id"] == topic_id), None)
+        # Fetch full topic data - get from active topics
+        topics = await self.store.get_active_topics(session_id)
+        topic_data = next((t for t in topics if t["id"] == topic_id), None)
 
         if topic_data:
             return Topic(

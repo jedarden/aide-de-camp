@@ -11,6 +11,12 @@ from .signals import (
     ImplicitFeedbackTracker,
     get_feedback_tracker,
 )
+from .background_analysis import (
+    AnalysisTrigger,
+    AnalysisProposal,
+    BackgroundAnalysisProcessor,
+    get_background_processor,
+)
 
 __all__ = [
     'FeedbackType',
@@ -22,4 +28,8 @@ __all__ = [
     'FeedbackSignal',
     'ImplicitFeedbackTracker',
     'get_feedback_tracker',
+    'AnalysisTrigger',
+    'AnalysisProposal',
+    'BackgroundAnalysisProcessor',
+    'get_background_processor',
 ]

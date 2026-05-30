@@ -11,6 +11,13 @@ from .warmer import (
     DEFAULT_REFRESH_INTERVAL,
     get_context_warmer,
 )
+from .prefetch import (
+    SpeculativePrefetcher,
+    FollowUpPattern,
+    PrefetchPrediction,
+    PrefetchCache,
+    get_prefetcher,
+)
 
 __all__ = [
     "ContextWarmer",
@@ -18,4 +25,9 @@ __all__ = [
     "DEFAULT_CONTEXT_TTL",
     "DEFAULT_REFRESH_INTERVAL",
     "get_context_warmer",
+    "SpeculativePrefetcher",
+    "FollowUpPattern",
+    "PrefetchPrediction",
+    "PrefetchCache",
+    "get_prefetcher",
 ]

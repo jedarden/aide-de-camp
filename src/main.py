@@ -37,6 +37,9 @@ from .feedback.processor import (
 from .agents.self_modification import ArtifactType
 from .components.library import get_library
 from .components.hot_reload import get_reload_manager
+from .monitoring.ambient import get_ambient_monitor
+from .context.warmer import get_context_warmer
+from .feedback.background_analysis import get_background_processor
 
 
 logger = getLogger(__name__)
@@ -59,6 +62,9 @@ _surface_router: Optional[SurfaceRouter] = None
 _feedback_processor = None
 _component_library = None
 _reload_manager = None
+_ambient_monitor = None
+_context_warmer = None
+_background_processor = None
 
 
 @asynccontextmanager
@@ -66,6 +72,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     global _store, _broadcaster, _topic_manager, _bead_watcher, _surface_router
     global _feedback_processor, _component_library, _reload_manager
+    global _ambient_monitor, _context_warmer, _background_processor
 
     logger.info("Starting aide-de-camp...")
 
@@ -103,6 +110,21 @@ async def lifespan(app: FastAPI):
     _feedback_processor = get_feedback_processor()
     logger.info("Feedback processor initialized")
 
+    # Initialize ambient monitor (Phase 3)
+    _ambient_monitor = get_ambient_monitor()
+    await _ambient_monitor.start()
+    logger.info("Ambient monitor started")
+
+    # Initialize context warmer (Phase 3)
+    _context_warmer = get_context_warmer()
+    await _context_warmer.start()
+    logger.info("Context warmer started")
+
+    # Initialize background analysis processor (Phase 3)
+    _background_processor = get_background_processor()
+    await _background_processor.start()
+    logger.info("Background analysis processor started")
+
     # Initialize bead watcher
     try:
         _bead_watcher = BeadWatcher(_store, _surface_router)
@@ -119,6 +141,12 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down aide-de-camp...")
     if _bead_watcher:
         await _bead_watcher.stop()
+    if _background_processor:
+        await _background_processor.stop()
+    if _context_warmer:
+        await _context_warmer.stop()
+    if _ambient_monitor:
+        await _ambient_monitor.stop()
     if _broadcaster:
         await _broadcaster.stop()
     if _component_library:
@@ -1007,6 +1035,138 @@ async def api_v1_reload_artifact(artifact_name: str):
             status_code=404,
             content={"error": "Artifact not found"}
         )
+
+
+# =============================================================================
+# Phase 3: Responsiveness endpoints
+# =============================================================================
+
+@app.get("/api/v1/monitoring/status")
+async def api_v1_monitoring_status():
+    """Get ambient monitoring status."""
+    if not _ambient_monitor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Ambient monitor not initialized"}
+        )
+
+    config = _ambient_monitor.config
+    if config:
+        return {
+            "running": _ambient_monitor.running,
+            "active_topics": len(config.active_topics),
+            "topics": [
+                {
+                    "topic_id": t.topic_id,
+                    "project_slug": t.project_slug,
+                    "intent_type": t.intent_type,
+                    "check_interval": t.check_interval,
+                    "urgency": t.urgency,
+                }
+                for t in config.active_topics
+            ],
+            "exceptions": len(config.exceptions),
+        }
+    return {"running": _ambient_monitor.running, "active_topics": 0}
+
+
+@app.post("/api/v1/monitoring/reload")
+async def api_v1_monitoring_reload():
+    """Reload monitoring configuration."""
+    if not _ambient_monitor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Ambient monitor not initialized"}
+        )
+
+    await _ambient_monitor.reload_config()
+    return {"status": "ok", "message": "Monitoring configuration reloaded"}
+
+
+@app.get("/api/v1/context/status")
+async def api_v1_context_status():
+    """Get context warmer status."""
+    if not _context_warmer:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Context warmer not initialized"}
+        )
+
+    store = await get_store()
+    active_topics = await store.get_active_topic_ids()
+
+    return {
+        "running": _context_warmer.running,
+        "refresh_interval": _context_warmer.refresh_interval,
+        "context_ttl": _context_warmer.context_ttl,
+        "active_topics_count": len(active_topics),
+    }
+
+
+@app.post("/api/v1/context/warm")
+async def api_v1_context_warm(request: dict):
+    """Manually trigger context warming for a topic."""
+    if not _context_warmer:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Context warmer not initialized"}
+        )
+
+    topic_id = request.get("topic_id")
+    project_slugs = request.get("project_slugs", [])
+
+    if not topic_id or not project_slugs:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Missing topic_id or project_slugs"}
+        )
+
+    await _context_warmer.warm_topic_context(topic_id, project_slugs)
+    return {"status": "ok", "message": f"Context warmed for topic {topic_id}"}
+
+
+@app.get("/api/v1/background/status")
+async def api_v1_background_status():
+    """Get background analysis processor status."""
+    if not _background_processor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Background processor not initialized"}
+        )
+
+    stats = {
+        "running": _background_processor.running,
+        "check_interval": _background_processor.check_interval,
+        "signal_threshold": _background_processor.signal_threshold,
+    }
+
+    return stats
+
+
+@app.post("/api/v1/background/analyze")
+async def api_v1_background_analyze():
+    """Manually trigger background analysis."""
+    if not _background_processor:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Background processor not initialized"}
+        )
+
+    proposals = await _background_processor.analyze_signals()
+
+    return {
+        "proposals": [
+            {
+                "proposal_id": p.proposal_id,
+                "artifact_type": p.artifact_type,
+                "artifact_name": p.artifact_name,
+                "change_summary": p.change_summary,
+                "confidence": p.confidence,
+                "signals_consulted": p.signals_consulted,
+            }
+            for p in proposals
+        ]
+    }
 
 
 @app.on_event("startup")

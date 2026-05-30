@@ -18,12 +18,24 @@ from aiohttp import ClientSession
 from aiosqlite import connect
 
 from ..session.store import get_store
+from ..fetch.executor import get_fetch_executor, FetchCommand, FetchType
 
 
 logger = getLogger(__name__)
 
 MONITORING_CONFIG_PATH = Path("/home/coding/aide-de-camp/config/monitoring.yaml")
 SESSION_DB_PATH = Path("/home/coding/aide-de-camp/data/session.db")
+
+# Mapping of intent types to fetch types
+INTENT_TYPE_TO_FETCH = {
+    "status": FetchType.KUBECTL_STATUS,
+    "pod_status": FetchType.POD_STATUS,
+    "deployment_status": FetchType.DEPLOYMENT_STATUS,
+    "argocd": FetchType.ARGOCD_STATUS,
+    "ci": FetchType.CI_STATUS,
+    "git": FetchType.GIT_LOG,
+    "beads": FetchType.BEAD_LIST,
+}
 
 
 @dataclass
@@ -73,6 +85,7 @@ class AmbientMonitor:
         self.running = False
         self.tasks: list[asyncio.Task] = []
         self._http_client: Optional[ClientSession] = None
+        self._fetch_executor = get_fetch_executor()
 
     async def _get_http_client(self) -> ClientSession:
         """Get or create HTTP client."""
@@ -135,14 +148,109 @@ class AmbientMonitor:
         """
         Check the current state of a topic.
 
-        This is a placeholder - in full implementation, this would call the
-        fetch strand to get current state for the topic.
+        Uses the fetch executor to get current state for the topic.
         """
-        # Placeholder: simulate state check
-        # Full implementation would call the fetch strand with the rule's project_slug and intent_type
+        executor = get_fetch_executor()
 
-        # For now, return None (no change detected)
-        return None
+        # Map intent_type to fetch_type
+        fetch_type = INTENT_TYPE_TO_FETCH.get(rule.intent_type, FetchType.KUBECTL_STATUS)
+
+        # Build fetch command
+        command = FetchCommand(
+            fetch_type=fetch_type,
+            project_slug=rule.project_slug,
+            args=[],  # Can be extended to support filters
+            timeout=rule.check_interval,
+        )
+
+        # Execute fetch
+        result = await executor.execute(command)
+
+        if result.success:
+            state_data = {
+                "project_slug": rule.project_slug,
+                "intent_type": rule.intent_type,
+                **result.data,
+            }
+
+            # Apply filters if specified
+            if rule.filters:
+                if not self._passes_filters(state_data, rule.filters):
+                    # Filter means we don't report this state
+                    logger.debug(f"State for {rule.topic_id} filtered by {rule.filters}")
+                    return None
+
+            return state_data
+        else:
+            logger.warning(f"Fetch failed for {rule.topic_id}: {result.error}")
+            return None
+
+    def _passes_filters(self, state_data: dict, filters: list[str]) -> bool:
+        """
+        Check if state data passes all filters.
+
+        Filters are simple expressions like "phase!=Running" or "restarts>0".
+        Returns False if any filter fails.
+        """
+        for filter_expr in filters:
+            if not self._evaluate_filter(state_data, filter_expr):
+                return False
+        return True
+
+    def _evaluate_filter(self, state_data: dict, filter_expr: str) -> bool:
+        """
+        Evaluate a single filter expression against state data.
+
+        Supports: !=, >, <, >=, <=, ==
+        Examples: "phase!=Running", "restarts>0", "ready!=1/1"
+        """
+        import re
+
+        # Parse filter expression
+        match = re.match(r'(\w+)(!=|>=|<=|>|<|==)(.+)', filter_expr)
+        if not match:
+            logger.warning(f"Invalid filter expression: {filter_expr}")
+            return True
+
+        field_path, op, value = match.groups()
+
+        # Get field value from nested dict
+        field_value = self._get_nested_value(state_data, field_path)
+
+        # Compare
+        if field_value is None:
+            return False
+
+        try:
+            if op == "!=":
+                return str(field_value) != value
+            elif op == "==":
+                return str(field_value) == value
+            elif op == ">":
+                return float(field_value) > float(value)
+            elif op == "<":
+                return float(field_value) < float(value)
+            elif op == ">=":
+                return float(field_value) >= float(value)
+            elif op == "<=":
+                return float(field_value) <= float(value)
+        except (ValueError, TypeError):
+            # If comparison fails, treat as no match
+            logger.warning(f"Filter comparison failed: {filter_expr} with value {field_value}")
+            return False
+
+        return True
+
+    def _get_nested_value(self, data: dict, path: str) -> Any:
+        """Get a value from nested dict using dot notation."""
+        keys = path.split(".")
+        value = data
+        for key in keys:
+            if isinstance(value, dict):
+                value = value.get(key)
+            else:
+                return None
+        return value
 
     async def detect_state_change(
         self,
