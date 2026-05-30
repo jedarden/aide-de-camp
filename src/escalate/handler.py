@@ -325,11 +325,6 @@ class EscalateHandler:
                 logger.debug(f"Extracted bead ID '{bead_id}' from output")
                 return bead_id
 
-        if match:
-            bead_id = match.group(0)
-            logger.debug(f"Extracted bead ID '{bead_id}' from output")
-            return bead_id
-
         # Fallback: if output already looks like a bead ID, return as-is
         # Basic validation: should contain a dash and be reasonable length
         if "-" in output and len(output) >= 3:
