@@ -176,6 +176,16 @@ async def health_check():
     return {"status": "ok", "service": "adc-voice"}
 
 
+@app.get("/")
+async def serve_canvas():
+    """
+    Serve the canvas HTML page (Phase 0 minimal surface).
+
+    This is the main entry point for the aide-de-camp interface.
+    """
+    return FileResponse(CANVAS_PATH)
+
+
 @app.websocket("/voice")
 async def voice_session(websocket: WebSocket):
     """
@@ -332,7 +342,7 @@ async def route_intent(request: dict):
 
     Classifies utterances into intent types and routes to appropriate strands.
     Task-profile intents are escalated to NEEDLE beads.
-    Other intents are routed to fetch + synthesize strands (TODO).
+    Other intents are routed to fetch + synthesize strands.
     """
     utterance = request.get("utterance", "")
     utterance_id = request.get("utterance_id")
@@ -384,6 +394,122 @@ async def route_intent(request: dict):
         return JSONResponse(
             status_code=500,
             content={"error": f"Router error: {str(e)}"}
+        )
+
+
+@app.post("/dispatch")
+async def dispatch_intent(request: dict):
+    """
+    Dispatch endpoint: router → N parallel synthesize calls → SSE stream.
+
+    Phase 0 core query loop:
+    1. Routes utterance to intents via intent router
+    2. For each intent, runs fetch + synthesize strands in parallel
+    3. Streams results via SSE to active canvas
+    4. Returns acknowledgment with intent IDs
+
+    Returns acknowledgment immediately with intent IDs for tracking.
+    Results are streamed via SSE to connected canvas surfaces.
+    """
+    utterance = request.get("utterance", "")
+    utterance_id = request.get("utterance_id")
+    session_id = request.get("session_id")
+    surface_id = request.get("surface_id")
+
+    logger.info(f"Dispatching utterance: {utterance[:100]}...")
+
+    store = await get_store()
+    router = get_intent_router(store)
+
+    # Generate utterance ID if not provided
+    if not utterance_id:
+        utterance_id = str(uuid.uuid4())
+
+    # Create utterance record
+    await store.create_utterance(session_id, utterance, utterance_id)
+
+    # Route the utterance
+    try:
+        routed_intents = await router.route_utterance(
+            utterance=utterance,
+            utterance_id=utterance_id,
+            session_id=session_id,
+        )
+
+        # Create intent records and process in parallel
+        intent_tasks = []
+        intent_ids = []
+
+        for routed_intent in routed_intents:
+            # Create intent record in store
+            classification = routed_intent.classification
+            await store.create_intent(
+                utterance_id=utterance_id,
+                session_id=session_id,
+                project_slug=classification.project_slug,
+                intent_type=classification.intent_type.value,
+            )
+            intent_ids.append(routed_intent.intent_id)
+
+            # Create task for parallel processing
+            task = asyncio.create_task(
+                router.process_intent(routed_intent),
+                name=f"process_{routed_intent.intent_id[:8]}"
+            )
+            intent_tasks.append((routed_intent.intent_id, task))
+
+        # Process intents in parallel and stream results via SSE
+        async def stream_results():
+            """Process intents and stream results to SSE."""
+            results = []
+
+            for intent_id, task in intent_tasks:
+                try:
+                    result = await task
+                    results.append(result)
+
+                    # Stream result via SSE if we have a surface
+                    if _broadcaster and surface_id:
+                        from .sse.events import SSEEvent
+                        await _broadcaster.broadcast(
+                            surface_id=surface_id,
+                            event=SSEEvent(
+                                event_type="intent_resolved",
+                                data={
+                                    "intent_id": intent_id,
+                                    "result": result,
+                                }
+                            )
+                        )
+
+                except Exception as e:
+                    logger.error(f"Intent processing failed: {e}")
+                    results.append({
+                        "intent_id": intent_id,
+                        "status": "error",
+                        "error": str(e),
+                    })
+
+            return results
+
+        # Start parallel processing in background
+        asyncio.create_task(stream_results())
+
+        # Return acknowledgment immediately
+        return {
+            "utterance_id": utterance_id,
+            "session_id": session_id,
+            "intent_count": len(intent_ids),
+            "intent_ids": intent_ids,
+            "status": "dispatched",
+            "message": f"Dispatched {len(intent_ids)} intents for parallel processing",
+        }
+
+    except Exception as e:
+        logger.error(f"Dispatch error: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Dispatch error: {str(e)}"}
         )
 
 
