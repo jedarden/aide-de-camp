@@ -31,5 +31,8 @@ line-length = 100
 select = ["E", "F", "I", "N", "W"]
 ignore = ["E501"]
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
 [tool.uv]
 dev-dependencies = []
