@@ -15,6 +15,9 @@ from typing import Any, Optional
 from ..escalate.handler import EscalateRequest, escalate_intent
 from ..escalate.llm import get_zai_client, ModelClass
 from ..session.store import get_store
+from ..fetch.commands import FetchRequest, FetchContext, IntentType as FetchIntentType
+from ..fetch.orchestrator import execute_fetch
+from ..synthesize.strand import SynthesizeRequest, synthesize_intent
 
 
 logger = getLogger(__name__)
@@ -304,14 +307,90 @@ class IntentRouter:
         if classification.intent_type == IntentType.TASK_PROFILE:
             return await self._escalate_to_bead(routed_intent)
 
-        # For other intents, return placeholder for now
-        # TODO: Integrate with fetch + synthesize strands
-        return {
-            "intent_id": routed_intent.intent_id,
-            "intent_type": classification.intent_type.value,
-            "status": "pending",
-            "message": f"Intent routed to {classification.intent_type.value} strand (not yet implemented)",
+        # For other intents, fetch then synthesize
+        return await self._fetch_and_synthesize(routed_intent)
+
+    async def _fetch_and_synthesize(
+        self,
+        routed_intent: RoutedIntent,
+    ) -> dict:
+        """
+        Fetch context then synthesize into structured result.
+
+        Args:
+            routed_intent: The routed intent to process
+
+        Returns:
+            Result dictionary with synthesized data
+        """
+        classification = routed_intent.classification
+
+        logger.info(
+            f"Fetching and synthesizing intent {routed_intent.intent_id} "
+            f"(type: {classification.intent_type.value})"
+        )
+
+        try:
+            # Step 1: Fetch context
+            fetch_intent_type = self._map_intent_type(classification.intent_type)
+            fetch_request = FetchRequest(
+                intent_id=routed_intent.intent_id,
+                intent_type=fetch_intent_type,
+                context=FetchContext(
+                    project_slug=classification.project_slug,
+                    session_id=routed_intent.session_id,
+                ),
+            )
+
+            fetch_result = await execute_fetch(fetch_request)
+
+            # Step 2: Synthesize result
+            synthesize_request = SynthesizeRequest(
+                intent_id=routed_intent.intent_id,
+                intent_type=fetch_intent_type,
+                utterance=routed_intent.utterance,
+                project_slug=classification.project_slug,
+                fetched_context=fetch_result,
+                urgency=classification.urgency,
+            )
+
+            synthesize_result = await synthesize_intent(synthesize_request)
+
+            return {
+                "intent_id": routed_intent.intent_id,
+                "intent_type": classification.intent_type.value,
+                "status": "resolved",
+                "data": synthesize_result.data,
+                "summary": synthesize_result.summary,
+                "urgency": synthesize_result.urgency.value,
+                "coverage": synthesize_result.coverage,
+                "caveats": synthesize_result.caveats,
+                "message": f"Intent synthesized successfully",
+            }
+
+        except Exception as e:
+            logger.error(f"Fetch/synthesize failed for intent {routed_intent.intent_id}: {e}")
+            return {
+                "intent_id": routed_intent.intent_id,
+                "intent_type": classification.intent_type.value,
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to fetch or synthesize intent",
+            }
+
+    def _map_intent_type(self, intent_type: IntentType) -> FetchIntentType:
+        """Map router IntentType to fetch IntentType."""
+        # Map enum values by string
+        type_map = {
+            IntentType.STATUS: FetchIntentType.STATUS,
+            IntentType.ACTION: FetchIntentType.ACTION,
+            IntentType.BRAINSTORM: FetchIntentType.BRAINSTORM,
+            IntentType.LOOKUP: FetchIntentType.LOOKUP,
+            IntentType.REMINDER: FetchIntentType.REMINDER,
+            IntentType.SELF_MODIFICATION: FetchIntentType.SELF_MODIFICATION,
+            IntentType.MONITORING_CONFIG: FetchIntentType.MONITORING_CONFIG,
         }
+        return type_map.get(intent_type, FetchIntentType.STATUS)
 
     async def _escalate_to_bead(
         self,
