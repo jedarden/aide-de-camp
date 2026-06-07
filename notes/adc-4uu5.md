@@ -1,12 +1,9 @@
-# adc-4uu5: Router.py Lines 225-235 Raw Content
+# Raw Content: src/intent/router.py lines 225-235
 
-## Task
-Read and record the exact text of lines 225-235 from src/intent/router.py
-
-## Raw Content (Lines 225-235)
+Task: Record exact line text for lines 225-235 without modification.
 
 ```
-        
+
                 classification = IntentClassification(
                     intent_type=intent_type,
                     project_slug=intent_data.get("project_slug"),
@@ -18,13 +15,5 @@ Read and record the exact text of lines 225-235 from src/intent/router.py
                 classifications.append(classification)
 ```
 
-## Context
-These lines show the creation of an IntentClassification object with fields:
-- intent_type
-- project_slug
-- confidence (default 0.8)
-- utterance_fragment (defaults to original utterance)
-- reasoning
-- urgency (default "normal")
-
-The classification is then appended to a classifications list.
+Captured: 2025-01-07
+Bead: adc-4uu5
