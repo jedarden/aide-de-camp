@@ -1,15 +1,15 @@
 {
-  "bead_id": "adc-5mz",
+  "bead_id": "adc-1i71",
   "agent": "claude-sonnet",
   "provider": "anthropic",
   "model": "claude-sonnet-4-6",
   "exit_code": 0,
   "outcome": "success",
-  "duration_ms": 111407,
+  "duration_ms": 61604,
   "input_tokens": null,
   "output_tokens": null,
   "cost_usd": null,
-  "captured_at": "2026-06-07T18:38:36.547695872Z",
+  "captured_at": "2026-06-07T18:26:08.756588509Z",
   "trace_format": "claude_json",
   "pruned": false,
   "template_version": null

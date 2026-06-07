@@ -1,0 +1,10 @@
+```
+SPLIT_COMPLETE: Created 3 children, parent converted to umbrella
+```
+
+Children:
+- `adc-311s` — Confirm src/intent/ directory exists on disk
+- `adc-gk7v` — List files in src/intent/ and locate router.py (depends on adc-311s)
+- `adc-37g1` — Stat src/intent/router.py and confirm it is a regular file (depends on adc-gk7v)
+
+Parent `adc-k6up` now has the `umbrella` label and depends on `adc-37g1` (the last child). The chain runs sequentially: directory check → file listing → stat confirmation.

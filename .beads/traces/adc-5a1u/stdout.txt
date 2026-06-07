@@ -1,0 +1,16 @@
+The dependency chain is confirmed. The split is complete.
+
+```
+SPLIT_COMPLETE: Created 4 children, parent converted to umbrella
+```
+
+```
+Children: adc-752a, adc-67n4, adc-48on, adc-1o48
+```
+
+**Dependency chain:**
+- `adc-752a` — Identify the project root directory (first, no deps)
+- `adc-67n4` — Confirm src/ directory exists → depends on adc-752a
+- `adc-48on` — Verify src/intent/ subdirectory exists → depends on adc-67n4
+- `adc-1o48` — List contents of src/intent/ → depends on adc-48on (last)
+- `adc-5a1u` (umbrella) — depends on adc-1o48
