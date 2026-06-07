@@ -1,0 +1,10 @@
+{
+  "last_run": "2026-06-07T14:13:11.189695768Z",
+  "seen_titles": [
+    "implement workload summary on reconnect",
+    "add diff-aware results to synthesize strand",
+    "add staleness indicators to canvas cards",
+    "implement memory extraction on turn done",
+    "implement adc cli with dispatch, ask, status, topics, and exceptions commands"
+  ]
+}
