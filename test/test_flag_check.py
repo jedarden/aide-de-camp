@@ -7,221 +7,55 @@ Confidence thresholds:
 - >= 0.9: High confidence - dispatch immediately
 - 0.7 - 0.9: Medium confidence - dispatch but flag for clarification
 - < 0.7: Low confidence - return CLARIFICATION intent type
+
+Fixtures are imported from test/fixtures/flag_check_fixtures.py
 """
-import json
-from dataclasses import dataclass
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 
 from src.intent.router import IntentType, IntentClassification
 
+# Import fixtures and test data from shared fixtures module
+from test.fixtures.flag_check_fixtures import (
+    # LLM response fixtures
+    HIGH_CONFIDENCE_095,
+    HIGH_CONFIDENCE_100,
+    HIGH_CONFIDENCE_090,
+    MEDIUM_CONFIDENCE_080,
+    MEDIUM_CONFIDENCE_075,
+    MEDIUM_CONFIDENCE_070,
+    LOW_CONFIDENCE_060,
+    LOW_CONFIDENCE_030,
+    LOW_CONFIDENCE_000,
+    MISSING_CONFIDENCE,
+    UNKNOWN_INTENT_TYPE,
+    MALFORMED_JSON,
+    INCOMPLETE_JSON,
+    EMPTY_INTENTS_ARRAY,
+    # pytest fixtures (must import dependencies for mock_router_with_mocks)
+    mock_zai_client,
+    mock_session_store,
+    mock_router_with_mocks,
+    sample_utterance,
+    sample_session_id,
+    sample_utterance_id,
+)
+
 
 # =============================================================================
-# Fixtures
+# Test Helper Fixtures
 # =============================================================================
 
-@dataclass
-class LLMResponseMock:
-    """Mock LLM response for testing."""
-    json_data: list[dict[str, Any]]
-    raw_response: str | None = None
-
-    def to_json(self) -> str:
-        """Convert to JSON string."""
-        return json.dumps(self.json_data)
-
-    def to_raw_response(self) -> str:
-        """Get raw response string."""
-        return self.raw_response or self.to_json()
-
-
-# High confidence fixtures (>= 0.9)
-HIGH_CONFIDENCE_095 = LLMResponseMock(
-    json_data=[{
-        "intent_type": "status",
-        "confidence": 0.95,
-        "project_slug": "options-pipeline",
-        "urgency": "normal",
-        "utterance_fragment": "check the pods",
-        "reasoning": "User wants to check status"
-    }]
-)
-
-HIGH_CONFIDENCE_100 = LLMResponseMock(
-    json_data=[{
-        "intent_type": "action",
-        "confidence": 1.0,
-        "project_slug": None,
-        "urgency": "normal",
-        "utterance_fragment": "restart the service",
-        "reasoning": "User wants to take action"
-    }]
-)
-
-HIGH_CONFIDENCE_090 = LLMResponseMock(
-    json_data=[{
-        "intent_type": "lookup",
-        "confidence": 0.9,
-        "project_slug": "kalshi-tape",
-        "urgency": "high",
-        "utterance_fragment": "find recent errors",
-        "reasoning": "User wants to look up information"
-    }]
-)
-
-# Medium confidence fixtures (0.7 - 0.9)
-MEDIUM_CONFIDENCE_080 = LLMResponseMock(
-    json_data=[{
-        "intent_type": "status",
-        "confidence": 0.8,
-        "project_slug": None,
-        "urgency": "normal",
-        "utterance_fragment": "how's it going",
-        "reasoning": "Ambiguous status request"
-    }]
-)
-
-MEDIUM_CONFIDENCE_075 = LLMResponseMock(
-    json_data=[{
-        "intent_type": "brainstorm",
-        "confidence": 0.75,
-        "project_slug": None,
-        "urgency": "normal",
-        "utterance_fragment": "maybe we could",
-        "reasoning": "Possible brainstorming"
-    }]
-)
-
-MEDIUM_CONFIDENCE_070 = LLMResponseMock(
-    json_data=[{
-        "intent_type": "action",
-        "confidence": 0.7,
-        "project_slug": None,
-        "urgency": "normal",
-        "utterance_fragment": "do something",
-        "reasoning": "Unclear action"
-    }]
-)
-
-# Low confidence fixtures (< 0.7)
-LOW_CONFIDENCE_060 = LLMResponseMock(
-    json_data=[{
-        "intent_type": "clarification",
-        "confidence": 0.6,
-        "project_slug": None,
-        "urgency": "normal",
-        "utterance_fragment": "check the pods",
-        "reasoning": "Unclear intent, needs clarification"
-    }]
-)
-
-LOW_CONFIDENCE_030 = LLMResponseMock(
-    json_data=[{
-        "intent_type": "clarification",
-        "confidence": 0.3,
-        "project_slug": None,
-        "urgency": "normal",
-        "utterance_fragment": "something something",
-        "reasoning": "Very unclear"
-    }]
-)
-
-LOW_CONFIDENCE_000 = LLMResponseMock(
-    json_data=[{
-        "intent_type": "clarification",
-        "confidence": 0.0,
-        "project_slug": None,
-        "urgency": "normal",
-        "utterance_fragment": "???",
-        "reasoning": "No confidence"
-    }]
-)
-
-# Edge case fixtures
-MISSING_CONFIDENCE = LLMResponseMock(
-    json_data=[{
-        "intent_type": "status",
-        "project_slug": "test",
-        "urgency": "normal",
-        "utterance_fragment": "check status",
-        "reasoning": "No confidence field"
-    }]
-)
-
-UNKNOWN_INTENT_TYPE = LLMResponseMock(
-    json_data=[{
-        "intent_type": "invalid-type",
-        "confidence": 0.9,
-        "project_slug": None,
-        "urgency": "normal",
-        "utterance_fragment": "some utterance",
-        "reasoning": "Unknown intent type"
-    }]
-)
-
-MALFORMED_JSON = LLMResponseMock(
-    json_data=[],
-    raw_response="This is not JSON"
-)
-
-INCOMPLETE_JSON = LLMResponseMock(
-    json_data=[],
-    raw_response='{"intent_type": "status", "confidence": }'
-)
-
-EMPTY_INTENTS_ARRAY = LLMResponseMock(
-    json_data=[]
-)
-
-
 @pytest.fixture
-def sample_utterance():
-    """Sample utterance for testing."""
-    return "check the pods in options-pipeline"
-
-
-@pytest.fixture
-def sample_session_id():
-    """Sample session ID for testing."""
-    return "test-session-123"
-
-
-@pytest.fixture
-def sample_utterance_id():
-    """Sample utterance ID for testing."""
-    return "test-utterance-456"
-
-
-@pytest.fixture
-def mock_router():
+def mock_router(mock_router_with_mocks):
     """
-    Mock router with all external dependencies replaced.
+    Alias for mock_router_with_mocks for backward compatibility.
 
-    Returns a router instance where mock_client.call_simple can be configured.
+    Returns a tuple of (router_instance, mock_client, mock_store) where
+    mock_client.call_simple can be dynamically configured per test.
     """
-    from src.intent.router import IntentRouter
-
-    router = IntentRouter()
-
-    # Create mock client and store
-    mock_client = AsyncMock()
-    mock_store = AsyncMock()
-    mock_store.get_session = AsyncMock(return_value=None)
-    mock_store.get_recent_intents = AsyncMock(return_value=[])
-
-    # Monkey-patch the private methods
-    async def mock_get_client():
-        return mock_client
-
-    async def mock_get_store():
-        return mock_store
-
-    router._get_zai_client = mock_get_client
-    router._get_store = mock_get_store
-
-    return router, mock_client, mock_store
+    return mock_router_with_mocks
 
 
 # =============================================================================
