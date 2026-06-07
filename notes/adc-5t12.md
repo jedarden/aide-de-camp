@@ -1,19 +1,20 @@
-# adc-5t12: Confirm src/intent/router.py exists
+# Bead adc-5t12: Verify router.py exists
 
 ## Task
-Locate and confirm `src/intent/router.py` exists and is accessible.
+Locate src/intent/router.py and confirm file exists and is accessible.
 
-## Result
-**Confirmed.** File exists at `/home/coding/aide-de-camp/src/intent/router.py`.
+## Findings
+- **File path:** `/home/coding/aide-de-camp/src/intent/router.py`
+- **Status:** Exists ✓
+- **Size:** 16,155 bytes (~16 KB)
+- **Lines:** 460 lines
+- **Permissions:** `-rw-rw-r--` (readable by owner and group)
+- **Content:** Intent Router - classifies utterances and routes to appropriate strands
 
-## File Details
-- **Path:** `src/intent/router.py`
-- **Size:** 16,155 bytes
-- **Lines:** 460
-- **Status:** Readable, non-empty Python module
+## Verification
+```bash
+ls -la /home/coding/aide-de-camp/src/intent/router.py
+wc -l /home/coding/aide-de-camp/src/intent/router.py
+```
 
-## Module Purpose
-Intent Router - classifies utterances and routes to appropriate strands.
-Uses LLM to classify intents by type and project, then routes:
-- task-profile intents → escalate strand (bead creation)
-- other intents → fetch + synthesize strands
+Result: File exists, is readable, and contains 460 lines of Python code.
