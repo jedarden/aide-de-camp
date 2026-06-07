@@ -1,14 +1,25 @@
 # Code Construct Analysis: router.py lines 225-235
 
+## Task
+Identify the code construct at router.py lines 225-235.
+
 ## Location
 File: `/home/coding/aide-de-camp/src/intent/router.py`
-Lines: 226-233
+Lines: 225-235
 
 ## Construct Type
-**Object Instantiation** of the `IntentClassification` class.
+**Object Instantiation** (dataclass instance creation)
 
-## Code
+## Detailed Analysis
 
+### Line 224
+```python
+intent_type = IntentType.STATUS
+```
+- Variable assignment with enum value fallback
+- This is a fallback case when an unknown intent type is encountered
+
+### Lines 226-233 (Primary Construct)
 ```python
 classification = IntentClassification(
     intent_type=intent_type,
@@ -20,21 +31,26 @@ classification = IntentClassification(
 )
 ```
 
-## Key Fields and Parameters
+This is **instantiation of a dataclass** (`IntentClassification`) using keyword arguments.
 
-| Field | Source | Default/Fallback |
-|-------|--------|------------------|
-| `intent_type` | Variable `intent_type` | None (required) |
-| `project_slug` | `intent_data.get("project_slug")` | `None` |
-| `confidence` | `intent_data.get("confidence", 0.8)` | `0.8` (cast to `float`) |
-| `utterance_fragment` | `intent_data.get("utterance_fragment", utterance)` | `utterance` variable |
-| `reasoning` | `intent_data.get("reasoning", "")` | `""` (empty string) |
-| `urgency` | `intent_data.get("urgency", "normal")` | `"normal"` |
+### Line 234
+```python
+classifications.append(classification)
+```
+- List method call appending the newly created object
+
+## IntentClassification Dataclass Fields
+
+Based on the instantiation, the `IntentClassification` dataclass has the following fields:
+
+| Field | Type | Description | Default/Source |
+|-------|------|-------------|----------------|
+| `intent_type` | `IntentType` (Enum) | The classified intent type | From variable (enum) |
+| `project_slug` | `str \| None` | Optional project identifier | From `intent_data` dict |
+| `confidence` | `float` | Classification confidence score (0.0-1.0) | From `intent_data`, defaults to 0.8 |
+| `utterance_fragment` | `str` | The specific fragment of the utterance | From `intent_data`, defaults to full `utterance` |
+| `reasoning` | `str` | Explanation of classification | From `intent_data`, defaults to empty string |
+| `urgency` | `str` | Urgency tier ("critical", "high", "normal", "low") | From `intent_data`, defaults to "normal" |
 
 ## Context
-The instantiated object is appended to a `classifications` list (line 234), suggesting this is part of a batch classification loop processing multiple intents from an utterance.
-
-## Pattern Notes
-- Uses Python's dataclass-style instantiation with named parameters
-- Defensive extraction from dictionary using `.get()` with sensible defaults
-- Type coercion applied (`float()` for confidence)
+This code is inside the `classify_utterance` method of the `IntentRouter` class, which processes LLM responses to classify user intents. The instantiation creates `IntentClassification` objects from parsed JSON data returned by the LLM.
