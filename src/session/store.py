@@ -182,13 +182,14 @@ class SessionStore:
             await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     # Session operations
-    async def create_session(self) -> str:
+    async def create_session(self, session_id: str | None = None) -> str:
         """Create a new session and return its ID."""
-        session_id = str(uuid4())
+        if not session_id:
+            session_id = str(uuid4())
         now = int(datetime.now().timestamp())
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
-                "INSERT INTO sessions (id, created_at, last_active) VALUES (?, ?, ?)",
+                "INSERT OR IGNORE INTO sessions (id, created_at, last_active) VALUES (?, ?, ?)",
                 (session_id, now, now)
             )
             await db.commit()
@@ -524,13 +525,11 @@ class SessionStore:
                 (session_id,)
             ))[0][0]
 
-            # Get new results (surfaced after last surface disconnect)
-            # For now, return count of results in last hour
-            one_hour_ago = int(datetime.now().timestamp()) - 3600
+            # Get new results (unsurfaced results)
             new_results = (await db.execute_fetchall(
                 """SELECT COUNT(*) FROM results
-                   WHERE session_id = ? AND created_at > ?""",
-                (session_id, one_hour_ago)
+                   WHERE session_id = ? AND surfaced_at IS NULL""",
+                (session_id,)
             ))[0][0]
 
             # Get exceptions (HUMAN beads or high urgency items)
@@ -680,7 +679,7 @@ class SessionStore:
         async with aiosqlite.connect(self.db_path) as db:
             for signal_id in signal_ids:
                 await db.execute(
-                    "UPDATE feedback_signals SET processed = 1, processed_at = ? WHERE id = ?",
+                    "UPDATE feedback_signals SET processed = 1, processed_at = ? WHERE signal_id = ?",
                     (now, signal_id)
                 )
             await db.commit()
