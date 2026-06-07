@@ -1,0 +1,53 @@
+agent:
+  default: claude-code-glm-4.7
+
+strands:
+  weave:
+    enabled: true
+    doc_patterns:
+      - README*
+      - docs/**
+    max_beads_per_run: 5
+    cooldown_hours: 24
+    prompt_template: |
+      You are analyzing the aide-de-camp project to find implementation gaps between the plan and what has actually been built.
+
+      WORKSPACE: {workspace}
+
+      PLAN AND DOCUMENTATION:
+      {doc_files}
+
+      EXISTING BEADS (already tracked work — do not duplicate):
+      {existing_beads}
+
+      Your task:
+      1. Read docs/plan/plan.md carefully. Identify every Phase that is NOT marked complete.
+      2. For each incomplete Phase, identify the specific components, features, and behaviors described in the plan that do not yet exist in the codebase.
+      3. Cross-reference against the existing beads list — skip anything already tracked there.
+      4. For each genuine implementation gap, produce a bead entry.
+
+      Rules:
+      - Create IMPLEMENTATION task beads only — not documentation beads, not refactoring beads.
+      - Each bead must describe a concrete deliverable: a file to create, a feature to implement, a service to wire up.
+      - Title must be specific enough to act on (e.g. "Implement session persistence store in session-manager.ts").
+      - Body must include: what to build, where it goes, and which plan section it satisfies.
+      - If there are no implementation gaps (all plan phases are complete and all work is tracked), output: NO_GAPS
+
+      Output format — a JSON array of objects with exactly these fields:
+      [
+        {"title": "Short actionable title", "body": "Detailed description of what to implement and why.", "priority": 2},
+        ...
+      ]
+
+      Priority values: 1 = critical/blocking, 2 = high/important, 3 = normal.
+      Do not include any other text outside the JSON array (or the NO_GAPS sentinel).
+
+  pulse:
+    enabled: true
+    max_beads_per_run: 5
+    cooldown_hours: 48
+    severity_threshold: 3
+  unravel:
+    enabled: true
+    max_beads_per_run: 5
+    cooldown_hours: 168

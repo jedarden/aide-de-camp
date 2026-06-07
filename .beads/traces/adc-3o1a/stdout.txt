@@ -1,0 +1,14 @@
+Everything is wired correctly. The split is complete.
+
+```
+SPLIT_COMPLETE: Created 4 children, parent converted to umbrella
+```
+
+Children: `adc-3owb`, `adc-10rn`, `adc-62zz`, `adc-5ub6`
+
+Chain:
+- `adc-3owb` — Read lines 225-235 and capture raw text
+- `adc-10rn` — Record line 225 content (blank line) → depends on adc-3owb
+- `adc-62zz` — Record lines 226-233 IntentClassification constructor → depends on adc-10rn
+- `adc-5ub6` — Record lines 234-235 closing lines → depends on adc-62zz
+- `adc-3o1a` (parent/umbrella) → depends on adc-5ub6

@@ -1,0 +1,11 @@
+The split is wired up correctly. Parent `adc-5mz` now has the `umbrella` label and depends on the last child `adc-5e8j`.
+
+```
+SPLIT_COMPLETE: Created 3 children, parent converted to umbrella
+```
+
+```
+Children: adc-4367, adc-3rpb, adc-5e8j
+```
+
+Chain: `adc-4367` → `adc-3rpb` → `adc-5e8j` → `adc-5mz` (umbrella)

@@ -1,0 +1,8 @@
+The split is complete and wired correctly. Parent `adc-4uu5` shows `umbrella` label and depends on the last child `adc-20wb`.
+
+```
+SPLIT_COMPLETE: Created 3 children, parent converted to umbrella
+Children: adc-2e57, adc-44ts, adc-20wb
+```
+
+Chain: `adc-2e57` → `adc-44ts` → `adc-20wb` → `adc-4uu5` (umbrella)

@@ -1,0 +1,13 @@
+The split is complete and verified. 
+
+```
+SPLIT_COMPLETE: Created 4 children, parent converted to umbrella
+```
+
+Children:
+- `adc-3lh` — Write tests for default field behavior (TC-FC-020, TC-FC-026)
+- `adc-31m` — Write tests for task-profile always-escalates routing (TC-FC-021, TC-FC-022) — depends on adc-3lh
+- `adc-2qi` — Write tests for urgency field integration (TC-FC-025) — depends on adc-31m
+- `adc-u8r` — Write tests for float precision boundary values (TC-FC-027) — depends on adc-2qi
+
+Parent `adc-310` now depends on `adc-u8r` (last child) and carries the `umbrella` label.

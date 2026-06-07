@@ -1,0 +1,9 @@
+The split is complete and verified.
+
+```
+SPLIT_COMPLETE: Created 3 children, parent converted to umbrella
+```
+
+Children: `adc-av6o`, `adc-82xn`, `adc-5o78`
+
+Chain: `adc-av6o` → `adc-82xn` → `adc-5o78` → `adc-37wa` (umbrella)

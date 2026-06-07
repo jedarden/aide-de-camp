@@ -1,0 +1,15 @@
+The full chain is: `adc-tg9` → `adc-1j8` → `adc-3uy` → `adc-310` → `adc-1dj`
+
+```
+SPLIT_COMPLETE: Created 4 children, parent converted to umbrella
+```
+
+Children: adc-tg9, adc-1j8, adc-3uy, adc-310
+
+**Summary of the split:**
+- **adc-tg9** — Create test fixtures (shared LLM response mocks for all confidence tiers)
+- **adc-1j8** — Write P0/P1 unit tests (confidence threshold routing: TC-FC-001 to TC-FC-010)
+- **adc-3uy** — Write P2 unit tests (edge cases + error conditions: TC-FC-011 to TC-FC-018)
+- **adc-310** — Write P3 unit tests (task-profile routing, urgency, boundary values: TC-FC-019 to TC-FC-027)
+
+Parent `adc-1dj` now has labels `split-child, umbrella` and depends on the last child `adc-310`.
