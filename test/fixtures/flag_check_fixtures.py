@@ -14,7 +14,7 @@ import pytest
 @dataclass
 class LLMResponseMock:
     """Mock LLM response for testing."""
-    json_data: list[dict[str, Any]]
+    json_data: list[dict[str, Any]] | dict[str, Any]
     raw_response: str | None = None
 
     def to_json(self) -> str:
@@ -139,9 +139,46 @@ MISSING_CONFIDENCE = LLMResponseMock(
     }]
 )
 
+# TC-FC-011: Invalid confidence type (string instead of float)
+INVALID_CONFIDENCE_STRING = LLMResponseMock(
+    json_data=[{
+        "intent_type": "status",
+        "confidence": "high",  # String instead of float
+        "project_slug": "options-pipeline",
+        "urgency": "normal",
+        "utterance_fragment": "check the pods",
+        "reasoning": "Confidence as string"
+    }]
+)
+
+# TC-FC-012: Negative confidence value
+NEGATIVE_CONFIDENCE = LLMResponseMock(
+    json_data=[{
+        "intent_type": "action",
+        "confidence": -0.1,
+        "project_slug": None,
+        "urgency": "normal",
+        "utterance_fragment": "restart the service",
+        "reasoning": "Negative confidence"
+    }]
+)
+
+# TC-FC-013: Over-unity confidence (> 1.0)
+OVER_UNITY_CONFIDENCE = LLMResponseMock(
+    json_data=[{
+        "intent_type": "lookup",
+        "confidence": 1.5,
+        "project_slug": "kalshi-tape",
+        "urgency": "normal",
+        "utterance_fragment": "find recent errors",
+        "reasoning": "Confidence exceeds 1.0"
+    }]
+)
+
+# TC-FC-014: Unknown intent type
 UNKNOWN_INTENT_TYPE = LLMResponseMock(
     json_data=[{
-        "intent_type": "invalid-type",
+        "intent_type": "unknown_type",  # Not a recognized intent type
         "confidence": 0.9,
         "project_slug": None,
         "urgency": "normal",
@@ -150,6 +187,60 @@ UNKNOWN_INTENT_TYPE = LLMResponseMock(
     }]
 )
 
+# TC-FC-015: Empty JSON array
+EMPTY_JSON_ARRAY = LLMResponseMock(
+    json_data=[]
+)
+
+# TC-FC-016: Mixed confidence multi-intent (high status, low action, medium lookup)
+MIXED_CONFIDENCE_MULTI = LLMResponseMock(
+    json_data=[
+        {
+            "intent_type": "status",
+            "confidence": 0.95,
+            "project_slug": "options-pipeline",
+            "urgency": "normal",
+            "utterance_fragment": "check the pods",
+            "reasoning": "High confidence status"
+        },
+        {
+            "intent_type": "action",
+            "confidence": 0.4,
+            "project_slug": None,
+            "urgency": "low",
+            "utterance_fragment": "maybe restart it",
+            "reasoning": "Low confidence action"
+        },
+        {
+            "intent_type": "lookup",
+            "confidence": 0.75,
+            "project_slug": "kalshi-tape",
+            "urgency": "normal",
+            "utterance_fragment": "find recent errors",
+            "reasoning": "Medium confidence lookup"
+        }
+    ]
+)
+
+# TC-FC-017: Non-JSON response from LLM
+NON_JSON_RESPONSE = LLMResponseMock(
+    json_data=[],
+    raw_response="I cannot understand that request"
+)
+
+# TC-FC-018: Invalid JSON structure (dict instead of list)
+INVALID_JSON_STRUCTURE = LLMResponseMock(
+    json_data={  # Dict instead of list
+        "intent_type": "status",
+        "confidence": 0.9,
+        "project_slug": "test",
+        "urgency": "normal",
+        "utterance_fragment": "check status",
+        "reasoning": "Wrapped as dict not list"
+    }
+)
+
+# Legacy fixtures for backward compatibility
 MALFORMED_JSON = LLMResponseMock(
     json_data=[],
     raw_response="This is not JSON"
@@ -160,38 +251,9 @@ INCOMPLETE_JSON = LLMResponseMock(
     raw_response='{"intent_type": "status", "confidence": }'
 )
 
-EMPTY_INTENTS_ARRAY = LLMResponseMock(
-    json_data=[]
-)
+EMPTY_INTENTS_ARRAY = EMPTY_JSON_ARRAY
 
-MULTIPLE_MIXED_CONFIDENCE = LLMResponseMock(
-    json_data=[
-        {
-            "intent_type": "status",
-            "confidence": 0.95,
-            "project_slug": "project-a",
-            "urgency": "normal",
-            "utterance_fragment": "check status",
-            "reasoning": "High confidence"
-        },
-        {
-            "intent_type": "action",
-            "confidence": 0.75,
-            "project_slug": None,
-            "urgency": "normal",
-            "utterance_fragment": "do something",
-            "reasoning": "Medium confidence"
-        },
-        {
-            "intent_type": "clarification",
-            "confidence": 0.5,
-            "project_slug": None,
-            "urgency": "normal",
-            "utterance_fragment": "unclear part",
-            "reasoning": "Low confidence"
-        }
-    ]
-)
+MULTIPLE_MIXED_CONFIDENCE = MIXED_CONFIDENCE_MULTI
 
 
 @pytest.fixture
