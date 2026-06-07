@@ -1,14 +1,12 @@
-Everything is wired correctly. The split is complete.
+The split is complete and verified.
 
 ```
-SPLIT_COMPLETE: Created 4 children, parent converted to umbrella
+SPLIT_COMPLETE: Created 3 children, parent converted to umbrella
 ```
 
-Children: `adc-3owb`, `adc-10rn`, `adc-62zz`, `adc-5ub6`
+Children: adc-5o3q, adc-2cu8, adc-1jks
 
-Chain:
-- `adc-3owb` — Read lines 225-235 and capture raw text
-- `adc-10rn` — Record line 225 content (blank line) → depends on adc-3owb
-- `adc-62zz` — Record lines 226-233 IntentClassification constructor → depends on adc-10rn
-- `adc-5ub6` — Record lines 234-235 closing lines → depends on adc-62zz
-- `adc-3o1a` (parent/umbrella) → depends on adc-5ub6
+- **adc-5o3q** — Confirm src/intent/router.py exists and is readable
+- **adc-2cu8** — Record router.py lines 225-235 raw content (depends on adc-5o3q)
+- **adc-1jks** — Document router.py lines 225-235 code construct analysis (depends on adc-2cu8)
+- **adc-3o1a** — Parent now has `umbrella` label and depends on adc-1jks (the last child)
