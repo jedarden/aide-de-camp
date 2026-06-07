@@ -23,6 +23,7 @@ from .realtime.session import VoiceSession, load_voice_prompt, AVAILABLE_VOICES
 from .realtime.dispatch import dispatch_intent, result_listener
 from .realtime.continuity import handle_surface_switch
 from .session.store import get_store as session_store_get_store
+from .memory.extraction import create_memory_handler
 from .sse.broadcaster import SSEBroadcaster, get_broadcaster, EventType, SSEEvent
 from .topic.model import TopicManager
 from .watcher.daemon import BeadWatcher
@@ -245,6 +246,11 @@ async def voice_session(websocket: WebSocket):
         except Exception as e:
             logger.error(f"Surface switch error: {e}", exc_info=True)
 
+    # Memory extraction handler for turn completion
+    memory_handler = create_memory_handler(session_id=session_id, api_key=api_key)
+    if memory_handler:
+        logger.info(f"Memory extraction enabled for session: {session_id}")
+
     # Create voice session
     voice = VoiceSession(
         websocket=websocket,
@@ -254,7 +260,7 @@ async def voice_session(websocket: WebSocket):
         system_message=voice_prompt,
         voice=DEFAULT_VOICE,
         logger=logger,
-        on_turn_done=None,  # TODO: add memory extraction
+        on_turn_done=memory_handler.on_turn_done if memory_handler else None,
         on_surface_switch=on_surface_switch,
     )
 
