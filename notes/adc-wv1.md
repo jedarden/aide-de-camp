@@ -1,33 +1,35 @@
-# ADC-WV1: Utterance Fragment Default Confirmation
+# ADC-WV1: Confirm utterance_fragment default at router.py:230
 
-## Task
-Confirm utterance_fragment default at router.py:230
+## Verification Summary
 
-## Findings
-
-### Exact Line (230)
+Confirmed that `IntentClassification` at router.py:230 is constructed with:
 ```python
 utterance_fragment=intent_data.get('utterance_fragment', utterance),
 ```
 
-### Default Expression
-- Uses `.get('utterance_fragment', utterance)` 
-- If `intent_data` lacks `utterance_fragment` key, defaults to `utterance` variable
-- `utterance` is the original parameter passed to `classify_utterance()` (line 166)
+## Details
 
-### TC-FC-020 Code Path Verified
-The fallback code path (lines 239-249) when JSON parsing fails also uses:
+- **Location:** `src/intent/router.py:230`
+- **Function:** `classify_utterance(self, utterance: str, session_id: str)`
+- **Default expression:** `intent_data.get('utterance_fragment', utterance)`
+- **Fallback behavior:** When LLM response doesn't include 'utterance_fragment' field, defaults to the original `utterance` parameter
+
+## TC-FC-020 Code Path
+
+This test case validates the default fallback behavior when the LLM omits the 'utterance_fragment' field in its response. The code ensures `IntentClassification.utterance_fragment` always has a value, either:
+1. The LLM-provided fragment (if present)
+2. The full original utterance (if omitted)
+
+## Related Code Context
+
+The IntentClassification dataclass (lines 39-47):
 ```python
-IntentClassification(
-    intent_type=IntentType.STATUS,
-    utterance_fragment=utterance,  # Line 245
-    confidence=0.5,
-    reasoning="Classification failed, defaulting to status",
-)
+@dataclass
+class IntentClassification:
+    intent_type: IntentType
+    project_slug: str | None = None
+    confidence: float = 1.0
+    utterance_fragment: str = ""
+    reasoning: str = ""
+    urgency: str = "normal"
 ```
-This provides consistent defaulting behavior when classification fails entirely.
-
-## Acceptance Criteria
-- [x] Exact line confirmed
-- [x] Default expression documented
-- [x] TC-FC-020 code path verified
