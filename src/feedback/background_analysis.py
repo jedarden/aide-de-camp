@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from ..session.store import get_store
 from ..agents.self_modification import SelfModificationAgent, get_self_modification_agent
+from ..sse.broadcaster import get_broadcaster, SSEEvent
 
 
 logger = getLogger(__name__)
@@ -40,6 +41,7 @@ class AnalysisProposal:
     confidence: float
     signals_consulted: int
     generated_at: int
+    session_ids: set[str] = field(default_factory=set)
     data: dict = field(default_factory=dict)
 
     def to_canvas_card(self) -> dict:
@@ -144,16 +146,19 @@ class BackgroundAnalysisProcessor:
         """Analyze signals of a specific type and generate proposals."""
         proposals = []
 
+        # Extract unique session_ids from these signals
+        session_ids = set(s.get("session_id") for s in signals if s.get("session_id"))
+
         if signal_type == "ack_speed":
-            proposals.extend(await self._analyze_ack_speed(signals))
+            proposals.extend(await self._analyze_ack_speed(signals, session_ids))
         elif signal_type == "follow_up_pattern":
-            proposals.extend(await self._analyze_follow_up_patterns(signals))
+            proposals.extend(await self._analyze_follow_up_patterns(signals, session_ids))
         elif signal_type == "surface_switch":
-            proposals.extend(await self._analyze_surface_switches(signals))
+            proposals.extend(await self._analyze_surface_switches(signals, session_ids))
         elif signal_type == "result_requery":
-            proposals.extend(await self._analyze_requeries(signals))
+            proposals.extend(await self._analyze_requeries(signals, session_ids))
         elif signal_type == "result_skipped":
-            proposals.extend(await self._analyze_skipped_results(signals))
+            proposals.extend(await self._analyze_skipped_results(signals, session_ids))
         elif signal_type == "topic_continuation":
             # Topic continuation signals are informational, don't generate proposals
             pass
@@ -163,7 +168,7 @@ class BackgroundAnalysisProcessor:
 
         return proposals
 
-    async def _analyze_ack_speed(self, signals: list[dict]) -> list[AnalysisProposal]:
+    async def _analyze_ack_speed(self, signals: list[dict], session_ids: set[str]) -> list[AnalysisProposal]:
         """
         Analyze acknowledgment speed signals.
 
@@ -218,6 +223,7 @@ class BackgroundAnalysisProcessor:
                     confidence=0.7,
                     signals_consulted=len(signals),
                     generated_at=int(datetime.now(timezone.utc).timestamp()),
+                    session_ids=session_ids,
                     data={"avg_delay_seconds": avg_delay, "worst_surface": worst_surface},
                 ))
             elif worst_surface == "canvas":
@@ -231,12 +237,13 @@ class BackgroundAnalysisProcessor:
                     confidence=0.65,
                     signals_consulted=len(signals),
                     generated_at=int(datetime.now(timezone.utc).timestamp()),
+                    session_ids=session_ids,
                     data={"avg_delay_seconds": avg_delay, "worst_surface": worst_surface},
                 ))
 
         return proposals
 
-    async def _analyze_follow_up_patterns(self, signals: list[dict]) -> list[AnalysisProposal]:
+    async def _analyze_follow_up_patterns(self, signals: list[dict], session_ids: set[str]) -> list[AnalysisProposal]:
         """
         Analyze follow-up pattern signals.
 
@@ -266,6 +273,7 @@ class BackgroundAnalysisProcessor:
                         confidence=0.8,
                         signals_consulted=len(signals),
                         generated_at=int(datetime.now(timezone.utc).timestamp()),
+                        session_ids=session_ids,
                         data={"follow_up_type": f_type, "count": count},
                     ))
                 elif f_type == "temporal_question":
@@ -278,6 +286,7 @@ class BackgroundAnalysisProcessor:
                         confidence=0.75,
                         signals_consulted=len(signals),
                         generated_at=int(datetime.now(timezone.utc).timestamp()),
+                        session_ids=session_ids,
                         data={"follow_up_type": f_type, "count": count},
                     ))
                 elif f_type == "more_detail":
@@ -290,12 +299,13 @@ class BackgroundAnalysisProcessor:
                         confidence=0.7,
                         signals_consulted=len(signals),
                         generated_at=int(datetime.now(timezone.utc).timestamp()),
+                        session_ids=session_ids,
                         data={"follow_up_type": f_type, "count": count},
                     ))
 
         return proposals
 
-    async def _analyze_surface_switches(self, signals: list[dict]) -> list[AnalysisProposal]:
+    async def _analyze_surface_switches(self, signals: list[dict], session_ids: set[str]) -> list[AnalysisProposal]:
         """
         Analyze surface switch signals.
 
@@ -320,12 +330,13 @@ class BackgroundAnalysisProcessor:
                 confidence=0.85,
                 signals_consulted=len(signals),
                 generated_at=int(datetime.now(timezone.utc).timestamp()),
+                session_ids=session_ids,
                 data={"audio_to_canvas_count": audio_to_canvas_count},
             ))
 
         return proposals
 
-    async def _analyze_requeries(self, signals: list[dict]) -> list[AnalysisProposal]:
+    async def _analyze_requeries(self, signals: list[dict], session_ids: set[str]) -> list[AnalysisProposal]:
         """
         Analyze re-query signals.
 
@@ -356,12 +367,13 @@ class BackgroundAnalysisProcessor:
                     confidence=0.75,
                     signals_consulted=len(signals),
                     generated_at=int(datetime.now(timezone.utc).timestamp()),
+                    session_ids=session_ids,
                     data={"utterance": utterance, "max_attempts": max_attempts},
                 ))
 
         return proposals
 
-    async def _analyze_skipped_results(self, signals: list[dict]) -> list[AnalysisProposal]:
+    async def _analyze_skipped_results(self, signals: list[dict], session_ids: set[str]) -> list[AnalysisProposal]:
         """
         Analyze skipped result signals.
 
@@ -382,6 +394,7 @@ class BackgroundAnalysisProcessor:
                 confidence=0.6,
                 signals_consulted=len(signals),
                 generated_at=int(datetime.now(timezone.utc).timestamp()),
+                session_ids=session_ids,
                 data={"skipped_count": skipped_count},
             ))
 
@@ -397,11 +410,23 @@ class BackgroundAnalysisProcessor:
                 proposals = await self.analyze_signals()
 
                 if proposals:
-                    # Surface proposals as canvas cards
+                    # Surface proposals as canvas cards via SSE
+                    broadcaster = get_broadcaster()
                     for proposal in proposals:
                         card = proposal.to_canvas_card()
-                        # TODO: Send to canvas via SSE
-                        logger.info(f"Generated proposal: {proposal.change_summary}")
+
+                        # Broadcast to each relevant session
+                        for session_id in proposal.session_ids:
+                            event = SSEEvent(
+                                event_type="artifact_proposal",
+                                data=card,
+                                target_session_id=session_id,
+                            )
+                            sent_count = await broadcaster.broadcast(event)
+                            logger.info(
+                                f"Broadcast proposal {proposal.proposal_id} to session {session_id}: "
+                                f"{proposal.change_summary} (sent to {sent_count} connections)"
+                            )
 
                 # Wait for next cycle
                 await asyncio.sleep(self.check_interval)
