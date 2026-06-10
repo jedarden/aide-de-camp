@@ -25,7 +25,7 @@ Error processing line 4 of /home/coding/.local/lib/python3.13/site-packages/_cud
   ModuleNotFoundError: No module named 'cuda'
 ```
 
-**Anomaly:** Background analysis loop error during lifespan startup:
+**Anomaly (FIXED):** Background analysis loop error during lifespan startup:
 ```
 Error in background analysis loop: 'id'
 Traceback (most recent call last):
@@ -36,7 +36,9 @@ Traceback (most recent call last):
 KeyError: 'id'
 ```
 
-This error occurs in `src/feedback/background_analysis.py:124` where the code assumes all signal dictionaries have an 'id' key. The server continues running despite this error.
+**Root Cause:** Column name mismatch. The code at line 124 used `s["id"]` but the database schema uses `signal_id` as the primary key column (src/session/store.py:139).
+
+**Fix Applied:** Changed `s["id"]` to `s["signal_id"]` in src/feedback/background_analysis.py:124. Verified in re-run - no errors, clean startup.
 
 #### ✅ 2. GET /health
 **Status:** PASS  
@@ -93,8 +95,6 @@ This error occurs in `src/feedback/background_analysis.py:124` where the code as
 ### Summary
 
 **Pass:** 6/6 core assertions  
-**Anomalies:** 1 (background analysis KeyError)
+**Bugs Fixed:** 1 (trivial column name mismatch in background_analysis.py)
 
-The background analysis error in `src/feedback/background_analysis.py:124` is a non-blocking issue but should be investigated. The code assumes all signals have an 'id' field, but some signal objects in the signals list are missing this field. A defensive check like `signal_ids = [s.get("id") for s in signals if "id" in s]` or investigating the source of malformed signals would resolve this.
-
-All critical HTTP and SSE endpoints function correctly. Server startup, health checks, canvas serving, surface registration, and event streaming all work as expected.
+All critical HTTP and SSE endpoints function correctly. Server startup, health checks, canvas serving, surface registration, and event streaming all work as expected. The background analysis KeyError was a trivial bug - column name mismatch (`id` vs `signal_id`) - fixed and verified.

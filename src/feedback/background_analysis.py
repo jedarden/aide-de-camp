@@ -121,7 +121,7 @@ class BackgroundAnalysisProcessor:
             proposals.extend(type_proposals)
 
         # Mark processed signals
-        signal_ids = [s["id"] for s in signals]
+        signal_ids = [s["signal_id"] for s in signals]
         await self.store.mark_signals_processed(signal_ids)
 
         logger.info(f"Generated {len(proposals)} proposals from {len(signals)} signals")
