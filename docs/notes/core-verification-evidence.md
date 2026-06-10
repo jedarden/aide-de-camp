@@ -202,3 +202,126 @@ All critical HTTP and SSE endpoints function correctly. Server startup, health c
 - Clean shutdown confirmed
 
 **No new code modifications required.** All tested functionality works as specified.
+
+---
+
+## Smoke Test - 2026-06-10 22:41 UTC (Final Verification)
+
+**Purpose:** Final verification after bug fix confirmation  
+**Bead:** adc-dmu (final test before close)  
+**Commit:** Pre-close verification
+
+### Test Execution
+- **Timestamp:** 2026-06-10 22:41 UTC
+- **Server Command:** `python3 -m uvicorn src.main:app --host 127.0.0.1 --port 8000`
+- **Test Duration:** ~5 minutes
+- **Server PID:** 1507875
+
+### Results
+
+#### 1. Server Startup ✅
+- **Status**: PASS
+- **Details**: Server started successfully
+- **Startup Log**:
+  ```
+  INFO:     Started server process [1507875]
+  INFO:     Waiting for application startup.
+  INFO:     Application startup complete.
+  INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+  ```
+- **Lifespan Services**: All initialized cleanly (NO KeyError):
+  - Session store initialized ✓
+  - SSE broadcaster started ✓
+  - Topic manager initialized ✓
+  - Surface router initialized ✓
+  - Component library initialized ✓
+  - Hot-reload manager initialized ✓
+  - Feedback processor initialized ✓
+  - Ambient monitor started ✓
+  - Context warmer started ✓
+  - Background analysis processor started ✓ (previous fix confirmed working)
+  - Bead watcher started ✓
+
+#### 2. GET /health ✅
+- **Status**: PASS
+- **Response**: 200 OK
+- **Body**: `{"status":"ok","service":"adc-voice"}`
+
+#### 3. GET / (Canvas Serving) ✅
+- **Status**: PASS
+- **Response**: 200 OK
+- **Content-Type**: text/html; charset=utf-8
+- **Content-Length**: 23736 bytes
+- **Served**: src/canvas/index.html
+
+#### 4. POST /api/v1/surfaces/register ✅
+- **Status**: PASS
+- **Response**: 200 OK
+- **Sample**: `{"surface_id":"55ee8fb5-eb8f-4d41-a7eb-cfefe33720cf","session_id":"01862d05-a26d-47e6-bbc2-bd392c5bc687"}`
+
+#### 5. GET /api/v1/sse (SSE Connection) ✅
+- **Status**: PASS
+- **Response**: 200 OK
+- **Content-Type**: text/event-stream; charset=utf-8
+- **Cache-Control**: no-cache
+- **Connection**: keep-alive
+- **X-Accel-Buffering**: no
+- **Duration Test**: Verified >= 3 seconds connection duration
+- **Initial Events Received**:
+  ```
+  event: connected
+  data: {"surface_id": "...", "session_id": "..."}
+
+  event: workload_summary
+  data: {"pending_intents": 0, "new_results": 0, "unresolved_exceptions": 0}
+
+  event: topic_cards
+  data: {"cards": []}
+  ```
+
+#### 6. GET /events (Legacy SSE) ✅
+- **Status**: PASS
+- **Response**: 200 OK
+- **Content-Type**: text/event-stream; charset=utf-8
+- **Behavior**: Identical to /api/v1/sse (backward compatibility confirmed)
+
+#### 7. Server Shutdown ✅
+- **Status**: PASS
+- **Method**: SIGINT (graceful shutdown)
+- **Shutdown Log**:
+  ```
+  INFO:     Shutting down
+  INFO:     Waiting for application shutdown.
+  INFO:     Application shutdown complete.
+  INFO:     Finished server process [1507875]
+  ```
+
+### Request Log
+All HTTP/SSE requests logged successfully:
+```
+INFO: 127.0.0.1:43060 - "GET /health HTTP/1.1" 200 OK
+INFO: 127.0.0.1:43072 - "GET / HTTP/1.1" 200 OK
+INFO: 127.0.0.1:53812 - "POST /api/v1/surfaces/register HTTP/1.1" 200 OK
+INFO: 127.0.0.1:53816 - "POST /api/v1/surfaces/register HTTP/1.1" 200 OK
+INFO: 127.0.0.1:53830 - "GET /api/v1/sse?session_id=smoke-sse-1781131273&surface_id=... HTTP/1.1" 200 OK
+INFO: 127.0.0.1:45480 - "GET /api/v1/sse?session_id=test-session&surface_id=test-surface HTTP/1.1" 200 OK
+INFO: 127.0.0.1:46526 - "GET /events?session_id=test&surface_id=test-surface HTTP/1.1" 200 OK
+INFO: 127.0.0.1:42136 - "POST /api/v1/surfaces/register HTTP/1.1" 200 OK
+INFO: 127.0.0.1:42150 - "GET /api/v1/sse?session_id=smoke-duration-1781131299&surface_id=... HTTP/1.1" 200 OK
+INFO: 127.0.0.1:38072 - "POST /api/v1/surfaces/register HTTP/1.1" 200 OK
+INFO: 127.0.0.1:38078 - "GET /api/v1/sse?session_id=smoke-keepalive-1781131324&surface_id=... HTTP/1.1" 200 OK
+```
+
+### Summary
+
+**All 7 smoke test assertions PASSED.** Final verification confirms:
+- HTTP endpoints respond correctly
+- Canvas HTML served successfully  
+- SSE streaming functional on both modern (/api/v1/sse) and legacy (/events) endpoints
+- SSE connections maintain state for >= 3 seconds
+- Background services initialize without error (previous KeyError fix confirmed stable)
+- Clean shutdown confirmed via SIGINT
+
+**No code modifications required.** All tested functionality works as specified.
+
+**Anomalies Detected:** None (previous background_analysis KeyError confirmed fixed in commit be62853)
