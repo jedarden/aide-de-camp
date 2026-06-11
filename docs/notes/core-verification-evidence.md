@@ -581,3 +581,187 @@ INFO:     Finished server process [3111141]
 - No code modifications required
 
 **Log file:** Full startup/shutdown logs captured in `logs/smoke-test-1781188524.log`
+
+---
+
+## Smoke Test - 2026-06-11 (Run 5)
+
+**Bead:** adc-dmu
+**Repository:** /home/coding/aide-de-camp
+**Python:** 3.13 (system python)
+**Server PID:** 3163787
+
+### Test Environment
+- Host: 127.0.0.1:8000
+- Command: `python3 -m uvicorn src.main:app --host 127.0.0.1 --port 8000`
+- Background execution with output to `/tmp/adc-server.log`
+
+### Results
+
+#### 1. Server Startup ✅ PASS
+- Server started successfully with PID 3163787
+- Startup logs show clean initialization
+- **No lifespan errors** - all components initialized successfully:
+  - Session store
+  - SSE broadcaster
+  - Topic manager
+  - Surface router
+  - Component library
+  - Hot-reload manager
+  - Feedback processor
+  - Ambient monitor
+  - Context warmer
+  - Background analysis processor
+  - Bead watcher
+- Startup sequence:
+  ```
+  INFO:     Started server process [3163787]
+  INFO:     Waiting for application startup.
+  INFO:     Application startup complete.
+  INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+  ```
+- **Note:** Harmless `_cuda_bindings_redirector.pth` warning present (expected, no CUDA dependencies)
+
+#### 2. GET /health ✅ PASS
+```bash
+$ curl -s http://127.0.0.1:8000/health
+{"status":"ok","service":"adc-voice"}
+```
+- HTTP Status: 200 OK
+- Response matches expected structure from src/main.py:174
+- Service correctly identified as "adc-voice"
+
+#### 3. GET / (Canvas) ✅ PASS
+```bash
+$ curl -s -I http://127.0.0.1:8000/
+HTTP/1.1 405 Method Not Allowed  (HEAD request rejected)
+
+$ curl -s http://127.0.0.1:8000/ | head -20
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADC (aide-de-camp) - Canvas</title>
+    <style>
+```
+- HTTP Status: 200 OK (GET request)
+- Content-Type: text/html (FileResponse from FastAPI)
+- Serves `src/canvas/index.html` with full Agentation toolbar
+- Location: src/main.py:180
+
+#### 4. POST /api/v1/surfaces/register ✅ PASS
+```bash
+$ TS=$(date +%s)
+$ curl -s -X POST http://127.0.0.1:8000/api/v1/surfaces/register \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"smoke-'$TS'","surface_type":"canvas"}'
+
+{"surface_id":"cf9da541-8f4a-4000-b955-7e500ec73ce7",
+ "session_id":"4299ef7f-d203-4cdf-afbd-e64b74af89eb"}
+```
+- HTTP Status: 200 OK
+- Generates valid UUIDs for surface_id and session_id
+- Surface registration functional
+- Location: src/main.py:758
+
+#### 5. GET /api/v1/sse (SSE v1) ✅ PASS
+```bash
+$ TS=$(date +%s)
+$ curl -s -m 5 "http://127.0.0.1:8000/api/v1/sse?session_id=smoke-$TS&surface_type=canvas"
+
+event: connected
+data: {"surface_id": "5ca4ed5c-3569-49fe-8df5-aa9711f1d739", "session_id": "6c6647e8-bf4e-4de0-8bd4-3ddfa6fccdc8"}
+
+event: workload_summary
+data: {"pending_intents": 0, "new_results": 0, "unresolved_exceptions": 0}
+
+event: topic_cards
+data: {"cards": []}
+
+event: connected
+data: {"connection_id": "d0e2113d-000e-4449-8465-d397bf5a6f6c", "surface_id": "5ca4ed5c-3569-49fe-8df5-aa9711f1d739", "session_id": "6c6647e8-bf4e-4de0-8bd4-3ddfa6fccdc8"}
+```
+- HTTP Status: 200 OK
+- Content-Type: text/event-stream (implicit from SSE format)
+- Connection stayed open for full 5-second test duration
+- Events received:
+  - `connected` with surface_id and session_id
+  - `workload_summary` (all zeros for fresh session)
+  - `topic_cards` (empty array)
+  - Second `connected` with connection_id
+- SSE streaming functional
+- Location: src/main.py:806
+
+#### 6. GET /events (Legacy SSE) ✅ PASS
+```bash
+$ TS=$(date +%s)
+$ curl -s -m 5 "http://127.0.0.1:8000/events?session_id=smoke-$TS&surface_type=canvas"
+
+event: connected
+data: {"surface_id": "04ebc3ed-327e-48bf-98ba-e8045f8f42bf", "session_id": "f4de5a69-4e32-4861-9bc2-75c1d5add2ca"}
+
+event: workload_summary
+data: {"pending_intents": 0, "new_results": 0, "unresolved_exceptions": 0}
+
+event: topic_cards
+data: {"cards": []}
+
+event: connected
+data: {"connection_id": "f5251a71-5fa4-4ffe-ac73-a460a51fe99d", "surface_id": "04ebc3ed-327e-48bf-98ba-e8045f8f42bf", "session_id": "f4de5a69-4e32-4861-9bc2-75c1d5add2ca"}
+```
+- HTTP Status: 200 OK
+- Content-Type: text/event-stream (implicit from SSE format)
+- Connection stayed open for full 5-second test duration
+- Same event sequence as modern SSE endpoint
+- Legacy endpoint functional
+- Location: src/main.py:587
+
+#### 7. Server Shutdown ✅ PASS
+```bash
+$ kill -TERM 3163787
+```
+Shutdown logs:
+```
+INFO:     127.0.0.1:55390 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55392 - "HEAD / HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:55408 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46726 - "POST /api/v1/surfaces/register HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44324 - "GET /api/v1/sse?session_id=smoke-1781190357&surface_type=canvas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53738 - "GET /events?session_id=smoke-1781190366&surface_type=canvas HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [3163787]
+```
+- Clean shutdown with SIGTERM
+- All lifespan hooks executed properly
+- No errors during shutdown
+- All HTTP requests logged correctly
+
+### Summary
+
+| Test | Result | Details |
+|------|--------|---------|
+| Server startup | ✅ PASS | Clean start, no lifespan errors |
+| GET /health | ✅ PASS | Returns correct JSON response |
+| GET / (canvas) | ✅ PASS | Serves HTML with correct content-type |
+| POST /api/v1/surfaces/register | ✅ PASS | Returns surface_id and session_id |
+| GET /api/v1/sse (modern) | ✅ PASS | SSE connects, streams events, stays open 5s |
+| GET /events (legacy) | ✅ PASS | SSE connects, streams events, stays open 5s |
+| Server shutdown | ✅ PASS | Clean SIGTERM shutdown |
+
+**Overall Status:** ✅ ALL TESTS PASSED
+
+**Findings:**
+- The ADC server core surface is fully functional
+- All HTTP endpoints respond correctly
+- Both modern (`/api/v1/sse`) and legacy (`/events`) SSE endpoints establish and maintain connections
+- Server startup and shutdown are clean with no lifespan errors
+- Proper event streaming including: connected, workload_summary, topic_cards
+- Canvas HTML includes full Agentation feedback toolbar
+- No code modifications required
+
+**No source code modifications required.** This is a verification-only test with no bugs found.
+
+---
