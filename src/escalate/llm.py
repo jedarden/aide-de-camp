@@ -18,8 +18,11 @@ import httpx
 
 logger = getLogger(__name__)
 
-# ZAI proxy endpoint
-ZAI_PROXY_URL = "http://llm-proxy.ardenone.com/v1/messages"
+# ZAI proxy endpoint — overridable via env var for local dev
+ZAI_PROXY_URL = os.environ.get(
+    "ZAI_PROXY_URL",
+    "https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages",
+)
 
 # Default model for bead formulation
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
@@ -106,7 +109,7 @@ class ZAIClient:
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client."""
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=self.timeout)
+            self._client = httpx.AsyncClient(timeout=self.timeout, verify=False)
         return self._client
 
     async def close(self) -> None:
@@ -151,15 +154,18 @@ class ZAIClient:
             response.raise_for_status()
             data = response.json()
 
+            # ZAI proxy wraps the Anthropic response under "result"
+            payload = data.get("result", data)
+
             # Extract content from response
-            content = data.get("content", [])
+            content = payload.get("content", [])
             if content and isinstance(content, list) and len(content) > 0:
                 text = content[0].get("text", "")
             else:
                 text = str(content)
 
             # Extract usage
-            usage = data.get("usage", {})
+            usage = payload.get("usage", data.get("usage", {}))
             input_tokens = usage.get("input_tokens", 0)
             output_tokens = usage.get("output_tokens", 0)
 
@@ -167,10 +173,10 @@ class ZAIClient:
 
             return LLMResponse(
                 content=text,
-                model=data.get("model", request.model),
+                model=payload.get("model", request.model),
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
-                finish_reason=data.get("stop_reason"),
+                finish_reason=payload.get("stop_reason"),
             )
 
         except asyncio.TimeoutError as e:

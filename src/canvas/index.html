@@ -763,5 +763,206 @@
 
         init();
     </script>
+
+    <!-- ── Agentation: element-selector feedback toolbar ────────────────────── -->
+    <script>
+    (function () {
+        var active = false;
+        var selectedEl = null;
+
+        // Build a stable CSS selector for a given element
+        function buildSelector(el) {
+            if (!el || el === document.body) return 'body';
+            var parts = [];
+            var cur = el;
+            while (cur && cur !== document.body && cur !== document.documentElement) {
+                if (cur.id) { parts.unshift('#' + cur.id); break; }
+                var tag = cur.tagName.toLowerCase();
+                var classes = Array.from(cur.classList)
+                    .filter(function (c) { return c.length > 1; })
+                    .slice(0, 2);
+                var part = tag + (classes.length ? '.' + classes.join('.') : '');
+                // add nth-of-type when siblings share the same tag
+                if (cur.parentElement) {
+                    var sibs = Array.from(cur.parentElement.children)
+                        .filter(function (s) { return s.tagName === cur.tagName; });
+                    if (sibs.length > 1) part += ':nth-of-type(' + (sibs.indexOf(cur) + 1) + ')';
+                }
+                parts.unshift(part);
+                cur = cur.parentElement;
+            }
+            return parts.join(' > ');
+        }
+
+        // Highlight box
+        var hlBox = document.createElement('div');
+        hlBox.style.cssText = [
+            'position:fixed', 'pointer-events:none', 'z-index:9998',
+            'border:2px solid #3b82f6', 'background:rgba(59,130,246,.08)',
+            'border-radius:4px', 'display:none', 'transition:all .08s'
+        ].join(';');
+        document.body.appendChild(hlBox);
+
+        function moveHighlight(el) {
+            if (!el || el === document.body) { hlBox.style.display = 'none'; return; }
+            var r = el.getBoundingClientRect();
+            hlBox.style.cssText = hlBox.style.cssText; // keep existing
+            hlBox.style.display = 'block';
+            hlBox.style.left  = (r.left   - 2) + 'px';
+            hlBox.style.top   = (r.top    - 2) + 'px';
+            hlBox.style.width = (r.width  + 4) + 'px';
+            hlBox.style.height= (r.height + 4) + 'px';
+        }
+
+        // Popover
+        var pop = document.createElement('div');
+        pop.style.cssText = [
+            'position:fixed', 'z-index:9999', 'display:none', 'width:300px',
+            'background:#1e293b', 'border:1px solid #3b82f6', 'border-radius:8px',
+            'padding:12px', 'box-shadow:0 8px 32px rgba(0,0,0,.5)',
+            'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif'
+        ].join(';');
+        pop.innerHTML = [
+            '<div id="atn-sel" style="font-size:11px;color:#64748b;margin-bottom:6px;',
+                'font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>',
+            '<textarea id="atn-txt" rows="3" placeholder="Describe what to change…" style="',
+                'width:100%;box-sizing:border-box;background:#0f1419;border:1px solid #334155;',
+                'color:#e2e8f0;border-radius:6px;padding:8px;font-size:13px;',
+                'resize:none;font-family:inherit;outline:none"></textarea>',
+            '<div style="display:flex;gap:6px;margin-top:8px">',
+                '<button id="atn-cancel" style="flex:1;padding:6px;background:#334155;border:none;',
+                    'color:#94a3b8;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>',
+                '<button id="atn-send" style="flex:1;padding:6px;background:#3b82f6;border:none;',
+                    'color:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500">',
+                    'Send feedback</button>',
+            '</div>'
+        ].join('');
+        document.body.appendChild(pop);
+
+        function positionPop(el) {
+            var r = el.getBoundingClientRect();
+            var top  = r.bottom + 8;
+            var left = r.left;
+            if (top  + 180 > window.innerHeight) top  = r.top - 188;
+            if (left + 308 > window.innerWidth)  left = window.innerWidth - 316;
+            if (left < 8) left = 8;
+            pop.style.top  = top  + 'px';
+            pop.style.left = left + 'px';
+            pop.style.display = 'block';
+        }
+
+        // Toggle button (bottom-right corner)
+        var toggleBtn = document.createElement('button');
+        toggleBtn.id = 'atn-btn';
+        toggleBtn.textContent = '✏️ Feedback';
+        toggleBtn.title = 'Click any element to give UI feedback';
+        toggleBtn.style.cssText = [
+            'position:fixed', 'bottom:16px', 'right:16px', 'z-index:9997',
+            'padding:8px 14px', 'background:#1e293b', 'border:1px solid #334155',
+            'color:#94a3b8', 'border-radius:20px', 'cursor:pointer', 'font-size:13px',
+            'font-family:inherit', 'transition:all .15s'
+        ].join(';');
+        document.body.appendChild(toggleBtn);
+
+        function enterMode() {
+            active = true;
+            toggleBtn.style.background = '#1e3a5f';
+            toggleBtn.style.borderColor = '#3b82f6';
+            toggleBtn.style.color = '#60a5fa';
+            toggleBtn.textContent = '✕ Cancel';
+            document.body.style.cursor = 'crosshair';
+        }
+
+        function exitMode() {
+            active = false;
+            selectedEl = null;
+            hlBox.style.display = 'none';
+            pop.style.display = 'none';
+            toggleBtn.style.background = '#1e293b';
+            toggleBtn.style.borderColor = '#334155';
+            toggleBtn.style.color = '#94a3b8';
+            toggleBtn.textContent = '✏️ Feedback';
+            document.body.style.cursor = '';
+            document.getElementById('atn-txt').value = '';
+        }
+
+        toggleBtn.addEventListener('click', function () {
+            if (active) exitMode(); else enterMode();
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (!active || pop.style.display === 'block') return;
+            var t = e.target;
+            if (t === toggleBtn || t === hlBox || t.closest('#atn-popover')) return;
+            moveHighlight(t);
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!active) return;
+            if (e.target === toggleBtn || e.target.closest && e.target.closest('[id^="atn-"]')) return;
+            e.preventDefault();
+            e.stopPropagation();
+            selectedEl = e.target;
+            document.getElementById('atn-sel').textContent = buildSelector(selectedEl);
+            document.getElementById('atn-txt').value = '';
+            positionPop(selectedEl);
+            setTimeout(function () { document.getElementById('atn-txt').focus(); }, 30);
+        }, true);
+
+        document.getElementById('atn-cancel').addEventListener('click', exitMode);
+
+        document.getElementById('atn-txt').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFeedback(); }
+            if (e.key === 'Escape') exitMode();
+        });
+
+        document.getElementById('atn-send').addEventListener('click', sendFeedback);
+
+        async function sendFeedback() {
+            var text = document.getElementById('atn-txt').value.trim();
+            if (!text || !selectedEl) return;
+            var sel     = buildSelector(selectedEl);
+            var elHtml  = selectedEl.outerHTML.slice(0, 2000);
+            var sendBtn = document.getElementById('atn-send');
+            sendBtn.textContent = 'Sending…';
+            sendBtn.disabled = true;
+            try {
+                await fetch('/api/v1/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        feedback: text,
+                        feedback_type: 'component_iteration',
+                        context: { selector: sel, element_html: elHtml },
+                        session_id: sessionId,
+                    }),
+                });
+                showToast('Feedback sent');
+            } catch (err) {
+                showToast('Failed to send', true);
+                console.error('Feedback error:', err);
+            }
+            exitMode();
+        }
+
+        function showToast(msg, isError) {
+            var t = document.createElement('div');
+            t.style.cssText = [
+                'position:fixed', 'bottom:56px', 'right:16px', 'z-index:10000',
+                'background:' + (isError ? '#7f1d1d' : '#166534'),
+                'color:'      + (isError ? '#fca5a5' : '#86efac'),
+                'padding:8px 14px', 'border-radius:8px', 'font-size:13px',
+                'pointer-events:none', 'transition:opacity .3s',
+                'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif'
+            ].join(';');
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(function () {
+                t.style.opacity = '0';
+                setTimeout(function () { t.remove(); }, 300);
+            }, 2500);
+        }
+    })();
+    </script>
 </body>
 </html>

@@ -289,9 +289,9 @@ class SessionStore:
                 return dict(row) if row else None
 
     # Utterance operations
-    async def create_utterance(self, session_id: str, raw_text: str) -> str:
+    async def create_utterance(self, session_id: str, raw_text: str, utterance_id: str | None = None) -> str:
         """Create a new utterance and return its ID."""
-        utterance_id = str(uuid4())
+        utterance_id = utterance_id or str(uuid4())
         now = int(datetime.now().timestamp())
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
