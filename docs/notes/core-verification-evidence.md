@@ -151,3 +151,100 @@ This document contains smoke test evidence for ADC (aide-de-camp) core surface v
 **All tests passed.** The ADC server starts correctly, serves the canvas, responds to health checks, registers surfaces, and maintains SSE connections for both v1 and legacy endpoints.
 
 **No bugs or fixes required.**
+
+---
+
+## Smoke Test - 2026-06-11 (Run 2)
+
+**Bead:** adc-dmu
+**Tested by:** claude-fable-5
+
+### Test Environment
+- Host: 127.0.0.1:8000
+- Python: 3.13 (system python)
+- Server PID: 2973985
+
+### Results
+
+#### 1. Server Startup
+**Status:** ✅ PASS
+- Command: `python3 -m uvicorn src.main:app --host 127.0.0.1 --port 8000`
+- Startup logs: No errors, clean startup
+- Lifespan events: All components initialized (session store, SSE broadcaster, topic manager, surface router, component library, hot-reload manager, feedback processor, ambient monitor, context warmer, background processor, bead watcher)
+- Notes: Harmless CUDA warning present in `_cuda_bindings_redirector.pth` but no impact on functionality
+
+#### 2. GET /health
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Response: `{"status":"ok","service":"adc-voice"}`
+- Location: src/main.py:174
+
+#### 3. GET / (Canvas)
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Content-Type: text/html; charset=utf-8
+- Content-Length: 33001 bytes
+- Serves: src/canvas/index.html
+- Location: src/main.py:180
+
+#### 4. POST /api/v1/surfaces/register
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Response:
+  ```json
+  {
+    "surface_id": "0f96e83a-3382-4313-a7d4-f1647b8a1a4b",
+    "session_id": "8839384f-0bdf-4026-b02a-2e6c4fa3ab67"
+  }
+  ```
+- Location: src/main.py:758
+
+#### 5. GET /api/v1/sse (SSE v1)
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Content-Type: text/event-stream
+- Connection duration: 3s (tested)
+- Events received:
+  - `connected` event with surface_id and session_id
+  - `workload_summary` event (pending_intents: 0, new_results: 0, unresolved_exceptions: 0)
+- Stream remained open for full test duration
+- Location: src/main.py:806
+
+#### 6. GET /events (Legacy SSE)
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Content-Type: text/event-stream
+- Connection duration: 3s (tested)
+- Events received:
+  - `connected` event with surface_id and session_id
+  - `workload_summary` event (pending_intents: 0, new_results: 0, unresolved_exceptions: 0)
+- Stream remained open for full test duration
+- Location: src/main.py:587
+
+#### 7. Server Shutdown
+**Status:** ✅ PASS
+- Method: SIGTERM (kill)
+- Shutdown logs:
+  ```
+  INFO:     Shutting down
+  INFO:     Waiting for application shutdown.
+  INFO:     Application shutdown complete.
+  INFO:     Finished server process [2973985]
+  ```
+- Clean shutdown with proper lifespan cleanup
+
+### Summary
+
+| Test | Result |
+|------|--------|
+| Server startup | ✅ PASS |
+| GET /health | ✅ PASS |
+| GET / (canvas) | ✅ PASS |
+| POST /api/v1/surfaces/register | ✅ PASS |
+| GET /api/v1/sse (modern SSE) | ✅ PASS |
+| GET /events (legacy SSE) | ✅ PASS |
+| Server shutdown | ✅ PASS |
+
+**Overall Status:** ✅ ALL TESTS PASSED
+
+**No source code modifications required. All endpoints responded correctly and SSE connections maintained properly.**
