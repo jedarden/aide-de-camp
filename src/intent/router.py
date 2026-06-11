@@ -6,6 +6,7 @@ Uses LLM to classify intents by type and project, then routes:
 - other intents → fetch + synthesize strands
 """
 import asyncio
+import json
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -209,8 +210,6 @@ class IntentRouter:
             )
 
             # Parse JSON response
-            import json
-
             intents_data = json.loads(response)
             classifications = []
 
