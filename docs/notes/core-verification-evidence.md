@@ -75,3 +75,79 @@ This document contains smoke test evidence for ADC (aide-de-camp) core surface v
 **All tests passed.** The ADC server starts correctly, serves the canvas, responds to health checks, registers surfaces, and maintains SSE connections for both v1 and legacy endpoints.
 
 **No bugs or fixes required.**
+
+---
+
+## Smoke Test - 2026-06-11
+
+### Test Environment
+- Host: 127.0.0.1:8000
+- Python: 3.13 (system python)
+- Test session: smoke-$(timestamp)
+- Actual session_id: b29d2f7d-88ad-44ba-a8dd-69810b057645
+- Actual surface_id: 435a9ac9-3498-4379-b655-910afc8ac8a7
+
+### Results
+
+#### 1. Server Startup
+**Status:** ✅ PASS
+- Command: `python3 -m uvicorn src.main:app --host 127.0.0.1 --port 8000`
+- Startup logs show no lifespan errors
+- All watcher/monitoring daemons started successfully
+- Only harmless warning: `_cuda_bindings_redirector.pth` (expected, no CUDA on this system)
+
+#### 2. GET /health
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Response: `{"status":"ok","service":"adc-voice"}`
+- Location: src/main.py:174
+
+#### 3. GET / (Canvas)
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Content-Type: text/html; charset=utf-8
+- Serves: src/canvas/index.html
+- Location: src/main.py:180
+
+#### 4. POST /api/v1/surfaces/register
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Response contains surface_id and session_id
+- Sample response:
+  ```json
+  {
+    "surface_id": "435a9ac9-3498-4379-b655-910afc8ac8a7",
+    "session_id": "b29d2f7d-88ad-44ba-a8dd-69810b057645"
+  }
+  ```
+- Location: src/main.py:758
+
+#### 5. GET /api/v1/sse (SSE v1)
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Content-Type: text/event-stream (inferred from SSE format)
+- Connection duration: 4s (tested with timeout)
+- Events received:
+  - `connected` with surface_id and session_id
+  - `workload_summary` (pending_intents: 0, new_results: 0, unresolved_exceptions: 0)
+  - `topic_cards` (empty array)
+- Location: src/main.py:806
+
+#### 6. GET /events (Legacy SSE)
+**Status:** ✅ PASS
+- HTTP Status: 200
+- Content-Type: text/event-stream (inferred from SSE format)
+- Connection duration: 4s (tested with timeout)
+- Events received: Same as v1 SSE (connected, workload_summary, topic_cards)
+- Location: src/main.py:587
+
+#### 7. Server Shutdown
+**Status:** ✅ PASS
+- Clean shutdown with SIGINT (kill -INT)
+- All services terminated without errors
+
+### Summary
+
+**All tests passed.** The ADC server starts correctly, serves the canvas, responds to health checks, registers surfaces, and maintains SSE connections for both v1 and legacy endpoints.
+
+**No bugs or fixes required.**
