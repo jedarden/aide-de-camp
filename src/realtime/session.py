@@ -8,10 +8,13 @@ Based on DUCK-E scaffolding but adapted for ADC's async result delivery pattern.
 import asyncio
 import httpx
 import json
+import os
 import time
 from logging import Logger, getLogger
 from pathlib import Path
 from typing import Any, Callable, Optional
+
+OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL", "https://openai-proxy.ardenone.com:8444")
 
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
@@ -109,7 +112,7 @@ class VoiceSession:
         """
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
-                "https://api.openai.com/v1/realtime/sessions",
+                f"{OPENAI_PROXY_URL}/v1/realtime/sessions",
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
