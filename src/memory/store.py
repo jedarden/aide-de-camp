@@ -7,12 +7,15 @@ Based on DUCK-E's memory module but simplified for ADC's context.
 import hashlib
 import httpx
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from logging import Logger
 from pathlib import Path
 from typing import Optional
+
+OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL", "https://openai-proxy.ardenone.com:8444")
 
 
 DEFAULT_MEMORY_DIR = "/home/coding/aide-de-camp/data/memory"
@@ -227,7 +230,7 @@ class MemoryStore:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
+                    f"{OPENAI_PROXY_URL}/v1/chat/completions",
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
