@@ -1097,3 +1097,181 @@ $ ps -p 3311018 > /dev/null 2>&1
 **No source code modifications required.** This is a verification-only test with no bugs found.
 
 ---
+## Smoke Test - 2026-06-11 (Run 8)
+
+**Bead:** adc-dmu
+**Repository:** /home/coding/aide-de-camp
+**Python:** 3.13 (system python)
+**Server PID:** 3361818
+**Test Time:** 16:36 UTC
+
+### Test Environment
+- Host: 127.0.0.1:8000
+- Command: `python3 -m uvicorn src.main:app --host 127.0.0.1 --port 8000`
+- Background execution with output to `/tmp/adc-server.log`
+
+### Results
+
+#### 1. Server Startup ✅ PASS
+- Server started successfully with PID 3361818
+- Startup logs show clean initialization
+- **No lifespan errors** - all watcher/monitoring daemons started successfully
+- Startup sequence:
+  ```
+  INFO:     Started server process [3361818]
+  INFO:     Waiting for application startup.
+  INFO:     Application startup complete.
+  INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+  ```
+- **Note:** Harmless `_cuda_bindings_redirector.pth` warning present (expected, no CUDA dependencies)
+
+#### 2. GET /health ✅ PASS
+```bash
+$ curl -s http://127.0.0.1:8000/health
+{"status":"ok","service":"adc-voice"}
+```
+- HTTP Status: 200 OK
+- Response matches expected structure from src/main.py:174
+- Service correctly identified as "adc-voice"
+
+#### 3. GET / (Canvas) ✅ PASS
+```bash
+$ curl -s -i http://127.0.0.1:8000/ | head -15
+HTTP/1.1 200 OK
+date: Thu, 11 Jun 2026 16:36:28 GMT
+server: uvicorn
+content-type: text/html; charset=utf-8
+content-length: 33001
+last-modified: Thu, 11 Jun 2026 11:23:55 GMT
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>ADC (aide-de-camp) - Canvas</title>
+```
+- HTTP Status: 200 OK
+- Content-Type: `text/html; charset=utf-8` (correct)
+- Serves `src/canvas/index.html` via FileResponse (33,001 bytes)
+- Location: src/main.py:180
+
+#### 4. POST /api/v1/surfaces/register ✅ PASS
+```bash
+$ TIMESTAMP=$(date +%s)
+$ curl -s -X POST http://127.0.0.1:8000/api/v1/surfaces/register \
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"smoke-${TIMESTAMP}\",\"surface_type\":\"canvas\"}"
+
+{
+  "surface_id": "f46f0f07-f359-4172-8069-e50541626e37",
+  "session_id": "85dde161-e806-4021-ba4c-86ca15d0fe99"
+}
+```
+- HTTP Status: 200 OK
+- Generates valid UUIDs for surface_id and session_id
+- Surface registration functional
+- Location: src/main.py:758
+
+#### 5. GET /api/v1/sse (SSE v1) ✅ PASS
+```bash
+$ curl -s -i --max-time 3 \
+  "http://127.0.0.1:8000/api/v1/sse?session_id=6b4d0daf-915a-4d02-944d-204a55182b75&surface_id=30583b94-74a5-444b-88f5-2203b98e20b4"
+
+HTTP/1.1 200 OK
+content-type: text/event-stream; charset=utf-8
+cache-control: no-cache
+connection: keep-alive
+
+event: connected
+data: {"surface_id": "30583b94-74a5-444b-88f5-2203b98e20b4", "session_id": "6b4d0daf-915a-4d02-944d-204a55182b75"}
+
+event: workload_summary
+data: {"pending_intents": 0, "new_results": 0, "unresolved_exceptions": 0}
+
+event: topic_cards
+data: {"cards": []}
+
+event: connected
+data: {"connection_id": "e63c8717-2bbf-4269-92a7-8de6708e1661", "surface_id": "30583b94-74a5-444b-88f5-2203b98e20b4", "session_id": "6b4d0daf-915a-4d02-944d-204a55182b75"}
+```
+- HTTP Status: 200 OK
+- Content-Type: `text/event-stream; charset=utf-8` (explicit)
+- **Connection duration: 3 seconds** (>= 3s requirement met)
+- Events received:
+  - `connected` with surface_id and session_id
+  - `workload_summary` (all zeros for fresh session)
+  - `topic_cards` (empty array)
+  - Second `connected` with connection_id
+- SSE streaming functional
+- Location: src/main.py:806
+
+#### 6. GET /events (Legacy SSE) ✅ PASS
+```bash
+# Validation test - missing parameter
+$ curl -s -i http://127.0.0.1:8000/events
+HTTP/1.1 422 Unprocessable Content
+{"detail":[{"type":"missing","loc":["query","session_id"],"msg":"Field required"}]}
+
+# With required parameter
+$ curl -s -i --max-time 3 \
+  "http://127.0.0.1:8000/events?session_id=6b4d0daf-915a-4d02-944d-204a55182b75"
+
+HTTP/1.1 200 OK
+content-type: text/event-stream; charset=utf-8
+
+event: connected
+data: {"surface_id": "c132741a-c3de-4564-8a37-9435f1f09f53", "session_id": "6b4d0daf-915a-4d02-944d-204a55182b75"}
+
+event: workload_summary
+data: {"pending_intents": 0, "new_results": 0, "unresolved_exceptions": 0}
+```
+- HTTP Status: 422 for missing parameter (correct validation)
+- HTTP Status: 200 with required parameters
+- Content-Type: `text/event-stream; charset=utf-8` (explicit)
+- **Connection duration: 3 seconds** (>= 3s requirement met)
+- Same event sequence as modern SSE endpoint
+- Legacy endpoint functional
+- Location: src/main.py:587
+
+#### 7. Server Shutdown ✅ PASS
+```bash
+$ kill -INT 3361818
+$ sleep 2
+```
+Shutdown logs:
+```
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [3361818]
+```
+- Clean shutdown with SIGINT
+- All lifespan hooks executed properly
+- Server terminated gracefully
+- No errors during shutdown
+
+### Summary
+
+| Test | Result | Details |
+|------|--------|---------|
+| Server startup | ✅ PASS | Clean start, no lifespan errors |
+| GET /health | ✅ PASS | Returns correct JSON response |
+| GET / (canvas) | ✅ PASS | Serves HTML with correct content-type |
+| POST /api/v1/surfaces/register | ✅ PASS | Returns surface_id and session_id |
+| GET /api/v1/sse (modern) | ✅ PASS | SSE connects, streams events, stays open 3s |
+| GET /events (legacy) | ✅ PASS | SSE connects, streams events, stays open 3s |
+| Server shutdown | ✅ PASS | Clean SIGINT shutdown |
+
+**Overall Status:** ✅ ALL TESTS PASSED
+
+**Findings:**
+- The ADC server core surface is fully functional
+- All HTTP endpoints respond correctly with proper status codes and content types
+- Both modern (`/api/v1/sse`) and legacy (`/events`) SSE endpoints establish and maintain connections for >= 3 seconds
+- Server startup and shutdown are clean with no lifespan errors
+- Proper event streaming including: connected, workload_summary, topic_cards
+- Canvas HTML served correctly via FileResponse
+- Legacy SSE validation working correctly (rejects missing parameters with 422)
+- No code modifications required
+
+**No source code modifications required.** This is a verification-only test with no bugs found.
+
+---
