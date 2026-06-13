@@ -209,8 +209,14 @@ class IntentRouter:
                 temperature=0.3,  # Lower temperature for consistent classification
             )
 
+            # Strip markdown code fences if present (ZAI proxy wraps in ```json...```)
+            raw = response.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1]
+                raw = raw.rsplit("```", 1)[0].strip()
+
             # Parse JSON response
-            intents_data = json.loads(response)
+            intents_data = json.loads(raw)
             classifications = []
 
             for intent_data in intents_data:
@@ -335,6 +341,7 @@ class IntentRouter:
             fetch_request = FetchRequest(
                 intent_id=routed_intent.intent_id,
                 intent_type=fetch_intent_type,
+                session_id=routed_intent.session_id,
                 context=FetchContext(
                     project_slug=classification.project_slug,
                     session_id=routed_intent.session_id,
