@@ -111,8 +111,14 @@ class SynthesizeStrand:
                 temperature=0.5,  # Lower temperature for consistent output
             )
 
+            # Strip markdown code fences if present
+            raw = response.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1]
+                raw = raw.rsplit("```", 1)[0].strip()
+
             # Parse JSON response
-            result_data = json.loads(response)
+            result_data = json.loads(raw)
 
             # Extract fields
             data = result_data.get("data", {})
