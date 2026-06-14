@@ -165,7 +165,15 @@ async def lifespan(app: FastAPI):
     logger.info("aide-de-camp shutdown complete")
 
 
-app = FastAPI(title="ADC (aide-de-camp)", version="0.1.0", lifespan=lifespan)
+def _read_version() -> str:
+    try:
+        import tomllib
+        pyproject = Path(__file__).parent.parent / "pyproject.toml"
+        return tomllib.loads(pyproject.read_text())["project"]["version"]
+    except Exception:
+        return "0.0.0"
+
+app = FastAPI(title="ADC (aide-de-camp)", version=_read_version(), lifespan=lifespan)
 
 
 async def get_store():
