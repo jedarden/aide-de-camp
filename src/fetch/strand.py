@@ -525,37 +525,45 @@ class FetchStrand:
             return {"error": str(e), "changed_files": []}
 
     async def _fetch_bead_list(self, context: FetchContext) -> dict:
-        """Fetch bead list for a project."""
+        """Fetch bead list from the repo's local .beads/ workspace."""
+        repo_path = context.repo_path
         project_slug = context.project_slug
-        if not project_slug:
-            return {"error": "No project slug specified"}
+
+        if not repo_path:
+            return {"error": "No repo path resolved for this project"}
+
+        from pathlib import Path as _Path
+        if not (_Path(repo_path) / ".beads" / "issues.jsonl").exists():
+            return {"error": f"No .beads workspace found at {repo_path}"}
 
         try:
             proc = await asyncio.create_subprocess_exec(
-                "br",
-                "list",
-                f"--project={project_slug}",
-                "--status=open",
-                "--output=json",
+                "br", "list", "--status=open", "--limit=50",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                cwd=repo_path,
             )
 
             stdout, stderr = await proc.communicate()
 
             if proc.returncode == 0:
-                import json
-                beads = json.loads(stdout.decode())
+                import json as _json
+                try:
+                    beads = _json.loads(stdout.decode())
+                except Exception:
+                    # br may return line-delimited or non-JSON on empty
+                    beads = []
                 return {
                     "project": project_slug,
+                    "repo": repo_path,
                     "beads": beads,
-                    "count": len(beads),
+                    "count": len(beads) if isinstance(beads, list) else 0,
                 }
             else:
-                return {"error": stderr.decode()}
+                return {"error": stderr.decode().strip() or "br list returned non-zero"}
 
         except FileNotFoundError:
-            return {"error": "br CLI not found"}
+            return {"error": "br CLI not found in PATH"}
         except Exception as e:
             return {"error": str(e)}
 
