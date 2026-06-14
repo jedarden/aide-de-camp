@@ -5,10 +5,16 @@ Voice mode server using OpenAI Realtime API.
 Replaces text input with voice session.
 """
 import asyncio
+import logging
 import os
 import uuid
 from logging import getLogger
 from pathlib import Path
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s %(name)s: %(message)s",
+)
 
 import httpx
 from contextlib import asynccontextmanager
