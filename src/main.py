@@ -49,6 +49,7 @@ from .context.warmer import get_context_warmer
 from .feedback.background_analysis import get_background_processor
 from .intent.router import get_router as get_intent_router
 from .escalate import escalate_intent, EscalateRequest
+from .environment.discovery import scan_environment, set_registry
 
 
 logger = getLogger(__name__)
@@ -84,6 +85,11 @@ async def lifespan(app: FastAPI):
     global _ambient_monitor, _context_warmer, _background_processor
 
     logger.info("Starting aide-de-camp...")
+
+    # Discover local environment (git repos + bead workspaces)
+    registry = await scan_environment()
+    set_registry(registry)
+    logger.info(f"Environment registry: {registry.summary()['total_repos']} repos, {registry.summary()['beaded_repos']} with beads")
 
     # Initialize data directory
     DB_PATH.parent.mkdir(exist_ok=True)

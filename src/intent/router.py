@@ -336,8 +336,20 @@ class IntentRouter:
         )
 
         try:
-            # Step 1: Fetch context
+            # Step 1: Fetch context — resolve project slug to local repo path
             fetch_intent_type = self._map_intent_type(classification.intent_type)
+
+            from ..environment.discovery import get_registry
+            repo_path = None
+            registry = get_registry()
+            if registry and classification.project_slug:
+                entry = registry.lookup(classification.project_slug)
+                if entry:
+                    repo_path = str(entry.path)
+                    logger.info(f"Resolved '{classification.project_slug}' → {repo_path}")
+                else:
+                    logger.info(f"No local repo found for slug '{classification.project_slug}'")
+
             fetch_request = FetchRequest(
                 intent_id=routed_intent.intent_id,
                 intent_type=fetch_intent_type,
@@ -345,6 +357,7 @@ class IntentRouter:
                 context=FetchContext(
                     project_slug=classification.project_slug,
                     session_id=routed_intent.session_id,
+                    repo_path=repo_path,
                 ),
             )
 
