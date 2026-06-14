@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 class EventType(Enum):
     """Types of SSE events."""
     RESULT = "result"
+    RESULT_CREATED = "result_created"
+    TOPIC_UPDATED = "topic_updated"
     COMPONENT_UPDATED = "component_updated"
     INTENT_DISPATCHED = "intent_dispatched"
     ACKNOWLEDGMENT = "acknowledgment"

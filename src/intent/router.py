@@ -362,16 +362,41 @@ class IntentRouter:
 
             synthesize_result = await synthesize_intent(synthesize_request)
 
+            # Persist result to session store so loadTopics() can display it
+            store = get_store()
+            _topic_type_map = {
+                IntentType.ACTION: "project",
+                IntentType.TASK_PROFILE: "project",
+            }
+            topic_type = _topic_type_map.get(classification.intent_type, "research")
+            topic_id, _ = await store.find_or_create_topic(
+                label=classification.utterance_fragment or routed_intent.utterance[:80],
+                topic_type=topic_type,
+                project_slugs=[classification.project_slug] if classification.project_slug else [],
+                session_id=routed_intent.session_id,
+            )
+            await store.link_intent_to_topic(routed_intent.intent_id, topic_id)
+            result_id = await store.create_result(
+                intent_id=routed_intent.intent_id,
+                topic_id=topic_id,
+                session_id=routed_intent.session_id,
+                summary=synthesize_result.summary,
+                data=synthesize_result.data,
+                urgency=synthesize_result.urgency.value,
+            )
+
             return {
                 "intent_id": routed_intent.intent_id,
                 "intent_type": classification.intent_type.value,
                 "status": "resolved",
+                "topic_id": topic_id,
+                "result_id": result_id,
                 "data": synthesize_result.data,
                 "summary": synthesize_result.summary,
                 "urgency": synthesize_result.urgency.value,
                 "coverage": synthesize_result.coverage,
                 "caveats": synthesize_result.caveats,
-                "message": f"Intent synthesized successfully",
+                "message": "Intent synthesized successfully",
             }
 
         except Exception as e:

@@ -685,7 +685,7 @@
                 const resp = await fetch('/dispatch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ utterance, session_id: sessionId }),
+                    body: JSON.stringify({ utterance, session_id: sessionId, surface_id: surfaceId }),
                 });
                 if (!resp.ok) {
                     const err = await resp.text();

@@ -480,16 +480,17 @@ async def dispatch_intent(request: dict):
                     result = await task
                     results.append(result)
 
-                    # Stream result via SSE if we have a surface
+                    # Broadcast result_created so canvas reloads topics
                     if _broadcaster and surface_id:
-                        from .sse.events import SSEEvent
                         await _broadcaster.broadcast(
-                            surface_id=surface_id,
-                            event=SSEEvent(
-                                event_type="intent_resolved",
+                            SSEEvent(
+                                event_type="result_created",
+                                target_surface_id=surface_id,
                                 data={
                                     "intent_id": intent_id,
-                                    "result": result,
+                                    "topic_id": result.get("topic_id"),
+                                    "summary": result.get("summary"),
+                                    "urgency": result.get("urgency"),
                                 }
                             )
                         )
