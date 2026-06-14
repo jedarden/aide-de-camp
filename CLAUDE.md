@@ -24,7 +24,7 @@ Logs go to `/tmp/adc.log`. Root logging is configured in `src/main.py` — all `
 
 **Every meaningful push must bump the version and cut a git tag.**
 
-Version lives in `pyproject.toml` → `[project] version`. The canvas header badge reads from `/openapi.json` which reflects this value in real time.
+Version lives in `pyproject.toml` → `[project] version`. At startup, `src/main.py` reads it via `tomllib` and passes it to FastAPI — the canvas header badge reads from `/openapi.json` which reflects this. **Do not hardcode the version anywhere else.**
 
 ### Scheme: semantic versioning (`MAJOR.MINOR.PATCH`)
 
