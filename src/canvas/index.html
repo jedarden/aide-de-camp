@@ -375,7 +375,10 @@
 <body>
     <div class="container">
         <header>
-            <h1>ADC Canvas</h1>
+            <div style="display:flex;align-items:baseline;gap:8px">
+                <h1>ADC Canvas</h1>
+                <span id="versionBadge" style="font-size:12px;color:#475569;font-weight:500;font-family:'Monaco','Menlo',monospace"></span>
+            </div>
             <div class="status">
                 <span class="status-dot" id="statusDot"></span>
                 <span id="statusText">Connecting...</span>
@@ -753,6 +756,12 @@
         // Initialize
         async function init() {
             try {
+                // Show version
+                const meta = await fetch('/openapi.json').then(r => r.json()).catch(() => null);
+                if (meta && meta.info && meta.info.version) {
+                    document.getElementById('versionBadge').textContent = 'v' + meta.info.version;
+                }
+
                 await registerSurface();
                 connectSSE();
             } catch (error) {
