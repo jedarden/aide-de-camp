@@ -39,6 +39,9 @@ class FetchSource(Enum):
     SESSION_STATE = "session_state"
     TOPIC_CONTEXT = "topic_context"
     REMINDERS = "reminders"
+    FS_EXPLORE = "fs_explore"      # list directory contents
+    FS_README = "fs_readme"        # read README of a repo
+    FS_HOME = "fs_home"            # overview of /home/coding/
 
 
 @dataclass
@@ -54,6 +57,20 @@ class FetchCommandSpec:
 # Command matrix per intent type
 FETCH_COMMAND_MATRIX: dict[IntentType, list[FetchCommandSpec]] = {
     IntentType.STATUS: [
+        FetchCommandSpec(
+            source=FetchSource.FS_EXPLORE,
+            command_template="ls {repo_path}",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.FS_README,
+            command_template="cat {repo_path}/README.md",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
         FetchCommandSpec(
             source=FetchSource.KUBECTL_PODS,
             command_template="kubectl --server={proxy} get pods -n {namespace} -o json",
@@ -131,6 +148,20 @@ FETCH_COMMAND_MATRIX: dict[IntentType, list[FetchCommandSpec]] = {
 
     IntentType.BRAINSTORM: [
         FetchCommandSpec(
+            source=FetchSource.FS_EXPLORE,
+            command_template="ls {repo_path}",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.FS_README,
+            command_template="cat {repo_path}/README.md",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
             source=FetchSource.COMPONENTS,
             command_template="components list --project {project_slug}",
             timeout_seconds=3,
@@ -155,10 +186,31 @@ FETCH_COMMAND_MATRIX: dict[IntentType, list[FetchCommandSpec]] = {
 
     IntentType.LOOKUP: [
         FetchCommandSpec(
+            source=FetchSource.FS_HOME,
+            command_template="ls /home/coding",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.FS_EXPLORE,
+            command_template="ls {repo_path}",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.FS_README,
+            command_template="cat {repo_path}/README.md",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
             source=FetchSource.LOGS,
             command_template="kubectl --server={proxy} logs -n {namespace} {pod_name} --tail=100",
             timeout_seconds=10,
-            required=True,
+            required=False,
             cacheable=False,
         ),
         FetchCommandSpec(
