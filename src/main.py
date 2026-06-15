@@ -605,6 +605,32 @@ async def escalate_endpoint(request: dict):
         )
 
 
+@app.get("/api/v1/environment")
+async def get_environment():
+    """Return the discovered local environment: all git repos and bead workspaces."""
+    from .environment.discovery import get_registry
+    registry = get_registry()
+    if not registry:
+        return {"error": "Registry not yet initialized"}
+    entries = [
+        {
+            "name": e.name,
+            "slug": e.slug,
+            "path": str(e.path),
+            "has_beads": e.has_beads,
+            "remote_url": e.remote_url,
+            "remote_name": e.remote_name,
+        }
+        for e in sorted(registry.all_entries(), key=lambda x: x.slug)
+    ]
+    summary = registry.summary()
+    return {
+        "total_repos": summary["total_repos"],
+        "beaded_repos": summary["beaded_repos"],
+        "repos": entries,
+    }
+
+
 @app.get("/events")
 async def canvas_sse(
     session_id: str,

@@ -71,6 +71,9 @@ class FetchStrand:
             FetchSource.SESSION_STATE: self._fetch_session_state,
             FetchSource.TOPIC_CONTEXT: self._fetch_topic_context,
             FetchSource.REMINDERS: self._fetch_reminders,
+            FetchSource.FS_EXPLORE: self._fetch_fs_explore,
+            FetchSource.FS_README: self._fetch_fs_readme,
+            FetchSource.FS_HOME: self._fetch_fs_home,
         }
 
     async def fetch(
@@ -672,6 +675,86 @@ class FetchStrand:
             "reminders": [],
             "count": 0,
         }
+
+    async def _fetch_fs_explore(self, context: FetchContext) -> dict:
+        """List contents of the resolved repo directory."""
+        from pathlib import Path as _Path
+        explore_path = _Path(context.repo_path) if context.repo_path else None
+        if not explore_path or not explore_path.exists():
+            return {"error": "No repo path resolved — cannot explore filesystem"}
+
+        items = []
+        try:
+            for entry in sorted(explore_path.iterdir()):
+                if entry.name.startswith("."):
+                    continue
+                items.append({
+                    "name": entry.name,
+                    "type": "dir" if entry.is_dir() else "file",
+                    "size": entry.stat().st_size if entry.is_file() else None,
+                })
+        except PermissionError as e:
+            return {"error": str(e)}
+
+        return {
+            "path": str(explore_path),
+            "items": items,
+            "count": len(items),
+        }
+
+    async def _fetch_fs_readme(self, context: FetchContext) -> dict:
+        """Read the README from the resolved repo directory."""
+        from pathlib import Path as _Path
+        if not context.repo_path:
+            return {"error": "No repo path resolved"}
+
+        repo = _Path(context.repo_path)
+        for name in ("README.md", "README.txt", "README.rst", "README"):
+            candidate = repo / name
+            if candidate.exists():
+                try:
+                    content = candidate.read_text(errors="replace")[:4000]
+                    return {"path": str(candidate), "content": content}
+                except Exception as e:
+                    return {"error": str(e)}
+
+        return {"error": f"No README found in {context.repo_path}"}
+
+    async def _fetch_fs_home(self, context: FetchContext) -> dict:
+        """Overview of /home/coding/ — all repos and bead workspaces."""
+        from ..environment.discovery import get_registry
+        registry = get_registry()
+        if registry:
+            summary = registry.summary()
+            entries = [
+                {
+                    "name": e.name,
+                    "slug": e.slug,
+                    "path": str(e.path),
+                    "has_beads": e.has_beads,
+                    "remote": e.remote_name,
+                }
+                for e in sorted(registry.all_entries(), key=lambda x: x.slug)
+            ]
+            return {
+                "home": "/home/coding",
+                "total_repos": summary["total_repos"],
+                "beaded_repos": summary["beaded_repos"],
+                "repos": entries,
+            }
+
+        # Fallback: direct scan if registry not ready
+        from pathlib import Path as _Path
+        home = _Path("/home/coding")
+        repos = []
+        for d in sorted(home.iterdir()):
+            if d.is_dir() and not d.name.startswith(".") and (d / ".git").is_dir():
+                repos.append({
+                    "name": d.name,
+                    "path": str(d),
+                    "has_beads": (d / ".beads").is_dir(),
+                })
+        return {"home": str(home), "repos": repos, "total_repos": len(repos)}
 
     def _get_pod_ready(self, pod_data: dict) -> str:
         """Get pod ready status (e.g., '1/1')."""
