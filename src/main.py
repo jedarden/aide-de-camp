@@ -617,16 +617,21 @@ async def get_environment():
             "name": e.name,
             "slug": e.slug,
             "path": str(e.path),
+            "host": e.host,
+            "display_path": e.display_path,
             "has_beads": e.has_beads,
             "remote_url": e.remote_url,
             "remote_name": e.remote_name,
         }
-        for e in sorted(registry.all_entries(), key=lambda x: x.slug)
+        for e in sorted(registry.all_entries(), key=lambda x: (x.host or "", x.slug))
     ]
     summary = registry.summary()
     return {
         "total_repos": summary["total_repos"],
         "beaded_repos": summary["beaded_repos"],
+        "local_repos": summary["local_repos"],
+        "remote_repos": summary["remote_repos"],
+        "remote_hosts": summary["remote_hosts"],
         "repos": entries,
     }
 
