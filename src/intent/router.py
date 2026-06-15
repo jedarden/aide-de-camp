@@ -341,14 +341,19 @@ class IntentRouter:
 
             from ..environment.discovery import get_registry
             repo_path = None
+            ssh_target = None
+            host_alias = None
             registry = get_registry()
             if registry and classification.project_slug:
                 entry = registry.lookup(classification.project_slug)
                 if entry:
                     repo_path = str(entry.path)
-                    logger.info(f"Resolved '{classification.project_slug}' → {repo_path}")
+                    ssh_target = entry.ssh_target
+                    host_alias = entry.host
+                    location = entry.display_path
+                    logger.info(f"Resolved '{classification.project_slug}' → {location}")
                 else:
-                    logger.info(f"No local repo found for slug '{classification.project_slug}'")
+                    logger.info(f"No repo found for slug '{classification.project_slug}'")
 
             fetch_request = FetchRequest(
                 intent_id=routed_intent.intent_id,
@@ -358,6 +363,8 @@ class IntentRouter:
                     project_slug=classification.project_slug,
                     session_id=routed_intent.session_id,
                     repo_path=repo_path,
+                    ssh_target=ssh_target,
+                    host_alias=host_alias,
                 ),
             )
 

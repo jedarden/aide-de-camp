@@ -307,6 +307,10 @@ class FetchContext:
     session_id: str | None = None
     intent_id: str | None = None
 
+    # Remote access — set when repo lives on a different machine
+    ssh_target: str | None = None  # e.g. "coding@100.81.129.38"
+    host_alias: str | None = None  # e.g. "lab"
+
     # Proxy endpoints
     proxy: str = "http://traefik-ardenone-manager:8001"
     argocd_proxy: str = "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444"

@@ -406,19 +406,27 @@ class FetchStrand:
         except Exception as e:
             return {"error": str(e)}
 
+    def _make_cmd(self, context: FetchContext, *args: str) -> list[str]:
+        """Wrap a command with SSH if the repo is remote."""
+        if context.ssh_target:
+            return ["ssh", "-o", "ConnectTimeout=8", "-o", "BatchMode=yes",
+                    context.ssh_target, " ".join(args)]
+        return list(args)
+
     async def _fetch_git_log(self, context: FetchContext) -> dict:
-        """Fetch git log for a project."""
+        """Fetch git log for a project (local or remote via SSH)."""
         repo_path = context.repo_path
-        if not repo_path or not Path(repo_path).exists():
-            return {"error": "No valid repo path specified"}
+        if not repo_path:
+            return {"error": "No repo path resolved"}
+
+        if not context.ssh_target and not Path(repo_path).exists():
+            return {"error": f"Repo path not found: {repo_path}"}
 
         try:
             # Fetch commits with author and date
             proc = await asyncio.create_subprocess_exec(
-                "git",
-                "-C", repo_path,
-                "log", "-10",
-                "--pretty=format:%h|%s|%an|%ar",
+                *self._make_cmd(context, "git", "-C", repo_path, "log", "-10",
+                                "--pretty=format:%h|%s|%an|%ar"),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -442,9 +450,7 @@ class FetchStrand:
 
             # Get current branch
             branch_proc = await asyncio.create_subprocess_exec(
-                "git",
-                "-C", repo_path,
-                "branch", "--show-current",
+                *self._make_cmd(context, "git", "-C", repo_path, "branch", "--show-current"),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -462,10 +468,12 @@ class FetchStrand:
             return {"error": str(e), "commits": []}
 
     async def _fetch_git_status(self, context: FetchContext) -> dict:
-        """Fetch git status for a project."""
+        """Fetch git status for a project (local or remote via SSH)."""
         repo_path = context.repo_path
-        if not repo_path or not Path(repo_path).exists():
-            return {"error": "No valid repo path specified"}
+        if not repo_path:
+            return {"error": "No repo path resolved"}
+        if not context.ssh_target and not Path(repo_path).exists():
+            return {"error": f"Repo path not found: {repo_path}"}
 
         try:
             # Get status output
@@ -528,24 +536,33 @@ class FetchStrand:
             return {"error": str(e), "changed_files": []}
 
     async def _fetch_bead_list(self, context: FetchContext) -> dict:
-        """Fetch bead list from the repo's local .beads/ workspace."""
+        """Fetch bead list from the repo's .beads/ workspace (local or remote)."""
         repo_path = context.repo_path
         project_slug = context.project_slug
 
         if not repo_path:
             return {"error": "No repo path resolved for this project"}
 
-        from pathlib import Path as _Path
-        if not (_Path(repo_path) / ".beads" / "issues.jsonl").exists():
-            return {"error": f"No .beads workspace found at {repo_path}"}
-
         try:
-            proc = await asyncio.create_subprocess_exec(
-                "br", "list", "--status=open", "--limit=50",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=repo_path,
-            )
+            if context.ssh_target:
+                # Remote: check for .beads and run br via SSH in one shot
+                proc = await asyncio.create_subprocess_exec(
+                    "ssh", "-o", "ConnectTimeout=8", "-o", "BatchMode=yes",
+                    context.ssh_target,
+                    f"cd {repo_path} && [ -f .beads/issues.jsonl ] && br list --status=open --limit=50 2>&1 || echo '{{\"error\":\"no beads workspace\"}}'",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+            else:
+                from pathlib import Path as _Path
+                if not (_Path(repo_path) / ".beads" / "issues.jsonl").exists():
+                    return {"error": f"No .beads workspace at {repo_path}"}
+                proc = await asyncio.create_subprocess_exec(
+                    "br", "list", "--status=open", "--limit=50",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=repo_path,
+                )
 
             stdout, stderr = await proc.communicate()
 
@@ -554,11 +571,11 @@ class FetchStrand:
                 try:
                     beads = _json.loads(stdout.decode())
                 except Exception:
-                    # br may return line-delimited or non-JSON on empty
                     beads = []
                 return {
                     "project": project_slug,
-                    "repo": repo_path,
+                    "repo": context.display_path if hasattr(context, "display_path") else repo_path,
+                    "host": context.host_alias,
                     "beads": beads,
                     "count": len(beads) if isinstance(beads, list) else 0,
                 }
@@ -677,11 +694,32 @@ class FetchStrand:
         }
 
     async def _fetch_fs_explore(self, context: FetchContext) -> dict:
-        """List contents of the resolved repo directory."""
-        from pathlib import Path as _Path
-        explore_path = _Path(context.repo_path) if context.repo_path else None
-        if not explore_path or not explore_path.exists():
+        """List contents of the resolved repo directory (local or remote)."""
+        if not context.repo_path:
             return {"error": "No repo path resolved — cannot explore filesystem"}
+
+        if context.ssh_target:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "ssh", "-o", "ConnectTimeout=8", "-o", "BatchMode=yes",
+                    context.ssh_target,
+                    f"ls -la {context.repo_path} 2>&1",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await proc.communicate()
+                return {
+                    "path": f"{context.ssh_target}:{context.repo_path}",
+                    "host": context.host_alias,
+                    "listing": stdout.decode(),
+                }
+            except Exception as e:
+                return {"error": str(e)}
+
+        from pathlib import Path as _Path
+        explore_path = _Path(context.repo_path)
+        if not explore_path.exists():
+            return {"error": f"Path not found: {explore_path}"}
 
         items = []
         try:
@@ -696,25 +734,40 @@ class FetchStrand:
         except PermissionError as e:
             return {"error": str(e)}
 
-        return {
-            "path": str(explore_path),
-            "items": items,
-            "count": len(items),
-        }
+        return {"path": str(explore_path), "items": items, "count": len(items)}
 
     async def _fetch_fs_readme(self, context: FetchContext) -> dict:
-        """Read the README from the resolved repo directory."""
-        from pathlib import Path as _Path
+        """Read the README from the resolved repo directory (local or remote)."""
         if not context.repo_path:
             return {"error": "No repo path resolved"}
 
+        if context.ssh_target:
+            try:
+                script = " || ".join(
+                    f"cat {context.repo_path}/{name} 2>/dev/null"
+                    for name in ("README.md", "README.txt", "README.rst", "README")
+                )
+                proc = await asyncio.create_subprocess_exec(
+                    "ssh", "-o", "ConnectTimeout=8", "-o", "BatchMode=yes",
+                    context.ssh_target, script,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await proc.communicate()
+                content = stdout.decode(errors="replace")[:4000]
+                if content.strip():
+                    return {"path": f"{context.ssh_target}:{context.repo_path}/README", "content": content}
+                return {"error": f"No README found on {context.host_alias}:{context.repo_path}"}
+            except Exception as e:
+                return {"error": str(e)}
+
+        from pathlib import Path as _Path
         repo = _Path(context.repo_path)
         for name in ("README.md", "README.txt", "README.rst", "README"):
             candidate = repo / name
             if candidate.exists():
                 try:
-                    content = candidate.read_text(errors="replace")[:4000]
-                    return {"path": str(candidate), "content": content}
+                    return {"path": str(candidate), "content": candidate.read_text(errors="replace")[:4000]}
                 except Exception as e:
                     return {"error": str(e)}
 
