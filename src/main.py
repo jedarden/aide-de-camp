@@ -49,7 +49,11 @@ from .context.warmer import get_context_warmer
 from .feedback.background_analysis import get_background_processor
 from .intent.router import get_router as get_intent_router
 from .escalate import escalate_intent, EscalateRequest
-from .environment.discovery import scan_environment, set_registry
+from .environment.discovery import (
+    scan_environment, set_registry,
+    refresh_registry, start_background_refresh, stop_background_refresh,
+    get_last_scan_at,
+)
 
 
 logger = getLogger(__name__)
@@ -86,10 +90,12 @@ async def lifespan(app: FastAPI):
 
     logger.info("Starting aide-de-camp...")
 
-    # Discover local environment (git repos + bead workspaces)
+    # Discover local + remote environment (git repos + bead workspaces)
     registry = await scan_environment()
     set_registry(registry)
-    logger.info(f"Environment registry: {registry.summary()['total_repos']} repos, {registry.summary()['beaded_repos']} with beads")
+    s = registry.summary()
+    logger.info(f"Environment registry: {s['total_repos']} repos ({s['local_repos']} local, {s['remote_repos']} remote), {s['beaded_repos']} with beads")
+    await start_background_refresh()
 
     # Initialize data directory
     DB_PATH.parent.mkdir(exist_ok=True)
@@ -154,6 +160,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down aide-de-camp...")
+    stop_background_refresh()
     if _bead_watcher:
         await _bead_watcher.stop()
     if _background_processor:
@@ -607,8 +614,9 @@ async def escalate_endpoint(request: dict):
 
 @app.get("/api/v1/environment")
 async def get_environment():
-    """Return the discovered local environment: all git repos and bead workspaces."""
+    """Return the discovered environment: all git repos and bead workspaces across all hosts."""
     from .environment.discovery import get_registry
+    import time
     registry = get_registry()
     if not registry:
         return {"error": "Registry not yet initialized"}
@@ -632,7 +640,25 @@ async def get_environment():
         "local_repos": summary["local_repos"],
         "remote_repos": summary["remote_repos"],
         "remote_hosts": summary["remote_hosts"],
+        "last_scan_at": get_last_scan_at(),
         "repos": entries,
+    }
+
+
+@app.post("/api/v1/environment/refresh")
+async def trigger_environment_refresh():
+    """Trigger an immediate environment rescan to discover new repos."""
+    import time
+    registry = await refresh_registry()
+    s = registry.summary()
+    return {
+        "status": "refreshed",
+        "total_repos": s["total_repos"],
+        "local_repos": s["local_repos"],
+        "remote_repos": s["remote_repos"],
+        "remote_hosts": s["remote_hosts"],
+        "beaded_repos": s["beaded_repos"],
+        "scanned_at": get_last_scan_at(),
     }
 
 
