@@ -8,7 +8,7 @@ CLI alias: `adc`
 
 ## How It Works
 
-1. **Intent routing** — a single fast LLM call segments your utterance into typed intent threads, each tagged with a project, an intent type (`status`, `action`, `brainstorm`, `lookup`, `reminder`, `task`), and an urgency level (`critical`, `high`, `normal`, `low`).
+1. **Intent routing** — a single fast LLM call segments your utterance into typed intent threads, each tagged with a project, an intent type (`status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`), and an urgency level (`critical`, `high`, `normal`, `low`).
 
 2. **Parallel dispatch** — all threads run concurrently. A compound utterance touching five projects takes as long as the slowest single agent, not their sum.
 
@@ -139,10 +139,11 @@ adc --help
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `OPENAI_API_KEY` | OpenAI key — required for voice/Realtime API | _(none; voice disabled without it)_ |
+| `ZAI_PROXY_URL` | ZAI proxy endpoint for LLM calls (routing and synthesis) | `https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages` |
 | `ADC_SERVER_URL` | Server URL used by the `adc` CLI | `http://localhost:8000` |
 | `ADC_TELEGRAM_BRIDGE_URL` | Telegram bridge URL for async task notifications | `https://telegram-proxy-telegram-bridge-ardenone-cluster-ts.ardenone.com:8444` ✓ |
 
-The LLM backend for intent routing and synthesis is configurable via `config/registry.yaml`. By default it points to a local proxy endpoint — update this to any OpenAI-compatible API endpoint.
+The LLM backend for intent routing and synthesis is configured via the `ZAI_PROXY_URL` environment variable. All LLM calls route through the ZAI proxy.
 
 ### Prompts directory
 

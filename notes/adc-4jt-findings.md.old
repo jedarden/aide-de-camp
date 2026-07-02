@@ -1,0 +1,239 @@
+# telegram-claude-bridge API Contract Verification - Findings
+
+## Date: 2026-07-02
+
+## Executive Summary
+
+Verification of `src/telegram/fallback.py` against the real telegram-claude-bridge API revealed **one critical mismatch** and **one minor issue**.
+
+## Endpoints Verified
+
+### ✅ GET /health (VERIFIED - WORKING)
+
+**Status:** Endpoint exists and is compatible
+
+**Implementation:**
+- `fallback.py` line 148-158: `check_bridge_available()` method
+- Calls `GET /health` with 5s timeout
+
+**Contract:**
+```python
+# fallback.py
+response = await client.get(f"{self.bridge_url}/health")
+# Expects: 200 OK
+```
+
+** telegram-claude-bridge contract (docs/plan/data-contract.md line 47-67):**
+```json
+{
+  "ok": true,
+  "polling": true,
+  "last_update_id": 123456789,
+  "uptime_seconds": 3600,
+  "contract_version": "1.0"
+}
+```
+
+**Verdict:** ✅ **COMPATIBLE**
+
+---
+
+### ✅ POST /send (VERIFIED - WORKING)
+
+**Status:** Endpoint exists and payload is compatible
+
+**Implementation:**
+- `fallback.py` line 39-84: `send_message()` method
+- Used by `send_result()`, `send_exception()`, `send_workload_summary()`
+
+**Contract from fallback.py:**
+```python
+response = await client.post(
+    f"{self.bridge_url}/send",
+    json={
+        "chat_id": int(chat_id) if isinstance(chat_id, str) else chat_id,
+        "text": message,
+        "parse_mode": parse_mode,  # Optional: defaults to "Markdown"
+    },
+    timeout=10.0,
+)
+```
+
+** telegram-claude-bridge contract (internal/contract/types.go line 138-146):**
+```go
+type SendRequest struct {
+    ChatID            int64          `json:"chat_id"`           // REQUIRED
+    ThreadID          *int64         `json:"thread_id,omitempty"` // OPTIONAL
+    Text              string         `json:"text"`              // REQUIRED
+    ParseMode         *string        `json:"parse_mode,omitempty"` // OPTIONAL
+    ReplyToMessageID  *int64         `json:"reply_to_message_id,omitempty"` // OPTIONAL
+    ReplyMarkup       *InlineKeyboard `json:"reply_markup,omitempty"` // OPTIONAL
+}
+```
+
+**Payload Analysis:**
+- ✅ `chat_id`: Correctly sent as integer
+- ✅ `text`: Correctly sent as string
+- ✅ `parse_mode`: Correctly sent as optional string (defaults to "Markdown")
+
+**Minor Issue - Parse Mode Format:**
+- ⚠️ `fallback.py` uses `"Markdown"` (legacy Telegram Markdown)
+- ⚠️ telegram-claude-bridge expects `"MarkdownV2"` or `"HTML"` (data-contract.md line 413)
+- ℹ️ **Impact:** LOW - Telegram still supports legacy Markdown in most cases, but it's deprecated
+- 💡 **Recommendation:** Change to `"HTML"` or `"MarkdownV2"` for future compatibility
+
+**Verdict:** ✅ **COMPATIBLE** (with minor deprecation warning)
+
+---
+
+### ❌ POST /register_surface (CRITICAL MISMATCH)
+
+**Status:** **Endpoint does NOT exist in telegram-claude-bridge**
+
+**Implementation:**
+- `fallback.py` line 125-146: `register_surface()` method
+- Called when a Telegram user starts a conversation
+
+**Contract from fallback.py:**
+```python
+async def register_surface(self, session_id: str, telegram_chat_id: str) -> bool:
+    """
+    Register a Telegram surface for a session.
+
+    Called when a Telegram user starts a conversation.
+    """
+    response = await client.post(
+        f"{self.bridge_url}/register_surface",
+        json={
+            "session_id": session_id,
+            "chat_id": telegram_chat_id,
+        },
+        timeout=10.0,
+    )
+    return response.status_code == 200
+```
+
+** telegram-claude-bridge endpoints (from cmd/proxy/main.go):**
+```go
+mux.HandleFunc("/health", handleHealth(poller))
+mux.HandleFunc("/updates", handleUpdates(poller))
+mux.HandleFunc("/send", handleSend(sender))
+mux.HandleFunc("/edit", handleEdit(sender))
+mux.HandleFunc("/send_chat_action", handleSendChatAction(sender))
+mux.HandleFunc("/create_topic", handleCreateTopic(sender))
+mux.HandleFunc("/edit_topic", handleEditTopic(sender))
+mux.HandleFunc("/close_topic", handleCloseTopic(sender))
+mux.HandleFunc("/reopen_topic", handleReopenTopic(sender))
+mux.HandleFunc("/pin_message", handlePinMessage(sender))
+mux.HandleFunc("/get_message", handleGetMessage(poller))
+mux.HandleFunc("/answer_callback", handleAnswerCallback(sender))
+mux.HandleFunc("GET /file/{file_id}", handleFile(sender))
+mux.HandleFunc("/send_photo", handleSendPhoto(sender))
+mux.HandleFunc("/send_document", handleSendDocument(sender))
+mux.HandleFunc("/send_audio", handleSendAudio(sender))
+mux.HandleFunc("/send_video", handleSendVideo(sender))
+```
+
+**Result:** `/register_surface` endpoint **does not exist** in telegram-claude-bridge
+
+**Architecture Mismatch:**
+
+The `register_surface()` method appears to be based on a **push-based architecture** where:
+- External systems register delivery surfaces for messages
+- The system would then push results to registered surfaces
+
+However, telegram-claude-bridge uses a **pull-based architecture** where:
+- The bridge manages Telegram forum topics internally as Claude Code sessions
+- Each topic maps to a tmux session running Claude Code
+- There is no concept of "external surface registration"
+
+**Verdict:** ❌ **CRITICAL MISMATCH** - This method will always fail
+
+**Impact:** HIGH
+- Any code calling `register_surface()` will receive HTTP 404
+- The method is documented as "Called when a Telegram user starts a conversation"
+- This suggests integration is incomplete or based on incorrect assumptions
+
+---
+
+## Root Cause Analysis
+
+The `fallback.py` implementation appears to be designed for a different bridge architecture that:
+1. Allows external systems to register message delivery endpoints
+2. Supports bidirectional session-surface mapping
+3. Provides registration APIs for surface management
+
+The actual telegram-claude-bridge:
+1. Manages sessions internally (one session per forum topic)
+2. Does not expose surface registration APIs
+3. Uses a pull-based model where the bridge polls Telegram and manages sessions
+
+---
+
+## Recommendations
+
+### Immediate Actions
+
+1. **Remove or stub `register_surface()` method**
+   - This endpoint does not exist and will never work
+   - Replace with a no-op stub or remove entirely
+   - Document why it's not implemented
+
+2. **Update `parse_mode` values**
+   - Change from `"Markdown"` to `"HTML"` or `"MarkdownV2"`
+   - `"Markdown"` is deprecated in Telegram API
+
+### Architectural Review
+
+3. **Review integration architecture**
+   - Determine if aide-de-camp should integrate with telegram-claude-bridge at all
+   - The bridge is designed for direct Claude Code sessions, not as a generic message delivery service
+   - Consider if a different integration pattern is needed
+
+### Alternative Approaches
+
+4. **Consider direct Telegram Bot API integration**
+   - If goal is message delivery to Telegram, use Telegram Bot API directly
+   - Register a bot via BotFather and use `python-telegram-bot` or `telethon`
+   - This gives full control without architectural mismatch
+
+5. **Create a bridge proxy service**
+   - Build a simple proxy that accepts aide-de-camp's API contract
+   - Translates to telegram-claude-bridge calls
+   - Can implement surface registration concept if needed
+
+---
+
+## Environment Configuration
+
+**Current Configuration:**
+- **Environment Variable:** `ADC_TELEGRAM_BRIDGE_URL`
+- **Default:** `http://telegram-claude-bridge:8000` (Tailscale hostname)
+- **Production:** `https://telegram-proxy-telegram-bridge-ardenone-cluster-ts.ardenone.com:8444` (per README.md)
+- **Status:** Service is running but `/register_surface` endpoint does not exist
+
+---
+
+## Testing Results
+
+**Test Date:** 2026-07-02
+
+**Test Method:**
+- Code review of telegram-claude-bridge source (cmd/proxy/main.go)
+- Contract comparison with internal/contract/types.go
+- Documentation review (docs/plan/data-contract.md)
+
+**Live Testing:**
+- ❌ Could not test `/register_surface` (endpoint doesn't exist)
+- ⚠️ Could not test `/send` (service not accessible in test environment)
+- ℹ️ Service is running but behind Tailscale ACLs
+
+---
+
+## Conclusion
+
+The `fallback.py` implementation has a **critical architectural mismatch** with telegram-claude-bridge. The `/send` and `/health` endpoints work correctly, but the `/register_surface` method calls a non-existent endpoint and will always fail.
+
+**Priority:** HIGH
+**Risk:** HIGH - `register_surface()` calls will fail with HTTP 404
+**Fix Required:** YES - Remove or stub the non-functional method

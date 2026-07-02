@@ -7,6 +7,7 @@ fallback surface for results and exceptions.
 
 import logging
 from typing import Optional
+from datetime import datetime
 
 import httpx
 
@@ -35,6 +36,10 @@ class TelegramFallback:
         self.bridge_url = bridge_url or os.getenv(
             "ADC_TELEGRAM_BRIDGE_URL", self.DEFAULT_BRIDGE_URL
         )
+        # Track bridge reachability state
+        self._is_reachable = None  # None = unknown, True = reachable, False = unreachable
+        self._last_failure_logged = None  # Track when we last logged a failure
+        self._failure_count = 0  # Track total failures
 
     async def send_message(
         self,
@@ -69,18 +74,22 @@ class TelegramFallback:
 
                 if response.status_code == 200:
                     logger.info(f"Sent Telegram message to chat {chat_id}")
+                    self._is_reachable = True  # Update reachability state
                     return True
                 else:
-                    logger.warning(
+                    self._handle_send_failure()
+                    logger.debug(
                         f"Failed to send Telegram message: {response.status_code} - {response.text}"
                     )
                     return False
 
         except httpx.RequestError as e:
-            logger.error(f"Request error sending to Telegram: {e}")
+            self._handle_send_failure()
+            logger.debug(f"Request error sending to Telegram: {e}")
             return False
         except Exception as e:
-            logger.error(f"Error sending to Telegram: {e}")
+            self._handle_send_failure()
+            logger.debug(f"Error sending to Telegram: {e}")
             return False
 
     async def send_result(self, chat_id: int | str, result: dict) -> bool:
@@ -162,9 +171,45 @@ class TelegramFallback:
                     f"{self.bridge_url}/health",
                     timeout=5.0,
                 )
-                return response.status_code == 200
+                is_available = response.status_code == 200
+                self._is_reachable = is_available
+                return is_available
         except Exception:
+            self._is_reachable = False
             return False
+
+    def get_bridge_status(self) -> dict:
+        """
+        Get the current bridge status.
+
+        Returns:
+            Dict with keys:
+            - reachable: bool or None (None = unknown yet)
+            - bridge_url: str
+            - failure_count: int
+        """
+        return {
+            "reachable": self._is_reachable,
+            "bridge_url": self.bridge_url,
+            "failure_count": self._failure_count,
+        }
+
+    def _handle_send_failure(self):
+        """Handle a send failure - log warning only on first failure in a batch."""
+        self._is_reachable = False
+        self._failure_count += 1
+
+        # Only log a warning if we haven't logged recently (within last 60 seconds)
+        # or if this is the first failure
+        now = datetime.now()
+        if (self._last_failure_logged is None or
+            (now - self._last_failure_logged).total_seconds() > 60):
+            logger.warning(
+                f"Telegram bridge unreachable at {self.bridge_url} "
+                f"(failure count: {self._failure_count}). "
+                f"Subsequent failures will be logged at DEBUG level only."
+            )
+            self._last_failure_logged = now
 
     def _format_result_message(self, result: dict) -> str:
         """Format a result as a Telegram message."""

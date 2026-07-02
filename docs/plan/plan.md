@@ -84,7 +84,7 @@ One LLM call per utterance. Receives the full utterance text, the project regist
 ]
 ```
 
-Intent types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`
+Intent types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`
 
 The router reads its segmentation prompt and the project registry from disk on each call — no caching. Hot-reload is automatic.
 
@@ -298,13 +298,33 @@ results (
 topics (
   id           TEXT PRIMARY KEY,
   label        TEXT,
-  type         TEXT,  -- 'project' | 'research' | 'personal' | 'exception'
+  type         TEXT,  -- 'project' | 'research' | 'personal' | 'exception' | 'compound'
   project_slugs TEXT,  -- JSON array
   scope        TEXT,  -- 'session' | 'cross-session' | 'global'
   session_id   TEXT,  -- null for cross-session/global
   created_at   INTEGER,
   last_active  INTEGER,
   archived_at  INTEGER
+)
+
+topic_context_cache (
+  topic_id     TEXT PRIMARY KEY,
+  context_data TEXT,  -- JSON: pre-fetched context (kubectl, git, beads results)
+  fetched_at  INTEGER,
+  expires_at  INTEGER
+)
+
+feedback_signals (
+  signal_id    TEXT PRIMARY KEY,
+  signal_type  TEXT,
+  session_id   TEXT,
+  result_id    TEXT,
+  topic_id     TEXT,
+  timestamp    INTEGER,
+  data         TEXT,  -- JSON: signal-specific data
+  surface_type TEXT,
+  processed    INTEGER,  -- 0 or 1
+  processed_at INTEGER
 )
 
 intent_topics (
@@ -346,6 +366,21 @@ card_cache (
   created_at        INTEGER,
   PRIMARY KEY (result_id, component_id, layout_bucket)
 )
+
+component_tags (
+  component_id TEXT,
+  tag TEXT,
+  PRIMARY KEY (component_id, tag)
+)
+
+component_usage_patterns (
+  component_id TEXT,
+  result_type TEXT,  -- e.g., "pod-status", "git-log"
+  match_score REAL,  -- 0-1
+  sample_count INTEGER,
+  last_matched INTEGER,
+  PRIMARY KEY (component_id, result_type)
+)
 ```
 
 ---
@@ -354,7 +389,7 @@ card_cache (
 
 ```
 aide-de-camp/
-├── adc                      ← CLI entry point (shell script or compiled binary)
+├── adc                      ← CLI entry point (shell script or Python package)
 ├── config/
 │   ├── registry.yaml        ← project registry (hot-reloaded by router)
 │   ├── monitoring.yaml      ← ambient monitoring rules
@@ -364,22 +399,78 @@ aide-de-camp/
 │   ├── synthesize.md        ← result generation prompt
 │   ├── voice.md             ← voice model system prompt
 │   ├── urgency.md           ← urgency classification prompt
-│   └── fetch/               ← per-intent-type fetch instructions
-│       ├── status.md
-│       ├── action.md
-│       └── ...
+│   ├── fetch/               ← per-intent-type fetch instructions
+│   │   ├── status.md
+│   │   ├── action.md
+│   │   └── ...
+│   └── escalate/            ← escalate/task-profile prompts
+│       └── task-profile.md
 ├── src/
-│   ├── router/              ← intent segmentation (direct API call)
+│   ├── main.py              ← FastAPI app entry point
+│   ├── registry.py          ← project registry loader
+│   ├── agents/              ← agent implementations
+│   │   ├── self_modification.py  ← self-improvement agent
+│   │   └── ui_regen.py          ← UI-regen agent
+│   ├── components/          ← component library and hot-reload
+│   │   ├── library.py           ← component library DB operations
+│   │   └── hot_reload.py        ← hot-reload watcher
+│   ├── context/             ← context warming and pre-fetch
+│   │   ├── warmer.py            ← context warmer for active topics
+│   │   └── prefetch.py          ← speculative pre-fetch
+│   ├── conversation/        ← multi-turn conversation handling
+│   ├── diff/                ← diff generation for results
+│   ├── environment/         ← environment and repo discovery
+│   │   └── discovery.py        ← repo scanner and registry
+│   ├── escalate/            ← escalate strand for task-profile intents
+│   │   ├── handler.py           ← escalate request handler
+│   │   ├── llm.py               ← LLM calls for bead formulation
+│   │   └── commands.py          ├── bead creation commands
+│   ├── feedback/            ← feedback processing and background analysis
+│   │   ├── processor.py         ← explicit feedback processor
+│   │   ├── signals.py           ← implicit feedback signal tracking
+│   │   └── background_analysis.py ← background analysis bead
 │   ├── fetch/               ← fetch strand (deterministic, per intent type)
-│   ├── synthesize/          ← synthesize strand (direct API call)
-│   ├── escalate/            ← escalate strand (bead creation)
-│   ├── watcher/             ← bead watcher daemon
+│   │   ├── commands.py          ← fetch command matrix
+│   │   ├── executor.py          ← command executor
+│   │   ├── orchestrator.py      ← parallel fetch orchestration
+│   │   └── strand.py            ← fetch strand entry point
+│   ├── intent/              ← intent router (LLM classification)
+│   │   └── router.py            ← intent segmentation and routing
+│   ├── memory/              ← memory store and extraction
+│   │   ├── store.py             ← memory persistence
+│   │   └── extraction.py        ← memory extraction from results
+│   ├── monitoring/          ← ambient monitoring
+│   │   └── ambient.py           ← ambient monitoring rules
+│   ├── realtime/            ← OpenAI Realtime API voice session
+│   │   ├── session.py           ← voice session handler
+│   │   ├── batching.py          ← result batching for narration
+│   │   ├── continuity.py        ← audio-to-canvas session continuity
+│   │   └── dispatch.py          ← tool-as-trigger dispatch
 │   ├── session/             ← session store (SQLite)
+│   │   └── store.py             ← session store operations
+│   ├── sse/                 ← SSE broadcasting
+│   │   ├── broadcaster.py       ← SSE connection registry
+│   │   └── events.py            ← SSE event types
+│   ├── surface/             ← surface routing
+│   │   └── router.py            ← result surface routing logic
+│   ├── synthesize/          ← synthesize strand (LLM)
+│   │   └── strand.py            ← result synthesis
+│   ├── telegram/            ← Telegram fallback surface
+│   │   └── fallback.py          ← Telegram delivery
+│   ├── topic/               ← topic model
+│   │   └── model.py             ← topic operations
+│   ├── watcher/             ← bead watcher daemon
+│   │   └── daemon.py            ← NEEDLE bead watcher
 │   ├── canvas/              ← web frontend (SSE consumer, card renderer)
+│   │   └── index.html           ← single-page canvas UI
 │   └── cli/                 ← adc CLI
+│       ├── main.py              ← CLI entry point
+│       ├── commands.py          ← CLI commands
+│       ├── config.py            ← CLI configuration
+│       └── sse.py               ← SSE streaming for CLI
 ├── data/
-│   ├── session.db           ← session store
-│   └── components.db        ← component library
+│   ├── session.db           ← session store (SQLite)
+│   └── components.db        ← component library (SQLite)
 └── docs/
     ├── research/            ← architecture and design research
     ├── plan/
@@ -401,19 +492,29 @@ aide-de-camp is a **live web application**, not a static site. The FastAPI serve
 - The session store (SQLite) and artifact store (prompts, registry) require a writable filesystem
 - Hot-reload depends on the running server reading updated files from disk on each invocation
 
-### Phased hosting
+### Current Deployment: Phase 0 (Hetzner server directly)
 
-**Phase 0 (Hetzner server directly)**
+**Status: COMPLETE** ✅
 
-Run FastAPI as a process on the Hetzner server itself, not in k8s. Simplest possible path:
+The server runs as a process on the Hetzner server itself, not in k8s:
 - NEEDLE workers and the aide-de-camp server share the same filesystem
 - Self-modification agent writes directly to `prompts/` and `config/` — hot-reload works without any coordination
-- Expose via Tailscale (the server is already on the mesh); no ingress config needed
+- Exposed via Tailscale (the server is already on the mesh); no ingress config needed
 - SQLite DBs are local files; no PVC required
 
-No container, no CI, no ArgoCD. Just `uvicorn src.main:app` managed by a long-running tmux session or systemd unit.
+Running command: `uvicorn src.main:app --host 0.0.0.0 --port 8000`
 
-**Phase 1+ (containerized, ardenone-cluster)**
+No container, no CI, no ArgoCD. Managed as a long-running process (see CLAUDE.md for restart commands).
+
+### Release flow (Phase 0)
+
+Version is in `pyproject.toml` only. No CI build — runs from source.
+
+Release: `bump version in pyproject.toml` → `commit` → `git tag vX.Y.Z` → `push`.
+
+### Future: Phase 1+ (containerized, ardenone-cluster)
+
+**Status: NOT BUILT** ❌
 
 Once session persistence and multi-surface routing are needed, containerize and move to k8s:
 
@@ -429,7 +530,9 @@ PVC: /data/ (SATA, ReadWriteOnce)
 
 The artifact store (prompts, registry) moves from the repo's working directory to the PVC. The self-modification agent updates artifacts via the aide-de-camp API (`PATCH /artifacts/{name}`), which writes to the PVC path the server reads from.
 
-### Traefik configuration for SSE and WebSocket
+### Future: Traefik configuration for SSE and WebSocket (Phase 1+)
+
+**Status: NOT BUILT** ❌
 
 Traefik's default response buffering breaks SSE. The IngressRoute needs:
 
@@ -467,6 +570,8 @@ DUCK-E's existing WebSocket IngressRoute config is the reference implementation 
 
 ### SQLite concurrency
 
+**Status: COMPLETE** ✅
+
 Multiple writers (bead watcher, background analysis bead, session handler) require WAL mode to avoid lock contention:
 
 ```python
@@ -475,7 +580,7 @@ conn.execute("PRAGMA journal_mode=WAL")
 conn.execute("PRAGMA synchronous=NORMAL")
 ```
 
-WAL mode allows concurrent reads during writes and serializes multiple writers without blocking. For a personal single-user app, this is sufficient through Phase 3. A server database (Postgres) is not needed.
+WAL mode allows concurrent reads during writes and serializes multiple writers without blocking. For a personal single-user app, this is sufficient.
 
 ### adc CLI connectivity
 
@@ -483,12 +588,15 @@ The `adc` CLI is a thin HTTP client. It talks to the running server over Tailsca
 
 ```bash
 # ~/.config/adc/config
-server_url = "http://aide-de-camp.ardenone.com"   # or localhost in Phase 0
+server_url = "http://localhost:8000"   # Phase 0 (local)
+# Future: "http://aide-de-camp.ardenone.com" (Phase 1+)
 ```
 
-No local inference. The CLI sends requests to the FastAPI backend and streams the SSE response to the terminal. On the Hetzner server in Phase 0, `server_url = "http://localhost:8000"`.
+No local inference. The CLI sends requests to the FastAPI backend and streams the SSE response to the terminal.
 
-### CI/CD (Phase 1+)
+### Future: CI/CD (Phase 1+)
+
+**Status: NOT BUILT** ❌
 
 New Argo WorkflowTemplate `aide-de-camp-build` on iad-ci:
 - Docker build → `ronaldraygun/aide-de-camp`
@@ -520,6 +628,8 @@ Same pattern as every other containerized service in the stack.
 
 ### Phase 0 — Minimal Viable Surface (~2 days)
 
+**Status: COMPLETE** ✅
+
 Validates the core question: does routing + parallel dispatch reduce friction?
 
 - Single HTML page: textarea + mic button (Web Speech API)
@@ -531,9 +641,11 @@ Deliverable: the core query loop working end-to-end.
 
 ### Phase 1 — Session and Topics (~1 week)
 
+**Status: COMPLETE** ✅
+
 Results persist; the canvas has memory.
 
-- Session store (SQLite, 7 tables)
+- Session store (SQLite, 7+ tables with topic_context_cache and feedback_signals)
 - Topic model: canvas shows one card per active topic, updated in place
 - Telegram surface fallback (reuse telegram-claude-bridge)
 - Bead watcher: closed NEEDLE beads push results to active surface
@@ -543,6 +655,8 @@ Results persist; the canvas has memory.
 Deliverable: sessions that survive browser refresh; Telegram fallback working.
 
 ### Phase 2 — Self-Improvement Loop (~2 weeks)
+
+**Status: COMPLETE** ✅
 
 The interface can be improved by talking into it.
 
@@ -555,6 +669,8 @@ The interface can be improved by talking into it.
 Deliverable: at least one end-to-end self-modification cycle working (user instructs change, diff surfaced, approved, takes effect without redeploy).
 
 ### Phase 3 — Responsiveness (~2-3 weeks)
+
+**Status: COMPLETE** ✅
 
 The interface feels alive, not just reactive.
 
@@ -570,6 +686,8 @@ Deliverable: monitoring fires unprompted for a watched topic; follow-up question
 
 ### Phase 4 — Audio Surface (~1-2 weeks)
 
+**Status: COMPLETE** ✅
+
 Full audio mode via Realtime API.
 
 - Realtime API voice session replaces text input path
@@ -578,6 +696,18 @@ Full audio mode via Realtime API.
 - Audio-to-canvas session continuity
 
 Deliverable: full voice session with canvas catch-up on surface switch.
+
+### Future Work
+
+**Status: NOT STARTED** ❌
+
+Potential enhancements beyond Phase 4:
+- Multi-modal input (image processing for UI feedback via Agentation)
+- Advanced topic clustering and auto-archival
+- Cross-session context persistence with summarization
+- Mobile-native surface (iOS/Android app)
+- Collaborative sessions (multi-user shared canvases)
+- Advanced memory extraction with semantic search
 
 ---
 
@@ -627,7 +757,7 @@ aide-de-camp adds a routing and rendering layer on top of existing infrastructur
 - **kubectl proxies** — fetch strand uses existing kubectl proxy access per cluster.
 - **ArgoCD read-only proxy** — fetch strand reads ArgoCD application state via `argocd-ro-ardenone-manager-ts.ardenone.com:8444`.
 
-Net-new code: approximately 1,400 lines of wiring across router, strand waterfall, bead watcher, session store, and canvas frontend.
+Net-new code: aide-de-camp is a substantial implementation spanning multiple subsystems. See the File System Layout section for the full module breakdown.
 
 ---
 
