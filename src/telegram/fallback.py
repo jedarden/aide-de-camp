@@ -77,18 +77,20 @@ class TelegramFallback:
                     self._is_reachable = True  # Update reachability state
                     return True
                 else:
-                    self._handle_send_failure()
+                    self._handle_send_failure(
+                        f"status {response.status_code} - {response.text}"
+                    )
                     logger.debug(
                         f"Failed to send Telegram message: {response.status_code} - {response.text}"
                     )
                     return False
 
         except httpx.RequestError as e:
-            self._handle_send_failure()
+            self._handle_send_failure(f"request error: {e}")
             logger.debug(f"Request error sending to Telegram: {e}")
             return False
         except Exception as e:
-            self._handle_send_failure()
+            self._handle_send_failure(f"unexpected error: {e}")
             logger.debug(f"Error sending to Telegram: {e}")
             return False
 
@@ -194,8 +196,12 @@ class TelegramFallback:
             "failure_count": self._failure_count,
         }
 
-    def _handle_send_failure(self):
-        """Handle a send failure - log warning only on first failure in a batch."""
+    def _handle_send_failure(self, error_context: str = ""):
+        """Handle a send failure - log warning only on first failure in a batch.
+
+        Args:
+            error_context: Details about the error (status code, error message, etc.)
+        """
         self._is_reachable = False
         self._failure_count += 1
 
@@ -205,8 +211,8 @@ class TelegramFallback:
         if (self._last_failure_logged is None or
             (now - self._last_failure_logged).total_seconds() > 60):
             logger.warning(
-                f"Telegram bridge unreachable at {self.bridge_url} "
-                f"(failure count: {self._failure_count}). "
+                f"Telegram send failure #{self._failure_count} at {self.bridge_url}. "
+                f"Error: {error_context if error_context else 'unknown error'}. "
                 f"Subsequent failures will be logged at DEBUG level only."
             )
             self._last_failure_logged = now
