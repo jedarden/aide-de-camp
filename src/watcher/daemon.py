@@ -213,24 +213,31 @@ class BeadWatcher:
         }
 
     async def _send_to_telegram(self, result: dict, session_id: str) -> None:
-        """Send result to Telegram via telegram-claude-bridge."""
+        """Send result to Telegram via telegram-claude-bridge.
+
+        NOTE: This requires a session→telegram_chat_id mapping. Current implementation
+        logs a warning because telegram-claude-bridge uses a pull-based architecture
+        (manages sessions internally per forum topic) rather than push-based message delivery.
+        """
         try:
-            # telegram-claude-bridge runs on Tailscale mesh
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "http://telegram-claude-bridge:8000/send_message",
-                    json={
-                        "session_id": session_id,
-                        "message": self._format_telegram_message(result),
-                    },
-                    timeout=5.0,
-                )
-                if response.status_code == 200:
-                    logger.info(f"Sent result to Telegram for session {session_id}")
-                else:
-                    logger.warning(f"Failed to send to Telegram: {response.status_code}")
+            # telegram-claude-bridge proxy expects actual Telegram chat_id (int64), not session_id
+            # Since we don't have a session→chat mapping, log this as unavailable
+            logger.warning(
+                f"Cannot send result to Telegram for session {session_id}: "
+                f"session→telegram_chat mapping not implemented. "
+                f"telegram-claude-bridge uses pull-based architecture (per forum topic sessions)."
+            )
+
+            # Correct contract for reference (if mapping is implemented later):
+            # POST http://telegram-claude-bridge:8000/send
+            # {
+            #   "chat_id": 123456789,  # int64, REQUIRED - actual Telegram chat ID
+            #   "text": "message",     # string, REQUIRED - message content
+            #   "parse_mode": "HTML"   # string, OPTIONAL
+            # }
+
         except Exception as e:
-            logger.error(f"Error sending to Telegram: {e}")
+            logger.error(f"Error in Telegram send logic: {e}")
 
     def _format_telegram_message(self, result: dict) -> str:
         """Format result as Telegram message."""
