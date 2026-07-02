@@ -27,36 +27,48 @@ class TelegramFallback:
     """
 
     # telegram-claude-bridge endpoint (Tailscale mesh)
-    BRIDGE_URL = "http://telegram-claude-bridge:8000"
+    # Configurable via ADC_TELEGRAM_BRIDGE_URL env var
+    DEFAULT_BRIDGE_URL = "http://telegram-claude-bridge:8000"
 
     def __init__(self, bridge_url: str | None = None):
-        self.bridge_url = bridge_url or self.BRIDGE_URL
+        import os
+        self.bridge_url = bridge_url or os.getenv(
+            "ADC_TELEGRAM_BRIDGE_URL", self.DEFAULT_BRIDGE_URL
+        )
 
     async def send_message(
         self,
-        session_id: str,
+        chat_id: int | str,
         message: str,
         parse_mode: str = "Markdown",
     ) -> bool:
         """
-        Send a message to a session's Telegram chat.
+        Send a message to a Telegram chat.
 
-        Returns True if successful, False otherwise.
+        Args:
+            chat_id: Telegram chat ID (int or str)
+            message: Message text to send
+            parse_mode: Parse mode for formatting (Markdown, HTML, etc.)
+
+        Returns:
+            True if successful, False otherwise.
         """
         try:
             async with httpx.AsyncClient() as client:
+                # telegram-claude-bridge proxy API uses /send endpoint
+                # Contract: {chat_id, text, parse_mode?, thread_id?, reply_to_message_id?}
                 response = await client.post(
-                    f"{self.bridge_url}/send_message",
+                    f"{self.bridge_url}/send",
                     json={
-                        "session_id": session_id,
-                        "message": message,
+                        "chat_id": int(chat_id) if isinstance(chat_id, str) else chat_id,
+                        "text": message,
                         "parse_mode": parse_mode,
                     },
                     timeout=10.0,
                 )
 
                 if response.status_code == 200:
-                    logger.info(f"Sent Telegram message for session {session_id}")
+                    logger.info(f"Sent Telegram message to chat {chat_id}")
                     return True
                 else:
                     logger.warning(
@@ -71,14 +83,18 @@ class TelegramFallback:
             logger.error(f"Error sending to Telegram: {e}")
             return False
 
-    async def send_result(self, session_id: str, result: dict) -> bool:
+    async def send_result(self, chat_id: int | str, result: dict) -> bool:
         """
         Send a structured result to Telegram.
+
+        Args:
+            chat_id: Telegram chat ID
+            result: Result dict with keys: summary, urgency, data
 
         Formats the result as a readable message and sends it.
         """
         message = self._format_result_message(result)
-        return await self.send_message(session_id, message)
+        return await self.send_message(chat_id, message)
 
     async def send_exception(
         self,
