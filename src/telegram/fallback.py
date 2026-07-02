@@ -77,21 +77,38 @@ class TelegramFallback:
                     self._is_reachable = True  # Update reachability state
                     return True
                 else:
-                    self._handle_send_failure(
-                        f"status {response.status_code} - {response.text}"
-                    )
-                    logger.debug(
-                        f"Failed to send Telegram message: {response.status_code} - {response.text}"
+                    error_msg = f"status {response.status_code} - {response.text}"
+                    self._handle_send_failure(error_msg)
+                    # WARNING log at point of failure with context
+                    logger.warning(
+                        f"First Telegram send failure to chat {chat_id} at {self.bridge_url}. "
+                        f"Error: {error_msg}. "
+                        f"Timestamp: {datetime.now().isoformat()}. "
+                        f"Subsequent failures will be logged at DEBUG level only."
                     )
                     return False
 
         except httpx.RequestError as e:
-            self._handle_send_failure(f"request error: {e}")
-            logger.debug(f"Request error sending to Telegram: {e}")
+            error_msg = f"request error: {e}"
+            self._handle_send_failure(error_msg)
+            # WARNING log at point of failure with context
+            logger.warning(
+                f"First Telegram send failure to chat {chat_id} at {self.bridge_url}. "
+                f"Error: {error_msg}. "
+                f"Timestamp: {datetime.now().isoformat()}. "
+                f"Subsequent failures will be logged at DEBUG level only."
+            )
             return False
         except Exception as e:
-            self._handle_send_failure(f"unexpected error: {e}")
-            logger.debug(f"Error sending to Telegram: {e}")
+            error_msg = f"unexpected error: {e}"
+            self._handle_send_failure(error_msg)
+            # WARNING log at point of failure with context
+            logger.warning(
+                f"First Telegram send failure to chat {chat_id} at {self.bridge_url}. "
+                f"Error: {error_msg}. "
+                f"Timestamp: {datetime.now().isoformat()}. "
+                f"Subsequent failures will be logged at DEBUG level only."
+            )
             return False
 
     async def send_result(self, chat_id: int | str, result: dict) -> bool:
