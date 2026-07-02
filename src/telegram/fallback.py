@@ -30,6 +30,8 @@ class TelegramFallback:
     # telegram-claude-bridge endpoint (Tailscale mesh)
     # Configurable via ADC_TELEGRAM_BRIDGE_URL env var
     DEFAULT_BRIDGE_URL = "http://telegram-claude-bridge:8000"
+    # Rate limit for repeated failure logs (5 minutes)
+    FAILURE_LOG_COOLDOWN_SECONDS = 300
 
     def __init__(self, bridge_url: str | None = None):
         import os
@@ -79,36 +81,15 @@ class TelegramFallback:
                 else:
                     error_msg = f"status {response.status_code} - {response.text}"
                     self._handle_send_failure(error_msg)
-                    # WARNING log at point of failure with context
-                    logger.warning(
-                        f"First Telegram send failure to chat {chat_id} at {self.bridge_url}. "
-                        f"Error: {error_msg}. "
-                        f"Timestamp: {datetime.now().isoformat()}. "
-                        f"Subsequent failures will be logged at DEBUG level only."
-                    )
                     return False
 
         except httpx.RequestError as e:
             error_msg = f"request error: {e}"
             self._handle_send_failure(error_msg)
-            # WARNING log at point of failure with context
-            logger.warning(
-                f"First Telegram send failure to chat {chat_id} at {self.bridge_url}. "
-                f"Error: {error_msg}. "
-                f"Timestamp: {datetime.now().isoformat()}. "
-                f"Subsequent failures will be logged at DEBUG level only."
-            )
             return False
         except Exception as e:
             error_msg = f"unexpected error: {e}"
             self._handle_send_failure(error_msg)
-            # WARNING log at point of failure with context
-            logger.warning(
-                f"First Telegram send failure to chat {chat_id} at {self.bridge_url}. "
-                f"Error: {error_msg}. "
-                f"Timestamp: {datetime.now().isoformat()}. "
-                f"Subsequent failures will be logged at DEBUG level only."
-            )
             return False
 
     async def send_result(self, chat_id: int | str, result: dict) -> bool:
@@ -216,23 +197,33 @@ class TelegramFallback:
     def _handle_send_failure(self, error_context: str = ""):
         """Handle a send failure - log warning only on first failure in a batch.
 
+        Rate-limited to prevent log spam: only logs a WARNING if:
+        - This is the first failure, OR
+        - It's been more than FAILURE_LOG_COOLDOWN_SECONDS (5 minutes) since the last logged failure
+
         Args:
             error_context: Details about the error (status code, error message, etc.)
         """
         self._is_reachable = False
         self._failure_count += 1
 
-        # Only log a warning if we haven't logged recently (within last 60 seconds)
+        # Only log a warning if we haven't logged recently (within cooldown period)
         # or if this is the first failure
         now = datetime.now()
         if (self._last_failure_logged is None or
-            (now - self._last_failure_logged).total_seconds() > 60):
+            (now - self._last_failure_logged).total_seconds() > self.FAILURE_LOG_COOLDOWN_SECONDS):
             logger.warning(
                 f"Telegram send failure #{self._failure_count} at {self.bridge_url}. "
                 f"Error: {error_context if error_context else 'unknown error'}. "
-                f"Subsequent failures will be logged at DEBUG level only."
+                f"Subsequent failures within the next {self.FAILURE_LOG_COOLDOWN_SECONDS // 60} minutes will be logged at DEBUG level only."
             )
             self._last_failure_logged = now
+        else:
+            # Log at DEBUG level to avoid spam while still providing visibility
+            logger.debug(
+                f"Repeated Telegram send failure #{self._failure_count} at {self.bridge_url}. "
+                f"Error: {error_context if error_context else 'unknown error'}."
+            )
 
     def _format_result_message(self, result: dict) -> str:
         """Format a result as a Telegram message."""

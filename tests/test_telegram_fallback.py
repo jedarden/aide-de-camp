@@ -106,3 +106,75 @@ class TestGlobalFallbackInstance:
 
         fallback = get_telegram_fallback()
         assert fallback.bridge_url == test_url
+
+
+class TestRateLimiting:
+    """Test failure log rate limiting to prevent spam."""
+
+    def test_first_failure_logs_warning(self, caplog):
+        """Test that the first failure logs a WARNING."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("WARNING"):
+            fallback._handle_send_failure("test error")
+
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Telegram send failure #1" in caplog.records[0].message
+        assert "test error" in caplog.records[0].message
+
+    def test_immediate_repeated_failure_logs_debug(self, caplog):
+        """Test that immediate repeated failures log at DEBUG level."""
+        from datetime import datetime, timedelta
+
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        # First failure logs WARNING
+        with caplog.at_level("WARNING"):
+            fallback._handle_send_failure("first error")
+
+        # Clear previous logs
+        caplog.clear()
+
+        # Second failure within cooldown should log at DEBUG level
+        with caplog.at_level("DEBUG"):
+            fallback._handle_send_failure("second error")
+
+        # Should have a DEBUG log for the repeated failure
+        debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
+
+        assert len(warning_records) == 0, "Repeated failure should not log at WARNING level"
+        assert len(debug_records) >= 1, "Repeated failure should log at DEBUG level"
+        assert any("Repeated Telegram send failure" in r.message for r in debug_records)
+
+    def test_failure_after_cooldown_logs_warning(self, caplog):
+        """Test that a failure after the cooldown period logs a WARNING again."""
+        from datetime import datetime, timedelta
+        from unittest.mock import patch
+
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        # First failure
+        with caplog.at_level("WARNING"):
+            fallback._handle_send_failure("first error")
+
+        # Clear previous logs
+        caplog.clear()
+
+        # Mock time to be after cooldown period (5 minutes + 1 second)
+        future_time = datetime.now() + timedelta(seconds=301)
+        with patch('src.telegram.fallback.datetime') as mock_datetime:
+            mock_datetime.now.return_value = future_time
+            with caplog.at_level("WARNING"):
+                fallback._handle_send_failure("second error")
+
+        # Should have a WARNING log for the failure after cooldown
+        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warning_records) >= 1, "Failure after cooldown should log at WARNING level"
+        assert any("Telegram send failure #2" in r.message for r in warning_records)
+
+    def test_cooldown_constant_value(self):
+        """Test that the cooldown period is set to 5 minutes (300 seconds)."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+        assert fallback.FAILURE_LOG_COOLDOWN_SECONDS == 300
