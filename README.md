@@ -140,6 +140,7 @@ adc --help
 |----------|---------|---------|
 | `OPENAI_API_KEY` | OpenAI key — required for voice/Realtime API | _(none; voice disabled without it)_ |
 | `ADC_SERVER_URL` | Server URL used by the `adc` CLI | `http://localhost:8000` |
+| `ADC_TELEGRAM_BRIDGE_URL` | Telegram bridge URL for async task notifications | `https://telegram-proxy-telegram-bridge-ardenone-cluster-ts.ardenone.com:8444` |
 
 The LLM backend for intent routing and synthesis is configurable via `config/registry.yaml`. By default it points to a local proxy endpoint — update this to any OpenAI-compatible API endpoint.
 
