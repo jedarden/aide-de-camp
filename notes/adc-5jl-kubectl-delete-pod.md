@@ -181,3 +181,48 @@ python3 -m pytest tests/test_kubectl_delete_pod_integration.py -v
 ```
 
 All tests pass successfully.
+
+---
+
+## Current Task (2026-07-02): Execute kubectl delete pod
+
+### Task
+Execute `kubectl delete pod` to delete a specific Kubernetes pod.
+
+### Outcome: INCOMPLETE - Requires User Input
+
+#### Issues Encountered
+
+1. **No pod name specified**: The command `kubectl delete pod` requires a pod name to delete. The user did not specify which pod to target.
+
+2. **OIDC authentication required**: The current kubectl context (`apexalgo-iad-kalshi-oidc`) requires browser-based OIDC authentication. When attempting to list pods, kubectl tried to open a browser at `http://localhost:18000/` but no browser executable was found in the PATH.
+
+### Options to Proceed
+
+The user needs to provide:
+- **Pod name** to delete (required)
+- **Namespace** (if not in default namespace)
+- **Which kubeconfig/cluster** to target (current context requires browser auth)
+
+### Available Kubeconfigs
+
+Direct kubeconfigs that don't require OIDC authentication:
+- `~/.kube/iad-ci.kubeconfig` — CI/CD cluster (cluster-admin)
+- `~/.kube/ardenone-manager.kubeconfig` — ArgoCD cluster (cluster-admin)
+- `~/.kube/rs-manager.kubeconfig` — Rackspace manager (cluster-admin)
+- `~/.kube/ord-devimprint-observer.kubeconfig` — read-only
+- `~/.kube/iad-options-observer.kubeconfig` — read-only
+- `~/.kube/iad-native-ads.kubeconfig` — read-only
+
+### Example Command Pattern
+```bash
+kubectl --kubeconfig=<kubeconfig-path> delete pod <pod-name> -n <namespace>
+```
+
+### Recommendation
+Wait for user to specify:
+1. Which pod to delete (name)
+2. Which namespace
+3. Which cluster/kubeconfig to use
+
+Once provided, the command can be executed directly.
