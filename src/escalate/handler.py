@@ -21,8 +21,10 @@ from typing import Any, Optional
 
 import httpx
 
+from ..components.hot_reload import get_reload_manager
 from ..session.store import get_store
 from .llm import get_zai_client, LLMRequest, ModelClass
+from .commands import get_kubectl_executor, CommandExecutionError
 
 
 logger = getLogger(__name__)
@@ -124,14 +126,15 @@ class EscalateHandler:
     Escalate handler for task-profile intents.
 
     Handles the full escalate flow:
-    1. Formulate bead body via LLM
-    2. Create bead via br CLI
-    3. Return pending-card spec
+    1. Check auto-approve rules from exceptions.yaml
+    2. Either execute directly (auto-approved) OR create bead (manual approval)
+    3. Return pending-card spec (if bead created) or execution result
     """
 
     def __init__(self, store=None):
         self.store = store
         self._zai_client = None
+        self._reload_manager = None
 
     async def _get_zai_client(self):
         """Get or create ZAI client."""
@@ -144,6 +147,273 @@ class EscalateHandler:
         if self.store is None:
             self.store = get_store()
         return self.store
+
+    def _get_reload_manager(self):
+        """Get or create hot-reload manager."""
+        if self._reload_manager is None:
+            self._reload_manager = get_reload_manager()
+        return self._reload_manager
+
+    def _evaluate_auto_approve(self, request: EscalateRequest, exceptions_config: dict) -> tuple[bool, str | None]:
+        """
+        Evaluate if an intent should be auto-approved based on exceptions.yaml.
+
+        Args:
+            request: The escalate request
+            exceptions_config: The loaded exceptions.yaml config
+
+        Returns:
+            (auto_approve: bool, reason: str | None)
+        """
+        auto_approve_rules = exceptions_config.get("auto_approve", {})
+
+        # Extract context for rule evaluation
+        context = {
+            "environment": request.metadata.get("environment"),
+            "project_slug": request.project_slug,
+            "branch": request.metadata.get("branch"),
+            "action": request.metadata.get("action"),
+            "risk_level": request.metadata.get("risk_level", "normal"),
+        }
+
+        # Check read-only operations (always auto-approved)
+        read_only_actions = auto_approve_rules.get("read_only", [])
+        action = context.get("action")
+        if action in read_only_actions:
+            return True, f"Read-only operation: {action}"
+
+        # Check safe mutations with conditions
+        safe_mutations = auto_approve_rules.get("safe_mutations", [])
+        for rule in safe_mutations:
+            condition = rule.get("condition", "")
+            actions = rule.get("actions", [])
+
+            # Simple condition evaluation (supports basic comparisons)
+            if self._evaluate_condition(condition, context) and action in actions:
+                return True, f"Safe mutation in {condition}: {action}"
+
+        # Check manual approval rules (never auto-approve)
+        manual_rules = exceptions_config.get("manual_approval", [])
+        for rule in manual_rules:
+            condition = rule.get("condition", "")
+            actions = rule.get("actions", [])
+
+            # Check if the action is in this rule's actions
+            if action not in actions:
+                continue
+
+            # Evaluate the condition
+            if self._evaluate_condition(condition, context):
+                if rule.get("always_approve") is False:
+                    return False, f"Manual approval required: {condition}"
+
+        # Check approval workflow rules
+        approval_config = exceptions_config.get("approval", {})
+        never_auto_approve = approval_config.get("never_auto_approve", [])
+        for condition_str in never_auto_approve:
+            if self._evaluate_condition(condition_str, context):
+                return False, f"Never auto-approve: {condition_str}"
+
+        # Default: require manual approval for unknown actions
+        return False, "Unknown action - requires manual approval"
+
+    def _evaluate_condition(self, condition: str, context: dict) -> bool:
+        """
+        Evaluate a condition string against context.
+
+        Supports simple conditions like:
+        - "environment == 'staging'"
+        - "branch == 'main' || branch == 'master'"  (using || for OR)
+        - "action == 'kubectl_delete_namespace'"
+        - "environment == 'staging' && action == 'restart'"  (using && for AND)
+
+        Note: Supports both shell-style operators (||, &&) and Python-style (or, and).
+
+        Args:
+            condition: The condition string
+            context: Dict of available variables
+
+        Returns:
+            True if condition evaluates to True, False otherwise
+        """
+        try:
+            # Translate shell-style operators to Python syntax
+            # (People are more familiar with || and && from bash/js)
+            python_condition = condition.replace(" || ", " or ").replace(" && ", " and ")
+
+            # Create a safe evaluation environment
+            safe_globals = {"__builtins__": {}}
+            safe_locals = {
+                "environment": context.get("environment"),
+                "project_slug": context.get("project_slug"),
+                "branch": context.get("branch"),
+                "action": context.get("action"),
+                "risk_level": context.get("risk_level"),
+            }
+
+            # Evaluate condition
+            result = eval(python_condition, safe_globals, safe_locals)
+            return bool(result)
+        except Exception as e:
+            logger.warning(f"Failed to evaluate condition '{condition}': {e}")
+            return False
+
+    def _get_bead_type_from_targets(self, intent_type: str, exceptions_config: dict) -> str:
+        """
+        Get the bead type from escalation_targets config.
+
+        Args:
+            intent_type: The intent type from IntentRouter (e.g., 'action', 'task-profile', 'self-modification')
+            exceptions_config: The loaded exceptions.yaml config
+
+        Returns:
+            The bead type to create (default: 'task')
+        """
+        # Map IntentRouter types to escalation_targets keys
+        intent_type_mapping = {
+            "action": "action",
+            "task-profile": "action",  # Task-profile intents create action-type beads
+            "self-modification": "self_modification",
+            "monitoring-config": "monitoring_config",
+        }
+
+        # Map the intent type to escalation_targets key
+        escalation_key = intent_type_mapping.get(intent_type, intent_type)
+
+        escalation_targets = exceptions_config.get("escalation_targets", {})
+        target_config = escalation_targets.get(escalation_key, {})
+        return target_config.get("bead_type", "task")
+
+    async def _execute_auto_approved(self, request: EscalateRequest) -> dict:
+        """
+        Execute an auto-approved action directly.
+
+        Executes kubectl and git commands that are auto-approved based on
+        exceptions.yaml rules, without creating beads.
+
+        Args:
+            request: The escalate request
+
+        Returns:
+            Execution result dict
+        """
+        action = request.metadata.get("action", "")
+        logger.info(f"Executing auto-approved action '{action}' for intent {request.intent_id}")
+
+        try:
+            # Route to appropriate executor based on action type
+            if action == "kubectl_delete_pod":
+                return await self._execute_delete_pod(request)
+            elif action.startswith("kubectl_"):
+                return await self._execute_kubectl_command(request)
+            elif action.startswith("git_"):
+                return await self._execute_git_command(request)
+            else:
+                # Unknown action - return placeholder for now
+                logger.warning(f"Unknown auto-approved action: {action}")
+                return {
+                    "status": "pending",
+                    "summary": f"Auto-approved action '{action}' not yet implemented",
+                    "data": {
+                        "action": action,
+                        "utterance": request.utterance,
+                    },
+                    "urgency": "low",
+                }
+
+        except CommandExecutionError as e:
+            logger.error(f"Command execution failed for intent {request.intent_id}: {e}")
+            return {
+                "status": "failed",
+                "summary": f"Command execution failed: {str(e)}",
+                "data": {
+                    "action": action,
+                    "error": str(e),
+                },
+                "urgency": "normal",
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error executing auto-approved action: {e}")
+            return {
+                "status": "failed",
+                "summary": f"Unexpected error: {str(e)}",
+                "data": {
+                    "action": action,
+                    "error": str(e),
+                },
+                "urgency": "normal",
+            }
+
+    async def _execute_delete_pod(self, request: EscalateRequest) -> dict:
+        """
+        Execute kubectl delete pod command.
+
+        Args:
+            request: The escalate request
+
+        Returns:
+            Execution result dict
+        """
+        executor = get_kubectl_executor()
+
+        # Parse utterance to extract pod name and namespace
+        params = executor.parse_delete_pod_utterance(
+            utterance=request.utterance,
+            project_slug=request.project_slug,
+        )
+
+        # Execute the delete command
+        result = await executor.execute_delete_pod(
+            pod_name=params["pod_name"],
+            namespace=params["namespace"],
+            project_slug=request.project_slug,
+        )
+
+        return result
+
+    async def _execute_kubectl_command(self, request: EscalateRequest) -> dict:
+        """
+        Execute other kubectl commands (placeholder for future).
+
+        Args:
+            request: The escalate request
+
+        Returns:
+            Execution result dict
+        """
+        # TODO: Implement other kubectl commands
+        action = request.metadata.get("action", "")
+        return {
+            "status": "pending",
+            "summary": f"Kubectl command '{action}' not yet implemented",
+            "data": {
+                "action": action,
+                "utterance": request.utterance,
+            },
+            "urgency": "low",
+        }
+
+    async def _execute_git_command(self, request: EscalateRequest) -> dict:
+        """
+        Execute git commands (placeholder for future).
+
+        Args:
+            request: The escalate request
+
+        Returns:
+            Execution result dict
+        """
+        # TODO: Implement git commands
+        action = request.metadata.get("action", "")
+        return {
+            "status": "pending",
+            "summary": f"Git command '{action}' not yet implemented",
+            "data": {
+                "action": action,
+                "utterance": request.utterance,
+            },
+            "urgency": "low",
+        }
 
     async def formulate_bead_body(
         self,
@@ -277,6 +547,77 @@ class EscalateHandler:
             logger.error(f"Failed to create bead: {e}")
             raise BeadCreationError(f"Failed to create bead: {e}") from e
 
+    async def _create_bead_with_type(
+        self,
+        request: EscalateRequest,
+        bead_body: str,
+        bead_type: str,
+    ) -> str:
+        """
+        Create a bead with a specific type using the br CLI.
+
+        Returns the bead ID.
+        """
+        # Generate bead title from intent
+        title = self._generate_bead_title(request)
+
+        # Prepare metadata (includes session_id for bead watcher routing)
+        metadata = {
+            "session_id": request.session_id,
+            "intent_id": request.intent_id,
+            "intent_type": request.intent_type,
+            "origin_surface_id": request.metadata.get("surface_id"),
+            "created_at": int(datetime.now(timezone.utc).timestamp()),
+        }
+
+        if request.project_slug:
+            metadata["project_slug"] = request.project_slug
+
+        if request.topic_id:
+            metadata["topic_id"] = request.topic_id
+
+        # Build br create command
+        try:
+            cmd = [
+                "br",
+                "create",
+                "--title", title,
+                "--type", bead_type,
+                "--description", bead_body,
+            ]
+
+            # Add labels for metadata tracking
+            for key, value in metadata.items():
+                if value is not None:
+                    cmd.extend(["--label", f"{key}={value}"])
+
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await proc.communicate()
+
+            if proc.returncode != 0:
+                error_msg = stderr.decode("utf-8", errors="replace")
+                logger.error(f"br create failed: {error_msg}")
+                raise BeadCreationError(f"br create failed: {error_msg}")
+
+            # Parse bead ID from output
+            output = stdout.decode("utf-8", errors="replace")
+            bead_id = self._extract_bead_id(output)
+
+            logger.info(f"Created bead {bead_id} (type: {bead_type}) for intent {request.intent_id}")
+            return bead_id
+
+        except FileNotFoundError:
+            logger.error("br CLI not found")
+            raise BeadCreationError("br CLI not found")
+        except Exception as e:
+            logger.error(f"Failed to create bead: {e}")
+            raise BeadCreationError(f"Failed to create bead: {e}") from e
+
     def _generate_bead_title(self, request: EscalateRequest) -> str:
         """Generate a bead title from the request."""
         # Use utterance prefix as title
@@ -339,6 +680,7 @@ class EscalateHandler:
         self,
         request: EscalateRequest,
         bead_id: str,
+        bead_type: str = "task",
     ) -> dict:
         """
         Build a pending-card spec for the surface.
@@ -359,7 +701,7 @@ class EscalateHandler:
             "metadata": {
                 "project_slug": request.project_slug,
                 "topic_id": request.topic_id,
-                "bead_type": "task",
+                "bead_type": bead_type,
             },
         }
 
@@ -368,27 +710,61 @@ class EscalateHandler:
         Escalate an intent to a bead.
 
         Full flow:
-        1. Formulate bead body via LLM
-        2. Create bead via br CLI
-        3. Return pending-card spec
+        1. Load exceptions.yaml to determine bead type from escalation_targets
+        2. Evaluate auto-approve rules from exceptions.yaml
+        3. If auto-approved: execute directly and return result
+        4. Otherwise: formulate bead body via LLM, create bead, return pending-card spec
 
         Args:
             request: The escalate request
 
         Returns:
-            EscalateResult with bead ID and pending card
+            EscalateResult with bead ID and pending card (if bead created)
+            or execution result (if auto-approved)
         """
-        logger.info(f"Escalating intent {request.intent_id} to bead")
+        logger.info(f"Escalating intent {request.intent_id}")
 
         try:
-            # Step 1: Formulate bead body
+            # Step 1: Load exceptions.yaml
+            reload_mgr = self._get_reload_manager()
+            exceptions_config = reload_mgr.get_config("exceptions")
+
+            # Step 2: Evaluate auto-approve rules
+            auto_approve, reason = self._evaluate_auto_approve(request, exceptions_config)
+
+            if auto_approve:
+                logger.info(f"Auto-approved intent {request.intent_id}: {reason}")
+
+                # Execute directly without bead creation
+                execution_result = await self._execute_auto_approved(request)
+
+                # Update intent in store
+                store = await self._get_store()
+                await store.update_intent_status(
+                    intent_id=request.intent_id,
+                    status="resolved",
+                )
+
+                # Return result with empty pending_card (auto-approved, no bead created)
+                return EscalateResult(
+                    bead_id="",  # No bead created
+                    intent_id=request.intent_id,
+                    pending_card=execution_result,  # Return execution result directly
+                    status="completed",
+                )
+
+            # Step 3: Determine bead type from escalation_targets
+            bead_type = self._get_bead_type_from_targets(request.intent_type, exceptions_config)
+            logger.info(f"Creating bead type '{bead_type}' for intent {request.intent_id} (not auto-approved: {reason})")
+
+            # Step 4: Formulate bead body
             bead_body = await self.formulate_bead_body(request)
 
-            # Step 2: Create bead
-            bead_id = await self.create_bead(request, bead_body)
+            # Step 5: Create bead with determined type
+            bead_id = await self._create_bead_with_type(request, bead_body, bead_type)
 
-            # Step 3: Build pending card
-            pending_card = self.build_pending_card(request, bead_id)
+            # Step 6: Build pending card
+            pending_card = self.build_pending_card(request, bead_id, bead_type)
 
             # Update intent in store with bead reference
             store = await self._get_store()
@@ -396,9 +772,6 @@ class EscalateHandler:
                 intent_id=request.intent_id,
                 status="dispatched",
             )
-
-            # Also update the bead_ref field
-            # (This would require a schema update, for now we track via metadata)
 
             logger.info(f"Escalated intent {request.intent_id} to bead {bead_id}")
 
