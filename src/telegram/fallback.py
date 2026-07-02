@@ -42,6 +42,7 @@ class TelegramFallback:
         self._is_reachable = None  # None = unknown, True = reachable, False = unreachable
         self._last_failure_logged = None  # Track when we last logged a failure
         self._failure_count = 0  # Track total failures
+        self._has_logged_first_failure = False  # Track if we've logged the first failure after startup
 
     async def send_message(
         self,
@@ -195,31 +196,29 @@ class TelegramFallback:
         }
 
     def _handle_send_failure(self, error_context: str = ""):
-        """Handle a send failure - log warning only on first failure in a batch.
+        """Handle a send failure - log warning only on the first failure after startup.
 
-        Rate-limited to prevent log spam: only logs a WARNING if:
-        - This is the first failure, OR
-        - It's been more than FAILURE_LOG_COOLDOWN_SECONDS (5 minutes) since the last logged failure
+        Logs a WARNING only for the very first failure after startup.
+        All subsequent failures are logged at DEBUG level to avoid spam.
 
         Args:
             error_context: Details about the error (status code, error message, etc.)
         """
         self._is_reachable = False
         self._failure_count += 1
-
-        # Only log a warning if we haven't logged recently (within cooldown period)
-        # or if this is the first failure
         now = datetime.now()
-        if (self._last_failure_logged is None or
-            (now - self._last_failure_logged).total_seconds() > self.FAILURE_LOG_COOLDOWN_SECONDS):
+
+        if not self._has_logged_first_failure:
+            # First failure after startup - log at WARNING level
             logger.warning(
-                f"Telegram send failure #{self._failure_count} at {self.bridge_url}. "
+                f"First Telegram send failure detected at {self.bridge_url}. "
                 f"Error: {error_context if error_context else 'unknown error'}. "
-                f"Subsequent failures within the next {self.FAILURE_LOG_COOLDOWN_SECONDS // 60} minutes will be logged at DEBUG level only."
+                f"Subsequent failures will be logged at DEBUG level only."
             )
+            self._has_logged_first_failure = True
             self._last_failure_logged = now
         else:
-            # Log at DEBUG level to avoid spam while still providing visibility
+            # Subsequent failures - log at DEBUG level to avoid spam
             logger.debug(
                 f"Repeated Telegram send failure #{self._failure_count} at {self.bridge_url}. "
                 f"Error: {error_context if error_context else 'unknown error'}."
