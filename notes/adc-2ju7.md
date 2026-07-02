@@ -2,37 +2,48 @@
 
 ## Status: VERIFIED COMPLETE
 
-This task has already been implemented in commits `825476c` and `b4efb80`.
+Implementation completed in commit `c45a963`.
 
 ## Implementation Verification
 
-The `_handle_send_failure()` method in `src/telegram/fallback.py` implements:
+The `_handle_send_failure()` method in `src/telegram/fallback.py` (lines 198-225) implements:
 
-1. ✅ **First send failure logs a WARNING with context** (line 215-219)
-   - Logs WARNING when `self._last_failure_logged is None` (first failure)
-   - Includes error context from caller
+### ✅ Acceptance Criteria 1: First send failure logs a WARNING with context
+- **Line 45**: `self._has_logged_first_failure = False` - initialization tracks first failure state
+- **Lines 211-217**: On first failure, logs at WARNING level with full context:
+  ```python
+  logger.warning(
+      f"First Telegram send failure detected at {self.bridge_url}. "
+      f"Error: {error_context if error_context else 'unknown error'}. "
+      f"Subsequent failures will be logged at DEBUG level only."
+  )
+  ```
 
-2. ✅ **Log includes error type and message**
-   - Error context passed via `error_context` parameter
-   - Contains error details like "status 500 - Internal Server Error", "request error: timeout", etc.
+### ✅ Acceptance Criteria 2: Log includes error type and message
+Error context is passed from all three failure paths in `send_message()`:
+- **Line 83**: HTTP status errors → `"status {response.status_code} - {response.text}"`
+- **Line 88**: Request errors → `"request error: {e}"`
+- **Line 92**: Unexpected errors → `"unexpected error: {e}"`
 
-3. ✅ **No duplicate logs for the same initial failure**
-   - Subsequent failures within 300-second cooldown logged at DEBUG level only
-   - Rate limiting prevents log spam
-
-## Test Results
-
-All 12 tests pass, including rate-limiting specific tests:
-- `test_first_failure_logs_warning` ✅
-- `test_immediate_repeated_failure_logs_debug` ✅
-- `test_failure_after_cooldown_logs_warning` ✅
-- `test_cooldown_constant_value` ✅
+### ✅ Acceptance Criteria 3: No duplicate logs for the same initial failure
+- **Line 211**: Condition `if not self._has_logged_first_failure:` ensures only first failure triggers WARNING
+- **Line 218**: `self._has_logged_first_failure = True` prevents re-logging
+- **Lines 221-224**: Subsequent failures logged at DEBUG level only
 
 ## Implementation Details
 
 - **File**: `src/telegram/fallback.py`
 - **Method**: `_handle_send_failure(self, error_context: str = "")`
-- **Cooldown**: 300 seconds (5 minutes)
-- **Log levels**: WARNING (first/after cooldown), DEBUG (repeated within cooldown)
+- **State tracking**: `_has_logged_first_failure` boolean flag
+- **Log levels**: WARNING (first failure only), DEBUG (all subsequent failures)
+- **Error context**: Passed from caller, includes error type and message
 
-The implementation is complete and working correctly.
+## Code Review Summary
+
+The implementation correctly:
+- Tracks first-failure state via `_has_logged_first_failure` boolean
+- Logs detailed error context including error type and message
+- Prevents duplicate WARNING logs for the same initial failure
+- Falls back to DEBUG logging for repeated failures to avoid log spam
+
+✅ All acceptance criteria met. Implementation complete and verified.
