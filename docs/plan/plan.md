@@ -86,6 +86,16 @@ One LLM call per utterance. Receives the full utterance text, the project regist
 
 Intent types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`
 
+- **status**: Query current state (pods, pipelines, deployments, beads)
+- **action**: Execute a command (deploy, restart, create)
+- **brainstorm**: Explore options, design, architecture discussion
+- **lookup**: Find specific information (logs, configs, docs)
+- **reminder**: Set or query reminders
+- **self-modification**: Instructions to improve the interface itself
+- **monitoring-config**: Configure ambient monitoring rules
+- **task-profile**: Durable async work items that escalate to NEEDLE beads
+- **clarification**: Low-confidence routing outcome requiring user input (meta-type, not dispatched)
+
 The router reads its segmentation prompt and the project registry from disk on each call — no caching. Hot-reload is automatic.
 
 Ambiguous intents: if confidence is below threshold, router returns an `intent_type: "clarification"` thread. The voice model or canvas handles the clarification round-trip before dispatching.
