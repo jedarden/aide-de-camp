@@ -40,7 +40,7 @@ class TelegramFallback:
         self,
         chat_id: int | str,
         message: str,
-        parse_mode: str = "Markdown",
+        parse_mode: str = "HTML",
     ) -> bool:
         """
         Send a message to a Telegram chat.
@@ -104,10 +104,16 @@ class TelegramFallback:
         """
         Send an exception to Telegram for human attention.
 
-        Exceptions are formatted prominently and may include action buttons.
+        NOTE: This method requires a session→telegram_chat_id mapping which is not
+        currently implemented. telegram-claude-bridge uses pull-based architecture
+        (manages sessions internally per forum topic), not push-based message delivery.
         """
-        message = self._format_exception_message(exception)
-        return await self.send_message(session_id, message, parse_mode="Markdown")
+        logger.warning(
+            f"send_exception() called for session {session_id} - "
+            f"session→telegram_chat mapping not implemented. "
+            f"telegram-claude-bridge uses pull-based architecture."
+        )
+        return False
 
     async def send_workload_summary(
         self,
@@ -117,33 +123,36 @@ class TelegramFallback:
         """
         Send a workload summary to Telegram.
 
-        Sent when a user reconnects after being away.
+        NOTE: This method requires a session→telegram_chat_id mapping which is not
+        currently implemented. telegram-claude-bridge uses pull-based architecture
+        (manages sessions internally per forum topic), not push-based message delivery.
         """
-        message = self._format_workload_summary(summary)
-        return await self.send_message(session_id, message)
+        logger.warning(
+            f"send_workload_summary() called for session {session_id} - "
+            f"session→telegram_chat mapping not implemented. "
+            f"telegram-claude-bridge uses pull-based architecture."
+        )
+        return False
 
     async def register_surface(self, session_id: str, telegram_chat_id: str) -> bool:
         """
         Register a Telegram surface for a session.
 
         Called when a Telegram user starts a conversation.
+
+        NOTE: The /register_surface endpoint does NOT exist in telegram-claude-bridge.
+        This method is a no-op stub for API compatibility. telegram-claude-bridge
+        uses a pull-based architecture where it manages sessions internally per forum topic,
+        not a push-based model where external systems register delivery surfaces.
+
+        Returns True for compatibility (pretends registration succeeded).
         """
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.bridge_url}/register_surface",
-                    json={
-                        "session_id": session_id,
-                        "chat_id": telegram_chat_id,
-                    },
-                    timeout=10.0,
-                )
-
-                return response.status_code == 200
-
-        except Exception as e:
-            logger.error(f"Error registering Telegram surface: {e}")
-            return False
+        logger.warning(
+            f"register_surface() called for session {session_id} - "
+            f"telegram-claude-bridge does not support surface registration. "
+            f"This is a no-op stub."
+        )
+        return True
 
     async def check_bridge_available(self) -> bool:
         """Check if telegram-claude-bridge is available."""
