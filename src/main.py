@@ -146,6 +146,20 @@ async def lifespan(app: FastAPI):
     await _background_processor.start()
     logger.info("Background analysis processor started")
 
+    # Check Telegram bridge reachability
+    try:
+        telegram_fallback = get_telegram_fallback()
+        bridge_available = await telegram_fallback.check_bridge_available()
+        if bridge_available:
+            logger.info(f"Telegram bridge reachable at {telegram_fallback.bridge_url}")
+        else:
+            logger.warning(
+                f"Telegram bridge unreachable at {telegram_fallback.bridge_url}. "
+                f"Telegram fallback will not be available."
+            )
+    except Exception as e:
+        logger.warning(f"Failed to check Telegram bridge reachability: {e}")
+
     # Initialize bead watcher
     try:
         _bead_watcher = BeadWatcher(_store, _surface_router)
@@ -1452,6 +1466,21 @@ async def api_v1_background_analyze():
             for p in proposals
         ]
     }
+
+
+@app.get("/api/v1/status/telegram_bridge")
+async def api_v1_telegram_bridge_status():
+    """Get Telegram bridge reachability status."""
+    try:
+        telegram_fallback = get_telegram_fallback()
+        status = telegram_fallback.get_bridge_status()
+        return status
+    except Exception as e:
+        logger.error(f"Error getting Telegram bridge status: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to get bridge status: {str(e)}"}
+        )
 
 
 @app.on_event("startup")
