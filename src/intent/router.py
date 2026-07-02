@@ -75,7 +75,7 @@ Return a JSON array of intent objects:
 ```json
 [
   {
-    "intent_type": "status|action|brainstorm|lookup|reminder|self-modification|monitoring-config|task-profile",
+    "intent_type": "status|action|brainstorm|lookup|reminder|self-modification|monitoring-config|task-profile|clarification",
     "project_slug": "project-id or null",
     "urgency": "critical|high|normal|low",
     "utterance_fragment": "the specific fragment this intent covers",
@@ -95,6 +95,7 @@ Return a JSON array of intent objects:
 - **self-modification**: Instructions to improve the interface itself
 - **monitoring-config**: Configure ambient monitoring rules
 - **task-profile**: Durable async work items that escalate to NEEDLE beads
+- **clarification**: Low-confidence routing outcome requiring user input (meta-type, not dispatched)
 
 ## Task-Profile Classification
 

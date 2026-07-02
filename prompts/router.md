@@ -19,7 +19,7 @@ Return a JSON array of intent objects:
 [
   {
     "project_slug": "project-id",
-    "intent_type": "status|action|brainstorm|lookup|reminder|self-modification|monitoring-config|task-profile",
+    "intent_type": "status|action|brainstorm|lookup|reminder|self-modification|monitoring-config|task-profile|clarification",
     "urgency": "critical|high|normal|low",
     "utterance_fragment": "the specific fragment this intent covers",
     "confidence": 0.0-1.0
@@ -37,6 +37,7 @@ Return a JSON array of intent objects:
 - **self-modification**: Instructions to improve the interface itself
 - **monitoring-config**: Configure ambient monitoring rules
 - **task-profile**: Complex multi-step work that requires durable async handling via NEEDLE bead
+- **clarification**: Low-confidence routing outcome requiring user input (meta-type, not dispatched)
 
 ## Urgency Tiers
 
