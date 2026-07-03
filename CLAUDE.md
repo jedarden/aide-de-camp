@@ -57,7 +57,8 @@ utterance (text or voice)
 Key files:
 - `src/main.py` — FastAPI app, `/dispatch` endpoint, SSE broadcaster wiring
 - `src/intent/router.py` — LLM classification → fetch+synthesize → store persistence
-- `src/fetch/strand.py` — parallel k8s/argocd/bead data fetching
+- `src/fetch/commands.py` — fetch command matrix, intent types, data structures
+- `src/fetch/orchestrator.py` — concurrent fetch execution with streaming and coverage tracking (FetchStrand implementation)
 - `src/synthesize/strand.py` — LLM synthesis into structured result
 - `src/session/store.py` — SQLite session store (aiosqlite); `data/session.db`
 - `src/sse/broadcaster.py` — SSE connection registry and event routing
