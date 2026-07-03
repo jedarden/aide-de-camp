@@ -1,247 +1,318 @@
 # Fetch Implementation Comparison Report
 
-**Bead:** adc-1dvh  
-**Date:** 2026-07-03  
-**Purpose:** Compare legacy fetch implementations (`strand.py` + `executor.py`) against canonical stack (`commands.py` + `orchestrator.py`)
+**Bead:** adc-1dvh
+**Date:** 2026-07-03
+**Purpose:** Compare deleted fetch modules (`strand.py` + `executor.py`) against canonical stack (`commands.py` + `orchestrator.py`)
 
-## Overview
+## Executive Summary
 
-The fetch implementation was consolidated in commit `34beb3c` ("refactor: consolidate dual fetch implementations (adc-wa9)"). Prior to this, there were two separate implementations:
+**Finding:** `strand.py` and `executor.py` were **NOT alternative implementations**—they were backward compatibility shims that wrapped the canonical implementation. Both were deleted in commit `34beb3c` (2026-07-03) as part of consolidating to a single fetch implementation.
 
-1. **`src/fetch/strand.py`** — `FetchStrand` class with streaming support and SSH
-2. **`src/fetch/executor.py`** — `FetchExecutor` class with project-centric design
+- **`strand.py`** (13 lines): Minimal shim that only re-exported `KUBECTL_PROXIES`
+- **`executor.py`** (217 lines): Adapter layer that wrapped the canonical API for legacy code
 
-The consolidation moved all capabilities into the canonical stack:
+**No migration needed**—all capabilities already exist in the canonical stack.
+
+---
+
+## Overview of Files
+
+The fetch implementation was consolidated in commit `34beb3c` ("refactor: consolidate dual fetch implementations (adc-wa9)").
+
+### Deleted Modules
+
+1. **`src/fetch/strand.py`** — 13-line compatibility shim
+2. **`src/fetch/executor.py`** — 217-line backward compatibility adapter
+
+### Canonical Implementation (Pre-Existing)
+
 - **`src/fetch/commands.py`** — Command matrix, data structures, intent types
-- **`src/fetch/orchestrator.py`** — `FetchStrand` (from strand.py) + `FetchOrchestrator` wrapper
+- **`src/fetch/orchestrator.py`** — `FetchStrand` + `FetchOrchestrator` with all source executors
 
-## Architecture Comparison
+## Deleted Module: `strand.py`
 
-### Legacy `strand.py`
+**Purpose:** Minimal backward compatibility shim
 
-**Purpose:** Concurrent data fetcher with streaming support
+**Full Content (13 lines):**
+```python
+"""
+Fetch strand - backward compatibility layer.
 
-**Key Components:**
-- `FetchStrand` class with source executor registry
-- `fetch()` method with `on_partial_result` streaming callback
-- Per-source timeout enforcement
-- Coverage tracking (succeeded, timed_out, failed, skipped)
-- Caveat generation for failed sources
-- SSH support for remote repos (`_make_cmd()` wrapper)
-- All source executors implemented as methods
+This module provides a compatibility shim for legacy imports.
+The canonical fetch implementation is in orchestrator.py and commands.py.
 
-**Source Types (16 total):**
-- `KUBECTL_PODS`, `KUBECTL_DEPLOYMENTS`, `KUBECTL_WORKFLOWS`
-- `ARGOCD_APP`
-- `GIT_LOG`, `GIT_STATUS`
-- `BEAD_LIST`, `BEAD_DETAILS`
-- `CI_STATUS` (alias for workflows)
-- `COMPONENTS`, `LOGS`, `EVENTS`
-- `SESSION_STATE`, `TOPIC_CONTEXT`, `REMINDERS`
-- `FS_EXPLORE`, `FS_README`, `FS_HOME`
+DEPRECATED: Import from commands.py and orchestrator.py directly.
+"""
 
-**Streaming Support:** Yes — `on_partial_result` callback invoked as each source completes
+# Re-export KUBECTL_PROXIES for backward compatibility
+from .commands import KUBECTL_PROXIES
 
-**Coverage Logic:** Full — tracks succeeded, timed_out, failed, skipped with caveats
+__all__ = ["KUBECTL_PROXIES"]
+```
 
-### Legacy `executor.py`
+**Analysis:** This module provided NO functionality beyond re-exporting a constant from `commands.py`. It existed solely to allow legacy imports like `from .strand import KUBECTL_PROXIES` to continue working.
 
-**Purpose:** Project-centric command executor for ambient monitoring and context warming
+---
 
-**Key Components:**
-- `FetchType` enum (different from `FetchSource`)
-- `FetchCommand` dataclass (fetch_type, project_slug, args, timeout)
-- `FetchResult` dataclass (fetch_type, project_slug, success, data, error, duration_ms)
-- `FetchExecutor` class with hardcoded project/cluster/repo mappings
-- No streaming callbacks
-- No coverage tracking (just success/error)
+## Deleted Module: `executor.py`
 
-**Fetch Types (7 total):**
-- `KUBECTL_STATUS`, `POD_STATUS`, `DEPLOYMENT_STATUS`
-- `ARGOCD_STATUS`
-- `GIT_LOG`
-- `BEAD_LIST`
-- `CI_STATUS`
+**Purpose:** Backward compatibility adapter wrapping the canonical implementation
 
-**Design Differences:**
-- **Project-centric** — all operations keyed by `project_slug`
-- **Hardcoded mappings** — project_slug → cluster, repo_path in `__init__`
-- **Args-based** — commands accept variable `args` list
-- **No SSH support** — all operations assumed local
-- **No intent-based routing** — simpler, direct execution model
+**Full Content (217 lines):**
 
-### Canonical Stack (`commands.py` + `orchestrator.py`)
+### Key Components
+
+1. **`FetchType` enum** (subset of `FetchSource`):
+   ```python
+   KUBECTL_STATUS = "kubectl_pods"
+   POD_STATUS = "kubectl_pods"  # Alias
+   ARGOCD_STATUS = "argocd_app"
+   GIT_LOG = "git_log"
+   BEAD_LIST = "bead_list"
+   CI_STATUS = "ci_status"
+   DEPLOYMENT_STATUS = "kubectl_deployments"
+   ```
+   - Mapped to canonical `FetchSource` via `_FETCH_TYPE_TO_SOURCE`
+   - Mapped to `IntentType` via `_FETCH_TYPE_TO_INTENT`
+
+2. **`FetchCommand` dataclass:**
+   ```python
+   fetch_type: FetchType
+   project_slug: str
+   args: list[str]
+   timeout: int
+   ```
+   - `to_canonical()` method converted to `FetchRequest`
+   - Auto-derived `intent_type` from `fetch_type`
+
+3. **`FetchResult` dataclass:**
+   ```python
+   success: bool
+   data: dict[str, Any]
+   error: Optional[str] = None
+   duration_ms: int = 0
+   ```
+   - `from_canonical()` factory converted from canonical `SourceResult`
+   - Extracted source-specific fields (e.g., `pods` from `KUBECTL_PODS` result)
+
+4. **`FetchExecutor` class:**
+   - `execute()` method took `FetchCommand`
+   - Converted to canonical `FetchRequest`
+   - **Delegated to `FetchStrand.fetch()`** (from canonical `orchestrator.py`)
+   - Converted result back to legacy `FetchResult`
+
+5. **`get_fetch_executor()`:** Global instance getter
+
+### Design Pattern
+
+The `executor.py` module was a **pure adapter layer**. All actual execution was delegated to the canonical `FetchStrand` from `orchestrator.py`:
+
+```python
+async def execute(self, command: FetchCommand) -> FetchResult:
+    canonical_request = command.to_canonical()
+    result = await self._strand.fetch(canonical_request)  # Delegates to canonical
+    return FetchResult.from_canonical(...)
+```
+
+No fetch logic was implemented in `executor.py`—it only translated between the old API and the canonical implementation.
+
+## Canonical Implementation: `commands.py` + `orchestrator.py`
 
 **Purpose:** Unified fetch framework with intent-based command matrix
 
+### `commands.py`
+
+**Purpose:** Command matrix defining what to fetch per intent type
+
 **Key Components:**
-- **`commands.py`:**
-  - `IntentType` enum (8 intent types)
-  - `FetchSource` enum (18 sources)
-  - `FetchCommandSpec` (source, template, timeout, required, cacheable)
-  - `FETCH_COMMAND_MATRIX` — intent → command specs mapping
-  - `FetchContext` — context variables for template expansion (with SSH support)
-  - `FetchRequest`, `SourceResult`, `FetchCoverage`, `FetchResult` dataclasses
 
-- **`orchestrator.py`:**
-  - `FetchStrand` class (migrated from strand.py, identical functionality)
-  - `FetchOrchestrator` class (convenience wrapper around FetchStrand)
-  - `get_orchestrator()`, `execute_fetch()` convenience functions
-  - `StreamCallback` type alias
-  - Global orchestrator/fetch_strand instances
+1. **`IntentType` enum** (8 types):
+   - `STATUS`, `ACTION`, `BRAINSTORM`, `LOOKUP`
+   - `REMINDER`, `SELF_MODIFICATION`, `MONITORING_CONFIG`, `TASK_PROFILE`
 
-**Source Types (18 total):**
-All from strand.py, PLUS:
-- No new sources added; all 16 from strand.py are present
+2. **`FetchSource` enum** (17 sources):
+   - Kubernetes: `KUBECTL_PODS`, `KUBECTL_DEPLOYMENTS`, `KUBECTL_WORKFLOWS`
+   - ArgoCD: `ARGOCD_APP`
+   - Git: `GIT_LOG`, `GIT_STATUS`
+   - Beads: `BEAD_LIST`, `BEAD_DETAILS`
+   - CI: `CI_STATUS`
+   - Components: `COMPONENTS`
+   - Operations: `LOGS`, `EVENTS`
+   - State: `SESSION_STATE`, `TOPIC_CONTEXT`, `REMINDERS`
+   - Filesystem: `FS_EXPLORE`, `FS_README`, `FS_HOME`
 
-**Intent Types (8 total):**
-- `STATUS`, `ACTION`, `BRAINSTORM`, `LOOKUP`, `REMINDER`, `SELF_MODIFICATION`, `MONITORING_CONFIG`, `TASK_PROFILE`
+3. **`FetchCommandSpec` dataclass:**
+   - `source`: FetchSource
+   - `command_template`: str (e.g., `"kubectl --server={proxy} get pods -n {namespace} -o json"`)
+   - `timeout_seconds`: int (default 5)
+   - `required`: bool (default False)
+   - `cacheable`: bool (default True)
 
-**Streaming Support:** Yes — identical to strand.py
+4. **`FETCH_COMMAND_MATRIX`:**
+   - Maps `IntentType` → `list[FetchCommandSpec]`
+   - Defines which sources to query for each intent type
+   - Configurable per-source timeouts
+   - Marks required vs. optional sources
 
-**Coverage Logic:** Full — identical to strand.py
+5. **`FetchContext` dataclass:**
+   - Context variables for template expansion
+   - Includes `ssh_target`, `host_alias` for remote execution
+   - Template expansion via `expand_template()` method
 
-**SSH Support:** Yes — via `FetchContext.ssh_target` and `_make_cmd()`
+6. **Result types:**
+   - `SourceResult`: Single source result (status, data, error, duration_ms, cached)
+   - `FetchCoverage`: Coverage report (succeeded, timed_out, failed, skipped)
+   - `FetchResult`: Complete result with all sources and coverage
+
+### `orchestrator.py`
+
+**Purpose:** Concurrent fetch execution with streaming support
+
+**Key Components:**
+
+1. **`FetchStrand` class:**
+   - `_source_executors`: Dict mapping `FetchSource` → async executor method
+   - `fetch()` method:
+     - Executes all sources concurrently via `asyncio.create_task()`
+     - Enforces per-source timeouts via `asyncio.wait_for()`
+     - Calls `on_partial_result` callback as each source completes
+     - Tracks coverage (succeeded, timed_out, failed, skipped)
+     - Generates caveats for failed sources
+   - **17 source executor methods**: `_fetch_kubectl_pods`, `_fetch_git_log`, etc.
+   - SSH remote execution support via `_make_cmd()` wrapper
+
+2. **`FetchOrchestrator` class:**
+   - Convenience wrapper around `FetchStrand`
+   - Provides `execute_fetch()` method with same interface
+
+3. **Global instances:**
+   - `get_orchestrator()`: Returns singleton `FetchOrchestrator`
+   - `get_fetch_strand()`: Returns singleton `FetchStrand`
+
+**Capabilities:**
+- ✅ Streaming callbacks via `on_partial_result(source, result)`
+- ✅ Concurrent execution via asyncio
+- ✅ Per-source timeouts
+- ✅ Comprehensive coverage tracking
+- ✅ Caveat generation for failed sources
+- ✅ SSH remote execution for git/filesystem operations
+- ✅ Async HTTP client (httpx) for Kubernetes API calls
 
 ## Capability Matrix
 
-| Capability | strand.py | executor.py | Canonical Stack | Notes |
-|------------|-----------|-------------|------------------|-------|
-| Concurrent execution | ✅ | ✅ | ✅ | All implementations concurrent |
-| Streaming callbacks | ✅ | ❌ | ✅ | executor.py lacked streaming |
-| Coverage tracking | ✅ | ❌ | ✅ | executor.py only had success/error |
-| Per-source timeout | ✅ | ✅ | ✅ | All support per-source timeout |
-| SSH remote support | ✅ | ❌ | ✅ | executor.py was local-only |
-| Intent-based routing | ❌ | ❌ | ✅ | New in canonical stack |
-| Command matrix | ❌ | ❌ | ✅ | New in canonical stack |
-| Source executors (16+) | ✅ | 7 | ✅ | executor.py had limited sources |
-| Required/optional sources | ✅ | ❌ | ✅ | New in canonical stack |
-| Cacheable flag | ✅ | ❌ | ✅ | New in canonical stack |
-| Caveat generation | ✅ | ❌ | ✅ | executor.py lacked caveats |
-| Environment discovery | ✅ | ❌ | ✅ | FS_HOME uses registry |
-| `FetchContext` | ✅ | ❌ | ✅ | Rich context in canonical |
+| Capability | Canonical (orchestrator.py) | Deleted (strand.py) | Deleted (executor.py) |
+|------------|----------------------------|--------------------|----------------------|
+| Concurrent fetch execution | ✅ Native | ❌ N/A (shim) | ❌ Delegated to canonical |
+| Streaming callbacks | ✅ `on_partial_result` | ❌ N/A (shim) | ❌ No support |
+| Per-source timeouts | ✅ `timeout_seconds` in spec | ❌ N/A (shim) | ❌ No support |
+| Coverage tracking | ✅ `FetchCoverage` dataclass | ❌ N/A (shim) | ❌ No support |
+| Caveat generation | ✅ Automatic | ❌ N/A (shim) | ❌ No support |
+| SSH remote execution | ✅ `_make_cmd()` wrapper | ❌ N/A (shim) | ❌ No support |
+| Kubernetes API (async) | ✅ Httpx async client | ❌ N/A (shim) | ❌ Delegated to canonical |
+| Git operations | ✅ Local + SSH remote | ❌ N/A (shim) | ❌ Delegated to canonical |
+| Filesystem operations | ✅ Local + SSH remote | ❌ N/A (shim) | ❌ Delegated to canonical |
+| Intent-based routing | ✅ `FETCH_COMMAND_MATRIX` | ❌ N/A (shim) | ❌ No support |
+| Source executors (17) | ✅ All implemented | ❌ N/A (shim) | ❌ Delegated to canonical |
 
-## Features NOT Migrated from `executor.py`
+---
 
-The following capabilities from `executor.py` were **intentionally not migrated** to the canonical stack:
+## Consolidation Details
 
-### 1. `FetchType` Enum
-- **executor.py** had `FetchType` enum with types like `KUBECTL_STATUS`, `POD_STATUS`
-- **Canonical** uses `FetchSource` enum instead — more granular, maps 1:1 with executors
-- **Rationale:** `FetchSource` is more flexible and extensible; `FetchType` was redundant
+### Commit: `34beb3c` (2026-07-03)
 
-### 2. `FetchCommand` with `args` List
-- **executor.py** accepted variable `args: list[str]` per command
-- **Canonical** uses `FetchContext` for all parameters
-- **Rationale:** `FetchContext` is more structured and type-safe
+**Title:** "refactor: consolidate dual fetch implementations (adc-wa9)"
 
-### 3. Hardcoded Project Mappings
-- **executor.py** had `self._project_repos`, `self._project_clusters` dictionaries
-- **Canonical** uses environment discovery (`src/environment/discovery.py`) for dynamic resolution
-- **Rationale:** Hardcoded mappings don't scale; dynamic discovery is more maintainable
+**Changes:**
+1. Deleted `src/fetch/executor.py` (217 lines)
+2. Deleted `src/fetch/strand.py` (13 lines)
+3. Updated `src/context/warmer.py` → use `get_fetch_strand()` from orchestrator
+4. Updated `src/context/prefetch.py` → use `get_fetch_strand()` from orchestrator
+5. Updated `src/monitoring/ambient.py` → use `get_fetch_strand()` from orchestrator
 
-### 4. Project-Centric Design
-- **executor.py** keyed everything by `project_slug`
-- **Canonical** uses context-based design with `FetchContext`
-- **Rationale:** Context-based design supports more varied use cases (SSH, different clusters, etc.)
+**Acceptance Criteria (from commit):**
+- ✅ Single fetch implementation using orchestrator+commands
+- ✅ No module imports fetch.strand or fetch.executor
+- ✅ Existing tests still pass
+- ✅ CLAUDE.md and README.md already agree on fetch module names
 
-### 5. `FetchResult.project_slug`
-- **executor.py** results included `project_slug`
-- **Canonical** results don't include project_slug (context has it)
-- **Rationale:** Avoids redundancy; context is already part of the request
+---
 
-## Features Added in Canonical Stack
+## Key Findings
 
-The following capabilities are **new** in the canonical stack (not present in either legacy file):
+### 1. `strand.py` Was a Minimal Shim
 
-### 1. Intent-Based Command Matrix
-- `FETCH_COMMAND_MATRIX` maps intent types to command specs
-- Enables automatic source selection based on intent
-- **Status:** ✅ Fully implemented
+**Purpose:** Allow legacy imports of `KUBECTL_PROXIES` to continue working
 
-### 2. Required/Optional Source Flag
-- `FetchCommandSpec.required` marks must-succeed sources
-- Affects caveats and coverage tracking
-- **Status:** ✅ Fully implemented
+**Impact:** Zero—no functionality lost, only a constant re-export
 
-### 3. Cacheable Flag
-- `FetchCommandSpec.cacheable` marks sources safe to cache
-- Future: integrate with caching layer
-- **Status:** ✅ Fully implemented (caching layer not yet implemented)
+### 2. `executor.py` Was an Adapter Layer
 
-### 4. `TASK_PROFILE` Intent Type
-- Escalates to NEEDLE bead for durable async handling
-- **Status:** ✅ Defined, integration pending
+**Purpose:** Translate old API (`FetchType`, `FetchCommand`) to new API (`FetchSource`, `FetchRequest`)
 
-### 5. `FetchOrchestrator` Wrapper
-- Convenience wrapper around `FetchStrand`
-- Provides cleaner API for consumers
-- **Status:** ✅ Fully implemented
+**Impact:** Zero—all execution delegated to canonical `FetchStrand.fetch()`
 
-## Migration Summary
+**Design Pattern:**
+- `FetchType` enum → mapped to `FetchSource`
+- `FetchCommand` → converted to `FetchRequest`
+- `FetchResult` → converted from `SourceResult`
+- `FetchExecutor.execute()` → delegated to `FetchStrand.fetch()`
 
-### ✅ Successfully Consolidated
+### 3. All Capabilities Were Already in Canonical Stack
 
-All capabilities from `strand.py` were migrated to `orchestrator.py`:
+The canonical implementation (`commands.py` + `orchestrator.py`) already had:
 
-- ✅ `FetchStrand` class (identical functionality)
-- ✅ All 16 source executors
-- ✅ Streaming callbacks (`on_partial_result`)
+- ✅ All 17 source executors
+- ✅ Streaming callbacks via `on_partial_result`
 - ✅ Coverage tracking (succeeded, timed_out, failed, skipped)
-- ✅ Caveat generation
-- ✅ SSH support (`_make_cmd`)
-- ✅ Environment discovery integration (`FS_HOME`)
+- ✅ Caveat generation for failed sources
+- ✅ SSH remote execution support
 - ✅ Per-source timeout enforcement
-- ✅ Global instance management (`get_fetch_strand()`)
+- ✅ Intent-based command matrix
+- ✅ Required/optional source flags
+- ✅ Cacheable flags (for future caching layer)
 
-### ❌ Intentionally Not Migrated
+---
 
-Capabilities from `executor.py` were superseded by better design:
+## Migration Status
 
-- ❌ `FetchType` enum → replaced by `FetchSource`
-- ❌ `FetchCommand` with `args` → replaced by `FetchContext`
-- ❌ Hardcoded mappings → replaced by dynamic discovery
-- ❌ Project-centric design → replaced by context-based design
-- ❌ Simple success/error → replaced by full coverage tracking
+**No migration required**—the deleted modules provided no capabilities beyond what exists in the canonical stack.
 
-### 🆕 New Capabilities
+### What Was Deleted
 
-Features added in consolidation:
+1. **`strand.py`** (13 lines):
+   - Re-exported `KUBECTL_PROXIES` constant
+   - Existed solely for backward compatibility
 
-- 🆕 Intent-based command matrix (`FETCH_COMMAND_MATRIX`)
-- 🆕 Required/optional source flag
-- 🆕 Cacheable flag (for future caching layer)
-- 🆕 `TASK_PROFILE` intent type
-- 🆕 `FetchOrchestrator` convenience wrapper
-- 🆕 `get_orchestrator()`, `execute_fetch()` convenience functions
+2. **`executor.py`** (217 lines):
+   - Adapter layer translating old API to new API
+   - Delegated all execution to canonical `FetchStrand`
+   - No independent fetch logic
 
-## Conclusion
+### What Remains
 
-**The canonical stack (`commands.py` + `orchestrator.py`) is a strict superset of `strand.py` capabilities** — all 16 source executors, streaming callbacks, coverage tracking, and SSH support were preserved during consolidation.
+1. **`commands.py`**:
+   - Intent types, fetch sources, command matrix
+   - Result types and context structures
 
-The `executor.py` implementation was **superseded rather than migrated** — its project-centric design and hardcoded mappings were replaced by a more flexible context-based approach with dynamic environment discovery.
+2. **`orchestrator.py`**:
+   - `FetchStrand` with all source executors
+   - `FetchOrchestrator` convenience wrapper
+   - Global instance management
 
-**No features require migration** — the canonical stack has all capabilities from both legacy implementations, plus new intent-based routing and command matrix features.
-
-### Verification
-
-To verify the consolidation was complete:
-
-```bash
-# Check that strand.py and executor.py no longer exist
-ls src/fetch/  # Should show only commands.py, orchestrator.py, __init__.py
-
-# Check that all source executors are present
-grep "async def _fetch_" src/fetch/orchestrator.py | wc -l  # Should be 16+
-
-# Check that streaming callbacks work
-# (Unit tests should verify on_partial_result is called)
-
-# Check that SSH support works
-# (Integration tests should verify remote repo fetching)
-```
+---
 
 ## Acceptance Criteria
 
-- ✅ Comparison report exists documenting all strand.py capabilities
-- ✅ List of features that need migration to canonical stack: **NONE** — all capabilities already present
+- ✅ Comparison report exists documenting all capabilities from deleted modules
+- ✅ List of features that need migration: **NONE**—all capabilities already present in canonical stack
+
+---
+
+## Conclusion
+
+**The canonical stack (`commands.py` + `orchestrator.py`) was already the complete implementation** before consolidation. The deleted `strand.py` and `executor.py` modules were compatibility shims that wrapped the canonical implementation:
+
+- `strand.py` was a 13-line shim that only re-exported `KUBECTL_PROXIES`
+- `executor.py` was a 217-line adapter that translated between old and new APIs
+
+**No features require migration**—all functionality exists in the canonical implementation. The consolidation successfully removed the compatibility layer without losing any capabilities.
