@@ -13,7 +13,8 @@ from logging import getLogger
 from typing import Any, Optional
 
 from ..session.store import get_store
-from ..fetch.executor import get_fetch_executor, FetchCommand, FetchType
+from ..fetch.orchestrator import get_fetch_strand
+from ..fetch.commands import FetchContext, FetchSource, IntentType
 
 
 logger = getLogger(__name__)
@@ -89,62 +90,40 @@ class ContextWarmer:
         self.context_ttl = context_ttl
         self.running = False
         self.task: Optional[asyncio.Task] = None
-        self._fetch_executor = get_fetch_executor()
+        self._fetch_strand = get_fetch_strand()
 
     async def fetch_kubectl_status(self, project_slug: str) -> Optional[dict]:
         """Fetch kubectl status for a project."""
-        command = FetchCommand(
-            fetch_type=FetchType.KUBECTL_STATUS,
-            project_slug=project_slug,
-            args=[],
-            timeout=30,
-        )
-        result = await self._fetch_executor.execute(command)
-        return result.data if result.success else None
+        context = FetchContext(project_slug=project_slug)
+        if project_slug:
+            context.namespace = project_slug.replace("-", "")
+
+        result = await self._fetch_strand._fetch_kubectl_pods(context)
+        return result if result and "error" not in result else None
 
     async def fetch_argocd_status(self, project_slug: str) -> Optional[dict]:
         """Fetch ArgoCD status for a project."""
-        command = FetchCommand(
-            fetch_type=FetchType.ARGOCD_STATUS,
-            project_slug=project_slug,
-            args=[],
-            timeout=30,
-        )
-        result = await self._fetch_executor.execute(command)
-        return result.data if result.success else None
+        context = FetchContext(project_slug=project_slug, app_name=project_slug)
+        result = await self._fetch_strand._fetch_argocd_app(context)
+        return result if result and "error" not in result else None
 
     async def fetch_git_log(self, project_slug: str) -> Optional[dict]:
         """Fetch git log for a project."""
-        command = FetchCommand(
-            fetch_type=FetchType.GIT_LOG,
-            project_slug=project_slug,
-            args=[],
-            timeout=30,
-        )
-        result = await self._fetch_executor.execute(command)
-        return result.data if result.success else None
+        context = FetchContext(project_slug=project_slug, repo_path=f"/home/coding/{project_slug}")
+        result = await self._fetch_strand._fetch_git_log(context)
+        return result if result and "error" not in result else None
 
     async def fetch_bead_list(self, project_slug: str) -> Optional[dict]:
         """Fetch bead list for a project."""
-        command = FetchCommand(
-            fetch_type=FetchType.BEAD_LIST,
-            project_slug=project_slug,
-            args=[],
-            timeout=30,
-        )
-        result = await self._fetch_executor.execute(command)
-        return result.data if result.success else None
+        context = FetchContext(project_slug=project_slug, repo_path=f"/home/coding/{project_slug}")
+        result = await self._fetch_strand._fetch_bead_list(context)
+        return result if result and "error" not in result else None
 
     async def fetch_ci_status(self, project_slug: str) -> Optional[dict]:
         """Fetch CI status for a project."""
-        command = FetchCommand(
-            fetch_type=FetchType.CI_STATUS,
-            project_slug=project_slug,
-            args=[],
-            timeout=30,
-        )
-        result = await self._fetch_executor.execute(command)
-        return result.data if result.success else None
+        context = FetchContext(project_slug=project_slug)
+        result = await self._fetch_strand._fetch_ci_status(context)
+        return result if result and "error" not in result else None
 
     async def build_context_bundle(self, topic_id: str, project_slugs: list[str]) -> ContextBundle:
         """

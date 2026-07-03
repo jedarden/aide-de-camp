@@ -18,7 +18,8 @@ from aiohttp import ClientSession
 from aiosqlite import connect
 
 from ..session.store import get_store
-from ..fetch.executor import get_fetch_executor, FetchCommand, FetchType
+from ..fetch.orchestrator import get_fetch_strand
+from ..fetch.commands import FetchContext, FetchSource, IntentType
 
 
 logger = getLogger(__name__)
@@ -26,15 +27,15 @@ logger = getLogger(__name__)
 MONITORING_CONFIG_PATH = Path("/home/coding/aide-de-camp/config/monitoring.yaml")
 SESSION_DB_PATH = Path("/home/coding/aide-de-camp/data/session.db")
 
-# Mapping of intent types to fetch types
+# Mapping of intent types to fetch sources
 INTENT_TYPE_TO_FETCH = {
-    "status": FetchType.KUBECTL_STATUS,
-    "pod_status": FetchType.POD_STATUS,
-    "deployment_status": FetchType.DEPLOYMENT_STATUS,
-    "argocd": FetchType.ARGOCD_STATUS,
-    "ci": FetchType.CI_STATUS,
-    "git": FetchType.GIT_LOG,
-    "beads": FetchType.BEAD_LIST,
+    "status": FetchSource.KUBECTL_PODS,
+    "pod_status": FetchSource.KUBECTL_PODS,
+    "deployment_status": FetchSource.KUBECTL_DEPLOYMENTS,
+    "argocd": FetchSource.ARGOCD_APP,
+    "ci": FetchSource.CI_STATUS,
+    "git": FetchSource.GIT_LOG,
+    "beads": FetchSource.BEAD_LIST,
 }
 
 
@@ -85,7 +86,7 @@ class AmbientMonitor:
         self.running = False
         self.tasks: list[asyncio.Task] = []
         self._http_client: Optional[ClientSession] = None
-        self._fetch_executor = get_fetch_executor()
+        self._fetch_strand = get_fetch_strand()
 
     async def _get_http_client(self) -> ClientSession:
         """Get or create HTTP client."""
@@ -148,41 +149,57 @@ class AmbientMonitor:
         """
         Check the current state of a topic.
 
-        Uses the fetch executor to get current state for the topic.
+        Uses the fetch strand to get current state for the topic.
         """
-        executor = get_fetch_executor()
+        # Map intent_type to fetch_source
+        fetch_source = INTENT_TYPE_TO_FETCH.get(rule.intent_type, FetchSource.KUBECTL_PODS)
 
-        # Map intent_type to fetch_type
-        fetch_type = INTENT_TYPE_TO_FETCH.get(rule.intent_type, FetchType.KUBECTL_STATUS)
+        # Build fetch context
+        context = FetchContext(project_slug=rule.project_slug)
+        if rule.project_slug:
+            context.namespace = rule.project_slug.replace("-", "")
+            context.repo_path = f"/home/coding/{rule.project_slug}"
+            context.app_name = rule.project_slug
+            context.deployment = rule.project_slug
 
-        # Build fetch command
-        command = FetchCommand(
-            fetch_type=fetch_type,
-            project_slug=rule.project_slug,
-            args=[],  # Can be extended to support filters
-            timeout=rule.check_interval,
-        )
+        # Execute fetch using the appropriate strand method
+        try:
+            if fetch_source == FetchSource.KUBECTL_PODS:
+                data = await self._fetch_strand._fetch_kubectl_pods(context)
+            elif fetch_source == FetchSource.KUBECTL_DEPLOYMENTS:
+                data = await self._fetch_strand._fetch_kubectl_deployments(context)
+            elif fetch_source == FetchSource.ARGOCD_APP:
+                data = await self._fetch_strand._fetch_argocd_app(context)
+            elif fetch_source == FetchSource.CI_STATUS:
+                data = await self._fetch_strand._fetch_ci_status(context)
+            elif fetch_source == FetchSource.GIT_LOG:
+                data = await self._fetch_strand._fetch_git_log(context)
+            elif fetch_source == FetchSource.BEAD_LIST:
+                data = await self._fetch_strand._fetch_bead_list(context)
+            else:
+                logger.warning(f"Unknown fetch source: {fetch_source}")
+                return None
 
-        # Execute fetch
-        result = await executor.execute(command)
+            if data and "error" not in data:
+                state_data = {
+                    "project_slug": rule.project_slug,
+                    "intent_type": rule.intent_type,
+                    **data,
+                }
 
-        if result.success:
-            state_data = {
-                "project_slug": rule.project_slug,
-                "intent_type": rule.intent_type,
-                **result.data,
-            }
+                # Apply filters if specified
+                if rule.filters:
+                    if not self._passes_filters(state_data, rule.filters):
+                        # Filter means we don't report this state
+                        logger.debug(f"State for {rule.topic_id} filtered by {rule.filters}")
+                        return None
 
-            # Apply filters if specified
-            if rule.filters:
-                if not self._passes_filters(state_data, rule.filters):
-                    # Filter means we don't report this state
-                    logger.debug(f"State for {rule.topic_id} filtered by {rule.filters}")
-                    return None
-
-            return state_data
-        else:
-            logger.warning(f"Fetch failed for {rule.topic_id}: {result.error}")
+                return state_data
+            else:
+                logger.warning(f"Fetch failed for {rule.topic_id}: {data.get('error', 'Unknown error') if data else 'No data returned'}")
+                return None
+        except Exception as e:
+            logger.error(f"Error checking state for {rule.topic_id}: {e}", exc_info=True)
             return None
 
     def _passes_filters(self, state_data: dict, filters: list[str]) -> bool:
