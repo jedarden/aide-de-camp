@@ -640,6 +640,8 @@ Same pattern as every other containerized service in the stack.
 
 **Status: COMPLETE** ✅
 
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` (smoke test results, 20+ runs with all tests passing)
+
 Validates the core question: does routing + parallel dispatch reduce friction?
 
 - Single HTML page: textarea + mic button (Web Speech API)
@@ -652,6 +654,8 @@ Deliverable: the core query loop working end-to-end.
 ### Phase 1 — Session and Topics (~1 week)
 
 **Status: COMPLETE** ✅
+
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` (session store, SSE, surface registration all verified)
 
 Results persist; the canvas has memory.
 
@@ -668,6 +672,8 @@ Deliverable: sessions that survive browser refresh; Telegram fallback working.
 
 **Status: COMPLETE** ✅
 
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` (component library, hot-reload manager verified)
+
 The interface can be improved by talking into it.
 
 - Self-modification agent (Claude Code via NEEDLE)
@@ -681,6 +687,8 @@ Deliverable: at least one end-to-end self-modification cycle working (user instr
 ### Phase 3 — Responsiveness (~2-3 weeks)
 
 **Status: COMPLETE** ✅
+
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` (ambient monitoring, context warmer verified)
 
 The interface feels alive, not just reactive.
 
@@ -698,6 +706,8 @@ Deliverable: monitoring fires unprompted for a watched topic; follow-up question
 
 **Status: COMPLETE** ✅
 
+*Verification evidence:* see `README-PHASE4.md` (full voice session implementation with Realtime API) and `docs/notes/core-verification-evidence.md`
+
 Full audio mode via Realtime API.
 
 - Realtime API voice session replaces text input path
@@ -710,6 +720,8 @@ Deliverable: full voice session with canvas catch-up on surface switch.
 ### Future Work
 
 **Status: NOT STARTED** ❌
+
+*Note: Phases 0-4 (core surface, sessions, self-improvement, responsiveness, and audio) are complete and verified. The following items are potential enhancements beyond Phase 4:*
 
 Potential enhancements beyond Phase 4:
 - Multi-modal input (image processing for UI feedback via Agentation)
@@ -767,7 +779,7 @@ aide-de-camp adds a routing and rendering layer on top of existing infrastructur
 - **kubectl proxies** — fetch strand uses existing kubectl proxy access per cluster.
 - **ArgoCD read-only proxy** — fetch strand reads ArgoCD application state via `argocd-ro-ardenone-manager-ts.ardenone.com:8444`.
 
-Net-new code: aide-de-camp is a substantial implementation spanning multiple subsystems. See the File System Layout section for the full module breakdown.
+Net-new code: aide-de-camp is a substantial implementation spanning multiple subsystems. The current codebase contains approximately **15,400 lines** of Python code across 80+ modules. See the File System Layout section for the full module breakdown.
 
 ---
 
