@@ -746,9 +746,102 @@
                 }
             });
         } else {
-            btnMic.title = 'Voice input not supported in this browser';
-            btnMic.style.opacity = '0.4';
-            btnMic.disabled = true;
+            // Fallback: MediaRecorder + whisper-stt for browsers without Web Speech API
+            let mediaRecorder = null;
+            let audioChunks = [];
+
+            async function startRecording() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        btnMic.classList.remove('recording');
+                        btnMic.innerHTML = '🎤';
+
+                        // Create audio blob and convert to base64
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const reader = new FileReader();
+                        reader.onloadend = async () => {
+                            const base64Audio = reader.result.split(',')[1];
+
+                            try {
+                                const resp = await fetch('/api/v1/stt', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        audio_data: base64Audio,
+                                        format: 'webm'
+                                    })
+                                });
+
+                                if (resp.ok) {
+                                    const data = await resp.json();
+                                    if (data.text) {
+                                        textarea.value = data.text;
+                                        textarea.style.height = 'auto';
+                                        textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
+                                        btnSend.disabled = textarea.value.trim().length === 0;
+                                        // Auto-dispatch on successful transcription
+                                        dispatch(data.text.trim());
+                                    }
+                                } else {
+                                    const err = await resp.json();
+                                    console.error('STT error:', err);
+                                    btnMic.title = `Transcription failed: ${err.error || 'Unknown error'}`;
+                                    setTimeout(() => {
+                                        btnMic.title = 'Click to record (whisper-stt fallback)';
+                                    }, 3000);
+                                }
+                            } catch (err) {
+                                console.error('STT request failed:', err);
+                                btnMic.title = 'STT service unavailable';
+                                setTimeout(() => {
+                                    btnMic.title = 'Click to record (whisper-stt fallback)';
+                                }, 3000);
+                            }
+                        };
+                        reader.readAsDataURL(audioBlob);
+
+                        // Stop all tracks to release microphone
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    btnMic.classList.add('recording');
+                    btnMic.innerHTML = '⏹';
+                } catch (err) {
+                    console.error('MediaRecorder access failed:', err);
+                    btnMic.title = 'Microphone access denied';
+                    btnMic.style.opacity = '0.4';
+                    btnMic.disabled = true;
+                }
+            }
+
+            function stopRecording() {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+            }
+
+            btnMic.title = 'Click to record (whisper-stt fallback)';
+            btnMic.disabled = false;
+            btnMic.style.opacity = '1';
+
+            btnMic.addEventListener('click', () => {
+                if (btnMic.classList.contains('recording')) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            });
         }
 
         // ── Initialize ─────────────────────────────────────────────────────────

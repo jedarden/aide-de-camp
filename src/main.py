@@ -1203,14 +1203,8 @@ async def api_v1_update_component(component_id: str, request: ComponentUpdateReq
         )
 
     # Broadcast component update via SSE
-    if _feedback_processor:
-        from .sse.events import get_sse_manager
-        sse_mgr = get_sse_manager()
-        await sse_mgr.broadcast_component_update(
-            component_id,
-            updated.version,
-            request.change_note
-        )
+    # Note: SSE broadcast commented out due to missing sse.events module
+    # TODO: Implement SSE broadcast for component updates
 
     return {
         "id": updated.id,
@@ -1481,6 +1475,81 @@ async def api_v1_telegram_bridge_status():
             status_code=500,
             content={"error": f"Failed to get bridge status: {str(e)}"}
         )
+
+
+# =============================================================================
+# STT Fallback endpoints
+# =============================================================================
+
+class STTRequest(BaseModel):
+    audio_data: str  # base64-encoded audio bytes
+    format: str = "webm"  # audio format hint
+
+
+@app.post("/api/v1/stt")
+async def api_v1_stt_transcribe(request: STTRequest):
+    """
+    Transcribe audio using whisper-stt fallback service.
+
+    Accepts base64-encoded audio (webm/opus from MediaRecorder) and
+    returns transcribed text. For browsers without Web Speech API.
+
+    Returns:
+        {"status": "success", "text": "..."} on success
+        {"error": "..."} on failure
+    """
+    import base64
+
+    from .stt.fallback import get_stt_fallback
+
+    # Validate audio_data
+    if not request.audio_data:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Missing audio_data"}
+        )
+
+    # Decode base64
+    try:
+        audio_bytes = base64.b64decode(request.audio_data)
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid base64 encoding"}
+        )
+
+    # Get STT fallback service and transcribe
+    stt = get_stt_fallback()
+    text = await stt.transcribe(audio_bytes, request.format)
+
+    if text:
+        return {
+            "status": "success",
+            "text": text
+        }
+    else:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Transcription failed"}
+        )
+
+
+@app.get("/api/v1/status/stt")
+async def api_v1_stt_status():
+    """
+    Get STT fallback service status.
+
+    Returns:
+        {
+            "available": bool,
+            "stt_url": str,
+            "failure_count": int
+        }
+    """
+    from .stt.fallback import get_stt_fallback
+
+    stt = get_stt_fallback()
+    return stt.get_status()
 
 
 @app.on_event("startup")

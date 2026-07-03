@@ -142,6 +142,7 @@ adc --help
 | `ZAI_PROXY_URL` | ZAI proxy endpoint for LLM calls (routing and synthesis) | `https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages` |
 | `ADC_SERVER_URL` | Server URL used by the `adc` CLI | `http://localhost:8000` |
 | `ADC_TELEGRAM_BRIDGE_URL` | Telegram bridge URL for async task notifications | `https://telegram-proxy-telegram-bridge-ardenone-cluster-ts.ardenone.com:8444` ✓ |
+| `ADC_WHISPER_STT_URL` | Whisper STT service URL for browser speech-to-text fallback | `https://whisper.ardenone.com` |
 
 The LLM backend for intent routing and synthesis is configured via the `ZAI_PROXY_URL` environment variable. All LLM calls route through the ZAI proxy.
 
