@@ -44,6 +44,20 @@ class FetchSource(Enum):
     FS_HOME = "fs_home"            # overview of /home/coding/
 
 
+# Kubernetes proxy endpoints by cluster
+KUBECTL_PROXIES: dict[str, str] = {
+    "apexalgo-iad": "http://traefik-apexalgo-iad:8001",
+    "ardenone-cluster": "http://traefik-ardenone-cluster:8001",
+    "ardenone-hub": "http://traefik-ardenone-hub:8001",
+    "ardenone-manager": "http://traefik-ardenone-manager:8001",
+    "rs-manager": "http://traefik-rs-manager:8001",
+    "ord-devimprint": "http://kubectl-proxy-ord-devimprint:8001",
+    "iad-kalshi": "http://kubectl-proxy-iad-kalshi:8001",
+    "iad-native-ads": "http://traefik-iad-native-ads-1:8001",
+    "iad-options": "http://traefik-iad-options:8001",
+}
+
+
 @dataclass
 class FetchCommandSpec:
     """Specification for a single fetch command."""
