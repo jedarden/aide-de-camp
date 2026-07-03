@@ -36,7 +36,7 @@ Return a JSON array of intent objects:
 - **reminder**: Set or query reminders
 - **self-modification**: Instructions to improve the interface itself
 - **monitoring-config**: Configure ambient monitoring rules
-- **task-profile**: Complex multi-step work that requires durable async handling via NEEDLE bead
+- **task-profile**: Durable async work items that escalate to NEEDLE beads
 - **clarification**: Low-confidence routing outcome requiring user input (meta-type, not dispatched)
 
 ## Urgency Tiers
