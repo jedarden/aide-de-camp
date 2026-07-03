@@ -20,12 +20,6 @@ from ..agents.self_modification import (
 from ..agents.ui_regen import UIRegenAgent, get_ui_regen_agent
 from ..components.hot_reload import get_reload_manager
 from ..components.library import get_library
-from ..sse.events import (
-    SSEManager,
-    SSEEvent,
-    EventType,
-    get_sse_manager
-)
 
 logger = logging.getLogger(__name__)
 
