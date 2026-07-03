@@ -15,7 +15,8 @@ from typing import Any, Optional, Callable
 import re
 
 from ..session.store import get_store
-from ..fetch.executor import get_fetch_executor, FetchCommand, FetchType
+from ..fetch.orchestrator import get_fetch_strand
+from ..fetch.commands import FetchContext
 
 
 logger = getLogger(__name__)
@@ -78,7 +79,7 @@ class SpeculativePrefetcher:
         self._cache: dict[str, PrefetchCache] = {}
         self._recent_utterances: dict[str, list[dict]] = {}  # session_id -> utterances
         self._fetch_callbacks: dict[FollowUpPattern, Callable] = {}
-        self._fetch_executor = get_fetch_executor()
+        self._fetch_strand = get_fetch_strand()
 
         # Register default fetch callbacks
         self._register_default_callbacks()
@@ -90,28 +91,21 @@ class SpeculativePrefetcher:
             result = {}
             for project_slug in project_slugs:
                 # Fetch CI status for timing info
-                ci_cmd = FetchCommand(
-                    fetch_type=FetchType.CI_STATUS,
-                    project_slug=project_slug,
-                    args=[],
-                    timeout=30,
-                )
-                ci_result = await self._fetch_executor.execute(ci_cmd)
-                if ci_result.success:
-                    result[project_slug] = {"ci_status": ci_result.data}
+                context = FetchContext(project_slug=project_slug)
+                ci_data = await self._fetch_strand._fetch_ci_status(context)
+                if ci_data and "error" not in ci_data:
+                    result[project_slug] = {"ci_status": ci_data}
 
                 # Fetch deployment status
-                deploy_cmd = FetchCommand(
-                    fetch_type=FetchType.DEPLOYMENT_STATUS,
-                    project_slug=project_slug,
-                    args=[],
-                    timeout=30,
-                )
-                deploy_result = await self._fetch_executor.execute(deploy_cmd)
-                if deploy_result.success:
+                context_ns = FetchContext(project_slug=project_slug)
+                if project_slug:
+                    context_ns.namespace = project_slug.replace("-", "")
+                    context_ns.deployment = project_slug
+                deploy_data = await self._fetch_strand._fetch_kubectl_deployments(context_ns)
+                if deploy_data and "error" not in deploy_data:
                     if project_slug not in result:
                         result[project_slug] = {}
-                    result[project_slug]["deployment"] = deploy_result.data
+                    result[project_slug]["deployment"] = deploy_data
             return result
 
         async def fetch_why(topic_id: str, project_slugs: list[str]) -> dict:
@@ -119,17 +113,14 @@ class SpeculativePrefetcher:
             # For now, return recent status that might explain why something happened
             result = {}
             for project_slug in project_slugs:
-                status_cmd = FetchCommand(
-                    fetch_type=FetchType.KUBECTL_STATUS,
-                    project_slug=project_slug,
-                    args=[],
-                    timeout=30,
-                )
-                status_result = await self._fetch_executor.execute(status_cmd)
-                if status_result.success:
+                context = FetchContext(project_slug=project_slug)
+                if project_slug:
+                    context.namespace = project_slug.replace("-", "")
+                status_data = await self._fetch_strand._fetch_kubectl_pods(context)
+                if status_data and "error" not in status_data:
                     result[project_slug] = {
-                        "pods": status_result.data.get("pods", []),
-                        "recent_events": status_result.data.get("events", []),
+                        "pods": status_data.get("pods", []),
+                        "recent_events": status_data.get("events", []),
                     }
             return result
 
@@ -137,30 +128,22 @@ class SpeculativePrefetcher:
             """Pre-fetch: git diff, recent commits, history."""
             result = {}
             for project_slug in project_slugs:
-                git_cmd = FetchCommand(
-                    fetch_type=FetchType.GIT_LOG,
-                    project_slug=project_slug,
-                    args=[],
-                    timeout=30,
-                )
-                git_result = await self._fetch_executor.execute(git_cmd)
-                if git_result.success:
-                    result[project_slug] = git_result.data
+                context = FetchContext(project_slug=project_slug, repo_path=f"/home/coding/{project_slug}")
+                git_data = await self._fetch_strand._fetch_git_log(context)
+                if git_data and "error" not in git_data:
+                    result[project_slug] = git_data
             return result
 
         async def fetch_is_ready(topic_id: str, project_slugs: list[str]) -> dict:
             """Pre-fetch: health status, ready condition, completion status."""
             result = {}
             for project_slug in project_slugs:
-                status_cmd = FetchCommand(
-                    fetch_type=FetchType.KUBECTL_STATUS,
-                    project_slug=project_slug,
-                    args=[],
-                    timeout=30,
-                )
-                status_result = await self._fetch_executor.execute(status_cmd)
-                if status_result.success:
-                    pods = status_result.data.get("pods", [])
+                context = FetchContext(project_slug=project_slug)
+                if project_slug:
+                    context.namespace = project_slug.replace("-", "")
+                status_data = await self._fetch_strand._fetch_kubectl_pods(context)
+                if status_data and "error" not in status_data:
+                    pods = status_data.get("pods", [])
                     ready_count = sum(1 for p in pods if p.get("phase") == "Running")
                     result[project_slug] = {
                         "health": "healthy" if ready_count == len(pods) and len(pods) > 0 else "degraded",
@@ -174,43 +157,32 @@ class SpeculativePrefetcher:
             result = {}
             for project_slug in project_slugs:
                 # Fetch comprehensive status
-                status_cmd = FetchCommand(
-                    fetch_type=FetchType.KUBECTL_STATUS,
-                    project_slug=project_slug,
-                    args=[],
-                    timeout=30,
-                )
-                status_result = await self._fetch_executor.execute(status_cmd)
-                if status_result.success:
-                    result[project_slug] = status_result.data
+                context = FetchContext(project_slug=project_slug)
+                if project_slug:
+                    context.namespace = project_slug.replace("-", "")
+                status_data = await self._fetch_strand._fetch_kubectl_pods(context)
+                if status_data and "error" not in status_data:
+                    result[project_slug] = status_data
 
                 # Fetch ArgoCD status if available
-                argocd_cmd = FetchCommand(
-                    fetch_type=FetchType.ARGOCD_STATUS,
-                    project_slug=project_slug,
-                    args=[],
-                    timeout=30,
-                )
-                argocd_result = await self._fetch_executor.execute(argocd_cmd)
-                if argocd_result.success:
+                context_app = FetchContext(project_slug=project_slug, app_name=project_slug)
+                argocd_data = await self._fetch_strand._fetch_argocd_app(context_app)
+                if argocd_data and "error" not in argocd_data:
                     if project_slug not in result:
                         result[project_slug] = {}
-                    result[project_slug]["argocd"] = argocd_result.data
+                    result[project_slug]["argocd"] = argocd_data
             return result
 
         async def fetch_status_check(topic_id: str, project_slugs: list[str]) -> dict:
             """Pre-fetch: current status, phase, health."""
             result = {}
             for project_slug in project_slugs:
-                status_cmd = FetchCommand(
-                    fetch_type=FetchType.KUBECTL_STATUS,
-                    project_slug=project_slug,
-                    args=[],
-                    timeout=30,
-                )
-                status_result = await self._fetch_executor.execute(status_cmd)
-                if status_result.success:
-                    pods = status_result.data.get("pods", [])
+                context = FetchContext(project_slug=project_slug)
+                if project_slug:
+                    context.namespace = project_slug.replace("-", "")
+                status_data = await self._fetch_strand._fetch_kubectl_pods(context)
+                if status_data and "error" not in status_data:
+                    pods = status_data.get("pods", [])
                     result[project_slug] = {
                         "status": "running" if any(p.get("phase") == "Running" for p in pods) else "not_running",
                         "phase": next((p.get("phase") for p in pods if p.get("phase") != "Succeeded"), "Unknown"),
@@ -223,15 +195,10 @@ class SpeculativePrefetcher:
             result = {}
             for project_slug in project_slugs:
                 # Fetch CI status for error details
-                ci_cmd = FetchCommand(
-                    fetch_type=FetchType.CI_STATUS,
-                    project_slug=project_slug,
-                    args=[],
-                    timeout=30,
-                )
-                ci_result = await self._fetch_executor.execute(ci_cmd)
-                if ci_result.success:
-                    workflows = ci_result.data.get("workflows", [])
+                context = FetchContext(project_slug=project_slug)
+                ci_data = await self._fetch_strand._fetch_ci_status(context)
+                if ci_data and "error" not in ci_data:
+                    workflows = ci_data.get("workflows", [])
                     failed_workflows = [w for w in workflows if w.get("phase") == "Failed"]
                     result[project_slug] = {
                         "error_logs": [w.get("message") for w in failed_workflows],
