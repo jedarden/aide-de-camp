@@ -95,15 +95,13 @@ The proxy also wraps the Anthropic response envelope under a `"result"` key. Unw
 
 ## SSE Broadcaster
 
-There are **two SSEEvent classes** — do not mix them:
-
-- `src/sse/broadcaster.py` → `SSEEvent(event_type: str, data: dict, target_surface_id=...)` — **use this one** for broadcasting
-- `src/sse/events.py` → `SSEEvent(type: EventType, data: dict)` — legacy, used internally
-
 Canvas listens for `"result_created"` and `"topic_updated"` events. Broadcast with:
 
 ```python
-await _broadcaster.broadcast(
+from src.sse import get_broadcaster, SSEEvent
+
+broadcaster = get_broadcaster()
+await broadcaster.broadcast(
     SSEEvent(
         event_type="result_created",
         target_surface_id=surface_id,
@@ -111,6 +109,11 @@ await _broadcaster.broadcast(
     )
 )
 ```
+
+SSEEvent supports optional targeting filters:
+- `target_session_id` — only send to connections for this session
+- `target_surface_id` — only send to this specific surface
+- `exclude_surface_id` — send to all surfaces except this one
 
 ## Canvas Dispatch Contract
 
