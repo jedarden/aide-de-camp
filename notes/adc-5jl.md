@@ -1,45 +1,54 @@
-# ADC-5JL: Router.py Lines 225-235 Capture
+# ADC-5JL: kubectl delete pod Execution Analysis
 
-## Task
-Capture lines 225-235 of src/intent/router.py
+## Task Context
+Task was to execute `kubectl delete pod` to delete "the specified Kubernetes pod" from the cluster.
 
-## Lines Captured (225-235)
+## Findings
 
-```python
-                # Line 225 is blank
-                classification = IntentClassification(
-                    intent_type=intent_type,
-                    project_slug=intent_data.get("project_slug"),
-                    confidence=float(intent_data.get("confidence", 0.8)),
-                    utterance_fragment=intent_data.get("utterance_fragment", utterance),
-                    reasoning=intent_data.get("reasoning", ""),
-                    urgency=intent_data.get("urgency", "normal"),
-                )
-                classifications.append(classification)
-                # Line 235 is blank
+### Current Kubeconfig Context
+- **Current context**: `apexalgo-iad-kalshi-oidc`
+- **Cluster**: `iad-kalshi` (Rackspace Spot cluster, us-east-iad-1)
+- **Namespace**: `default` (no namespace explicitly set)
+- **Access method**: Read-only kubectl-proxy at `http://kubectl-proxy-iad-kalshi:8001`
+
+### Pods in Cluster
+Found multiple pods across namespaces, but **no pods in the default namespace**:
+- `armor/` - armor deployment
+- `calico-apiserver/` - networking
+- `calico-system/` - Calico networking components
+- `cert-manager/` - certificate management
+- `devpod-observer/` - kubectl-proxy (read-only access)
+- `external-secrets/` - external secrets operator
+- `kalshi-backtest/` - backtest-scanner
+- `kalshi-tape-query/` - tape query service
+- `kalshi-tape/` - tape pods (one with ContainerStatusUnknown for 5 days)
+- `kube-system/` - coredns
+
+### Issue: Task Incomplete
+**The task specification is incomplete.** The command `kubectl delete pod` requires:
+1. A pod name (e.g., `kubectl delete pod my-pod-12345`)
+2. Or a selector (e.g., `kubectl delete pod -l app=myapp`)
+3. Or a namespace (e.g., `kubectl delete pod my-pod -n my-namespace`)
+
+Without specifying **which pod** to delete, the command cannot be executed.
+
+### Access Constraints
+- **Read-only proxy** (`http://kubectl-proxy-iad-kalshi:8001`): Cannot delete resources
+- **Admin kubeconfig** exists at `/home/coding/.kube/iad-kalshi.kubeconfig` (read/write access)
+
+## Pod of Potential Interest
+One pod shows issues:
 ```
-
-## Context
-This code appears within the `_classify_intent_internal` method, inside the loop that processes multiple intent classifications returned by the LLM. The code constructs an `IntentClassification` dataclass from parsed intent data and adds it to a list.
-
-## Surrounding Code (220-240)
-```python
-                try:
-                    intent_type = IntentType(intent_type_str)
-                except ValueError:
-                    logger.warning(f"Unknown intent type: {intent_type_str}")
-                    intent_type = IntentType.STATUS
-
-                classification = IntentClassification(
-                    intent_type=intent_type,
-                    project_slug=intent_data.get("project_slug"),
-                    confidence=float(intent_data.get("confidence", 0.8)),
-                    utterance_fragment=intent_data.get("utterance_fragment", utterance),
-                    reasoning=intent_data.get("reasoning", ""),
-                    urgency=intent_data.get("urgency", "normal"),
-                )
-                classifications.append(classification)
-
-            logger.info(f"Classified {len(classifications)} intents from utterance")
-            return classifications
+kalshi-tape/kalshi-tape-7655745f5b-c5mbf
+Status: ContainerStatusUnknown
+Age: 5d18h
 ```
+This pod has been in unknown state for 5 days and may be a candidate for cleanup, but this should be confirmed before deletion.
+
+## Recommendations
+1. **Specify the target pod** - Which pod should be deleted?
+2. **Use admin kubeconfig** - For actual deletion, use `kubectl --kubeconfig=/home/coding/.kube/iad-kalshi.kubeconfig delete pod <pod-name> -n <namespace>`
+3. **Follow GitOps** - If this is an ArgoCD-managed resource, edit the manifest in `jedarden/declarative-config` instead of live deletion
+
+## GitOps Consideration
+Per CLAUDE.md, **all cluster changes go through `jedarden/declarative-config`**. Live pod deletions should be coordinated with ArgoCD to avoid fighting the controller. Only orphaned pods beyond ReplicaSet desired count should be directly deleted.
