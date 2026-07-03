@@ -1,45 +1,49 @@
-# Intent Type Reconciliation (adc-676t)
+# Intent Type Reconciliation Verification (adc-676t)
 
-## Task Completed
+## Task
+Reconcile intent types across all documentation files.
 
-Reconciled intent types across all documentation in aide-de-camp.
+## Verification Result: ✅ ALREADY RECONCILED
 
-## Canonical Intent Type List (9 types)
+All four files contain the **identical canonical list of 9 intent types** with matching descriptions.
 
-1. **status** - Query current state (pods, pipelines, deployments, beads)
-2. **action** - Execute a command (deploy, restart, create)
-3. **brainstorm** - Explore options, design, architecture discussion
-4. **lookup** - Find specific information (logs, configs, docs)
-5. **reminder** - Set or query reminders
-6. **self-modification** - Instructions to improve the interface itself
-7. **monitoring-config** - Configure ambient monitoring rules
-8. **task-profile** - Durable async work items that escalate to NEEDLE beads
-9. **clarification** - Low-confidence routing outcome requiring user input (meta-type, not dispatched)
+## Canonical Intent Type List
 
-## Files Verified
+| Intent Type | Description |
+|-------------|-------------|
+| `status` | Query current state (pods, pipelines, deployments, beads) |
+| `action` | Execute a command (deploy, restart, create) |
+| `brainstorm` | Explore options, design, architecture discussion |
+| `lookup` | Find specific information (logs, configs, docs) |
+| `reminder` | Set or query reminders |
+| `self-modification` | Instructions to improve the interface itself |
+| `monitoring-config` | Configure ambient monitoring rules |
+| `task-profile` | Durable async work items that escalate to NEEDLE beads |
+| `clarification` | Low-confidence routing outcome requiring user input (meta-type, not dispatched) |
 
-1. ✅ `docs/plan/plan.md` (section 1, Intent Router) - Lines 87-98
-2. ✅ `README.md` (How It Works section) - Line 11
-3. ✅ `prompts/router.md` (Intent Types section) - Lines 30-40
-4. ✅ `src/intent/router.py` (IntentType enum and ROUTER_SYSTEM_PROMPT) - Lines 27-37, 88-98
+## File-by-File Verification
 
-## Changes Made
+### 1. docs/plan/plan.md (line 87)
+✅ Lists all 9 types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`
 
-- Fixed `prompts/router.md` line 39: Changed "Complex multi-step work that requires durable async handling via NEEDLE bead" to "Durable async work items that escalate to NEEDLE beads" to match the canonical description in `src/intent/router.py` and `docs/plan/plan.md`
+### 2. README.md (line 11)
+✅ Lists all 9 types in the same order with identical formatting
 
-## Integration Verification
+### 3. prompts/router.md (lines 30-40)
+✅ Lists all 9 types with full descriptions for each
 
-- `prompts/escalate/task-profile.md` exists and is properly integrated into the escalate strand code
-- The escalate path is referenced in `src/intent/router.py` lines 312-314 (process_intent method routes TASK_PROFILE to escalate)
-- `src/escalate/handler.py` and `src/escalate/llm.py` handle the escalate logic using the task-profile.md prompt
+### 4. src/intent/router.py (lines 27-37, IntentType enum)
+✅ Enum contains all 9 types: `STATUS`, `ACTION`, `BRAINSTORM`, `LOOKUP`, `REMINDER`, `SELF_MODIFICATION`, `MONITORING_CONFIG`, `TASK_PROFILE`, `CLARIFICATION`
+✅ Inline system prompt (lines 88-98) also documents all 9 types with identical descriptions
 
-## Acceptance Criteria Met
+## Note on 'task' vs 'task-profile'
 
-- ✅ Intent type list is identical across plan.md, README.md, prompts/router.md, and src/intent/router.py
-- ✅ All intent types have consistent descriptions
-- ✅ No orphaned intent types in any file
-- ✅ prompts/escalate/task-profile.md is referenced and integrated
+The task description mentioned `'task'` being used separately from `'task-profile'`. After review:
+- The **intent type** is consistently `'task-profile'` across all files
+- `'task'` appears only in `prompts/escalate/task-profile.md` as a **bead type** for the escalate path
+- This is correct — `'task'` refers to the br/NEEDLE bead type, not an intent type
+- No reconciliation needed
 
-## Notes
+## Conclusion
 
-The intent type list was already consistent across all four files—only the task-profile description needed minor harmonization. The escalate strand properly uses `task-profile` (not `task`) as the intent type, and the escalation prompt at `prompts/escalate/task-profile.md` is correctly wired into the codebase.
+No file changes required. Intent types were already fully reconciled across all documentation.
