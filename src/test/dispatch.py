@@ -10,7 +10,7 @@ from logging import getLogger
 from typing import Optional
 
 from fastapi import HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from ..intent.router import get_router
 from ..session.store import get_store
@@ -28,6 +28,15 @@ class TestDispatchRequest(BaseModel):
     surface_id: Optional[str] = None
     wait_for_results: bool = False  # If True, wait for results and return them
     timeout_seconds: int = 30  # Max time to wait for results
+
+    @field_validator('utterance')
+    @classmethod
+    def utterance_must_be_non_empty(cls, v: str) -> str:
+        """Validate that utterance is a non-empty string."""
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError('utterance must be a non-empty string')
+        return stripped
 
 
 class TestDispatchResponse(BaseModel):
@@ -321,6 +330,10 @@ async def api_v1_test_dispatch(request: TestDispatchRequest) -> TestDispatchResp
             "message": "...",
             "results": [...]  // Only if wait_for_results=true
         }
+
+    Error responses:
+        400: Missing or invalid utterance text
+        500: Dispatch processing error
     """
     return await dispatch_test_utterance(request)
 
