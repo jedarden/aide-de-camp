@@ -1,7 +1,0 @@
-```
-SPLIT_COMPLETE: Created 4 children, parent converted to umbrella
-```
-
-Children: `adc-csx6`, `adc-3hde`, `adc-4z0s`, `adc-2q6k`
-
-Chain: `adc-csx6` → `adc-3hde` → `adc-4z0s` → `adc-2q6k` → `adc-1i71` (umbrella)

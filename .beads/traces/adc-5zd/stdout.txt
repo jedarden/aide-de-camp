@@ -1,7 +1,0 @@
-The split is complete.
-
-```
-SPLIT_COMPLETE: Created 3 children, parent converted to umbrella
-```
-
-Children: adc-1qx, adc-ps7, adc-4yl

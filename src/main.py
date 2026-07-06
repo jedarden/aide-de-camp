@@ -49,6 +49,7 @@ from .context.warmer import get_context_warmer
 from .feedback.background_analysis import get_background_processor
 from .intent.router import get_router as get_intent_router
 from .escalate import escalate_intent, EscalateRequest
+from .test.dispatch import router as test_router
 from .environment.discovery import (
     scan_environment, set_registry,
     refresh_registry, start_background_refresh, stop_background_refresh,
@@ -201,6 +202,9 @@ def _read_version() -> str:
         return "0.0.0"
 
 app = FastAPI(title="ADC (aide-de-camp)", version=_read_version(), lifespan=lifespan)
+
+# Include test router
+app.include_router(test_router, prefix="/api/v1", tags=["test"])
 
 
 async def get_store():
