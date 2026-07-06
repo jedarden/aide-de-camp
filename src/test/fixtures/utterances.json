@@ -1,0 +1,277 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Pre-canned test utterances for aide-de-camp regression testing",
+    "last_updated": "2026-07-06",
+    "total_utterances": 25
+  },
+  "utterances": {
+    "project": [
+      {
+        "name": "project_status_pods",
+        "utterance": "how are the pods doing in options pipeline",
+        "expected_intent_type": "status",
+        "expected_topic_type": "project",
+        "expected_project_slug": "options-pipeline",
+        "description": "Status query for specific project pods"
+      },
+      {
+        "name": "project_action_deploy",
+        "utterance": "deploy the latest version of nap-api to production",
+        "expected_intent_type": "action",
+        "expected_topic_type": "project",
+        "expected_project_slug": "iad-native-ads",
+        "description": "Action request to deploy a service"
+      },
+      {
+        "name": "project_lookup_logs",
+        "utterance": "find the recent error logs for the nap-api container",
+        "expected_intent_type": "lookup",
+        "expected_topic_type": "project",
+        "expected_project_slug": "iad-native-ads",
+        "description": "Lookup request for container logs"
+      },
+      {
+        "name": "project_monitoring_config",
+        "utterance": "set up monitoring for the kalshi-weather pipeline",
+        "expected_intent_type": "monitoring-config",
+        "expected_topic_type": "project",
+        "expected_project_slug": "kalshi-weather",
+        "description": "Monitoring configuration request"
+      },
+      {
+        "name": "project_multi_action",
+        "utterance": "restart the nap-api pods and check the deployment status",
+        "expected_intent_type": "action",
+        "expected_topic_type": "project",
+        "expected_project_slug": "iad-native-ads",
+        "description": "Multi-action project request"
+      }
+    ],
+    "research": [
+      {
+        "name": "research_brainstorm_optimization",
+        "utterance": "let's brainstorm ways to optimize the pipeline performance",
+        "expected_intent_type": "brainstorm",
+        "expected_topic_type": "research",
+        "description": "Brainstorming request for optimization"
+      },
+      {
+        "name": "research_lookup_architecture",
+        "utterance": "find documentation about the aide-de-camp architecture",
+        "expected_intent_type": "lookup",
+        "expected_topic_type": "research",
+        "description": "Research lookup for architecture documentation"
+      },
+      {
+        "name": "research_investigation",
+        "utterance": "investigate the recent latency spikes in the options pipeline",
+        "expected_intent_type": "lookup",
+        "expected_topic_type": "research",
+        "expected_project_slug": "options-pipeline",
+        "description": "Investigation request for performance issue"
+      },
+      {
+        "name": "research_compare_configs",
+        "utterance": "compare the current ArgoCD configuration with the previous version",
+        "expected_intent_type": "lookup",
+        "expected_topic_type": "research",
+        "description": "Comparative research request"
+      },
+      {
+        "name": "research_deep_dive",
+        "utterance": "do a deep dive analysis on the memory usage patterns in NEEDLE workers",
+        "expected_intent_type": "lookup",
+        "expected_topic_type": "research",
+        "description": "Deep analysis request"
+      }
+    ],
+    "personal": [
+      {
+        "name": "personal_reminder_daily",
+        "utterance": "remind me to check the cluster status every morning",
+        "expected_intent_type": "reminder",
+        "expected_topic_type": "personal",
+        "description": "Daily reminder request"
+      },
+      {
+        "name": "personal_status_workload",
+        "utterance": "what's on my plate for today",
+        "expected_intent_type": "status",
+        "expected_topic_type": "personal",
+        "description": "Personal workload status query"
+      },
+      {
+        "name": "personal_organization",
+        "utterance": "show me all my active beads across projects",
+        "expected_intent_type": "status",
+        "expected_topic_type": "personal",
+        "description": "Personal organization request"
+      },
+      {
+        "name": "personal_reminder_specific",
+        "utterance": "remind me to follow up on the pipeline migration task tomorrow",
+        "expected_intent_type": "reminder",
+        "expected_topic_type": "personal",
+        "description": "Specific reminder request"
+      },
+      {
+        "name": "personal_planning",
+        "utterance": "help me plan my work for the sprint",
+        "expected_intent_type": "brainstorm",
+        "expected_topic_type": "personal",
+        "description": "Personal planning assistance"
+      }
+    ],
+    "exception": [
+      {
+        "name": "exception_critical_failure",
+        "utterance": "the nap-api service is down and needs immediate attention",
+        "expected_intent_type": "action",
+        "expected_topic_type": "exception",
+        "expected_project_slug": "iad-native-ads",
+        "urgency": "critical",
+        "description": "Critical service failure"
+      },
+      {
+        "name": "exception_error_investigation",
+        "utterance": "investigate the 500 errors in the options pipeline logs",
+        "expected_intent_type": "lookup",
+        "expected_topic_type": "exception",
+        "expected_project_slug": "options-pipeline",
+        "urgency": "high",
+        "description": "Error investigation request"
+      },
+      {
+        "name": "exception_resource_exhaustion",
+        "utterance": "the cluster is running out of memory and pods are getting evicted",
+        "expected_intent_type": "status",
+        "expected_topic_type": "exception",
+        "urgency": "critical",
+        "description": "Resource exhaustion emergency"
+      },
+      {
+        "name": "exception_authentication_failure",
+        "utterance": "fix the authentication issues with the kubectl proxy",
+        "expected_intent_type": "action",
+        "expected_topic_type": "exception",
+        "urgency": "high",
+        "description": "Authentication failure resolution"
+      },
+      {
+        "name": "exception_data_loss",
+        "utterance": "we lost data in the session database and need to recover it",
+        "expected_intent_type": "action",
+        "expected_topic_type": "exception",
+        "urgency": "critical",
+        "description": "Data loss emergency"
+      }
+    ],
+    "compound": [
+      {
+        "name": "compound_status_plus_action",
+        "utterance": "check the pipeline status and restart it if it's failing",
+        "expected_intent_type": "action",
+        "expected_topic_type": "compound",
+        "expected_project_slug": "options-pipeline",
+        "description": "Status check with conditional action"
+      },
+      {
+        "name": "compound_multi_project",
+        "utterance": "how's the options pipeline doing and also check the ibkr mcp status",
+        "expected_intent_type": "status",
+        "expected_topic_type": "compound",
+        "description": "Multi-project status query"
+      },
+      {
+        "name": "compound_research_plus_action",
+        "utterance": "look up the deployment logs and then deploy the fix if errors are found",
+        "expected_intent_type": "action",
+        "expected_topic_type": "compound",
+        "description": "Research followed by conditional action"
+      },
+      {
+        "name": "compound_triple_intent",
+        "utterance": "check the pods, investigate the error logs, and restart the service if needed",
+        "expected_intent_type": "action",
+        "expected_topic_type": "compound",
+        "description": "Three-part compound request"
+      },
+      {
+        "name": "compound_workflow",
+        "utterance": "find the failing bead, analyze the error, and create a fix task for it",
+        "expected_intent_type": "task-profile",
+        "expected_topic_type": "compound",
+        "description": "Complete workflow compound request"
+      }
+    ],
+    "edge_cases": [
+      {
+        "name": "edge_empty_utterance",
+        "utterance": "",
+        "expected_intent_type": "clarification",
+        "description": "Empty utterance - should be rejected or clarified",
+        "should_fail": true
+      },
+      {
+        "name": "edge_whitespace_only",
+        "utterance": "    ",
+        "expected_intent_type": "clarification",
+        "description": "Whitespace-only utterance",
+        "should_fail": true
+      },
+      {
+        "name": "edge_very_long_utterance",
+        "utterance": "I need you to perform a comprehensive analysis of the entire infrastructure stack including all pods in all namespaces across all clusters, check every single log file for the last 24 hours, correlate all the error messages with their corresponding deployment states, investigate the network connectivity between every single service, analyze the resource usage patterns for all containers, check the database consistency across all replicas, verify the data integrity in the session store, validate the SSL certificates for all endpoints, review the firewall rules for every namespace, audit the RBAC permissions for all service accounts, check the disk space usage on all nodes, monitor the memory consumption patterns, analyze the CPU utilization trends, review the autoscaling configurations, validate the ingress rules, check the service mesh configurations, review the monitoring and alerting setup, analyze the log aggregation pipeline, check the backup and restore procedures, validate the disaster recovery configuration, review the high availability setup, analyze the load balancing configuration, check the rate limiting settings, review the authentication and authorization setup, validate the encryption at rest and in transit, check the compliance with security standards, review the audit logging configuration, analyze the performance metrics, check the latency patterns, review the throughput statistics, analyze the error rates, check the availability metrics, review the reliability targets, validate the service level agreements, check the incident response procedures, review the post-mortem analysis, analyze the root cause investigations, check the remediation steps, validate the prevention measures, review the monitoring dashboards, check the alerting rules, analyze the notification channels, validate the escalation procedures, review the on-call setup, check the runbook availability, analyze the documentation completeness, review the knowledge base articles, check the troubleshooting guides, validate the incident response playbooks, review the communication protocols, check the stakeholder notification procedures, analyze the impact assessment, review the risk mitigation strategies, validate the business continuity plans, check the disaster recovery testing results, review the performance optimization opportunities, analyze the cost optimization possibilities, check the resource utilization efficiency, review the capacity planning projections, validate the scalability requirements, check the architecture evolution plans, review the technology stack updates, analyze the dependency management, check the vulnerability assessment results, review the security patch management, validate the compliance requirements, check the audit findings, review the risk assessment reports, analyze the threat modeling, check the security controls, validate the incident response capabilities, review the business impact analysis, check the critical business functions, validate the recovery time objectives, review the recovery point objectives, analyze the backup strategy, check the restore procedures, validate the data retention policies, review the archival processes, check the data classification, validate the privacy controls, review the data processing agreements, check the regulatory compliance, validate the industry standards, review the best practices, analyze the lessons learned, check the improvement opportunities, validate the change management procedures, review the deployment strategies, check the rollback plans, validate the testing coverage, review the quality assurance processes, check the continuous integration setup, validate the delivery pipelines, review the infrastructure as code, check the configuration management, validate the version control, review the documentation standards, check the collaboration tools, validate the communication channels, review the team workflows, check the skill matrix, validate the training programs, review the onboarding processes, check the knowledge sharing, validate the mentoring setup, review the career development, check the performance management, validate the feedback processes, review the recognition programs, check the team engagement, validate the culture initiatives, review the diversity and inclusion, check the work-life balance, validate the wellness programs, review the employee assistance, check the mental health support, validate the ergonomics assessment, review the safety protocols, check the emergency procedures, validate the crisis management, review the business continuity, check the disaster recovery, validate the incident response, review the post-incident analysis, check the corrective actions, validate the preventive measures, review the monitoring and alerting, check the dashboards and reports, validate the metrics and KPIs, review the analytics and insights, check the data-driven decisions, validate the continuous improvement, review the innovation opportunities, check the research and development, validate the experimentation framework, review the hypothesis testing, check the A/B testing, validate the feature flags, review the canary deployments, check the blue-green deployments, validate the traffic shifting, review the rollback mechanisms, check the health checks, validate the circuit breakers, review the retry mechanisms, check the rate limiting, validate the throttling, review the caching strategies, check the CDN configuration, validate the edge computing, review the serverless setup, check the container orchestration, validate the service mesh, review the API gateway, check the load balancing, validate the session management, review the state management, check the data consistency, validate the transaction management, review the distributed computing, check the microservices architecture, validate the monolith decomposition, review the event-driven architecture, check the message queues, validate the event streaming, review the data pipelines, check the ETL processes, validate the data warehousing, review the data lakes, check the data marts, validate the data catalogs, review the metadata management, check the data governance, validate the data quality, review the master data management, check the reference data management, validate the data lineage, review the data provenance, check the data privacy, validate the data security, review the data compliance, check the regulatory requirements, validate the audit trails, review the data retention, check the archival policies, validate the disposal procedures, review the data lifecycle, check the data classification, validate the sensitivity levels, review the access controls, check the encryption, validate the masking, review the anonymization, check the pseudonymization, validate the tokenization, review the data loss prevention, check the data leak detection, validate the data breach response, review the incident management, check the crisis communication, validate the stakeholder management, review the regulatory reporting, check the compliance audits, validate the risk assessments, review the security assessments, check the penetration testing, validate the vulnerability scanning, review the security monitoring, check the threat detection, validate the incident response, review the disaster recovery, check the business continuity, validate the resilience testing, review the capacity planning, check the performance tuning, validate the optimization strategies, review the cost management, check the budget monitoring, validate the forecasting, review the financial planning, check the expense tracking, validate the cost optimization, review the resource allocation, check the workload management, validate the scheduling, review the prioritization, check the time management, validate the productivity, review the efficiency metrics, check the effectiveness measures, validate the outcome tracking, review the value realization, check the ROI analysis, validate the benefit realization, review the portfolio management, check the project governance, validate the stakeholder engagement, review the communication plans, check the reporting structures, validate the decision-making frameworks, review the strategic alignment, check the business value, validate the impact assessment, review the success criteria, check the KPI tracking, validate the performance monitoring, review the continuous improvement, check the innovation management, validate the change leadership, review the transformation programs, check the digitalization initiatives, validate the automation opportunities, review the process optimization, check the workflow automation, validate the robotic process automation, review the machine learning, check the artificial intelligence, validate the predictive analytics, review the prescriptive analytics, check the cognitive computing, validate the natural language processing, review the computer vision, check the speech recognition, validate the biometric authentication, review the IoT devices, check the edge computing, validate the fog computing, review the cloud computing, check the hybrid cloud, validate the multi-cloud, review the private cloud, check the public cloud, validate the cloud-native, review the containers, check the Kubernetes, validate the Docker, review the virtualization, check the serverless, validate the platform as a service, review the infrastructure as code, check the configuration management, validate the deployment automation, review the continuous integration, check the continuous deployment, validate the DevOps practices, review the DevSecOps, check the GitOps, validate the ChatOps, review the monitoring as code, check the policy as code, validate the security as code, review the compliance as code, check the documentation as code, validate the testing as code, review the quality as code, check the performance as code, validate the reliability as code, review the scalability as code, check the availability as code, validate the maintainability as code, review the usability as code, check the accessibility as code, validate the internationalization, review the localization, check the globalization, validate the cultural adaptation, review the user experience, check the customer journey, validate the touchpoints, review the service design, check the design thinking, validate the agile methodology, review the lean startup, check the scrum framework, validate the kanban method, review the extreme programming, check the test-driven development, validate the behavior-driven development, review the domain-driven design, check the acceptance test-driven development, validate the feature-driven development, review the rapid application development, check the spiral model, validate the waterfall model, review the V-model, check the iterative model, validate the incremental model, review the prototyping, check the proof of concept, validate the pilot testing, review the beta testing, check the user acceptance testing, validate the alpha testing, review the integration testing, check the system testing, validate the end-to-end testing, review the regression testing, check the smoke testing, validate the sanity testing, review the performance testing, check the load testing, validate the stress testing, review the volume testing, check the spike testing, validate the scalability testing, review the reliability testing, check the availability testing, validate the recoverability testing, review the maintainability testing, check the usability testing, validate the accessibility testing, review the compatibility testing, check the interoperability testing, validate the compliance testing, review the security testing, check the penetration testing, validate the vulnerability assessment",
+        "expected_intent_type": "lookup",
+        "description": "Extremely long utterance to test parsing limits",
+        "should_truncate": true
+      },
+      {
+        "name": "edge_special_characters",
+        "utterance": "Check the status of pods with special chars: @#$%^&*()_+-=[]{}|;':\",./<>?",
+        "expected_intent_type": "status",
+        "description": "Special characters in utterance"
+      },
+      {
+        "name": "edge_unicode_emoji",
+        "utterance": "🚀 deploy the nap-api service 🔥 and check the pods 🎉",
+        "expected_intent_type": "action",
+        "expected_project_slug": "iad-native-ads",
+        "description": "Unicode emoji in utterance"
+      },
+      {
+        "name": "edge_unicode_multilingual",
+        "utterance": "Проверить статус подов в options pipeline и проверить логи",
+        "expected_intent_type": "status",
+        "expected_project_slug": "options-pipeline",
+        "description": "Multilingual (Russian) utterance"
+      },
+      {
+        "name": "edge_code_snippet",
+        "utterance": "run this command: kubectl get pods -n production -l app=nap-api",
+        "expected_intent_type": "action",
+        "expected_project_slug": "iad-native-ads",
+        "description": "Code snippet in utterance"
+      },
+      {
+        "name": "edge_newlines",
+        "utterance": "check the pods\n\nthen check the logs\n\nthen restart the service",
+        "expected_intent_type": "action",
+        "description": "Multiple newlines in utterance"
+      },
+      {
+        "name": "edge_tabs",
+        "utterance": "check\tthe\tpods\tand\trestart\tthe\tservice",
+        "expected_intent_type": "action",
+        "description": "Tabs instead of spaces"
+      },
+      {
+        "name": "edge_repeated_chars",
+        "utterance": "theeeeeeeeeeee pods areeeeeeeeeeeeeee dooooooooooooooing fiiiiiiiiiiiiine",
+        "expected_intent_type": "status",
+        "description": "Repeated characters (typing stutter)"
+      }
+    ]
+  }
+}
