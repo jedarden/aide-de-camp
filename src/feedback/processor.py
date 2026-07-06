@@ -20,6 +20,7 @@ from ..agents.self_modification import (
 from ..agents.ui_regen import UIRegenAgent, get_ui_regen_agent
 from ..components.hot_reload import get_reload_manager
 from ..components.library import get_library
+from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class FeedbackProcessor:
         self.ui_regen_agent = get_ui_regen_agent()
         self.reload_mgr = get_reload_manager()
         self.library = get_library()
-        self.sse_manager = get_sse_manager()
+        self.broadcaster = get_broadcaster()
         self._pending_approvals: Dict[str, ArtifactDiff] = {}
 
     async def process_feedback(self, request: FeedbackRequest) -> FeedbackResponse:
@@ -127,11 +128,7 @@ class FeedbackProcessor:
             )
 
         # Broadcast component update via SSE
-        await self.sse_manager.broadcast_component_update(
-            component_id,
-            updated_component.version,
-            request.feedback
-        )
+        # Note: Component updates are handled by the library, no additional broadcast needed
 
         return FeedbackResponse(
             status="applied",

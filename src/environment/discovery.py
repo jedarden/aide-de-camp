@@ -312,6 +312,8 @@ def _normalize(s: str) -> str:
 
 # Global registry — populated at startup
 _registry: Optional[EnvironmentRegistry] = None
+_last_scan_at: Optional[str] = None
+_background_refresh_task: Optional[asyncio.Task] = None
 
 
 def get_registry() -> Optional[EnvironmentRegistry]:
@@ -321,3 +323,56 @@ def get_registry() -> Optional[EnvironmentRegistry]:
 def set_registry(registry: EnvironmentRegistry) -> None:
     global _registry
     _registry = registry
+
+
+def get_last_scan_at() -> Optional[str]:
+    """Get the timestamp of the last environment scan."""
+    return _last_scan_at
+
+
+async def refresh_registry() -> EnvironmentRegistry:
+    """
+    Trigger an immediate environment rescan.
+
+    Updates the global registry and returns the new registry.
+    """
+    global _registry, _last_scan_at
+
+    from datetime import datetime
+
+    _last_scan_at = datetime.now().isoformat()
+    _registry = await scan_environment()
+    return _registry
+
+
+async def start_background_refresh():
+    """Start background environment refresh task."""
+    global _background_refresh_task
+
+    if _background_refresh_task is not None:
+        return  # Already running
+
+    async def _refresh_loop():
+        """Background refresh loop."""
+        while True:
+            try:
+                await asyncio.sleep(300)  # Refresh every 5 minutes
+                await refresh_registry()
+            except asyncio.CancelledError:
+                logger.info("Background refresh task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Background refresh error: {e}")
+
+    _background_refresh_task = asyncio.create_task(_refresh_loop())
+    logger.info("Background environment refresh started")
+
+
+def stop_background_refresh():
+    """Stop background environment refresh task."""
+    global _background_refresh_task
+
+    if _background_refresh_task is not None:
+        _background_refresh_task.cancel()
+        _background_refresh_task = None
+        logger.info("Background environment refresh stopped")

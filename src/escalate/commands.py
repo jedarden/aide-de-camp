@@ -10,7 +10,7 @@ import re
 from logging import getLogger
 from typing import Optional
 
-from ..fetch.strand import KUBECTL_PROXIES
+from ..fetch.commands import KUBECTL_PROXIES
 
 
 logger = getLogger(__name__)
