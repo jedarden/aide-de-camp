@@ -4,8 +4,8 @@ Test Module - Testing endpoints for aide-de-camp.
 Provides test endpoints that bypass the Web Speech API and directly
 inject test utterances into the dispatch pipeline for end-to-end testing.
 """
+from .router import router
 from .dispatch import (
-    router,
     TestDispatchRequest,
     TestDispatchResponse,
     TestUtterance,

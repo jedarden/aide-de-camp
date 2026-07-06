@@ -9,16 +9,16 @@ import uuid
 from logging import getLogger
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 from ..intent.router import get_router
 from ..session.store import get_store
 from ..sse.broadcaster import get_broadcaster, SSEEvent
+from .router import router
 
 
 logger = getLogger(__name__)
-router = APIRouter()
 
 
 class TestDispatchRequest(BaseModel):
