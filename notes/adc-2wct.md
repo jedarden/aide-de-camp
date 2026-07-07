@@ -105,18 +105,67 @@ python3 tests/e2e/verify_canvas_test_render.py
 
 **Date Verified:** 2026-07-06
 
-## Latest Test Run (2026-07-06)
+## Latest Test Run (2026-07-07)
 
-All 4 tests passed:
+All tests passed - full pipeline verified:
 ```
-✅ ALL TESTS PASSED
+============================================================
+Testing Canvas Rendering Pipeline
+Session ID: 3b9aded2-29b9-4a50-a22c-9356d14681c1
+Surface ID: 25ba6247-9796-40...
+============================================================
 
-Verified:
-  ✓ Canvas receives SSE events from test dispatch
-  ✓ Canvas fetches topics from /api/v1/sessions/{session_id}/topics
-  ✓ Result cards render with correct content
-  ✓ Card content matches dispatch results
-  ✓ SSE triggers canvas refresh on result_created
+Step 1: Registering canvas surface...
+✓ Registered surface: ee0d599c-de44-4c...
 
-✅ Canvas correctly renders test endpoint results
+Step 2: Connecting to SSE stream...
+  SSE Event: connected
+  SSE Event: workload_summary
+  SSE Event: topic_cards
+  SSE Event: connected
+
+Step 3: Dispatching test utterance...
+✓ Dispatch status: dispatched
+✓ Intent count: 1
+✓ Intent IDs: 1
+✓ Message: Test dispatch initiated for 1 intents
+
+Step 4: Waiting for SSE events...
+  SSE Event: result_created
+✓ Received 5 SSE events
+
+Step 5: Verifying SSE events...
+  Event types: ['connected', 'workload_summary', 'topic_cards', 'connected', 'result_created']
+✓ Required SSE events received
+
+Step 6: Fetching topics from API...
+✓ Topics API response status: 200
+✓ Retrieved 1 topic cards
+
+Step 7: Verifying card structure...
+
+  Card 1:
+    Topic ID: a2bff7d3-56bd-48...
+    Label: how are the pods doing
+    Type: research
+    Staleness: 32s
+    Summary: I couldn't fetch the current status because no specific project or namespace was...
+    Urgency: normal
+
+✓ Card structure verification passed
+
+Step 8: Verifying SSE data matches API data...
+  SSE result data: {
+  "intent_id": "7aa5da6d-37f4-429c-a721-476b8d9d43bd",
+  "topic_id": "a2bff7d3-56bd-48f0-af93-71c581d4a09d",
+  "summary": "I couldn't fetch the current status because no specific project or namespace was selected...",
+  "urgency": "normal"
+}
+  API summary: I couldn't fetch the current status because no specific project or namespace was...
+  SSE summary: I couldn't fetch the current status because no specific project or namespace was...
+✓ SSE and API data are consistent
+
+============================================================
+✓ All canvas rendering tests passed!
+============================================================
 ```
