@@ -302,7 +302,10 @@ results (
   urgency     TEXT,  -- 'critical' | 'high' | 'normal' | 'low'
   created_at  INTEGER,
   surfaced_at INTEGER,
-  acked_at    INTEGER
+  acked_at    INTEGER,
+  previous_result_id TEXT,  -- link to prior result on same topic for diffing
+  diff_summary TEXT,  -- human-readable diff summary
+  diff_data    TEXT   -- JSON: detailed field diffs
 )
 
 topics (
