@@ -7,6 +7,7 @@ based on user feedback.
 
 import time
 import json
+from logging import getLogger
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
@@ -14,6 +15,27 @@ from enum import Enum
 
 from ..components.hot_reload import get_reload_manager
 from ..components.library import get_library
+from ..escalate.llm import get_zai_client, ModelClass
+
+
+logger = getLogger(__name__)
+
+# Prompt paths read per-invocation so edits take effect without a server restart
+# (hot-reload), matching the pattern in src/synthesize/strand.py and
+# src/intent/router.py.
+SELF_MOD_PARSE_PROMPT_PATH = Path("/home/coding/aide-de-camp/prompts/self_mod_parse.md")
+SELF_MOD_GENERATE_PROMPT_PATH = Path("/home/coding/aide-de-camp/prompts/self_mod_generate.md")
+
+# Fallbacks used only if a prompt file cannot be read at runtime.
+_PARSE_PROMPT_FALLBACK = (
+    "You classify a user instruction to the artifact it targets. "
+    'Return ONLY JSON: {"artifact_type": "prompt|config|component", '
+    '"artifact_name": "<name>", "reasoning": "..."}.'
+)
+_GENERATE_PROMPT_FALLBACK = (
+    "You apply a user instruction to an artifact. Return ONLY JSON: "
+    '{"updated_content": "<full updated text>", "change_summary": "one sentence"}.'
+)
 
 
 class ArtifactType(Enum):
@@ -57,12 +79,51 @@ class SelfModificationAgent:
     7. On rejection: discard
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        parse_prompt_path: Optional[Path] = None,
+        generate_prompt_path: Optional[Path] = None,
+    ):
         self.reload_mgr = get_reload_manager()
         self.component_library = get_library()
         self._pending_diffs: List[ArtifactDiff] = []
+        self.parse_prompt_path = parse_prompt_path or SELF_MOD_PARSE_PROMPT_PATH
+        self.generate_prompt_path = generate_prompt_path or SELF_MOD_GENERATE_PROMPT_PATH
+        self._zai_client = None
 
-    def process_instruction(self, instruction: str) -> ArtifactDiff:
+    async def _get_zai_client(self):
+        """Get or create the ZAI proxy client (lazy singleton)."""
+        if self._zai_client is None:
+            self._zai_client = get_zai_client()
+        return self._zai_client
+
+    def _load_prompt(self, path: Path, fallback: str) -> str:
+        """Load a self-modification prompt from disk (hot-reload, per call)."""
+        try:
+            return path.read_text()
+        except Exception as e:
+            logger.error(f"Failed to load prompt {path}: {e}")
+            return fallback
+
+    def _available_artifacts(self) -> List[Dict[str, str]]:
+        """Build the list of registered artifacts for the parser prompt."""
+        artifacts: List[Dict[str, str]] = []
+        for name, path_str in self.reload_mgr.list_artifacts().items():
+            suffix = Path(path_str).suffix.lower()
+            type_str = "config" if suffix in (".yaml", ".yml") else "prompt"
+            artifacts.append({"name": name, "type": type_str})
+        return artifacts
+
+    @staticmethod
+    def _strip_fences(raw: str) -> str:
+        """Strip ```json ... ``` markdown fences from a GLM response."""
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]
+            raw = raw.rsplit("```", 1)[0].strip()
+        return raw
+
+    async def process_instruction(self, instruction: str) -> ArtifactDiff:
         """
         Process a user instruction for system modification.
 
@@ -72,14 +133,14 @@ class SelfModificationAgent:
         Returns:
             The proposed diff for user approval
         """
-        # Parse the instruction to identify target
-        request = self._parse_instruction(instruction)
+        # Parse the instruction to identify target (LLM call)
+        request = await self._parse_instruction(instruction)
 
         # Get current content
         current_content = self._get_artifact_content(request)
 
-        # Generate update (this would be an LLM call in production)
-        updated_content, change_summary = self._generate_update(
+        # Generate update (LLM call)
+        updated_content, change_summary = await self._generate_update(
             request,
             current_content
         )
@@ -96,54 +157,75 @@ class SelfModificationAgent:
         self._pending_diffs.append(diff)
         return diff
 
-    def _parse_instruction(self, instruction: str) -> ModificationRequest:
+    async def _parse_instruction(self, instruction: str) -> ModificationRequest:
         """
-        Parse instruction to identify target artifact.
+        Parse an instruction to identify the target artifact via an LLM call.
 
-        In production, this is an LLM call. For now, use simple heuristics.
+        The LLM classifies the free-text instruction against the registered
+        artifacts and returns the artifact_type + artifact_name. Falls back to
+        the router prompt if the call or its response cannot be parsed.
         """
-        instruction_lower = instruction.lower()
-
-        artifact_name = None
-        artifact_type = None
-        context = {}
-
-        # Identify keywords
-        if "prompt" in instruction_lower or "router" in instruction_lower:
-            if "router" in instruction_lower:
-                artifact_name = "router"
-            elif "synthesize" in instruction_lower:
-                artifact_name = "synthesize"
-            elif "voice" in instruction_lower:
-                artifact_name = "voice"
-            elif "urgency" in instruction_lower:
-                artifact_name = "urgency"
-            artifact_type = ArtifactType.PROMPT
-
-        elif "registry" in instruction_lower or "project" in instruction_lower:
-            artifact_name = "registry"
-            artifact_type = ArtifactType.CONFIG
-
-        elif "monitoring" in instruction_lower:
-            artifact_name = "monitoring"
-            artifact_type = ArtifactType.CONFIG
-
-        elif "component" in instruction_lower or "card" in instruction_lower:
-            artifact_type = ArtifactType.COMPONENT
-
-        # If no specific artifact identified, default to router prompt
-        if artifact_name is None and artifact_type is None:
-            artifact_name = "router"
-            artifact_type = ArtifactType.PROMPT
-
-        context["raw_instruction"] = instruction
-
-        return ModificationRequest(
-            instruction=instruction,
-            artifact_name=artifact_name,
-            artifact_type=artifact_type,
-            context=context
+        system_prompt = self._load_prompt(self.parse_prompt_path, _PARSE_PROMPT_FALLBACK)
+        user_message = (
+            "## Registered Artifacts\n"
+            + json.dumps(self._available_artifacts(), indent=2)
+            + f"\n\n## User Instruction\n{instruction}\n"
         )
+
+        try:
+            client = await self._get_zai_client()
+            response = await client.call_simple(
+                system_prompt=system_prompt,
+                user_message=user_message,
+                model=ModelClass.HAIKU.value,  # cheap, fast classification
+                max_tokens=512,
+                temperature=0.0,  # deterministic classification
+            )
+            data = json.loads(self._strip_fences(response))
+
+            type_str = data.get("artifact_type", "prompt")
+            name = data.get("artifact_name")
+
+            try:
+                artifact_type = ArtifactType(type_str)
+            except ValueError:
+                artifact_type = ArtifactType.PROMPT
+
+            # Validate the name is actually registered; fall back to a known
+            # artifact (preferring the router prompt) so we never target a
+            # non-existent artifact.
+            registered = list(self.reload_mgr.list_artifacts().keys())
+            registered_set = set(registered)
+            if artifact_type != ArtifactType.COMPONENT and (
+                not name or name not in registered_set
+            ):
+                if "router" in registered_set:
+                    name = "router"
+                elif registered:
+                    name = registered[0]
+                else:
+                    name = "unknown"
+                artifact_type = ArtifactType.PROMPT
+
+            return ModificationRequest(
+                instruction=instruction,
+                artifact_name=name,
+                artifact_type=artifact_type,
+                context={
+                    "raw_instruction": instruction,
+                    "reasoning": data.get("reasoning", ""),
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                f"_parse_instruction LLM parse failed, defaulting to router prompt: {e}"
+            )
+            return ModificationRequest(
+                instruction=instruction,
+                artifact_name="router",
+                artifact_type=ArtifactType.PROMPT,
+                context={"raw_instruction": instruction, "fallback": True},
+            )
 
     def _get_artifact_content(self, request: ModificationRequest) -> str:
         """Get current content of the target artifact."""
@@ -159,43 +241,50 @@ class SelfModificationAgent:
 
         return "# Artifact not found or not loaded"
 
-    def _generate_update(
+    async def _generate_update(
         self,
         request: ModificationRequest,
         current_content: str
     ) -> Tuple[str, str]:
         """
-        Generate updated artifact content.
+        Generate updated artifact content via an LLM call.
 
-        In production, this is an LLM call that:
-        1. Understands the instruction
-        2. Analyzes current content
-        3. Generates appropriate update
-
-        For now, return a simple transformation.
+        Sends the current content + instruction to the LLM and returns the full
+        updated content plus a change summary. On failure, returns the content
+        unchanged with an honest summary rather than fabricating a change.
         """
-        # Simple heuristic-based updates for demo
-        instruction_lower = request.instruction.lower()
+        system_prompt = self._load_prompt(
+            self.generate_prompt_path, _GENERATE_PROMPT_FALLBACK
+        )
+        artifact_type = request.artifact_type.value if request.artifact_type else "prompt"
+        user_message = (
+            f"## Instruction\n{request.instruction}\n\n"
+            f"## Artifact Type\n{artifact_type}\n\n"
+            f"## Current Content\n```\n{current_content}\n```\n"
+        )
 
-        if "restart" in instruction_lower and "count" in instruction_lower:
-            # Add restart count to synthesize prompt
-            updated = current_content + "\n\n### Restart Count\nAlways include pod restart count in status results."
-            summary = "Added restart count field to status results"
-        elif "alias" in instruction_lower:
-            # Add alias to registry (parse from instruction)
-            updated = current_content + "\n  - new_alias"
-            summary = "Added new alias to registry"
-        elif "verbose" in instruction_lower or "more detail" in instruction_lower:
-            # Increase detail level
-            updated = current_content.replace("2-3 sentence", "3-5 sentence")
-            summary = "Increased detail level in summaries"
-        else:
-            # Generic comment addition
-            comment = f"\n\n# User feedback: {request.instruction}"
-            updated = current_content + comment
-            summary = f"Added note about user feedback"
+        try:
+            client = await self._get_zai_client()
+            response = await client.call_simple(
+                system_prompt=system_prompt,
+                user_message=user_message,
+                model=ModelClass.SONNET.value,  # higher quality for rewriting
+                max_tokens=4096,
+                temperature=0.2,
+            )
+            data = json.loads(self._strip_fences(response))
 
-        return updated, summary
+            updated = data.get("updated_content")
+            summary = data.get("change_summary", "")
+            if not isinstance(updated, str) or not updated.strip():
+                logger.warning(
+                    "_generate_update returned no updated_content; leaving artifact unchanged"
+                )
+                return current_content, summary or "No update generated"
+            return updated, summary or "Updated artifact"
+        except Exception as e:
+            logger.error(f"_generate_update LLM call failed: {e}")
+            return current_content, f"Update generation failed: {e}"
 
     def _estimate_confidence(
         self,

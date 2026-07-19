@@ -145,7 +145,7 @@ class FeedbackProcessor:
     ) -> FeedbackResponse:
         """Process feedback for artifact modification."""
         # Generate diff
-        diff = self.self_mod_agent.process_instruction(request.feedback)
+        diff = await self.self_mod_agent.process_instruction(request.feedback)
 
         # If confidence is high and auto-approve is allowed, apply immediately
         if not request.require_approval and diff.confidence >= 0.9:
