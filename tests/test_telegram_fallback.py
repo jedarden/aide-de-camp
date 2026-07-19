@@ -3,7 +3,7 @@ Unit tests for Telegram fallback integration.
 """
 
 import os
-import pytest
+
 from src.telegram.fallback import TelegramFallback, get_telegram_fallback
 
 
@@ -46,7 +46,6 @@ class TestTelegramFallbackAPIContract:
         fallback = TelegramFallback(bridge_url="http://test:8000")
 
         # Mock the HTTP client to capture payload
-        import httpx
         captured_payload = {}
         captured_url = None
 
@@ -108,73 +107,108 @@ class TestGlobalFallbackInstance:
         assert fallback.bridge_url == test_url
 
 
-class TestRateLimiting:
-    """Test failure log rate limiting to prevent spam."""
+class TestFirstFailureTracking:
+    """Test first-failure detection: exactly one WARNING per process startup."""
 
-    def test_first_failure_logs_warning(self, caplog):
-        """Test that the first failure logs a WARNING."""
+    async def test_first_failure_logs_warning_with_error_type(self, caplog):
+        """The first failure logs a WARNING carrying both error type and message."""
         fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
 
         with caplog.at_level("WARNING"):
-            fallback._handle_send_failure("test error")
+            await fallback._handle_send_failure(
+                error=ConnectionError("connection refused")
+            )
 
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "Telegram send failure #1" in caplog.records[0].message
-        assert "test error" in caplog.records[0].message
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        msg = warnings[0].message
+        assert "First Telegram send failure detected" in msg
+        # Acceptance criterion: error type AND message are both present.
+        assert "ConnectionError" in msg  # error type
+        assert "connection refused" in msg  # error message
 
-    def test_immediate_repeated_failure_logs_debug(self, caplog):
-        """Test that immediate repeated failures log at DEBUG level."""
-        from datetime import datetime, timedelta
-
+    async def test_subsequent_failures_log_debug_not_warning(self, caplog):
+        """After the first failure, later failures log at DEBUG, not WARNING."""
         fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
 
-        # First failure logs WARNING
         with caplog.at_level("WARNING"):
-            fallback._handle_send_failure("first error")
+            await fallback._handle_send_failure(error=ConnectionError("boom"))
 
-        # Clear previous logs
         caplog.clear()
 
-        # Second failure within cooldown should log at DEBUG level
         with caplog.at_level("DEBUG"):
-            fallback._handle_send_failure("second error")
+            await fallback._handle_send_failure(error=ConnectionError("boom2"))
 
-        # Should have a DEBUG log for the repeated failure
-        debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
-        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        debugs = [r for r in caplog.records if r.levelname == "DEBUG"]
+        assert warnings == []
+        assert len(debugs) == 1
+        assert "Repeated Telegram send failure" in debugs[0].message
+        assert "ConnectionError" in debugs[0].message
 
-        assert len(warning_records) == 0, "Repeated failure should not log at WARNING level"
-        assert len(debug_records) >= 1, "Repeated failure should log at DEBUG level"
-        assert any("Repeated Telegram send failure" in r.message for r in debug_records)
-
-    def test_failure_after_cooldown_logs_warning(self, caplog):
-        """Test that a failure after the cooldown period logs a WARNING again."""
-        from datetime import datetime, timedelta
-        from unittest.mock import patch
+    async def test_exactly_one_warning_under_concurrency(self, caplog):
+        """N concurrent failures produce exactly one WARNING and failure_count == N."""
+        import asyncio
 
         fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
 
-        # First failure
         with caplog.at_level("WARNING"):
-            fallback._handle_send_failure("first error")
+            await asyncio.gather(
+                *(
+                    fallback._handle_send_failure(error=ConnectionError(f"e{i}"))
+                    for i in range(50)
+                )
+            )
 
-        # Clear previous logs
-        caplog.clear()
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        assert fallback._failure_count == 50
 
-        # Mock time to be after cooldown period (5 minutes + 1 second)
-        future_time = datetime.now() + timedelta(seconds=301)
-        with patch('src.telegram.fallback.datetime') as mock_datetime:
-            mock_datetime.now.return_value = future_time
-            with caplog.at_level("WARNING"):
-                fallback._handle_send_failure("second error")
-
-        # Should have a WARNING log for the failure after cooldown
-        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
-        assert len(warning_records) >= 1, "Failure after cooldown should log at WARNING level"
-        assert any("Telegram send failure #2" in r.message for r in warning_records)
-
-    def test_cooldown_constant_value(self):
-        """Test that the cooldown period is set to 5 minutes (300 seconds)."""
+    async def test_first_failure_timestamp_set_once(self):
+        """first_failure_timestamp is set on the first failure and frozen after."""
         fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
-        assert fallback.FAILURE_LOG_COOLDOWN_SECONDS == 300
+
+        assert fallback._first_failure_timestamp is None
+
+        await fallback._handle_send_failure(error=ConnectionError("first"))
+        first_ts = fallback._first_failure_timestamp
+        assert first_ts is not None
+
+        await fallback._handle_send_failure(error=ConnectionError("second"))
+        assert fallback._first_failure_timestamp is first_ts  # unchanged (set-once)
+        assert fallback._last_failure_timestamp is not first_ts  # advanced
+
+    async def test_reset_re_arms_detection(self, caplog):
+        """After reset, the next failure is 'first' again; counters are retained."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        await fallback._handle_send_failure(error=ConnectionError("first"))
+        assert fallback._has_logged_first_failure is True
+        assert fallback._failure_count == 1
+
+        await fallback.reset_first_failure_state()
+        assert fallback._has_logged_first_failure is False
+        assert fallback._first_failure_timestamp is None
+        assert fallback._failure_count == 1  # retained across reset
+
+        caplog.clear()
+        with caplog.at_level("WARNING"):
+            await fallback._handle_send_failure(error=ConnectionError("after reset"))
+
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        assert fallback._failure_count == 2  # incremented, not reset
+
+    async def test_non_2xx_response_logs_synthesized_type_and_context(self, caplog):
+        """A non-2xx response (no exception) logs the synthesized type + context."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("WARNING"):
+            await fallback._handle_send_failure(
+                error_context="status 500 - upstream down"
+            )
+
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        assert "HTTPError" in warnings[0].message  # synthesized type
+        assert "status 500 - upstream down" in warnings[0].message

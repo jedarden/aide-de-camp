@@ -5,9 +5,10 @@ Integrates with telegram-claude-bridge to provide an always-available
 fallback surface for results and exceptions.
 """
 
+import asyncio
 import logging
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
 import httpx
 
@@ -30,19 +31,27 @@ class TelegramFallback:
     # telegram-claude-bridge endpoint (Tailscale mesh)
     # Configurable via ADC_TELEGRAM_BRIDGE_URL env var
     DEFAULT_BRIDGE_URL = "http://telegram-claude-bridge:8000"
-    # Rate limit for repeated failure logs (5 minutes)
-    FAILURE_LOG_COOLDOWN_SECONDS = 300
 
     def __init__(self, bridge_url: str | None = None):
         import os
         self.bridge_url = bridge_url or os.getenv(
             "ADC_TELEGRAM_BRIDGE_URL", self.DEFAULT_BRIDGE_URL
         )
-        # Track bridge reachability state
+        # Reachability — a separate logical object; its OTHER writers (send success
+        # below, and the health check) are intentionally NOT under the failure lock.
         self._is_reachable = None  # None = unknown, True = reachable, False = unreachable
-        self._last_failure_logged = None  # Track when we last logged a failure
-        self._failure_count = 0  # Track total failures
-        self._has_logged_first_failure = False  # Track if we've logged the first failure after startup
+
+        # First-failure record: flat instance vars on the singleton, per-startup,
+        # no persistence. Exactly one WARNING is emitted per process startup.
+        self._has_logged_first_failure: bool = False
+        self._failure_count: int = 0
+        self._first_failure_timestamp: Optional[datetime] = None  # set-once
+        self._last_failure_timestamp: Optional[datetime] = None  # updated every failure
+
+        # Serializes the first-failure claim-and-set. The critical section
+        # (_record_failure_locked) is await-free on purpose so the read-then-set
+        # of the flag cannot be interleaved by another coroutine.
+        self._first_failure_lock: asyncio.Lock = asyncio.Lock()
 
     async def send_message(
         self,
@@ -81,16 +90,14 @@ class TelegramFallback:
                     return True
                 else:
                     error_msg = f"status {response.status_code} - {response.text}"
-                    self._handle_send_failure(error_msg)
+                    await self._handle_send_failure(error_context=error_msg)
                     return False
 
         except httpx.RequestError as e:
-            error_msg = f"request error: {e}"
-            self._handle_send_failure(error_msg)
+            await self._handle_send_failure(error=e)
             return False
         except Exception as e:
-            error_msg = f"unexpected error: {e}"
-            self._handle_send_failure(error_msg)
+            await self._handle_send_failure(error=e)
             return False
 
     async def send_result(self, chat_id: int | str, result: dict) -> bool:
@@ -183,46 +190,108 @@ class TelegramFallback:
         """
         Get the current bridge status.
 
+        Lock-free read: single-field atomic reads; monitoring tolerates staleness.
+
         Returns:
             Dict with keys:
             - reachable: bool or None (None = unknown yet)
             - bridge_url: str
             - failure_count: int
+            - has_logged_first_failure: bool
+            - first_failure_timestamp: ISO-8601 string or None
+            - last_failure_timestamp: ISO-8601 string or None
         """
         return {
             "reachable": self._is_reachable,
             "bridge_url": self.bridge_url,
             "failure_count": self._failure_count,
+            "has_logged_first_failure": self._has_logged_first_failure,
+            "first_failure_timestamp": self._first_failure_timestamp.isoformat()
+            if self._first_failure_timestamp else None,
+            "last_failure_timestamp": self._last_failure_timestamp.isoformat()
+            if self._last_failure_timestamp else None,
         }
 
-    def _handle_send_failure(self, error_context: str = ""):
-        """Handle a send failure - log warning only on the first failure after startup.
+    async def _handle_send_failure(
+        self,
+        error: Exception | None = None,
+        error_context: str = "",
+    ) -> None:
+        """Reactive detection entry for a Telegram send failure.
 
-        Logs a WARNING only for the very first failure after startup.
-        All subsequent failures are logged at DEBUG level to avoid spam.
+        Called only from ``send_message``'s failure branches. Logs a WARNING that
+        includes the error type and message on the FIRST failure after startup;
+        every later failure in the startup is logged at DEBUG only. Exactly one
+        WARNING is emitted per process startup.
 
         Args:
-            error_context: Details about the error (status code, error message, etc.)
+            error: The exception that caused the failure, if any. Its type name
+                and message are included in the log. ``None`` for non-2xx HTTP
+                responses (httpx does not raise for those).
+            error_context: Free-form context (e.g. ``"status 500 - ..."``) used as
+                the message when no exception is available, or to enrich one.
         """
+        async with self._first_failure_lock:
+            self._record_failure_locked(error=error, error_context=error_context)
+
+    def _record_failure_locked(
+        self,
+        error: Exception | None = None,
+        error_context: str = "",
+    ) -> bool:
+        """Record a failure and claim the "first failure" slot if still available.
+
+        Caller MUST hold ``_first_failure_lock``. Sync on purpose — no ``await``
+        inside, so the read-then-set of ``_has_logged_first_failure`` cannot be
+        interleaved by another coroutine.
+
+        Returns:
+            True iff THIS call performed the first-failure claim (the
+            ``_has_logged_first_failure`` False→True flip); False for every later
+            failure in the startup. "First" is the winner of the claim, not a
+            timestamp comparison.
+        """
+        now = datetime.now()
         self._is_reachable = False
         self._failure_count += 1
-        now = datetime.now()
+        self._last_failure_timestamp = now
+
+        if error is not None:
+            error_type = type(error).__name__
+            message = str(error) or error_context or "unknown error"
+        else:
+            error_type = "HTTPError"
+            message = error_context or "unknown error"
 
         if not self._has_logged_first_failure:
-            # First failure after startup - log at WARNING level
+            # First failure after startup — WARNING with error type + message.
+            self._has_logged_first_failure = True
+            self._first_failure_timestamp = now
             logger.warning(
                 f"First Telegram send failure detected at {self.bridge_url}. "
-                f"Error: {error_context if error_context else 'unknown error'}. "
+                f"Error type: {error_type}. Error: {message}. "
                 f"Subsequent failures will be logged at DEBUG level only."
             )
-            self._has_logged_first_failure = True
-            self._last_failure_logged = now
-        else:
-            # Subsequent failures - log at DEBUG level to avoid spam
-            logger.debug(
-                f"Repeated Telegram send failure #{self._failure_count} at {self.bridge_url}. "
-                f"Error: {error_context if error_context else 'unknown error'}."
-            )
+            return True
+
+        logger.debug(
+            f"Repeated Telegram send failure #{self._failure_count} "
+            f"at {self.bridge_url}. Error type: {error_type}. Error: {message}."
+        )
+        return False
+
+    async def reset_first_failure_state(self) -> None:
+        """Re-arm first-failure detection.
+
+        Resets the claim flag and the first-failure timestamp under the lock, so
+        the next failure is treated as "first" again. Used by tests and by future
+        recovery-based reset hooks. The diagnostic counters
+        (``_failure_count``, ``_last_failure_timestamp``) are intentionally
+        retained.
+        """
+        async with self._first_failure_lock:
+            self._has_logged_first_failure = False
+            self._first_failure_timestamp = None
 
     def _format_result_message(self, result: dict) -> str:
         """Format a result as a Telegram message."""

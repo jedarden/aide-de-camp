@@ -2,10 +2,9 @@
 Test Telegram bridge status tracking and API endpoint.
 """
 
-import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timedelta
+
+import pytest
 
 from src.telegram.fallback import TelegramFallback, get_telegram_fallback
 
@@ -97,26 +96,24 @@ class TestTelegramBridgeStatus:
             assert status["reachable"] is False
             assert status["failure_count"] == 1
 
-    def test_handle_send_failure_rate_limiting(self, caplog):
-        """Test that failure warnings are rate-limited."""
+    async def test_handle_send_failure_first_only(self, caplog):
+        """Only the first failure after startup logs a WARNING; later ones do not."""
         fallback = TelegramFallback()
-        fallback._last_failure_logged = None
 
-        # First failure should log WARNING
+        # First failure → WARNING (the one-per-startup notification).
         with patch("src.telegram.fallback.logger") as mock_logger:
-            fallback._handle_send_failure()
+            await fallback._handle_send_failure(error=ConnectionError("boom"))
             assert mock_logger.warning.called
+            assert not mock_logger.debug.called
 
-        # Recent failure should not log WARNING (within 60 seconds)
+        # Subsequent failure → DEBUG, no WARNING.
         with patch("src.telegram.fallback.logger") as mock_logger:
-            fallback._handle_send_failure()
+            await fallback._handle_send_failure(error=ConnectionError("boom2"))
+            assert mock_logger.debug.called
             assert not mock_logger.warning.called
 
-        # Failure after 60 seconds should log WARNING again
-        fallback._last_failure_logged = datetime.now() - timedelta(seconds=61)
-        with patch("src.telegram.fallback.logger") as mock_logger:
-            fallback._handle_send_failure()
-            assert mock_logger.warning.called
+        assert fallback._failure_count == 2
+        assert fallback._has_logged_first_failure is True
 
     @pytest.mark.asyncio
     async def test_send_message_uses_debug_after_first_warning(self, caplog):
