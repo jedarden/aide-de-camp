@@ -13,10 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import httpx
-
 from ..session.store import SessionStore
-from ..sse.broadcaster import EventType, SSEEvent, broadcast_result
+from ..sse.broadcaster import broadcast_result
 from ..surface.router import SurfaceRouter
 
 logger = logging.getLogger(__name__)
@@ -35,22 +33,47 @@ class BeadWatcher:
     """
     Watches for bead events and routes results to surfaces.
 
-    Integration with br CLI (beads_rust):
-    - Reads beads JSONL file for closed beads
-    - Extracts session_id and surface_id from bead metadata
+    Integration with the br CLI (bead-forge, the bf/br superset):
+    - Reads the bf workspace checkpoint JSONL (`.beads/issues.jsonl`) for
+      terminal beads
+    - Extracts session_id / origin_surface_id / urgency from the bead's flat
+      `labels` array -- escalate/handler.py encodes these as `key=value` labels
     - Pushes results to active surfaces via SSE
     - Falls back to Telegram if no surface available
+
+    The checkpoint is rewritten in full on every `bf sync --flush-only` (it is
+    not append-only), so each tick re-reads the whole file and relies on
+    `_processed_beads` to dedup already-delivered beads.
     """
 
     CHECK_INTERVAL_SECONDS = 5
-    BEADS_JSONL = ".beads/beads.jsonl"
+    # bf (bead-forge) workspace checkpoint. The live store is beads.db; this is
+    # the flushed checkpoint bf writes on `bf sync --flush-only`. Absolute path
+    # because the server may be launched from any CWD (matches DB_PATH in
+    # src/main.py). The old value ".beads/beads.jsonl" never existed -- this file
+    # is the real one and has always been named issues.jsonl.
+    BEADS_JSONL = "/home/coding/aide-de-camp/.beads/issues.jsonl"
+    # Terminal statuses meaning "work is done, deliver the result". bf uses
+    # "closed" for normally-completed beads and "resolved" for beads closed via
+    # the escalate auto-approve path. Both warrant delivery (see adc-5wtm); the
+    # session_id-label guard below scopes delivery to escalate-tracked beads
+    # regardless of status, so including "resolved" is safe.
+    TERMINAL_STATUSES = ("closed", "resolved")
 
-    def __init__(self, store: SessionStore, router: SurfaceRouter):
+    def __init__(
+        self,
+        store: SessionStore,
+        router: SurfaceRouter,
+        beads_jsonl: str | None = None,
+    ):
         self.store = store
         self.router = router
+        # Allow tests / alternate workspaces to point at a scratch checkpoint.
+        self._beads_jsonl = beads_jsonl or self.BEADS_JSONL
         self._running = False
         self._task: Optional[asyncio.Task] = None
-        self._last_position = 0  # Position in beads.jsonl
+        # Bead IDs we have already delivered. In-memory only, so a process
+        # restart re-delivers currently-terminal beads (pre-existing behavior).
         self._processed_beads: set[str] = set()
 
     async def start(self) -> None:
@@ -83,72 +106,101 @@ class BeadWatcher:
                 await asyncio.sleep(self.CHECK_INTERVAL_SECONDS)
 
     async def _check_for_events(self) -> None:
-        """Check for new bead events and process them."""
-        beads_path = Path(self.BEADS_JSONL)
+        """Check for terminal bead events and process them."""
+        beads_path = Path(self._beads_jsonl)
         if not beads_path.exists():
             return
 
-        # Read new lines from beads.jsonl
-        events = await self._read_new_bead_events(beads_path)
+        events = await self._read_terminal_events(beads_path)
 
         for event in events:
             await self._process_bead_event(event)
 
-    async def _read_new_bead_events(self, beads_path: Path) -> list[BeadEvent]:
-        """Read new bead events from beads.jsonl."""
-        events = []
+    async def _read_terminal_events(self, beads_path: Path) -> list[BeadEvent]:
+        """
+        Read terminal (closed/resolved) bead events from the checkpoint.
+
+        The bf checkpoint is rewritten in full on each flush (not appended to),
+        so byte-offset tracking would silently miss beads whose status changed
+        on an earlier line. We therefore re-read the whole file each tick;
+        `_processed_beads` guards against re-delivering beads already routed.
+        """
+        events: list[BeadEvent] = []
 
         try:
             with open(beads_path, "r") as f:
-                # Seek to last position
-                f.seek(self._last_position)
-                new_lines = f.readlines()
-
-                # Update position
-                self._last_position = f.tell()
-
-                for line in new_lines:
-                    if not line.strip():
-                        continue
-
-                    try:
-                        bead = json.loads(line)
-                        bead_id = bead.get("id")
-                        status = bead.get("status")
-
-                        if not bead_id or bead_id in self._processed_beads:
-                            continue
-
-                        # Process closed beads
-                        if status == "closed":
-                            events.append(BeadEvent(
-                                bead_id=bead_id,
-                                event_type="closed",
-                                timestamp=int(datetime.now().timestamp()),
-                                data=bead,
-                            ))
-                            self._processed_beads.add(bead_id)
-
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"Failed to parse bead JSON: {e}")
-
+                lines = f.readlines()
         except Exception as e:
             logger.error(f"Error reading beads file: {e}")
+            return events
+
+        for line in lines:
+            if not line.strip():
+                continue
+
+            try:
+                bead = json.loads(line)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse bead JSON: {e}")
+                continue
+
+            bead_id = bead.get("id")
+            status = bead.get("status")
+
+            if not bead_id or bead_id in self._processed_beads:
+                continue
+
+            # Process terminal beads (closed or resolved)
+            if status in self.TERMINAL_STATUSES:
+                events.append(BeadEvent(
+                    bead_id=bead_id,
+                    event_type=status,  # 'closed' or 'resolved'
+                    timestamp=int(datetime.now().timestamp()),
+                    data=bead,
+                ))
+                self._processed_beads.add(bead_id)
 
         return events
+
+    def _extract_metadata(self, bead: dict) -> dict:
+        """
+        Reconstruct routing metadata from a bead's flat `labels` array.
+
+        escalate/handler.py's `_create_bead` / `_create_bead_with_type` encode
+        session_id, origin_surface_id, urgency, etc. as `key=value` label
+        strings (e.g. `session_id=session-1`). bf issues have NO nested
+        `metadata` object -- only a flat `labels` list -- so we parse those
+        `key=value` entries back into a dict, matching the encoding the escalate
+        handler writes. Labels without `=` (e.g. `deferred`, `split-child`) and
+        `:`-style labels (e.g. `failure-count:1`) are ignored.
+        """
+        metadata: dict = {}
+        labels = bead.get("labels", [])
+        if not isinstance(labels, list):
+            return metadata
+        for label in labels:
+            if not isinstance(label, str) or "=" not in label:
+                continue
+            key, _, value = label.partition("=")
+            key = key.strip()
+            if key:
+                metadata[key] = value.strip()
+        return metadata
 
     async def _process_bead_event(self, event: BeadEvent) -> None:
         """Process a bead event and route to surfaces."""
         bead_data = event.data
 
-        # Extract metadata
-        metadata = bead_data.get("metadata", {})
+        # Extract routing metadata from the bead's labels (escalate encoding).
+        metadata = self._extract_metadata(bead_data)
         session_id = metadata.get("session_id")
         surface_id = metadata.get("origin_surface_id")
 
         if not session_id:
-            # No session_id - can't route
-            logger.warning(f"Bead {event.bead_id} has no session_id in metadata")
+            # Not an escalate-tracked bead (no session_id label) -- nothing to
+            # route. This is expected for the vast majority of bf beads, so this
+            # is a debug log, not a warning.
+            logger.debug(f"Bead {event.bead_id} has no session_id label; skipping")
             return
 
         # Determine target surface
@@ -185,17 +237,13 @@ class BeadWatcher:
             logger.info(f"No surface available for bead {event.bead_id}, result queued")
 
     async def _extract_result_from_bead(self, bead: dict, session_id: str) -> Optional[dict]:
-        """Extract result data from a closed bead."""
-        # Try to extract structured result from bead body
-        body = bead.get("body", "")
-        metadata = bead.get("metadata", {})
+        """Extract result data from a terminal bead (real bf schema)."""
+        metadata = self._extract_metadata(bead)
 
-        # If metadata already has result structure, use it
-        if "result" in metadata:
-            return metadata["result"]
+        # bf stores the bead body in `description` (NOT `body`); fall back to
+        # notes then title so the summary is never empty.
+        body = bead.get("description") or bead.get("notes") or bead.get("title") or ""
 
-        # Try to parse result from body
-        # For now, create a basic result from the bead
         return {
             "id": bead.get("id"),
             "type": "bead_result",
@@ -203,8 +251,8 @@ class BeadWatcher:
             "data": {
                 "bead_id": bead.get("id"),
                 "title": bead.get("title"),
-                "type": bead.get("type"),
-                "body": body,
+                "issue_type": bead.get("issue_type"),
+                "description": body,
                 "status": bead.get("status"),
             },
             "urgency": metadata.get("urgency", "normal"),
