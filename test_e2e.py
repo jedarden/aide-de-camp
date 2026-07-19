@@ -52,9 +52,12 @@ async def run(utterance: str) -> bool:
     async def dispatch():
         await asyncio.sleep(0.5)  # let SSE connect first
         async with httpx.AsyncClient(base_url=BASE, timeout=60) as client:
+            # surface_id is required: /dispatch only broadcasts result_created to
+            # surfaces it can target (src/main.py guards on `if surface_id`).
             resp = await client.post("/dispatch", json={
                 "utterance": utterance,
                 "session_id": session_id,
+                "surface_id": surface_id,
             })
             resp.raise_for_status()
             ack = resp.json()
