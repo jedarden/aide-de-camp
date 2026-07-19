@@ -23,6 +23,11 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# The Python package is the `src/` directory (imported as `src.main`, `src.intent.router`, ...),
+# not a dir named after the project. Tell hatchling so `pip install -e ".[dev]"` works.
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100

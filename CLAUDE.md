@@ -6,15 +6,37 @@ FastAPI server providing a voice/text → intent routing → parallel fetch+synt
 
 ## Running the Server
 
+> **Use the repo venv (`.venv/bin/python`), never bare system `python3`.**
+> This host runs NixOS. The system `python3` (`/run/current-system/sw/bin/python3`, 3.12) ships **no pip, fastapi, uvicorn, httpx, or pytest** — they are not Nix-managed, so a `nixos-rebuild` wipes them. Deps live only in the project venv, which is git-ignored and must be recreated after a rebuild. Running `python3 -m uvicorn ...` (the old command) fails with `No module named uvicorn`. Always invoke `.venv/bin/python` (or activate the venv) instead.
+
+### One-time setup (or after a NixOS rebuild)
+
 ```bash
 # From /home/coding/aide-de-camp/
-nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8000 > /tmp/adc.log 2>&1 &
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+```
+
+This installs fastapi, `uvicorn[standard]`, httpx, websockets, pydantic, aiosqlite (runtime) plus pytest, pytest-asyncio, ruff (dev), and the `src` package itself in editable mode, all from `pyproject.toml`.
+
+Verify it took:
+
+```bash
+.venv/bin/python -c "import fastapi, uvicorn, httpx, pydantic, aiosqlite; print('deps OK')"
+.venv/bin/pytest --collect-only -q   # should collect ~60+ tests
+```
+
+### Start / restart
+
+```bash
+# From /home/coding/aide-de-camp/
+nohup .venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000 > /tmp/adc.log 2>&1 &
 
 # Restart (kill then start)
 kill -2 $(ps aux | grep "uvicorn src.main" | grep -v grep | awk '{print $2}') 2>/dev/null; true
-nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8000 > /tmp/adc.log 2>&1 &
+nohup .venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000 > /tmp/adc.log 2>&1 &
 
-# Health check
+# Health check (expect HTTP 200 + {"status":"ok","service":"adc-voice"})
 curl -s http://localhost:8000/health
 ```
 
