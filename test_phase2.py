@@ -40,7 +40,7 @@ async def test_self_modification_cycle():
     print(f"  👤 User instruction: '{instruction}'")
 
     # Step 2: Generate diff
-    diff = agent.process_instruction(instruction)
+    diff = await agent.process_instruction(instruction)
     print(f"  ✅ Diff generated")
     print(f"     - Artifact: {diff.artifact_name}")
     print(f"     - Type: {diff.artifact_type.value}")
