@@ -1,49 +1,86 @@
 # adc-2ju7: Add WARNING log on first Telegram send failure
 
-## Status: VERIFIED COMPLETE
+**Status: VERIFIED COMPLETE** — umbrella bead closed. All child beads closed.
 
-Implementation completed in commit `c45a963`.
+## What this bead is
 
-## Implementation Verification
+`adc-2ju7` is the **umbrella** tracking bead for "add a WARNING log on the first
+Telegram send failure after startup." The implementation work was split across
+child beads, all now closed:
 
-The `_handle_send_failure()` method in `src/telegram/fallback.py` (lines 198-225) implements:
+| Bead     | Title                                     | Status  |
+|----------|-------------------------------------------|---------|
+| adc-4667 | Find all Telegram send locations          | closed  |
+| adc-4vhr | Design first-failure tracking mechanism   | closed  |
+| adc-4las | Implement WARNING log with error context  | closed  |
+| adc-39tx | Verify WARNING logs only on first failure | closed  |
 
-### ✅ Acceptance Criteria 1: First send failure logs a WARNING with context
-- **Line 45**: `self._has_logged_first_failure = False` - initialization tracks first failure state
-- **Lines 211-217**: On first failure, logs at WARNING level with full context:
-  ```python
-  logger.warning(
-      f"First Telegram send failure detected at {self.bridge_url}. "
-      f"Error: {error_context if error_context else 'unknown error'}. "
-      f"Subsequent failures will be logged at DEBUG level only."
-  )
-  ```
+> Earlier versions of this note referenced commit `c45a963` (the first, simpler
+> attempt). That was superseded by `301b82a` (adc-4las), which is the
+> **current** implementation this note now reflects.
 
-### ✅ Acceptance Criteria 2: Log includes error type and message
-Error context is passed from all three failure paths in `send_message()`:
-- **Line 83**: HTTP status errors → `"status {response.status_code} - {response.text}"`
-- **Line 88**: Request errors → `"request error: {e}"`
-- **Line 92**: Unexpected errors → `"unexpected error: {e}"`
+## Final implementation
 
-### ✅ Acceptance Criteria 3: No duplicate logs for the same initial failure
-- **Line 211**: Condition `if not self._has_logged_first_failure:` ensures only first failure triggers WARNING
-- **Line 218**: `self._has_logged_first_failure = True` prevents re-logging
-- **Lines 221-224**: Subsequent failures logged at DEBUG level only
+File: `src/telegram/fallback.py`, method `_record_failure_locked()` (called under
+`_first_failure_lock` from the async entry `_handle_send_failure()`).
 
-## Implementation Details
+State (instance vars on the singleton, per-startup, no persistence):
 
-- **File**: `src/telegram/fallback.py`
-- **Method**: `_handle_send_failure(self, error_context: str = "")`
-- **State tracking**: `_has_logged_first_failure` boolean flag
-- **Log levels**: WARNING (first failure only), DEBUG (all subsequent failures)
-- **Error context**: Passed from caller, includes error type and message
+- `_has_logged_first_failure: bool` — one-shot claim flag
+- `_failure_count: int`, `_first_failure_timestamp`, `_last_failure_timestamp`
+- `_first_failure_lock: asyncio.Lock` — serializes the claim-and-set
 
-## Code Review Summary
+All three failure branches in `send_message()` route through
+`_handle_send_failure()`:
 
-The implementation correctly:
-- Tracks first-failure state via `_has_logged_first_failure` boolean
-- Logs detailed error context including error type and message
-- Prevents duplicate WARNING logs for the same initial failure
-- Falls back to DEBUG logging for repeated failures to avoid log spam
+- non-2xx HTTP → `error_context="status {code} - {text}"`
+- `httpx.RequestError` → `error=e`
+- any other `Exception` → `error=e`
+
+`_record_failure_locked()` derives `error_type` (`type(e).__name__`, or
+synthesized `"HTTPError"` for non-2xx responses) and `message`, then:
+
+- On the **first** failure: flips `_has_logged_first_failure` True, stamps
+  `_first_failure_timestamp`, and emits one `logger.warning(...)` carrying the
+  error type and message. Returns `True` (this call won the claim).
+- On every **later** failure in the startup: emits `logger.debug(...)` only.
+  Returns `False`.
+
+"First" is the winner of the lock-guarded claim, not a timestamp comparison — so
+exactly one WARNING is emitted per process startup even under concurrent
+failures.
+
+## Acceptance-criteria verification
+
+- ✅ **First send failure logs a WARNING with context** — `_record_failure_locked`
+  WARNING branch.
+- ✅ **Log includes error type and message** — `Error type: {error_type}. Error:
+  {message}.` (synthesized `HTTPError` + context for non-2xx responses).
+- ✅ **No duplicate logs for the same initial failure** — `_has_logged_first_failure`
+  guard + `_first_failure_lock`; subsequent failures log at DEBUG only.
+
+## Tests (24 passing)
+
+`.venv/bin/pytest tests/test_telegram_fallback.py tests/test_telegram_bridge_status.py`
+→ 24 passed.
+
+First-failure coverage in `tests/test_telegram_fallback.py::TestFirstFailureTracking`:
+
+- first failure logs WARNING with error type + message
+- subsequent failures log at DEBUG, not WARNING
+- exactly one WARNING under 50 concurrent failures (`failure_count == 50`)
+- `_first_failure_timestamp` is set-once; `_last_failure_timestamp` advances
+- `reset_first_failure_state()` re-arms detection, retains counters
+- non-2xx response logs synthesized `HTTPError` type + context
+
+Plus 9 tests in `tests/test_telegram_bridge_status.py` covering the failure
+counter, singleton, and the `/api/v1/telegram/bridge-status` surface.
+
+## Commits
+
+- `c45a963` — original simpler WARNING (superseded)
+- `301b82a` (adc-4las) — current impl: error type + message + lock
+- `4d7e94f` (adc-39tx) — verification tests
+- `2c63f2e`, `d5bf9e8` — earlier (stale) versions of this note
 
 ✅ All acceptance criteria met. Implementation complete and verified.
