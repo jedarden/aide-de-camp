@@ -58,7 +58,7 @@ async def demo_self_modification_cycle():
 
     # Step 2: Generate diff
     print_section("Step 2: Generating Diff")
-    diff = agent.process_instruction(instruction)
+    diff = await agent.process_instruction(instruction)
     print_diff(diff)
 
     # Step 3: Surface for approval
