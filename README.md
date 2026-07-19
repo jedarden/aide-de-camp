@@ -174,8 +174,8 @@ All prompts are hot-reloaded on every invocation. Edit these files to tune behav
 |------|---------------|
 | `src/main.py` | FastAPI app; `/dispatch`, `/voice`, `/sse` endpoints |
 | `src/intent/router.py` | LLM classification and parallel thread dispatch |
-| `src/fetch/commands.py` | Fetch command matrix per intent type |
-| `src/fetch/orchestrator.py` | Parallel fetch execution |
+| `src/fetch/commands.py` | Fetch command matrix, intent types, data structures |
+| `src/fetch/orchestrator.py` | Concurrent fetch execution with streaming and coverage tracking (FetchStrand implementation) |
 | `src/synthesize/strand.py` | LLM synthesis strand |
 | `src/session/store.py` | SQLite session store (aiosqlite) |
 | `src/sse/broadcaster.py` | SSE connection registry and event routing |
