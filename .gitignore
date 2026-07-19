@@ -3,6 +3,10 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Virtualenv (local runtime, not versioned)
+.venv/
+venv/
+
 # Pytest cache
 .pytest_cache/
 

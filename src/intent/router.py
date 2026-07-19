@@ -11,8 +11,10 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 from logging import getLogger
+from pathlib import Path
 from typing import Any, Optional
 
+from ..components.hot_reload import get_reload_manager
 from ..escalate.handler import EscalateRequest, escalate_intent
 from ..escalate.llm import get_zai_client, ModelClass
 from ..session.store import get_store
@@ -57,86 +59,17 @@ class RoutedIntent:
     utterance: str
 
 
-# Router system prompt
-ROUTER_SYSTEM_PROMPT = """You are the Intent Router for aide-de-camp, a universal personal interface that routes user utterances to parallel agents across multiple projects and domains.
+# Path to the router segmentation prompt. Read from disk on each classify_utterance()
+# call so edits to prompts/router.md take effect without a server restart (hot-reload),
+# matching the pattern in src/synthesize/strand.py (SYNTHESIZE_PROMPT_PATH).
+ROUTER_PROMPT_PATH = Path("/home/coding/aide-de-camp/prompts/router.md")
 
-## Your Role
-
-Given a user utterance (stream-of-consciousness voice or text), you must:
-1. **Segment** the utterance into distinct intent threads
-2. **Classify** each thread by intent type
-3. **Route** each thread to the correct project
-4. **Assign** urgency tier
-
-## Output Format
-
-Return a JSON array of intent objects:
-
-```json
-[
-  {
-    "intent_type": "status|action|brainstorm|lookup|reminder|self-modification|monitoring-config|task-profile|clarification",
-    "project_slug": "project-id or null",
-    "urgency": "critical|high|normal|low",
-    "utterance_fragment": "the specific fragment this intent covers",
-    "confidence": 0.0-1.0,
-    "reasoning": "brief explanation of classification"
-  }
-]
-```
-
-## Intent Types
-
-- **status**: Query current state (pods, pipelines, deployments, beads)
-- **action**: Execute a command (deploy, restart, create)
-- **brainstorm**: Explore options, design, architecture discussion
-- **lookup**: Find specific information (logs, configs, docs)
-- **reminder**: Set or query reminders
-- **self-modification**: Instructions to improve the interface itself
-- **monitoring-config**: Configure ambient monitoring rules
-- **task-profile**: Durable async work items that escalate to NEEDLE beads
-- **clarification**: Low-confidence routing outcome requiring user input (meta-type, not dispatched)
-
-## Task-Profile Classification
-
-Route to **task-profile** when:
-- User explicitly requests tracking ("make me a bead for...", "track this as...")
-- Intent requires multi-step implementation work
-- Request involves creating/modifying features or infrastructure
-- Complexity exceeds single-turn synthesis
-- Action verbs: "implement", "add", "create", "fix", "investigate", "refactor"
-- Scope indicators: "feature", "bug", "optimization", "migration"
-
-Task-profile intents are escalated to NEEDLE beads for durable async handling.
-
-## Urgency Tiers
-
-- **critical**: Blocking production, security incident, immediate action required
-- **high**: Important but not blocking, user is actively waiting
-- **normal**: Routine query, no time pressure
-- **low**: Background research, nice-to-have, can be deferred
-
-## Routing Logic
-
-Use available project context to map utterances to projects:
-- Look for direct project name matches
-- Check aliases (e.g., "the pipeline" → "options-pipeline")
-- Use context from previous utterances in the session
-- If ambiguous, set confidence < 0.7 and the system will clarify
-
-## Segmentation Guidelines
-
-- Split multi-part utterances: "how's the pipeline and what about the ibkr mcp" → two intents
-- Keep related clauses together: "are the pods running and healthy" → one intent
-- Extract compound workflows: "deploy the pipeline and check if it synced" → two intents (action, then status)
-
-## Confidence Threshold
-
-- **confidence >= 0.9**: Dispatch immediately
-- **confidence 0.7-0.9**: Dispatch but flag for possible clarification
-- **confidence < 0.7**: Return intent_type "clarification" with the ambiguous fragment
-
-Return ONLY the JSON array. No explanations."""
+# Fallback used only if the prompt file cannot be read at runtime.
+_ROUTER_PROMPT_FALLBACK = (
+    "You are the Intent Router for aide-de-camp. Segment the utterance into "
+    "distinct intent threads, classify each, and return ONLY a JSON array of "
+    "intent objects."
+)
 
 
 class IntentRouter:
@@ -147,9 +80,11 @@ class IntentRouter:
     For other intents, routes to fetch + synthesize strands (TODO).
     """
 
-    def __init__(self, store=None):
+    def __init__(self, store=None, prompt_path: Optional[Path] = None):
         self.store = store
+        self.prompt_path = prompt_path or ROUTER_PROMPT_PATH
         self._zai_client = None
+        self._reload_manager = None
 
     async def _get_zai_client(self):
         """Get or create ZAI client."""
@@ -162,6 +97,45 @@ class IntentRouter:
         if self.store is None:
             self.store = get_store()
         return self.store
+
+    def _get_reload_manager(self):
+        """Get or create the hot-reload manager (lazy singleton)."""
+        if self._reload_manager is None:
+            self._reload_manager = get_reload_manager()
+        return self._reload_manager
+
+    def _load_router_prompt(self) -> str:
+        """Load the router segmentation prompt from disk (hot-reload, per call)."""
+        try:
+            return self.prompt_path.read_text()
+        except Exception as e:
+            logger.error(f"Failed to load router prompt from {self.prompt_path}: {e}")
+            return _ROUTER_PROMPT_FALLBACK
+
+    def _load_urgency_prompt(self) -> str:
+        """
+        Load the urgency classification prompt from disk via the hot-reload manager.
+
+        prompts/urgency.md is a separately hot-reloadable artifact (registered in
+        src/components/hot_reload.py). Splicing it here keeps urgency guidance
+        editable independently of the segmentation prompt. Returns "" on failure
+        so the router still functions without urgency guidance.
+        """
+        try:
+            return self._get_reload_manager().get_prompt("urgency")
+        except Exception as e:
+            logger.warning(f"Failed to load urgency prompt: {e}")
+            return ""
+
+    def _build_system_prompt(self) -> str:
+        """Build the full system prompt: segmentation prompt + urgency rules."""
+        system_prompt = self._load_router_prompt()
+        urgency_prompt = self._load_urgency_prompt()
+        if urgency_prompt:
+            system_prompt = (
+                f"{system_prompt}\n\n## Urgency Classification Rules\n\n{urgency_prompt}"
+            )
+        return system_prompt
 
     async def classify_utterance(
         self,
@@ -201,9 +175,13 @@ class IntentRouter:
 
         logger.info(f"Classifying utterance for session {session_id}")
 
+        # Build system prompt per call from prompts/router.md (+ urgency rules),
+        # so edits to either prompt take effect without a server restart.
+        system_prompt = self._build_system_prompt()
+
         try:
             response = await client.call_simple(
-                system_prompt=ROUTER_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
                 max_tokens=2048,
