@@ -1,346 +1,179 @@
-# First-Failure Tracking Mechanism Design
+# First-Failure Tracking Mechanism — Umbrella Design (adc-4vhr)
 
-## Overview
+**Status:** Design COMPLETE.
+**Authoritative source:** `notes/adc-14la-first-failure-tracking-design.md` (the synthesized
+end-to-end design). **This note is the umbrella entry point**; depth lives in adc-14la and its
+child designs. Where any earlier `adc-4vhr*` note disagrees with adc-14la, **adc-14la wins.**
 
-This document designs a robust mechanism to track and detect the **FIRST** Telegram send failure after startup in aide-de-camp (async FastAPI application).
-
-## Current Implementation Analysis
-
-The existing `TelegramFallback` class (`src/telegram/fallback.py`) has a basic first-failure mechanism:
-
-### Current State Variables
-```python
-self._has_logged_first_failure = False  # Boolean flag
-self._failure_count = 0                 # Total failures
-self._last_failure_logged = None        # Timestamp
-self._is_reachable = None               # Bridge reachability
-```
-
-### Current Behavior
-- First failure after startup → WARNING log
-- Subsequent failures → DEBUG log (rate-limited)
-- State is per-instance (singleton via `get_telegram_fallback()`)
-
-## Problems with Current Design
-
-### 1. Thread-Safety Issues ❌
-**Problem**: FastAPI handles concurrent requests asynchronously. Multiple coroutines can call `_handle_send_failure()` simultaneously, leading to race conditions:
-
-```python
-# Thread 1                    # Thread 2
-if not self._has_logged_first_failure:
-                              if not self._has_logged_first_failure:
-logger.warning(...)           
-self._has_logged_first_failure = True
-                              logger.warning(...)  # DUPLICATE WARNING!
-                              self._has_logged_first_failure = True
-```
-
-**Impact**: Multiple concurrent failures on first error → duplicate WARNING logs, defeating the purpose.
-
-### 2. State Persistence Limitations
-- State resets to `False` on every app restart
-- No persistent record of first failure timestamp
-- Cannot distinguish "first after startup" from "first ever"
-
-### 3. Testing Challenges
-- State encapsulated in instance, hard to reset in tests
-- No clean way to inject a mock state manager
-- Hard to verify first-failure behavior deterministically
-
-### 4. No Persistence Layer
-- First failure timestamp not stored anywhere
-- Cannot query "when was the first failure?"
-- Cannot build metrics/alerting on first-failure events
-
-## Proposed Design
-
-### Architecture: Asyncio-Safe State Manager with Optional Persistence
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   TelegramFallback                          │
-│  ┌───────────────────────────────────────────────────────┐ │
-│  │          FirstFailureTracker (thread-safe)            │ │
-│  │                                                        │ │
-│  │  - asyncio.Lock for atomic state transitions          │ │
-│  │  - first_failure_timestamp: datetime | None           │ │
-│  │  - total_failure_count: int                           │ │
-│  │  - last_failure_timestamp: datetime | None            │ │
-│  │                                                        │ │
-│  │  Methods:                                             │ │
-│  │  - record_failure() -> FirstFailureEvent              │ │
-│  │  - is_first_failure() -> bool                          │ │
-│  │  - reset_for_testing()                                 │ │
-│  │  - get_state() -> FailureState                        │ │
-│  └───────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │  Optional Persistence│
-                    │  (file-based SQLite)│
-                    │  - Record first      │
-                    │    failure events    │
-                    │  - Enable metrics    │
-                    └─────────────────────┘
-```
-
-### Thread-Safety Strategy
-
-**Approach 1: asyncio.Lock (Recommended)**
-```python
-class FirstFailureTracker:
-    def __init__(self):
-        self._lock = asyncio.Lock()
-        self._first_failure_logged = False
-        self._total_failures = 0
-        
-    async def record_failure(self, error_context: str) -> FailureEvent:
-        async with self._lock:
-            self._total_failures += 1
-            is_first = not self._first_failure_logged
-            
-            if is_first:
-                self._first_failure_logged = True
-                return FailureEvent(
-                    type="first_failure",
-                    timestamp=datetime.now(timezone.utc),
-                    error_context=error_context,
-                    failure_number=self._total_failures
-                )
-            else:
-                return FailureEvent(
-                    type="subsequent_failure",
-                    timestamp=datetime.now(timezone.utc),
-                    error_context=error_context,
-                    failure_number=self._total_failures
-                )
-```
-
-**Why asyncio.Lock?**
-- FastAPI runs on asyncio event loop
-- Lock ensures atomic check-and-set operations
-- Minimal overhead (only held during microsecond state transitions)
-- Compatible with async/await throughout the stack
-
-**Alternative: threading.Lock** ❌ Not recommended
-- Would work but mixes threading and asyncio models
-- Less idiomatic in async FastAPI context
-
-### State Storage Options
-
-#### Option 1: In-Memory Only (Current + Lock)
-**Pros:**
-- Simple, no dependencies
-- Fast, no I/O
-- No persistence cleanup
-
-**Cons:**
-- Lost on restart (may be acceptable)
-- No historical tracking
-- Harder to debug post-mortem
-
-#### Option 2: In-Memory + Optional Persistence File (Recommended)
-**Pros:**
-- Best of both worlds
-- Optional persistence via env var: `ADC_FIRST_FAILURE_DB=/tmp/first_failures.db`
-- Enables post-mortem analysis
-- Can build metrics over time
-
-**Cons:**
-- Slightly more complex
-- Need file cleanup strategy
-
-**Schema:**
-```sql
-CREATE TABLE first_failures (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    startup_time TEXT NOT NULL,  -- ISO timestamp of app start
-    first_failure_time TEXT NOT NULL,
-    error_context TEXT,
-    resolved INTEGER DEFAULT 0  -- Whether service recovered
-);
-```
-
-### Implementation Guidance
-
-#### Phase 1: Thread-Safe In-Memory Tracker (MVP)
-1. Create `FirstFailureTracker` class with `asyncio.Lock`
-2. Replace `_handle_send_failure()` logic with tracker
-3. Return `FailureEvent` objects instead of side-effects
-4. Update logging based on event type
-
-#### Phase 2: Optional Persistence (Enhancement)
-1. Add SQLite persistence layer (opt-in via env var)
-2. Record first failure events with startup timestamps
-3. Add API endpoint to query first-failure history
-4. Add metrics endpoint for monitoring
-
-#### Phase 3: Testing & Reset (Quality)
-1. Add `reset_for_testing()` method for test isolation
-2. Add dependency injection support
-3. Add unit tests for concurrent failure scenarios
-4. Add integration tests for real failure detection
-
-## Design Decisions
-
-### Q1: Why not use atomic operations (e.g., `compare_and_swap`)?
-**A**: Python doesn't have atomic compare-and-swap primitives for booleans. `asyncio.Lock` is the idiomatic asyncio pattern for mutual exclusion.
-
-### Q2: Why not use a global state variable?
-**A**: Global variables are not asyncio-safe. Even with a lock, global state is hard to test and reason about. Encapsulation in a tracker class is cleaner.
-
-### Q3: Why separate tracker from TelegramFallback?
-**A**: Separation of concerns. The tracker manages failure state; TelegramFallback manages Telegram communication. This makes testing easier and allows reuse of the tracker for other services.
-
-### Q4: Why optional persistence instead of required?
-**A**: Not all deployments need persistence. Local development and testing can run without it. Production can opt-in via env var.
-
-## Race Condition Examples
-
-### Scenario 1: Concurrent First Failures (Fixed by Lock)
-```
-Time    Request A              Request B              State
-──────  ─────────────────────  ─────────────────────  ─────────────────────
-t0      send_message fails     send_message fails     _first = False
-t1      check _first=False                            (both see False)
-t2      acquiring lock...     acquiring lock...      (A gets lock first)
-t3      set _first=True,       waiting for lock...    _first = True
-        log WARNING                                   
-t4      release lock           acquiring lock...     
-t5                            check _first=True      (B sees True)
-t6                            log DEBUG              
-```
-
-**Result**: Only ONE WARNING logged (correct)
-
-### Scenario 2: Mixed Timing (Fixed by Lock)
-```
-Time    Request A              Request B              State
-──────  ─────────────────────  ─────────────────────  ─────────────────────
-t0      check _first=False                            _first = False
-t1      acquiring lock...     
-t2      set _first=True,                             _first = True
-        log WARNING                                   
-t3      release lock           
-t4                            send_message fails     
-t5                            check _first=True      (B sees True)
-t6                            log DEBUG              
-```
-
-**Result**: One WARNING, one DEBUG (correct)
-
-## Testing Strategy
-
-### Unit Tests
-```python
-async def test_concurrent_first_failures():
-    """Verify only one WARNING when multiple failures happen concurrently."""
-    tracker = FirstFailureTracker()
-    
-    # Simulate 10 concurrent failures
-    tasks = [tracker.record_failure(f"error_{i}") for i in range(10)]
-    events = await asyncio.gather(*tasks)
-    
-    first_failures = [e for e in events if e.type == "first_failure"]
-    subsequent_failures = [e for e in events if e.type == "subsequent_failure"]
-    
-    assert len(first_failures) == 1, "Only one first failure should be logged"
-    assert len(subsequent_failures) == 9, "Rest should be subsequent"
-```
-
-### Integration Tests
-```python
-async def test_first_failure_logging(caplog):
-    """Verify WARNING on first failure, DEBUG on subsequent."""
-    telegram = get_telegram_fallback()
-    
-    # First failure
-    with caplog.at_level(logging.WARNING):
-        await telegram.send_message(123, "test")
-    assert "First Telegram send failure" in caplog.text
-    
-    # Second failure
-    caplog.clear()
-    with caplog.at_level(logging.DEBUG):
-        await telegram.send_message(123, "test")
-    assert "Repeated Telegram send failure" in caplog.text
-```
-
-## Performance Considerations
-
-### Lock Contention
-- **Overhead**: Microseconds per acquisition
-- **Frequency**: Only on failures (rare, hopefully)
-- **Impact**: Negligible compared to HTTP I/O (10+ second timeouts)
-
-### State Size
-- **Memory**: ~100 bytes per tracker instance
-- **Scaling**: Singleton pattern ensures only one instance
-
-## Error Handling
-
-### Tracker Failure Fallback
-If the tracker itself fails (e.g., persistence I/O error):
-1. Fall back to basic boolean flag
-2. Log tracker error at ERROR level
-3. Continue operation (degraded mode)
-
-## Migration Path
-
-### Step 1: Add Tracker Class (Non-Breaking)
-```python
-# src/telegram/first_failure_tracker.py
-class FirstFailureTracker:
-    # ... implementation ...
-```
-
-### Step 2: Wire into TelegramFallback
-```python
-class TelegramFallback:
-    def __init__(self):
-        # ... existing ...
-        self._failure_tracker = FirstFailureTracker()
-        
-    def _handle_send_failure(self, error_context: str):
-        event = await self._failure_tracker.record_failure(error_context)
-        if event.type == "first_failure":
-            logger.warning(f"First Telegram send failure: {error_context}")
-        else:
-            logger.debug(f"Repeated failure #{event.failure_number}: {error_context}")
-```
-
-### Step 3: Add Tests
-- Unit tests for tracker
-- Integration tests for TelegramFallback
-- Concurrent failure tests
-
-### Step 4: Optional Persistence
-- Add env var check
-- Implement SQLite layer
-- Add metrics endpoints
-
-## Acceptance Criteria Verification
-
-- [x] **State storage**: Defined (FirstFailureTracker class with asyncio.Lock)
-- [x] **Thread-safety**: Addressed (asyncio.Lock ensures atomic state transitions)
-- [x] **Race conditions**: Examples provided, solution prevents them
-- [x] **Implementation guidance**: Step-by-step migration path provided
-- [x] **Testing strategy**: Unit and integration test patterns defined
-- [x] **Performance**: Lock overhead analyzed (negligible)
-
-## Next Steps
-
-See bead **adc-5jl** for implementation of this design:
-1. Create `FirstFailureTracker` class
-2. Integrate into `TelegramFallback`
-3. Add comprehensive tests
-4. Implement optional persistence
+> **Why this note exists.** adc-4vhr is the umbrella bead ("Design first-failure tracking
+> mechanism"). Its children — data-structure (adc-65l3), storage (adc-2duz), thread-safety
+> (adc-50ld, authoritative), detection logic (adc-12bt) — were synthesized into one coherent
+> design by adc-14la. That synthesis satisfies this bead's acceptance criteria directly. This
+> note records that decision, verifies it against the current code, de-conflicts the older
+> superseded drafts, and hands off to the implementation bead.
 
 ---
 
-**Design Document**: adc-4vhr  
-**Status**: Design Complete  
-**Next Bead**: adc-5jl (Implementation)  
-**Date**: 2026-07-02
+## 1. The one invariant
+
+> **Exactly one first-failure notification is emitted per process startup** when the Telegram
+> bridge first fails to accept a send. Every subsequent failure within that startup is silent
+> (DEBUG + counters only).
+
+First-failure is a **per-startup** semantic — a process restart re-arms detection intentionally.
+Everything else in the design exists to make that invariant hold under concurrency, hold without
+log spam, and hold robustly rather than by accident.
+
+---
+
+## 2. Acceptance-criteria resolution
+
+| Criterion (adc-4vhr) | Resolution | Detail |
+|---|---|---|
+| Design documented in bead body | ✅ This note + authoritative synthesis adc-14la | adc-14la is the single document the implementation bead implements against |
+| State storage | ✅ **Flat instance variables on the `TelegramFallback` singleton** (`get_telegram_fallback()`); in-memory, per-process, per-startup; **no persistence layer** | adc-2duz (storage) + adc-65l3 (fields); rejected: a separate `FirstFailureTracker` class / module, and any SQLite/file persistence for v1 |
+| Initialization | ✅ All fields set in `TelegramFallback.__init__` (incl. the `asyncio.Lock`); reachability `_is_reachable` is a *separate* logical object whose other writers stay lock-free | adc-14la §4.1 |
+| Race-condition handling | ✅ `asyncio.Lock` serializes the critical section; `_record_failure_locked` is a plain `def` with **no `await`** (makes check-then-act atomic by construction); notification I/O runs **after** lock release, keyed on `was_first: bool` | adc-50ld (authoritative) + adc-12bt; adc-14la §5 |
+| Clear implementation guidance for next bead | ✅ adc-14la §8 — sequenced 7-step plan, tests, verification, anti-patterns | "What NOT to do" in §8.4 |
+
+---
+
+## 3. Design at a glance (umbrella altitude)
+
+**State model** (flat on the singleton — no wrapper class):
+
+| Field | Type | Init | Semantics |
+|---|---|---|---|
+| `_has_logged_first_failure` | `bool` | `False` | The check-then-act flag. Monotonic `False→True` within a startup; the failure that flips it is "first." |
+| `_failure_count` | `int` | `0` | Total failures since startup (unconditional `+= 1`). Diagnostic; surfaced on the status endpoint. |
+| `_first_failure_timestamp` | `datetime \| None` | `None` | **NEW**, set-once. When the first failure occurred. |
+| `_last_failure_timestamp` | `datetime \| None` | `None` | **RENAMED** from current `_last_failure_logged` (which was updated *only* on the first failure — a latent bug); now updated on *every* failure. |
+| `_first_failure_lock` | `asyncio.Lock` | `asyncio.Lock()` | Serializes the critical section. Instance-level, created in `__init__`. |
+
+**Flow:** `send_message()` failure branch → `await _handle_send_failure(ctx)` →
+`async with self._first_failure_lock:` → `_record_failure_locked(ctx)` (plain `def`, returns
+`was_first: bool`) → lock released → if `was_first`: `await _notify_first_failure(ctx)`
+(side-channel I/O, **never** `self.send_message`).
+
+**Concurrency framing (load-bearing):** CPython asyncio runs one task at a time and switches only
+at an `await` that yields. The *current* `_handle_send_failure` is synchronous and await-free, so
+it is **already atomic** with respect to every other coroutine — the duplicate-WARNING race is
+**latent, not active**. The lock is **defense-in-depth**: the moment a maintainer adds an `await`
+inside the critical section (async logging handler, a DB persist, an inline notification), the
+incidental atomicity evaporates *silently*. An explicit lock + the plain-`def` helper make
+correctness survive that change. Measured overhead: ~0.32 µs on a path that is dormant today
+(adc-4rh3).
+
+**"First" = claim-and-set, not a timestamp comparison** — which is what makes it well-defined under
+concurrency and exactly-once without deduplication. Under N near-simultaneous failures the lock
+serializes entry; coroutine 1 flips the flag and returns `was_first=True`; coroutines 2…N observe
+`True`, increment the counter, return `False`. Net: exactly one notification, `_failure_count == N`,
+one `_first_failure_timestamp`.
+
+---
+
+## 4. Code verification (performed 2026-07-19 against current tree)
+
+CLAUDE.md directs verification of any design that names files/flags before recommending it. I
+checked every code claim in adc-14la against the live source — **all accurate**:
+
+| Claim (adc-14la) | Verified |
+|---|---|
+| `TelegramFallback.__init__` at `src/telegram/fallback.py:36` | ✅ `:36` |
+| Current fields `_is_reachable`/`_last_failure_logged`/`_failure_count`/`_has_logged_first_failure` at `:42–45` | ✅ exact |
+| Three failure branches in `send_message`: non-2xx `:84`, `RequestError` `:89`, other `Exception` `:93` — all currently **sync** `self._handle_send_failure(...)` | ✅ exact; `send_message` is `async def`, so these can become `await` |
+| `_handle_send_failure` at `:198` | ✅ `:198` |
+| `_is_reachable = True` written on send success at `:80`; by health-check at `:176`/`:179` | ✅ exact |
+| `_last_failure_logged = now` set **only** on the first failure (`:219`) — confirms the latent bug | ✅ confirmed |
+| `FAILURE_LOG_COOLDOWN_SECONDS = 300` at `:34` is a **dead constant** (declared, never referenced) | ✅ `grep` across `src/` returns only the declaration — dead |
+| Singleton wired in FastAPI lifespan at `src/main.py:152`; `check_bridge_available()` at `:153` (health check, **not** the first-failure trigger) | ✅ exact |
+| Status endpoint `/api/v1/status/telegram_bridge` at `src/main.py:1469`, reads `get_bridge_status()` at `:1474` | ✅ exact (`:1469`/`:1474`) |
+| `import asyncio` not yet present; `from typing import Optional` and `from datetime import datetime` already imported | ✅ confirmed |
+| Deployment is single-worker (`uvicorn src.main:app`, no `--workers`) | ✅ per CLAUDE.md startup command |
+
+**No drift between the design and the code.** The implementation bead can apply adc-14la §4
+verbatim.
+
+---
+
+## 5. De-conflicting the earlier adc-4vhr drafts
+
+There are three **superseded** `adc-4vhr*` design notes. Do not implement against any of them —
+adc-14la is authoritative:
+
+| Note | Status | Why superseded |
+|---|---|---|
+| `notes/adc-4vhr-design.md` (early draft) | Superseded | Predates the adc-50ld/adc-12bt refinements; no reconciliation of the child-design conflicts. |
+| `notes/adc-4vhr-first-failure-tracking-design.md` (2026-07-08 synthesis) | Superseded | Explicitly named "superseded synthesis" by adc-14la §11. Proposed a dedicated `FirstFailureTracker` class returning log-level *strings* — **rejected** (adc-14la §7 #1): the singleton owns the state; a wrapper class adds indirection without encapsulation gain. |
+| This note, prior to 2026-07-19 | Replaced | The pre-2026-07-19 version of `notes/adc-4vhr.md` *also* proposed the `FirstFailureTracker`-class + optional-SQLite-persistence approach. Both elements are rejected by the authoritative child designs (adc-65l3/adc-2duz: flat instance vars, no persistence for v1). |
+
+The earlier notes are retained for the decision history (adc-14la §7 reconciliation table references
+them), but the design they propose is **not** the design.
+
+---
+
+## 6. Rejected alternatives (decision rationale, preserved)
+
+- **Separate `FirstFailureTracker` class / `src/telegram/first_failure_tracker.py`** — rejected.
+  Flat instance vars on the singleton (adc-65l3, adc-2duz). A wrapper adds indirection without
+  encapsulation gain; the singleton already owns the state.
+- **SQLite / file persistence for v1** — rejected. State is per-startup diagnostic, not a
+  per-deployment record; persistence adds cleanup + failure modes with no current requirement.
+  Recorded as the **upgrade path** (adc-14la §9): switch to a SQLite-atomic compare-and-set *if*
+  state must survive restarts, adc is scaled to `--workers N`, or a threadpool path touches the
+  state.
+- **`threading.Lock`** — rejected. Mixes threading and asyncio models; `asyncio.Lock` is the
+  idiomatic match for state that is in-memory, per-process, per-startup.
+- **Time-based re-notification cooldown** — the dead `FAILURE_LOG_COOLDOWN_SECONDS` constant is a
+  leftover from a superseded "re-notify after 5 min" idea. Implementation bead: **delete it**
+  (adc-14la §6.8) — do not leave a constant implying behavior the code does not have. Re-alerting,
+  if ever wanted, is recovery-based reset (adc-14la §6.4), not a timer.
+- **Pulling `_is_reachable`'s other writers under the lock** — rejected. One lock per logical state
+  object (adc-50ld §5.4); `_is_reachable` is written from success/health-check/failure paths, each a
+  single atomic `STORE_ATTR` with no check-then-act.
+
+---
+
+## 7. Hand-off to the implementation bead
+
+The implementation bead **does not yet exist** as a tracked bead (the prior reference to `adc-5jl`
+in this note's history was wrong — `adc-5jl` is an unrelated kubectl action bead). Its spec is
+**adc-14la §8**, condensed:
+
+1. Fields + `asyncio.Lock` in `__init__` (add `_first_failure_timestamp`; rename
+   `_last_failure_logged`→`_last_failure_timestamp`; add `_first_failure_lock`; `import asyncio`).
+2. Split the current sync `_handle_send_failure` into an `async def _handle_send_failure` (acquires
+   lock, calls helper, awaits notify if first) + a plain-`def _record_failure_locked(...) -> bool`
+   (returns `was_first`; unconditional counter increment first; set-once first timestamp).
+3. Add `async def _notify_first_failure(...)` as a documented no-op seam (channel choice is a
+   separate bead).
+4. `await` the three call sites in `send_message` (`:84`/`:89`/`:93`).
+5. Extend `get_bridge_status` with `has_logged_first_failure` / `first_failure_timestamp` /
+   `last_failure_timestamp`; confirm `src/main.py:1469` serializes.
+6. Add `reset_first_failure_state()` (test hook + future recovery/hot-reload).
+7. Delete the dead `FAILURE_LOG_COOLDOWN_SECONDS`.
+
+**Tests (adc-14la §8.2):** concurrent first-failure (exactly one WARNING, `_failure_count == N`),
+counter accuracy under 100 concurrent calls, **structural no-I/O guard**
+(`assert inspect.iscoroutinefunction(fallback._record_failure_locked) is False` — the load-bearing
+invariant), subsequent suppression, reset re-arms, read-doesn't-block.
+
+**Anti-patterns (adc-14la §8.4):** no `FirstFailureTracker` class/module; no `await` inside
+`_record_failure_locked`; `_notify_first_failure` must not call `self.send_message`; don't pull
+`_is_reachable`'s other writers under the lock; no lock timeout.
+
+---
+
+## 8. References
+
+- **Authoritative synthesis:** `notes/adc-14la-first-failure-tracking-design.md`
+- **Child designs:** adc-65l3 (data structure), adc-2duz (storage), adc-50ld (thread-safety,
+  authoritative; comprehensive spec adc-5xuy; race catalog adc-4ol5; perf adc-4rh3), adc-12bt
+  (detection logic).
+- **Current code:** `src/telegram/fallback.py` (`__init__` :36, `_handle_send_failure` :198,
+  failure branches :84/:89/:93, dead constant :34); singleton wired `src/main.py:152`; status
+  endpoint `src/main.py:1469`.
+- **Superseded drafts:** `notes/adc-4vhr-design.md`, `notes/adc-4vhr-first-failure-tracking-design.md`
+  (and the pre-2026-07-19 version of this note).
+
+**Bead:** adc-4vhr · **Status:** Design Complete · **Date:** 2026-07-19
