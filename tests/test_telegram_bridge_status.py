@@ -96,8 +96,8 @@ class TestTelegramBridgeStatus:
             assert status["reachable"] is False
             assert status["failure_count"] == 1
 
-    async def test_handle_send_failure_first_only(self, caplog):
-        """Only the first failure after startup logs a WARNING; later ones do not."""
+    async def test_handle_send_failure_first_warns_then_rate_limits(self, caplog):
+        """First failure WARNINGs; an immediate repeat is rate-limited (suppressed)."""
         fallback = TelegramFallback()
 
         # First failure → WARNING (the one-per-startup notification).
@@ -106,11 +106,11 @@ class TestTelegramBridgeStatus:
             assert mock_logger.warning.called
             assert not mock_logger.debug.called
 
-        # Subsequent failure → DEBUG, no WARNING.
+        # Immediate subsequent failure → suppressed by the rate-limit (no log).
         with patch("src.telegram.fallback.logger") as mock_logger:
             await fallback._handle_send_failure(error=ConnectionError("boom2"))
-            assert mock_logger.debug.called
             assert not mock_logger.warning.called
+            assert not mock_logger.debug.called
 
         assert fallback._failure_count == 2
         assert fallback._has_logged_first_failure is True

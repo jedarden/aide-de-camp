@@ -127,14 +127,36 @@ class TestFirstFailureTracking:
         assert "ConnectionError" in msg  # error type
         assert "connection refused" in msg  # error message
 
-    async def test_subsequent_failures_log_debug_not_warning(self, caplog):
-        """After the first failure, later failures log at DEBUG, not WARNING."""
+    async def test_repeated_failure_within_cooldown_is_suppressed(self, caplog):
+        """An immediate repeat is deduped: counted, but NOT logged (no spam)."""
         fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
 
         with caplog.at_level("WARNING"):
             await fallback._handle_send_failure(error=ConnectionError("boom"))
 
         caplog.clear()
+
+        with caplog.at_level("DEBUG"):
+            await fallback._handle_send_failure(error=ConnectionError("boom2"))
+
+        # Within the cooldown window the repeated failure is counted but silent.
+        assert caplog.records == []
+        assert fallback._failure_count == 2
+        assert fallback._failures_since_last_log == 1
+
+    async def test_repeated_failure_after_cooldown_logs_debug_summary(self, caplog):
+        """Once the cooldown elapses, a repeated failure logs a DEBUG summary."""
+        from datetime import datetime, timedelta
+
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("WARNING"):
+            await fallback._handle_send_failure(error=ConnectionError("boom"))
+
+        caplog.clear()
+
+        # Simulate the cooldown window elapsing.
+        fallback._last_repeated_log_timestamp = datetime.now() - timedelta(seconds=999)
 
         with caplog.at_level("DEBUG"):
             await fallback._handle_send_failure(error=ConnectionError("boom2"))
@@ -212,3 +234,97 @@ class TestFirstFailureTracking:
         assert len(warnings) == 1
         assert "HTTPError" in warnings[0].message  # synthesized type
         assert "status 500 - upstream down" in warnings[0].message
+
+
+class TestFailureLogRateLimiting:
+    """Test configurable rate-limiting / dedup of repeated-failure logs."""
+
+    def test_default_failure_log_interval(self, monkeypatch):
+        """Default cooldown is 300s when the env var is unset."""
+        monkeypatch.delenv("ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS", raising=False)
+        fallback = TelegramFallback()
+        assert fallback._failure_log_interval_seconds == 300.0
+
+    def test_interval_configurable_via_env(self, monkeypatch):
+        """ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS overrides the default."""
+        monkeypatch.setenv("ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS", "60")
+        fallback = TelegramFallback()
+        assert fallback._failure_log_interval_seconds == 60.0
+
+    def test_interval_invalid_env_falls_back_to_default(self, monkeypatch):
+        """A non-numeric env value falls back to the default instead of crashing."""
+        monkeypatch.setenv("ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS", "not-a-number")
+        fallback = TelegramFallback()
+        assert fallback._failure_log_interval_seconds == 300.0
+
+    def test_constructor_interval_overrides_env(self, monkeypatch):
+        """The constructor arg takes precedence over the env var."""
+        monkeypatch.setenv("ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS", "60")
+        fallback = TelegramFallback(failure_log_interval_seconds=10)
+        assert fallback._failure_log_interval_seconds == 10.0
+
+    def test_status_exposes_rate_limit_state(self):
+        """get_bridge_status surfaces the configured interval and dedup counter."""
+        fallback = TelegramFallback(failure_log_interval_seconds=42)
+        status = fallback.get_bridge_status()
+        assert status["failure_log_interval_seconds"] == 42.0
+        assert status["failures_since_last_log"] == 0
+
+    async def test_no_debug_spam_under_sustained_failures(self, caplog):
+        """A burst of failures within one cooldown window emits zero DEBUG lines."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("DEBUG"):
+            # 1st → WARNING; the next 49 are within the cooldown → suppressed.
+            for i in range(50):
+                await fallback._handle_send_failure(error=ConnectionError(f"e{i}"))
+
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        debugs = [r for r in caplog.records if r.levelname == "DEBUG"]
+        assert len(warnings) == 1
+        assert debugs == []  # rate-limited — no DEBUG spam from the burst
+        assert fallback._failure_count == 50
+        assert fallback._failures_since_last_log == 49  # all-but-first counted silently
+
+    async def test_one_debug_summary_per_cooldown_window(self, caplog):
+        """Across two elapsed cooldown windows exactly two summaries are emitted."""
+        from datetime import datetime, timedelta
+
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("DEBUG"):
+            await fallback._handle_send_failure(error=ConnectionError("first"))  # WARNING
+            for _ in range(5):
+                await fallback._handle_send_failure(error=ConnectionError("burst1"))  # suppressed
+
+            # Elapse the cooldown → next failure emits a summary, then a new window.
+            fallback._last_repeated_log_timestamp = datetime.now() - timedelta(seconds=999)
+            await fallback._handle_send_failure(error=ConnectionError("post1"))  # summary #1
+            await fallback._handle_send_failure(error=ConnectionError("post2"))  # suppressed
+
+            # Elapse again → another summary.
+            fallback._last_repeated_log_timestamp = datetime.now() - timedelta(seconds=999)
+            await fallback._handle_send_failure(error=ConnectionError("post3"))  # summary #2
+
+        debugs = [r for r in caplog.records if r.levelname == "DEBUG"]
+        assert len(debugs) == 2
+        # Summary #1 covers the 5 suppressed burst failures + its own trigger = 6.
+        assert "6 failure(s) since last log" in debugs[0].message
+        # Summary #2 covers post2 + its own trigger = 2.
+        assert "2 failure(s) since last log" in debugs[1].message
+
+    async def test_reset_clears_rate_limit_window(self, caplog):
+        """reset_first_failure_state also clears the dedup window and counter."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("DEBUG"):
+            await fallback._handle_send_failure(error=ConnectionError("first"))  # WARNING
+            for _ in range(3):
+                await fallback._handle_send_failure(error=ConnectionError("suppressed"))
+
+        assert fallback._failures_since_last_log == 3
+
+        await fallback.reset_first_failure_state()
+        assert fallback._last_repeated_log_timestamp is None
+        assert fallback._failures_since_last_log == 0
+        assert fallback._failure_count == 4  # diagnostic counter retained

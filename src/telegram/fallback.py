@@ -31,12 +31,33 @@ class TelegramFallback:
     # telegram-claude-bridge endpoint (Tailscale mesh)
     # Configurable via ADC_TELEGRAM_BRIDGE_URL env var
     DEFAULT_BRIDGE_URL = "http://telegram-claude-bridge:8000"
+    # Minimum spacing (seconds) between repeated-failure DEBUG summaries, so a
+    # sustained outage cannot spam the log. Configurable via the
+    # ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS env var.
+    DEFAULT_FAILURE_LOG_INTERVAL_SECONDS = 300.0
 
-    def __init__(self, bridge_url: str | None = None):
+    def __init__(
+        self,
+        bridge_url: str | None = None,
+        failure_log_interval_seconds: float | None = None,
+    ):
         import os
         self.bridge_url = bridge_url or os.getenv(
             "ADC_TELEGRAM_BRIDGE_URL", self.DEFAULT_BRIDGE_URL
         )
+        # Rate-limit window for repeated-failure DEBUG logs. Resolution order:
+        # constructor arg → ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS env var
+        # → DEFAULT_FAILURE_LOG_INTERVAL_SECONDS. Invalid env values fall back
+        # to the default rather than crashing the singleton on startup.
+        interval = failure_log_interval_seconds
+        if interval is None:
+            env_val = os.getenv("ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS")
+            try:
+                interval = float(env_val) if env_val else self.DEFAULT_FAILURE_LOG_INTERVAL_SECONDS
+            except (TypeError, ValueError):
+                interval = self.DEFAULT_FAILURE_LOG_INTERVAL_SECONDS
+        self._failure_log_interval_seconds: float = float(interval)
+
         # Reachability — a separate logical object; its OTHER writers (send success
         # below, and the health check) are intentionally NOT under the failure lock.
         self._is_reachable = None  # None = unknown, True = reachable, False = unreachable
@@ -47,6 +68,14 @@ class TelegramFallback:
         self._failure_count: int = 0
         self._first_failure_timestamp: Optional[datetime] = None  # set-once
         self._last_failure_timestamp: Optional[datetime] = None  # updated every failure
+
+        # Rate-limit / dedup window for repeated-failure logs. Failures that occur
+        # inside a quiet window are counted silently; when the window elapses one
+        # DEBUG summary is emitted reporting the burst size, then a new window
+        # starts. `_last_repeated_log_timestamp` is seeded by the first-failure
+        # WARNING so it is not immediately followed by a DEBUG storm.
+        self._last_repeated_log_timestamp: Optional[datetime] = None
+        self._failures_since_last_log: int = 0
 
         # Serializes the first-failure claim-and-set. The critical section
         # (_record_failure_locked) is await-free on purpose so the read-then-set
@@ -200,6 +229,8 @@ class TelegramFallback:
             - has_logged_first_failure: bool
             - first_failure_timestamp: ISO-8601 string or None
             - last_failure_timestamp: ISO-8601 string or None
+            - failure_log_interval_seconds: float (configured rate-limit window)
+            - failures_since_last_log: int (dedup counter for the current window)
         """
         return {
             "reachable": self._is_reachable,
@@ -210,6 +241,8 @@ class TelegramFallback:
             if self._first_failure_timestamp else None,
             "last_failure_timestamp": self._last_failure_timestamp.isoformat()
             if self._last_failure_timestamp else None,
+            "failure_log_interval_seconds": self._failure_log_interval_seconds,
+            "failures_since_last_log": self._failures_since_last_log,
         }
 
     async def _handle_send_failure(
@@ -234,27 +267,48 @@ class TelegramFallback:
         async with self._first_failure_lock:
             self._record_failure_locked(error=error, error_context=error_context)
 
+    def _repeated_log_cooldown_elapsed(self, now: datetime) -> bool:
+        """True if the rate-limit window has elapsed and a DEBUG summary may be logged.
+
+        Caller MUST hold ``_first_failure_lock``. Returns True immediately when no
+        repeated log has been emitted yet in this startup.
+        """
+        if self._last_repeated_log_timestamp is None:
+            return True
+        elapsed = (now - self._last_repeated_log_timestamp).total_seconds()
+        return elapsed >= self._failure_log_interval_seconds
+
     def _record_failure_locked(
         self,
         error: Exception | None = None,
         error_context: str = "",
     ) -> bool:
-        """Record a failure and claim the "first failure" slot if still available.
+        """Record a failure and emit the appropriate (rate-limited) log line.
 
         Caller MUST hold ``_first_failure_lock``. Sync on purpose — no ``await``
-        inside, so the read-then-set of ``_has_logged_first_failure`` cannot be
-        interleaved by another coroutine.
+        inside, so the read-then-set of the flags cannot be interleaved by
+        another coroutine.
+
+        Logging policy:
+        - The FIRST failure after startup emits exactly one WARNING (the
+          ``_has_logged_first_failure`` False→True claim, one per process startup).
+        - Later failures are rate-limited: at most one DEBUG summary per
+          ``_failure_log_interval_seconds`` window. Failures inside a window are
+          counted silently (deduped) so a sustained outage cannot spam the log.
+
+        ``_failure_count`` and ``_last_failure_timestamp`` are updated on every
+        call regardless of whether anything is logged.
 
         Returns:
             True iff THIS call performed the first-failure claim (the
-            ``_has_logged_first_failure`` False→True flip); False for every later
-            failure in the startup. "First" is the winner of the claim, not a
-            timestamp comparison.
+            ``_has_logged_first_failure`` False→True flip); False otherwise.
+            "First" is the winner of the claim, not a timestamp comparison.
         """
         now = datetime.now()
         self._is_reachable = False
         self._failure_count += 1
         self._last_failure_timestamp = now
+        self._failures_since_last_log += 1
 
         if error is not None:
             error_type = type(error).__name__
@@ -267,24 +321,38 @@ class TelegramFallback:
             # First failure after startup — WARNING with error type + message.
             self._has_logged_first_failure = True
             self._first_failure_timestamp = now
+            # Seed the rate-limit window so the WARNING is not immediately
+            # followed by a DEBUG storm.
+            self._last_repeated_log_timestamp = now
+            self._failures_since_last_log = 0
             logger.warning(
                 f"First Telegram send failure detected at {self.bridge_url}. "
                 f"Error type: {error_type}. Error: {message}. "
-                f"Subsequent failures will be logged at DEBUG level only."
+                f"Subsequent failures are rate-limited (one DEBUG summary per "
+                f"{self._failure_log_interval_seconds:g}s)."
             )
             return True
 
-        logger.debug(
-            f"Repeated Telegram send failure #{self._failure_count} "
-            f"at {self.bridge_url}. Error type: {error_type}. Error: {message}."
-        )
+        # Repeated failure — emit a DEBUG summary only when the rate-limit window
+        # has elapsed; otherwise count it silently to avoid log spam.
+        if self._repeated_log_cooldown_elapsed(now):
+            batch = self._failures_since_last_log  # failures accumulated since last log
+            logger.debug(
+                f"Repeated Telegram send failures: {batch} failure(s) since last "
+                f"log (total {self._failure_count}) at {self.bridge_url}. "
+                f"Latest error type: {error_type}. Error: {message}."
+            )
+            self._last_repeated_log_timestamp = now
+            self._failures_since_last_log = 0
+
         return False
 
     async def reset_first_failure_state(self) -> None:
         """Re-arm first-failure detection.
 
-        Resets the claim flag and the first-failure timestamp under the lock, so
-        the next failure is treated as "first" again. Used by tests and by future
+        Resets the claim flag, the first-failure timestamp, and the rate-limit
+        window under the lock, so the next failure is treated as "first" again
+        and starts a fresh quiet period. Used by tests and by future
         recovery-based reset hooks. The diagnostic counters
         (``_failure_count``, ``_last_failure_timestamp``) are intentionally
         retained.
@@ -292,6 +360,8 @@ class TelegramFallback:
         async with self._first_failure_lock:
             self._has_logged_first_failure = False
             self._first_failure_timestamp = None
+            self._last_repeated_log_timestamp = None
+            self._failures_since_last_log = 0
 
     def _format_result_message(self, result: dict) -> str:
         """Format a result as a Telegram message."""
