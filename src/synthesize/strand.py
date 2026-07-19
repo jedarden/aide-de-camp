@@ -16,6 +16,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Optional
 
+from ..components.hot_reload import get_reload_manager
 from ..escalate.llm import get_zai_client, ModelClass
 from ..fetch.commands import FetchResult, IntentType
 
@@ -69,12 +70,19 @@ class SynthesizeStrand:
     def __init__(self, prompt_path: Optional[Path] = None):
         self.prompt_path = prompt_path or SYNTHESIZE_PROMPT_PATH
         self._zai_client = None
+        self._reload_manager = None
 
     async def _get_zai_client(self):
         """Get or create ZAI client."""
         if self._zai_client is None:
             self._zai_client = get_zai_client()
         return self._zai_client
+
+    def _get_reload_manager(self):
+        """Get or create the hot-reload manager (lazy singleton)."""
+        if self._reload_manager is None:
+            self._reload_manager = get_reload_manager()
+        return self._reload_manager
 
     def _load_prompt(self) -> str:
         """Load synthesize prompt from disk (hot-reload)."""
@@ -83,6 +91,20 @@ class SynthesizeStrand:
         except Exception as e:
             logger.error(f"Failed to load synthesize prompt: {e}")
             return "You are a helpful assistant that synthesizes data into structured results."
+
+    def _load_urgency_prompt(self) -> str:
+        """
+        Load urgency classification rules from prompts/urgency.md (hot-reload).
+
+        urgency.md is a separately hot-reloadable artifact registered in
+        src/components/hot_reload.py. Returns "" on failure so synthesis still
+        functions without urgency guidance.
+        """
+        try:
+            return self._get_reload_manager().get_prompt("urgency")
+        except Exception as e:
+            logger.warning(f"Failed to load urgency prompt: {e}")
+            return ""
 
     async def synthesize(self, request: SynthesizeRequest) -> SynthesizeResult:
         """
@@ -97,6 +119,13 @@ class SynthesizeStrand:
         client = await self._get_zai_client()
         prompt = self._load_prompt()
 
+        # Splice urgency.md rules into the system prompt (hot-reloadable).
+        urgency_prompt = self._load_urgency_prompt()
+        if urgency_prompt:
+            system_prompt = f"{prompt}\n\n## Urgency Classification Rules\n\n{urgency_prompt}"
+        else:
+            system_prompt = prompt
+
         # Build user message with intent spec and fetched context
         user_message = self._build_user_message(request)
 
@@ -104,7 +133,7 @@ class SynthesizeStrand:
 
         try:
             response = await client.call_simple(
-                system_prompt=prompt,
+                system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
                 max_tokens=4096,
