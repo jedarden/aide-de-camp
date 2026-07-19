@@ -1,498 +1,321 @@
 # Thread-Safety Approach for Async FastAPI First-Failure State
 
-## Overview
+**Bead:** adc-50ld — "Design thread-safety approach for async FastAPI"
+**Child of:** adc-4vhr (Design first-failure tracking mechanism)
+**Depends on:** adc-2duz (state storage — closed), adc-5xuy (comprehensive design doc — closed)
+**Status:** Authoritative parent-bead deliverable. Supersedes the prior version of this file
+(dated 2026-07-08), which reached the right conclusion for the wrong reason and carried
+performance figures overstated by ~3,000–4,000×. **Where this document disagrees with the
+prior version, this document is authoritative.**
+**Date:** 2026-07-19
 
-This document designs the thread-safety approach for safely reading/writing first-failure state across concurrent requests in the async FastAPI application. It identifies race conditions, evaluates locking mechanisms, and documents performance implications.
+> The full implementation-level specification lives in
+> `notes/adc-5xuy-thread-safety-design.md` (the comprehensive synthesis). This file is the
+> concise parent-bead answer to the three acceptance criteria: *(1) thread-safety approach
+> documented, (2) specific race conditions identified, (3) locking strategy explained or
+> justified as unnecessary.*
 
-## Current Implementation Analysis
+---
 
-### Existing Code (NOT Thread-Safe)
+## 1. One-sentence design
+
+> A single instance-level `asyncio.Lock` on the `TelegramFallback` singleton guards a
+> minimal, **`await`-free** critical section over the first-failure record — because that
+> state is in-memory, per-process, and per-startup. **The lock is defense-in-depth, not a
+> fix for an active bug:** the current synchronous handler is already race-free on a single
+> event loop.
+
+---
+
+## 2. What we are protecting
+
+`TelegramFallback` is a process-wide singleton (`get_telegram_fallback()`, first instantiated
+during the FastAPI `lifespan` at `src/main.py:152`). It upholds one operational invariant:
+
+> **Exactly one WARNING is logged per process startup** when the bridge first fails; all
+> subsequent failures log at DEBUG.
+
+The **first-failure record** is four instance attributes (per the data-structure bead
+adc-65l3 and the storage decision adc-2duz — in-memory, per-startup, **no** persistence):
 
 ```python
-# src/telegram/fallback.py (current)
-def __init__(self, bridge_url: str | None = None):
-    self._has_logged_first_failure = False  # ❌ No lock protection
-    self._failure_count = 0
+self._has_logged_first_failure: bool            # the check-then-act flag
+self._failure_count: int                         # read-modify-write counter
+self._last_failure_logged: datetime | None       # updated every failure
+self._first_failure_timestamp: datetime | None   # set-once (to be added — adc-65l3)
+```
 
-def _handle_send_failure(self, error_context: str = ""):
-    # ❌ Synchronous function - not async
-    # ❌ No lock protection on check-and-set
+All four are mutated in exactly one place today: `_handle_send_failure`
+(`src/telegram/fallback.py:198`), reachable only through the async `send_message`
+(`fallback.py:84,89,93`). A fifth attribute, `_is_reachable`, is shared mutable state but is
+**deliberately out of scope** for this lock (§5).
+
+---
+
+## 3. The decisive nuance — why the current code is *already* safe (and why we lock anyway)
+
+This is the single most important point in the design, and it refines what the prior version
+of this file (and the race catalog in adc-4ol5) imply.
+
+**Fact about CPython asyncio:** the event loop runs one task at a time and can only switch
+tasks at a suspension point — an `await` that actually yields. Between suspension points, a
+coroutine runs without interruption, including any *synchronous* function it calls. A
+synchronous function with **no `await` inside** is therefore atomic with respect to every
+other coroutine on the loop.
+
+The current `_handle_send_failure` is exactly that:
+
+```python
+def _handle_send_failure(self, error_context: str = ""):   # sync, no `await`
+    self._is_reachable = False
+    self._failure_count += 1
+    now = datetime.now()
     if not self._has_logged_first_failure:
-        logger.warning("First failure...")
-        self._has_logged_first_failure = True  # ❌ Race condition here
+        logger.warning(...)            # stdlib logging — blocking I/O, but does NOT yield
+        self._has_logged_first_failure = True
+        self._last_failure_logged = now
+    else:
+        logger.debug(...)
 ```
 
-### Race Conditions Identified
+There is **no suspension point** anywhere in this body. `datetime.now()` and stdlib
+`logger.*` are synchronous and do not return control to the event loop. So two overlapping
+`send_message` coroutines **cannot interleave** inside `_handle_send_failure` — the
+T0/T1/T2/T3 "both read False, both warn" interleaving described in the race catalog cannot
+fire as the code stands.
 
-#### Race Condition 1: Concurrent First Failures
+**Therefore: the race described by the prior docs is *latent*, not *active*.** The invariant
+"one WARNING per startup" currently holds because of *incidental* no-await atomicity, not
+because of any explicit protection.
 
-**Scenario**: Multiple requests fail simultaneously at application startup
+**Why we add a lock anyway:**
 
-```
-Time  T0: Request A fails → checks _has_logged_first_failure (False)
-Time  T1: Request B fails → checks _has_logged_first_failure (False)
-Time  T2: Request A sets flag to True, logs WARNING
-Time  T3: Request B sets flag to True, logs WARNING  ❌ DUPLICATE WARNING
-```
+| Role of the lock | What it buys |
+|---|---|
+| **Defense-in-depth against future `await`s** | The moment a maintainer adds an `await` inside the critical section (async logging handler, a DB persist, an inline notification call), the incidental atomicity evaporates *silently* and the latent race goes live. An explicit lock makes correctness survive that change. |
+| **Explicit, self-documenting contract** | "No `await` in here" is an invisible convention. `async with self._first_failure_lock:` makes the critical section's boundaries visible to every reader and reviewer. |
+| **Negligible cost** | Measured ~0.32 µs of isolated overhead (adc-4rh3), on a path that is **dormant today** (see §6). There is no performance reason *not* to take the insurance. |
 
-**Impact**: 
-- Multiple WARNING logs for the same "first" failure
-- Violates the requirement of exactly one WARNING per startup
-- Log spam when bridge is down
-
-#### Race Condition 2: Read-Write Race on failure_count
-
-**Scenario**: Multiple concurrent failures increment the counter
-
-```
-Time  T0: failure_count = 0
-Time  T1: Request A reads failure_count (0)
-Time  T2: Request B reads failure_count (0)
-Time  T3: Request A increments: failure_count = 1
-Time  T4: Request B increments: failure_count = 1  ❌ Lost update (should be 2)
-```
-
-**Impact**:
-- Inaccurate failure count
-- Misleading diagnostics
-- Wrong metrics for monitoring
-
-#### Race Condition 3: Check-Then-Act on Timestamps
-
-**Scenario**: Multiple failures update timestamps concurrently
-
-```
-Time  T0: Request A checks first_failure_timestamp (None)
-Time  T1: Request B checks first_failure_timestamp (None)
-Time  T2: Request A sets first_failure_timestamp = now
-Time  T3: Request B sets first_failure_timestamp = now  ❌ Overwrite
-```
-
-**Impact**:
-- Lost first-failure timestamp accuracy
-- Difficult to correlate with logs
-- Misleading diagnostics
-
-## Locking Mechanisms Evaluation
-
-### Option 1: asyncio.Lock (RECOMMENDED)
-
-**Approach**:
-```python
-import asyncio
-
-class TelegramFallback:
-    def __init__(self):
-        self._has_logged_first_failure = False
-        self._failure_count = 0
-        self._first_failure_lock = asyncio.Lock()  # ✅ Async-native lock
-
-    async def _handle_send_failure(self, error_context: str = ""):
-        async with self._first_failure_lock:  # ✅ Serialize critical section
-            if not self._has_logged_first_failure:
-                logger.warning("First failure...")
-                self._has_logged_first_failure = True
-                self._first_failure_timestamp = datetime.now()
-                self._failure_count = 1
-            else:
-                logger.debug("Repeated failure...")
-                self._failure_count += 1
-            self._last_failure_timestamp = datetime.now()
-```
-
-**Pros**:
-- ✅ Designed for async/await contexts
-- ✅ Non-blocking when lock is free
-- ✅ Minimal overhead (fast acquisition)
-- ✅ Serializes the critical section (check + set)
-- ✅ Native to FastAPI's async model
-- ✅ Works with `async with` for clean syntax
-
-**Cons**:
-- Lock only works within the same event loop (not an issue for single-process FastAPI)
-- Requires all call sites to `await` (good - enforces async discipline)
-
-**Verdict**: ✅ **RECOMMENDED** - Perfect fit for async FastAPI
+> **The honest answer to "is a lock needed?":** Strictly, no — the synchronous, await-less
+> handler is already atomic on this single-worker, single-loop deployment. We add the lock so
+> that correctness does not depend on a future maintainer knowing that, and so that the
+> notification I/O the design wants to add can be wired in safely.
 
 ---
 
-### Option 2: threading.Lock (NOT RECOMMENDED)
+## 4. Race conditions identified
 
-**Approach**:
-```python
-import threading
+Six races arise when concurrent coroutines enter the failure handler. Cataloged in full in
+`notes/adc-4ol5-race-conditions.md`; the decisive ones:
 
-class TelegramFallback:
-    def __init__(self):
-        self._has_logged_first_failure = False
-        self._lock = threading.Lock()  # ❌ Wrong for async
+| # | Race | Pattern | Severity | Status today |
+|---|---|---|---|---|
+| 1 | **Duplicate first-failure WARNINGs** | check-then-act on `_has_logged_first_failure` | **High** — breaks the core invariant | Latent (no `await` to interleave) → **goes live the moment an `await` enters the section** |
+| 2 | **Lost counter updates** | read-modify-write `_failure_count += 1` (LOAD/ADD/STORE) | Medium | Latent for the same reason |
+| 3 | **First-failure timestamp overwrite** | set-once via the racy flag check | Low | Latent |
+| 4 | **Last-failure timestamp lost update** | non-deterministic write ordering | Low | Latent |
+| 5 | **Read-during-write on status check** | `get_bridge_status` reads mid-mutation | Low | Tolerated (stale-but-consistent is fine for monitoring) |
+| 6 | **Reachability toggle** | concurrent success (`_is_reachable = True`) vs failure (`= False`) | Medium | Accepted as benign (single-bytecode writes, last-write-wins) — see §5 |
 
-    def _handle_send_failure(self, error_context: str = ""):
-        with self._lock:  # ❌ Blocking - defeats async benefits
-            if not self._has_logged_first_failure:
-                logger.warning("First failure...")
-                self._has_logged_first_failure = True
-```
+**The dividing line is the *shape* of the operation, not the field:**
 
-**Pros**:
-- Thread-safe across OS threads
-- Familiar API
+| Shape | Example | Atomic on a single loop? |
+|---|---|---|
+| Single assignment of an immutable | `_has_logged_first_failure = True` | ✅ atomic (one bytecode, and GIL-protected) |
+| Read of a single field | `_failure_count` in `get_bridge_status` | ✅ atomic |
+| **Check-then-act** | `if not flag: flag = True` | ⚠️ atomic *only while there's no `await` between check and act* |
+| **Read-modify-write** | `_failure_count += 1` | ⚠️ atomic *only while there's no `await` between read and write* |
+| Multi-field consistent snapshot | status dict assembled field-by-field | ⚠️ same caveat |
 
-**Cons**:
-- ❌ **Blocking**: Lock acquisition blocks the event loop
-- ❌ **Wrong model**: FastAPI runs on one thread with cooperative multitasking
-- ❌ **Performance risk**: Blocking call stalls all requests on that worker
-- ❌ **Unnecessary**: asyncio.Lock is designed for this exact pattern
-
-**Verdict**: ❌ **REJECTED** - Blocking in async context is anti-pattern
+The GIL makes single bytecodes atomic; it does **not** make compound sequences atomic, and
+asyncio does not make them atomic either — it merely happens not to interrupt them absent a
+suspension point. That caveat is precisely what the lock removes.
 
 ---
 
-### Option 3: Module-Level Lock with Singleton (NOT RECOMMENDED)
+## 5. Locking strategy
 
-**Approach**:
+### 5.1 Decision
+
+> **One instance-level `asyncio.Lock` per `TelegramFallback`, created in `__init__`, scoped to
+> the first-failure record fields only.**
+
+- **All mutations** of the record go through `async with self._first_failure_lock:`.
+- **Reads** (`get_bridge_status`) take **no** lock — single-field atomic reads; monitoring
+  tolerates staleness (Race 5).
+- The critical section contains **no `await`/I/O** — implemented as a pre-locked **plain `def`
+  helper** so I/O is structurally impossible inside it.
+
+### 5.2 Why `asyncio.Lock` and not the alternatives
+
+The right mechanism is dictated by **where the state lives and which concurrency layer touches
+it.** For this state only the event-loop layer exists (single worker, all-async access paths,
+in-memory per-startup — verified against CLAUDE.md and `src/`):
+
+| Mechanism | Verdict | Why |
+|---|---|---|
+| **`asyncio.Lock` (instance)** | ✅ **Chosen** | Native to async, non-blocking, sub-µs uncontended, groups the multi-field record into one consistent section. |
+| `threading.Lock` | ❌ wrong layer | Blocking acquire stalls the loop; can't be held across `await`. No threaded path touches this state. |
+| Module-level / `app.state` lock | ⚠️ unnecessary | State is owned by the singleton instance; an instance lock is better encapsulated. |
+| Queue-based serialization | ❌ overkill | A background task + queue lifecycle for one boolean flag. |
+
+### 5.3 Correction: "atomic operations are NOT POSSIBLE" is false
+
+The prior version of this file (Option 4) declared atomic operations impossible in Python and
+concluded `asyncio.Lock` is the *only* viable mechanism. That reasoning is **wrong**, and the
+correction matters for future maintainers:
+
+- **GIL-level atomics** exist for single-bytecode operations (§4 table).
+- **SQLite transactions are atomic** — strictly *stronger* than an in-memory lock for
+  persisted state (survive restarts, span workers). `src/session/store.py` already runs
+  `PRAGMA journal_mode=WAL`, and `aiosqlite` is already a dependency.
+- **File-level atomics** (`os.replace` temp-then-rename) exist for on-disk state.
+
+The right mental model is **pick the mechanism that matches where the state lives**, not
+"always reach for `asyncio.Lock`." For the first-failure record the *conclusion* (use
+`asyncio.Lock`) is correct — but the *reason* is "because this state is in-memory,
+per-process, per-startup," **not** "because atomics are impossible." Recording the right reason
+prevents a future maintainer from mis-generalizing and blocking a better design elsewhere
+(e.g. a genuine `find_or_create_topic` TOCTOU, which should be fixed with a unique index +
+`INSERT … ON CONFLICT DO NOTHING … RETURNING`, not a lock).
+
+### 5.4 `_is_reachable` is explicitly out of scope
+
+`_is_reachable` is written from *different* paths (success at `:80`, health-check at `:176,179`,
+failure at `:207`). **Do not pull it under the first-failure lock:** every write is a single
+atomic `STORE_ATTR` with no check-then-act, it has a different lifecycle, and coupling it to a
+failure-path lock would force the success/health-check paths to acquire a failure lock for no
+reason. Rule of thumb: **one lock per logical state object.**
+
+### 5.5 The structural rules (the parts a reviewer must enforce)
+
+1. **One `asyncio.Lock`** per instance, created in `__init__` (safe — singleton built on the
+   serving loop, constructor does not `await`).
+2. **No `await` inside the critical section.** Enforce by putting the body in a plain `def`
+   helper (`_record_failure_locked`) — a `def` mechanically cannot `await`.
+3. **I/O runs after release**, keyed on a `was_first: bool` captured inside the section.
+4. **Never nest two `async with self._first_failure_lock:`** — `asyncio.Lock` is non-reentrant;
+   re-entry deadlocks. There is no async `RLock`; the pre-locked helper is the fix.
+5. **No lock timeout** — the section is await-free, so a holder can only be preempted between
+   bytecodes for microseconds; a timeout would add a failure mode with no good recovery.
+6. **`get_bridge_status` and all `_is_reachable` writes stay lock-free.**
+
+Sketch (full version + diff in `adc-5xuy-thread-safety-design.md` §5–§6):
+
 ```python
-# Module-level lock
-_first_failure_lock = asyncio.Lock()
+async def _handle_send_failure(self, error_context: str = "") -> None:
+    was_first = False
+    async with self._first_failure_lock:
+        was_first = self._record_failure_locked(error_context)  # plain def; no await
+    if was_first:
+        await self._notify_first_failure(error_context)         # I/O outside the lock
 
-async def _handle_send_failure(fallback_instance, error_context: str = ""):
-    async with _first_failure_lock:
-        if not fallback_instance._has_logged_first_failure:
-            # ...
+def _record_failure_locked(self, error_context: str) -> bool:
+    """Caller MUST hold _first_failure_lock. Sync on purpose — no await."""
+    ...
 ```
-
-**Pros**:
-- Lock shared globally
-
-**Cons**:
-- ❌ **Unclear ownership**: Lock is separate from the state it protects
-- ❌ **Harder to test**: Global state requires manual reset
-- ❌ **Less encapsulated**: State and lock are in different places
-- ❌ **No benefit**: Instance-level lock is sufficient (singleton pattern)
-
-**Verdict**: ❌ **REJECTED** - Unnecessary complexity
 
 ---
 
-### Option 4: Atomic Operations (NOT POSSIBLE)
+## 6. Performance (corrected)
 
-**Approach**: Use atomic compare-and-swap (CAS) operations
+Measured on CPython 3.12 on this box (full benchmark + listing in adc-4rh3; logging raised to
+CRITICAL to isolate lock cost from handler I/O):
 
-**Problem**: 
-- Python has no built-in atomic operations for objects
-- `asyncio` doesn't provide atomic primitives for custom state
-- Would require external libraries (e.g., `threading.atomic` - not async-aware)
+| Operation | Measured cost |
+|---|---|
+| Uncontended `async with lock:` (empty body) | **~0.47 µs** |
+| Lock-free status read | **~0.09 µs** |
+| Isolated lock overhead (realistic section, with − without) | **~0.32 µs** |
+| 100 fully-serialized failures | **~60–90 µs total** (count exactly correct; flat to 128 contenders) |
 
-**Verdict**: ❌ **NOT VIABLE** - No async-safe atomic operations in Python
+> **Correction to the prior version of this file.** It carried "~1–2 ms per failure",
+> "2–5 ms per request", and "100 concurrent failures = 200 ms total" figures. Measurement
+> shows the lock itself costs ~0.32 µs and 100 serialized failures complete in **~60–90 µs**.
+> The prior figures are **overstated by ~3,000–4,000×** — they conflated lock acquisition cost
+> (sub-µs) with logging-I/O latency (ms, only if a handler does I/O). **Do not propagate them.**
 
----
+The decisive argument is grounded in the code, not the microbenchmark: the protected path is
+**dormant today.** `_handle_send_failure` is reachable only via `send_message`, and
+`send_message`/`send_result` have **no live callers** outside `fallback.py` (verified across
+`src/` — `send_exception` and `send_workload_summary` are no-op stubs). The only live touchers
+of the singleton are the lifespan health-check (writes `_is_reachable`, not the record) and the
+read-only status endpoint. **You cannot contend a lock on a code path that isn't called.**
 
-### Option 5: Queue-Based Serialization (OVERKILL)
-
-**Approach**: Push all failures to a queue, process sequentially
-
-```python
-class TelegramFallback:
-    def __init__(self):
-        self._failure_queue = asyncio.Queue()
-        self._processor_task = None
-
-    async def _process_failures(self):
-        while True:
-            failure = await self._failure_queue.get()
-            # Process sequentially...
-```
-
-**Pros**:
-- Guaranteed serialization
-- Decouples failure handling from request path
-
-**Cons**:
-- ❌ **Overkill**: Full queue for a single boolean flag
-- ❌ **Complex**: Requires background task lifecycle management
-- ❌ **Latency**: Queue adds indirection overhead
-- ❌ **Backpressure**: Could fill up if bridge is down for long time
-
-**Verdict**: ❌ **REJECTED** - Wrong tool for the job
+The one real performance risk is **I/O inside the critical section** (e.g. calling a 10 s-timeout
+notification `await` inside the lock → every concurrent failing request serializes behind one
+10 s timeout). That is structurally prevented by the plain-`def` helper (§5.5 rule 2).
 
 ---
 
-## Recommended Design: asyncio.Lock with Instance State
+## 7. Edge cases (summary)
 
-### Architecture
+| Case | Resolution |
+|---|---|
+| Lock timeout | None added (§5.5 rule 5). If ever added, on-timeout behavior must be "log + skip the update," never a partial write. |
+| Deadlock / self-reentrancy | Prevented: single lock + pre-locked `def` helper; review rule "never nest two `async with` on the same lock." |
+| Cancellation while waiting / holding | `async with` releases on `CancelledError`; body never runs or runs atomically; lock never leaked. |
+| Cancellation during post-lock notification | Only the (best-effort) alert is lost; the record was already written, so the one-WARNING guarantee holds. |
+| Exception inside the section | `async with` releases the lock; read the decision first, write last so an exception is most likely before any field is touched. |
+| Reset vs. in-flight failure | Both `reset_first_failure_state` and `_handle_send_failure` take the same lock → they serialize cleanly; no contradictory state. |
+| Lazy-singleton init | `get_telegram_fallback()` is safe because `__init__` does not `await` — no yield between the `is None` check and the assignment. Would need to move into `lifespan` if `__init` ever awaits. |
+| Multi-worker / restart | In-memory lock does not coordinate across workers or after restart. Acceptable: deployment is single-worker, and the semantic is "one WARNING **per startup**." If it becomes "one per **deployment**," escalate to the SQLite-atomic CAS (§8). |
 
-```
-┌──────────────────────────────────────────────────────────┐
-│              TelegramFallback (Singleton)                │
-├──────────────────────────────────────────────────────────┤
-│                                                           │
-│  Instance Variables (protected by _first_failure_lock)  │
-│  ┌───────────────────────────────────────────────────┐   │
-│  │ _has_logged_first_failure: bool = False          │   │
-│  │ _failure_count: int = 0                          │   │
-│  │ _first_failure_timestamp: Optional[datetime]      │   │
-│  │ _last_failure_timestamp: Optional[datetime]       │   │
-│  │ _first_failure_lock: asyncio.Lock                │   │
-│  └───────────────────────────────────────────────────┘   │
-│                                                           │
-│  Methods                                                  │
-│  ├─► async _handle_send_failure()  [under lock]          │
-│  └─► def get_bridge_status()        [no lock needed]     │
-│                                                           │
-└──────────────────────────────────────────────────────────┘
+---
 
-Singleton Access: get_telegram_fallback() returns the same instance
-```
+## 8. Upgrade path (when atomics become the right answer)
 
-### Thread-Safe Implementation Pattern
+Switch the record to the SQLite-atomic pattern (`UPDATE … SET claimed=1, first_failure_at=? WHERE
+id=1 AND claimed=0` + `cur.rowcount == 1` as the compare-and-set; `aiosqlite` already a dep, no
+new deps) **if any of these becomes true:**
 
-#### Critical Section (Write Access)
+- State must survive restarts (one first-failure per deployment, not per startup).
+- adc is scaled to `uvicorn --workers N`.
+- A `def` route or threadpool path starts touching this state.
 
-```python
-async def _handle_send_failure(self, error_context: str = ""):
-    """
-    Handle a send failure with thread-safe first-failure detection.
-    
-    All state mutations occur under lock protection to prevent
-    race conditions from concurrent async requests.
-    """
-    async with self._first_failure_lock:  # 🔒 Serialize access
-        if not self._has_logged_first_failure:
-            # First failure - log at WARNING level
-            logger.warning(
-                f"First Telegram send failure detected at {self.bridge_url}. "
-                f"Error: {error_context if error_context else 'unknown error'}. "
-                f"Subsequent failures will be logged at DEBUG level only."
-            )
-            self._has_logged_first_failure = True  # ✅ Set under lock
-            self._first_failure_timestamp = datetime.now()
-            self._failure_count = 1
-        else:
-            # Subsequent failure - log at DEBUG level
-            logger.debug(
-                f"Repeated Telegram send failure #{self._failure_count + 1} "
-                f"at {self.bridge_url}. "
-                f"Error: {error_context if error_context else 'unknown error'}."
-            )
-            self._failure_count += 1  # ✅ Increment under lock
-        self._last_failure_timestamp = datetime.now()  # ✅ Update under lock
-```
+This is a **correctness/durability** escalation (a SQL round-trip is ~0.1–1 ms vs ~0.32 µs for the
+lock), not a performance one. Recorded so it need not be re-derived.
 
-#### Non-Critical Section (Read Access)
+---
 
-```python
-def get_bridge_status(self) -> dict:
-    """
-    Get the current bridge status.
-    
-    Read operations do NOT require the lock as they:
-    - Read immutable values (bool, int)
-    - Don't require cross-field consistency
-    - Are used for status/reporting, not decision-making
-    """
-    return {
-        "reachable": self._is_reachable,
-        "bridge_url": self.bridge_url,
-        "failure_count": self._failure_count,  # ✅ Safe to read (no lock)
-        "has_logged_first_failure": self._has_logged_first_failure,  # ✅ Safe
-        "first_failure_timestamp": self._first_failure_timestamp.isoformat() 
-            if self._first_failure_timestamp else None,
-        "last_failure_timestamp": self._last_failure_timestamp.isoformat() 
-            if self._last_failure_timestamp else None,
-    }
-```
+## 9. Verification pointers
 
-### Lock Acquisition Flow (Concurrent Failures)
+Tests to add alongside the implementation (details in adc-5xuy §10 / adc-4rh3 §11):
 
-```
-Request A fails          Request B fails          Request C fails
-     │                        │                        │
-     ▼                        ▼                        ▼
- Acquire lock? YES      Acquire lock? NO       Acquire lock? NO
- (wait for lock)        (queued)               (queued)
-     │                        │                        │
-     ▼                        │                        │
- Check flag=False          │                        │
- Log WARNING               │                        │
- Set flag=True             │                        │
- Update timestamps         │                        │
- Release lock              │                        │
-     │                        ▼                        │
-     │                   Acquire lock? YES            │
-     │                   (wait for lock)              │
-     │                        │                        │
-     │                        ▼                        │
-     │                   Check flag=True              │
-     │                   Log DEBUG                   │
-     │                   Increment count              │
-     │                   Update timestamp             │
-     │                   Release lock                 │
-     │                        │                        ▼
-     └────────────────────────┴─────────────────── Acquire lock? YES
-                                                          (wait for lock)
-                                                               │
-                                                               ▼
-                                                          Check flag=True
-                                                          Log DEBUG
-                                                          Increment count
-                                                          Update timestamp
-                                                          Release lock
+- **Concurrent first-failure:** `asyncio.gather` of N `_handle_send_failure` → exactly one
+  WARNING, `failure_count == N`, single `_first_failure_timestamp`.
+- **Counter accuracy:** 100 concurrent calls → `failure_count == 100`.
+- **Structural no-I/O guard:** `assert inspect.iscoroutinefunction(fallback._record_failure_locked)
+  is False` — the load-bearing invariant.
+- **Reset-vs-failure** and **read-doesn't-block** tests.
 
-Result: 1 WARNING, 2 DEBUG logs ✅ Correct
-```
+---
 
-## Performance Implications
+## 10. Corrections logged vs. the prior version of this file
 
-### Lock Contention Analysis
+| Prior claim (2026-07-08) | Status | Why |
+|---|---|---|
+| "Atomic operations NOT POSSIBLE" (Option 4) | **Wrong** | GIL atomics, SQLite txns, and `os.replace` all exist. Use `asyncio.Lock` because the state is in-memory per-startup, not because atomics are impossible. |
+| "~2–5 ms per request", "100 failures = 200 ms" | **Overstated ~3,000–4,000×** | Measured ~0.32 µs lock overhead; 100 failures ≈ 60–90 µs. Conflated lock cost with logging-I/O latency. |
+| Current code "breaks the moment two requests fail in overlapping coroutines" | **Imprecise** | Overlapping coroutines do **not** interleave inside a synchronous, await-less function on a single event loop. The race is **latent**, held off by incidental no-await atomicity. The lock makes the property robust rather than incidental. |
+| `asyncio.Lock` recommended (Option 1) | **Correct** | Conclusion stands; reasoning refined. |
+| Race catalog (duplicate WARNING, lost counter, timestamp overwrite) | **Correct** | Unchanged; reframed as latent. |
 
-#### Scenario 1: Bridge Healthy (No Failures)
-**Lock usage**: None (no failures, no lock acquisition)
-**Performance impact**: Zero ✅
+---
 
-#### Scenario 2: First Failure at Startup
-**Lock usage**: Single acquisition for ~1-2ms (logging + state updates)
-**Performance impact**: Negligible ✅
-- Only one WARNING log ever
-- Lock is held for microseconds
-- No contention (first failure is rare)
+## References
 
-#### Scenario 3: Multiple Concurrent Failures (Bridge Down)
-**Lock usage**: Each failing request acquires lock sequentially
-**Performance impact**: Minimal ✅
-- Lock acquisition is fast (~0.1ms when free)
-- Contention only occurs when bridge is down (already degraded state)
-- Each request waits 1-2ms max for lock
-- Total latency increase: 2-5ms per request (acceptable)
-
-#### Scenario 4: High Traffic with Bridge Down
-**Lock usage**: Many requests queuing for lock
-**Performance impact**: Bounded ✅
-- Worst case: N requests queue, each takes 2ms under lock
-- Total queue wait time: N × 2ms
-- Example: 100 concurrent failures = 200ms total wait = 2ms average per request
-- **Why this is acceptable**:
-  - Bridge is already down (latency doesn't matter for failed sends)
-  - Sends are already failing (no "happy path" to optimize)
-  - Logging overhead dominates (2ms lock is <10% of total)
-
-### Performance Measurements (Estimated)
-
-| Operation | Time (without lock) | Time (with lock) | Overhead |
-|-----------|-------------------|-----------------|----------|
-| Successful send | ~50ms | ~50ms | 0% (no lock used) |
-| First failure | ~10ms (logging) | ~12ms | +20% (2ms lock) |
-| Subsequent failure | ~5ms (DEBUG log) | ~7ms | +40% (2ms lock) |
-| Status check | <1ms | <1ms | 0% (no lock) |
-
-**Conclusion**: Lock overhead is negligible (<5ms) and only affects the error path (already slow).
-
-### Alternatives Considered for Performance
-
-#### Option: Lock-Free with Compare-And-Swap
-**Rejected**: No async-safe CAS operations in Python
-
-#### Option: Per-Request State
-**Rejected**: Would violate "one WARNING per startup" requirement
-
-#### Option: Queue-Based Delegation
-**Rejected**: Overkill for simple boolean flag
-
-## Implementation Checklist
-
-For the implementation bead (adc-44u or similar):
-
-- [ ] Add `import asyncio` to `src/telegram/fallback.py`
-- [ ] Add `self._first_failure_lock = asyncio.Lock()` to `__init__()`
-- [ ] Make `_handle_send_failure()` async (add `async`)
-- [ ] Wrap all state mutations in `async with self._first_failure_lock:`
-- [ ] Update all call sites to `await self._handle_send_failure(...)`
-- [ ] Add tests for concurrent failures using `asyncio.gather()`
-- [ ] Add test for race condition prevention
-- [ ] Verify only one WARNING is logged for N concurrent failures
-
-## Testing Strategy
-
-### Test 1: Concurrent First Failures
-```python
-async def test_concurrent_first_failures():
-    """Verify only one WARNING is logged when multiple requests fail concurrently."""
-    fallback = TelegramFallback()
-    
-    # Trigger 10 concurrent failures
-    await asyncio.gather(*[
-        fallback._handle_send_failure(f"error{i}")
-        for i in range(10)
-    ])
-    
-    # Verify state
-    assert fallback._has_logged_first_failure == True
-    assert fallback._failure_count == 10
-    
-    # Verify logs (count WARNING vs DEBUG)
-    # Should see: 1 WARNING, 9 DEBUG
-```
-
-### Test 2: Sequential Failures After First
-```python
-async def test_sequential_failures():
-    """Verify subsequent failures log at DEBUG level."""
-    fallback = TelegramFallback()
-    
-    # First failure
-    await fallback._handle_send_failure("error1")
-    assert fallback._has_logged_first_failure == True
-    assert fallback._failure_count == 1
-    
-    # Subsequent failures
-    await fallback._handle_send_failure("error2")
-    await fallback._handle_send_failure("error3")
-    
-    assert fallback._failure_count == 3
-    # Should see: 1 WARNING, 2 DEBUG
-```
-
-### Test 3: No Lock Contention on Success
-```python
-async def test_no_lock_on_success():
-    """Verify successful sends don't acquire the lock."""
-    fallback = TelegramFallback()
-    
-    # Mock successful send
-    with patch.object(fallback, '_send_http_request', return_value=True):
-        await fallback.send_message("chat_id", "message")
-    
-    # State unchanged, lock never acquired
-    assert fallback._failure_count == 0
-```
-
-## Summary
-
-### Race Conditions Prevented
-1. ✅ **Duplicate WARNING logs**: Lock serializes check-and-set of `_has_logged_first_failure`
-2. ✅ **Lost updates on counter**: Lock protects `failure_count` increment
-3. ✅ **Timestamp overwrites**: Lock protects timestamp assignments
-
-### Locking Strategy
-- **Mechanism**: `asyncio.Lock` (async-native, non-blocking)
-- **Scope**: Instance-level lock in `TelegramFallback` singleton
-- **Critical section**: All state mutations in `_handle_send_failure()`
-- **Non-critical**: Read-only access (`get_bridge_status()`) requires no lock
-
-### Performance Impact
-- **Happy path** (successful sends): Zero overhead (no lock acquisition)
-- **Error path** (failures): +2-5ms per request (negligible, only affects degraded state)
-- **Worst case** (100 concurrent failures): ~200ms total queue wait = 2ms per request average
-
-### Why This Approach Works
-1. ✅ **Matches FastAPI architecture**: Async-native, non-blocking
-2. ✅ **Simple**: Single lock, clear critical section
-3. ✅ **Performant**: Minimal overhead, only on error path
-4. ✅ **Correct**: Prevents all identified race conditions
-5. ✅ **Maintainable**: Clear pattern, easy to test
-
-### Migration Path
-From current (sync, no lock) → new (async, with lock):
-1. Add lock to `__init__()`
-2. Make `_handle_send_failure()` async
-3. Wrap state mutations in `async with self._first_failure_lock:`
-4. Update all call sites to `await self._handle_send_failure(...)`
+- **Comprehensive implementation spec:** `notes/adc-5xuy-thread-safety-design.md` (adc-5xuy) — the
+  deep dive; concrete diff, reviewer checklist, cheat sheet.
+- **Race catalog:** `notes/adc-4ol5-race-conditions.md` (adc-4ol5).
+- **Mechanism research:** `notes/adc-4783.md` (adc-4783) — `asyncio.Lock` behavior, GIL atomicity,
+  SQLite-atomic CAS pattern, correction to "atomics impossible."
+- **Strategy decision:** `notes/adc-41u0.md` (adc-41u0).
+- **Performance analysis:** `notes/adc-4rh3.md` (adc-4rh3) — measured costs; benchmark at
+  `~/scratch/adc-4rh3-lock-bench.py`.
+- **Data structure / storage (dependencies):** `notes/adc-65l3-first-failure-state-structure.md`
+  (adc-65l3), `notes/adc-2duz-state-storage-design.md` (adc-2duz) — storage decision is
+  in-memory, per-startup, no persistence.
+- **Current code:** `src/telegram/fallback.py` — `_handle_send_failure` at `:198`, call sites at
+  `:84,89,93`, `__init__` at `:36`; singleton created in `lifespan` at `src/main.py:152`; status
+  read at `src/main.py:1474`. Deployment: single worker (`uvicorn src.main:app`, no `--workers`).
