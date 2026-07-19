@@ -218,6 +218,9 @@ class EventType:
     RESULT_CREATED = "result_created"
     RESULT_UPDATED = "result_updated"
 
+    # Component events (Phase 2)
+    COMPONENT_UPDATED = "component_updated"
+
     # Intent events
     INTENT_PENDING = "intent_pending"
     INTENT_DISPATCHED = "intent_dispatched"

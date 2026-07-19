@@ -1206,9 +1206,17 @@ async def api_v1_update_component(component_id: str, request: ComponentUpdateReq
             content={"error": "Component not found"}
         )
 
-    # Broadcast component update via SSE
-    # Note: SSE broadcast commented out due to missing sse.events module
-    # TODO: Implement SSE broadcast for component updates
+    # Broadcast component update via SSE so connected canvases update in place.
+    broadcaster = get_broadcaster()
+    await broadcaster.broadcast(
+        SSEEvent(
+            event_type=EventType.COMPONENT_UPDATED,
+            data={
+                "component_id": updated.id,
+                "version": updated.version,
+            },
+        )
+    )
 
     return {
         "id": updated.id,
