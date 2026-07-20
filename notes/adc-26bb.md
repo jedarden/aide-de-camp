@@ -7,8 +7,29 @@ Execute `kubectl delete pod` to remove a Kubernetes pod from the cluster.
 
 `kubectl delete pod` is syntactically incomplete: it targets **no pod** and **no cluster**.
 It cannot be executed autonomously without guessing a destructive target, which this
-environment's safety posture forbids. This matches the prior identical bead
-[[adc-5jl]] (`notes/adc-5jl-kubectl-delete-pod.md`), which reached the same conclusion.
+environment's safety posture forbids.
+
+This is a re-release of this same bead — **9th** overall occurrence of this auto-generated
+bare-command task, every one reaching the identical conclusion:
+
+- [[adc-5jl]] (`notes/adc-5jl-kubectl-delete-pod.md`) — 1st
+- [[adc-26bb]] (`notes/adc-26bb.md`) — 2nd (this bead; original run)
+- [[adc-1tes]] (`notes/adc-1tes.md`) — 3rd
+- [[adc-1vr8]] (`notes/adc-1vr8.md`) — 4th
+- [[adc-69sb]] (`notes/adc-69sb.md`) — 5th
+- [[adc-39bw]] (`notes/adc-39bw.md`) — 6th
+- [[adc-304j]] (`notes/adc-304j.md`) — 7th
+- [[adc-24z1]] (`notes/adc-24z1.md`) — 8th
+- this run — 9th (re-released)
+
+The task generator deterministically re-emits this bare command whenever the escalate
+intent matches `kubectl delete pod` but the source utterance carries no operand. Nine
+recurrences make it definitive that the durable fix is **upstream**: the escalate
+parser/classifier should reject (or request) the missing operand *before* a bead is ever
+created. The repo's own parser already *requires* a `<pod-name>` token
+(`src/escalate/commands.py:92` `parse_delete_pod_utterance`, dispatched at
+`src/escalate/handler.py`) — so the bare command would already fail to parse there. The
+recurrence is happening *before* that gate.
 
 ### Why it cannot run as given
 
@@ -35,12 +56,15 @@ environment's safety posture forbids. This matches the prior identical bead
    Deployment/ReplicaSet it will simply respawn. That makes a guessed delete pointless
    *and* still potentially disruptive. Confirming intent first is the right call.
 
-### Environment facts (gathered)
+### Environment facts (re-verified 2026-07-19 on 9th re-release)
 
-- `kubectl config current-context` → not set
-- `~/.kube/` contains: `iad-acb.kubeconfig`, `iad-ci.kubeconfig` (+ cache)
-- `notes/adc-5jl-kubectl-delete-pod.md` — prior identical task, same "incomplete,
-  needs user input" outcome
+- `kubectl config current-context` → `error: current-context is not set`
+- `~/.kube/` kubeconfigs actually on disk: `iad-acb.kubeconfig`, `iad-ci.kubeconfig`
+  (+ cache). CLAUDE.md also references `ardenone-manager.kubeconfig` /
+  `rs-manager.kubeconfig` / `iad-options.kubeconfig` — **not present on disk** here.
+- Escalate parser (`src/escalate/commands.py:92` `parse_delete_pod_utterance`) still
+  requires a `<pod-name>` operand via pattern `kubectl\s+delete\s+pod\s+(\S+)…`; a bare
+  `kubectl delete pod` raises `CommandExecutionError` (no operand to extract).
 
 ### What's needed to proceed
 
