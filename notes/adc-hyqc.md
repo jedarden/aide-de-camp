@@ -1,47 +1,65 @@
-# Bead adc-hyqc: Telegram Send Failure WARNING
+# Bead adc-hyqc: Add WARNING on first failed Telegram send
+
+**Type:** umbrella (split-child) — work delivered across closed child beads.
+**Status:** no source changes required; closing.
 
 ## Finding
 
-The functionality requested in this bead **already exists** in `src/telegram/fallback.py`.
+The functionality requested in this bead **already exists, fully shipped** in
+`src/telegram/fallback.py`, delivered by the three closed child beads:
 
-## Existing Implementation
+| Child | Title | Status |
+|-------|-------|--------|
+| `adc-1qc` | Add startup bridge reachability check | closed |
+| `adc-b5j6` / `adc-47l2` | Rate-limiting for repeated Telegram send failures | closed |
+| `adc-20p9` | Verify Telegram send failure logging end-to-end | closed |
 
-The `_handle_send_failure()` method (lines 197-212) implements exactly what was requested:
+## Current implementation
 
-```python
-def _handle_send_failure(self):
-    """Handle a send failure - log warning only on first failure in a batch."""
-    self._is_reachable = False
-    self._failure_count += 1
+`TelegramFallback.send_message()` routes all failure paths
+(HTTP non-2xx, `httpx.RequestError`, generic exceptions) into
+`_handle_send_failure()` → `_record_failure_locked()`, which runs under
+`_first_failure_lock` (sync critical section, await-free on purpose).
 
-    # Only log a warning if we haven't logged recently (within last 60 seconds)
-    # or if this is the first failure
-    now = datetime.now()
-    if (self._last_failure_logged is None or
-        (now - self._last_failure_logged).total_seconds() > 60):
-        logger.warning(
-            f"Telegram bridge unreachable at {self.bridge_url} "
-            f"(failure count: {self._failure_count}). "
-            f"Subsequent failures will be logged at DEBUG level only."
-        )
-        self._last_failure_logged = now
-```
+Logging policy (`fallback.py:281-348`):
 
-## How It Works
+- **First failure after startup** — emits exactly one `logger.warning(...)`
+  claiming the `_has_logged_first_failure` False→True flip (one per process
+  startup). The message includes the bridge URL, error type, and error message.
+- **Repeated failures** — rate-limited: at most one `logger.debug(...)` summary
+  per `_failure_log_interval_seconds` window (default **300s**, configurable via
+  `ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS`). Failures inside a window are
+  counted silently (`_failures_since_last_log`) so a sustained outage cannot
+  spam the log. The window is seeded by the first-failure WARNING to prevent a
+  follow-on DEBUG storm.
+- `_failure_count` and `_last_failure_timestamp` update on every failure
+  regardless of logging; both are exposed via `get_bridge_status()`.
 
-1. **First failure after startup**: `_last_failure_logged` is `None`, so a WARNING is logged
-2. **Subsequent failures**: Only logged if 60+ seconds have passed since the last WARNING
-3. **All error paths covered**:
-   - HTTP non-200 response (line 80)
-   - `httpx.RequestError` network errors (line 87)
-   - Generic exceptions (line 91)
+> Note: an earlier version of this note described a 60-second
+> `_last_failure_logged` implementation. That has since been superseded by the
+> per-startup first-failure claim + 300s rate-limit window shipped by the child
+> beads above.
 
-## Acceptance Criteria Met
+## Acceptance criteria — verified
 
-- ✅ First send failure logs a WARNING with context (bridge URL + failure count)
-- ✅ Failures are visible at WARNING level (not just DEBUG)
-- ✅ No log spam from repeated failures (60-second rate limit)
+1. ✅ **First send failure logs a WARNING with context** — bridge URL + error
+   type + message (`fallback.py:328-333`).
+2. ✅ **Failures visible at WARNING level, not just DEBUG** — first failure is
+   `WARNING`; only later failures fall through to `DEBUG`.
+3. ✅ **No log spam from repeated failures** — 300s rate-limit window dedupes.
+
+## Verification performed this session
+
+- `tests/test_telegram_fallback.py` + `tests/test_telegram_bridge_status.py`
+  → **33 passed**.
+- End-to-end drive: pointed the singleton at an unreachable bridge
+  (`http://127.0.0.1:9/nope`) and issued 4 sends. Result: exactly **one**
+  `WARNING` (`First Telegram send failure detected ... Error type: ConnectError.
+  Error: All connection attempts failed ...`), zero further
+  `telegram.fallback` log lines for the 3 repeated failures
+  (`failures_since_last_log: 3`), confirming the rate-limit dedupe.
 
 ## Conclusion
 
-No code changes needed. The implementation was already present and working as intended.
+No source changes were needed — the feature was already present and working.
+This note is the closure artifact for the umbrella.
