@@ -10,7 +10,14 @@ from typing import AsyncGenerator, Optional
 from urllib.parse import urlencode
 
 import pytest
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+
+try:
+    from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+    _HAS_PLAYWRIGHT = True
+except ModuleNotFoundError:  # playwright is optional — only browser tests need it
+    async_playwright = None  # type: ignore[assignment]
+    Browser = BrowserContext = Page = None  # type: ignore[assignment]
+    _HAS_PLAYWRIGHT = False
 
 
 # Configuration
@@ -30,6 +37,8 @@ def event_loop():
 @pytest.fixture(scope="function")
 async def browser() -> AsyncGenerator[Browser, None]:
     """Launch Playwright browser instance."""
+    if not _HAS_PLAYWRIGHT:
+        pytest.skip("playwright not installed — install with: pip install playwright && playwright install chromium")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         yield browser
