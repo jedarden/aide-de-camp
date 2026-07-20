@@ -808,3 +808,43 @@ Net-new code: aide-de-camp is a substantial implementation spanning multiple sub
 6. **Voice UX** — push-to-talk vs. continuous listening + VAD silence detection. What's the right default for the audio surface?
 
 7. **Disambiguation flow** — when router confidence is below threshold, how does the clarification round-trip work without breaking conversational flow in audio mode?
+
+---
+
+## ADR-1: 2026-07-20 — Decouple the Telegram fallback surface from telegram-claude-bridge
+
+**Status:** Proposed
+
+### Context
+
+The plan's "Surface Routing Rules" section makes Telegram the fallback of last resort:
+
+> Exception-class results (urgency: critical, type: exception) push to Telegram regardless of canvas state if no canvas has been active within the past N minutes.
+
+Phase 1 ("Session and Topics") is marked `Status: COMPLETE ✅` with "Telegram surface fallback (reuse telegram-claude-bridge)" listed as a shipped deliverable, and "Relationship to Existing Infrastructure" states `telegram-claude-bridge` is reused for the Telegram surface.
+
+Live verification on 2026-07-20 against the running server (PID confirmed serving from this checkout, `git -C /home/coding/aide-de-camp` cwd) shows this promise does not hold:
+
+1. **Wrong default, and never overridden at runtime.** `src/telegram/fallback.py` hardcodes `DEFAULT_BRIDGE_URL = "http://telegram-claude-bridge:8000"` — a k8s-internal-style hostname that does not resolve from the bare Hetzner host process (Phase 0 deployment, per this plan's "Deployment Model"). The documented fix — `ADC_TELEGRAM_BRIDGE_URL` env var, default value corrected in `README.md`'s configuration table — exists in code (bead `adc-lc4` already tracks making the URL configurable) but the server is started per this repo's `CLAUDE.md` run command with no env vars set, so the live process still uses the broken default. `GET /api/v1/status/telegram_bridge` on the running server currently returns `{"reachable": false, "bridge_url": "http://telegram-claude-bridge:8000", ...}`. The documented working URL (`https://telegram-proxy-telegram-bridge-ardenone-cluster-ts.ardenone.com:8444`) was independently confirmed reachable (`{"ok":true,"polling":true,...}`) during this audit.
+2. **Even pointed at the right URL, the surface doesn't do what the plan promises.** `send_exception()`, `send_workload_summary()`, and `register_surface()` in `src/telegram/fallback.py` are stubs: each logs a warning and returns `False` (or a fake `True` for `register_surface`), with an explicit code comment explaining why — "telegram-claude-bridge uses pull-based architecture (manages sessions internally per forum topic), not push-based message delivery," and "the `/register_surface` endpoint does NOT exist in telegram-claude-bridge." These are exactly the three methods the exception-routing and workload-summary promises above depend on.
+3. **The mismatch is architectural, not a bug.** Checked `/home/coding/telegram-claude-bridge`'s own README and CLAUDE.md: it is a *Claude Code session router* — one persistent `claude` process per `(chat_id, thread_id)` forum-topic pair, created via bot commands (`/new`), with tools like `update_progress` only available *inside* an active session. It has no concept of "register an external session_id against a chat_id and let me push arbitrary notifications to it." aide-de-camp's `TelegramFallback` class was written against an imagined generic push-notification API that the real service doesn't expose.
+
+Net effect: the *only* channel the plan defines for reaching the user when no canvas is open — critical alerts, exception routing, workload summaries — has never worked in any deployment of aide-de-camp, and the existing beads (`adc-lc4`, `adc-44u`, and children) address the URL/observability half of the problem but not the deeper architecture mismatch in point 3.
+
+### Decision
+
+Give aide-de-camp its **own** direct, minimal Telegram Bot API integration — a fixed `chat_id` (the user's personal chat with a dedicated bot, configured once via `ADC_TELEGRAM_CHAT_ID` / a bot token secret) — instead of routing fallback notifications through `telegram-claude-bridge`. aide-de-camp calls `sendMessage`/`editMessageText` directly (or via `telegram-claude-bridge`'s stateless *proxy* component's `/send`, `/edit` endpoints if reusing its bot-token holder is preferred over provisioning a second bot — but *not* through the bridge's session/topic layer). `register_surface()`, and the assumption that a `session_id` maps to a Telegram forum topic, are removed. All aide-de-camp Telegram traffic becomes plain messages to one fixed destination — no topic creation, no session binding, no dependency on whether the user happens to have a live Claude Code conversation running in that bridge at the time.
+
+### Alternatives Considered
+
+- **A. Fix the URL and build the missing session→chat_id registry against telegram-claude-bridge's real model** (create/reuse a dedicated aide-de-camp forum topic, post into it via proxy calls). Rejected: telegram-claude-bridge's session model exists to route messages to a live `claude` process. Posting plain notifications into a topic either requires keeping a phantom Claude session alive just to have somewhere to post, or bypassing the bridge's session semantics and talking to its proxy layer directly anyway — at which point this is the Decision above, just laundered through a second project's internal model and its future schema changes.
+- **B. Implement `register_surface()` for real** (a one-time `/register <session_id>` command run inside a bridge topic, stored server-side). Rejected: reintroduces the coupling of Alternative A, and "always-available fallback" is specifically the guarantee that must *not* depend on a setup step the user might forget, or on telegram-claude-bridge's session lifecycle (stale-session cleanup, restarts) continuing to hold that mapping.
+- **C. Drop the Telegram fallback surface entirely; rely on canvas + CLI only.** Rejected: removes a load-bearing requirement from the plan's own Surface Routing Rules rather than fixing it — the entire point of urgency-tiered exception routing is reaching the user when no canvas tab is open.
+
+### Consequences
+
+- Exception pushes and workload summaries can actually work, independent of `telegram-claude-bridge` health, session state, or whether a forum topic happens to exist.
+- Removes a runtime dependency and API-contract coupling on a project whose primary purpose (multi-agent coding sessions per Telegram topic) is unrelated to notification delivery — aide-de-camp no longer breaks silently when telegram-claude-bridge changes its internal session/topic schema.
+- Two independent Telegram integrations now exist in the household stack (telegram-claude-bridge's own bot, aide-de-camp's own bot or shared-proxy usage) — needs a one-line note in `README.md`'s configuration table clarifying which is which, so a future pass doesn't "fix" aide-de-camp by re-coupling it to the bridge.
+- Out of scope: two-way interaction (replying to a card *from* Telegram) — this ADR only covers aide-de-camp → Telegram notification delivery, not conversational input. That would need its own design if wanted later.
+- Requires a one-time human step (bot token / chat_id provisioning) outside NEEDLE's reach — tracked as a separate bead rather than assumed away.
