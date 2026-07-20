@@ -6,12 +6,17 @@ inject test utterances into the dispatch pipeline for end-to-end testing.
 
 Also provides TTS/narration testing endpoints for capturing and verifying
 narration events without actual audio output.
+
+Session injection/cleanup endpoints (POST /sessions, DELETE /sessions/{id})
+support canvas test-data injection: creating sessions with predictable IDs and
+tearing them down cleanly after a test run.
 """
+import uuid
 from logging import getLogger
+from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-
 
 logger = getLogger(__name__)
 
@@ -19,16 +24,72 @@ logger = getLogger(__name__)
 router = APIRouter()
 
 # Import narration endpoints to register them
-from .narration import (
-    create_narration_session,
-    inject_narration_event,
-    inject_tts_capture,
-    get_narration_session,
-    verify_narration,
-    delete_narration_session,
-    list_narration_sessions,
-    cleanup_all_sessions,
-)
+
+
+class SessionCreateRequest(BaseModel):
+    """Request body for creating a test session with a predictable ID."""
+    session_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Predictable session ID for test repeatability (e.g. 'test-inject-foo'). "
+            "If omitted, a random 'test-inject-<hex>' ID is generated."
+        ),
+    )
+
+
+@router.post("/sessions")
+async def api_v1_create_session(request: SessionCreateRequest) -> dict:
+    """
+    Create a test session with an explicit, predictable ID.
+
+    Mounted at ``POST /api/v1/sessions``. Used by canvas test-data injection
+    utilities to set up a known session before injecting topics. Idempotent:
+    if the session already exists it is returned with ``created: false``.
+
+    Request body:
+    ```
+    {"session_id": "test-inject-my-scenario"}   # optional
+    ```
+
+    Returns:
+    ```
+    {"session_id": "test-inject-my-scenario", "created": true}
+    ```
+    """
+    from ..session.store import get_store
+
+    store = get_store()
+    session_id = request.session_id or f"test-inject-{uuid.uuid4().hex[:12]}"
+    existing = await store.get_session(session_id)
+    created = False
+    if not existing:
+        await store.create_session(session_id)
+        created = True
+    logger.info(f"[TEST] create_session id={session_id} created={created}")
+    return {"session_id": session_id, "created": created}
+
+
+@router.delete("/sessions/{session_id}")
+async def api_v1_delete_session(session_id: str) -> dict:
+    """
+    Delete a test session and all data tied to it.
+
+    Mounted at ``DELETE /api/v1/sessions/{session_id}``. Removes the session's
+    topics, results, intents, utterances, surfaces, and feedback signals (see
+    ``SessionStore.delete_session`` for the explicit cleanup order — SQLite FK
+    CASCADE is not enforced here). Intended for test teardown.
+
+    Returns:
+    ```
+    {"status": "deleted", "session_id": "...", "session_removed": 1, "topics_removed": 3}
+    ```
+    """
+    from ..session.store import get_store
+
+    store = get_store()
+    summary = await store.delete_session(session_id)
+    logger.info(f"[TEST] delete_session {summary}")
+    return {"status": "deleted", **summary}
 
 
 class TestClassificationRequest(BaseModel):
@@ -152,9 +213,12 @@ async def test_create_topic(request: TestCreateTopicRequest) -> dict:
             "type": "project"
         }
     """
-    from ..session.store import get_store
-    from datetime import datetime, timedelta
     import uuid
+    from datetime import datetime, timedelta
+
+    import aiosqlite
+
+    from ..session.store import get_store
 
     logger.info(f"[TEST] Creating test topic: {request.label}")
 
@@ -162,35 +226,60 @@ async def test_create_topic(request: TestCreateTopicRequest) -> dict:
         # Get session store
         store = get_store()
 
-        # Create or get session
+        # Create or get session (pass session_id so sessions.id PK matches the
+        # topic/session_id below — otherwise create_session() mints an unrelated id).
         session = await store.get_session(request.session_id)
         if not session:
-            await store.create_session()
+            await store.create_session(request.session_id)
             logger.info(f"[TEST] Created session: {request.session_id}")
 
-        # Create topic
-        topic_id = str(uuid.uuid4())
+        # results.intent_id is NOT NULL (and references intents.id), and
+        # intents.utterance_id is NOT NULL — so anchor the result on a real
+        # utterance → intent pair via the store methods rather than a raw insert
+        # with a dangling id.
+        utterance_id = str(uuid.uuid4())
+        await store.create_utterance(
+            request.session_id, f"[test-inject] {request.label}", utterance_id
+        )
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=request.session_id,
+            project_slug="test-project",
+            intent_type="test",
+        )
 
-        # Calculate created_at based on staleness_seconds
-        created_at = datetime.utcnow() - timedelta(seconds=request.staleness_seconds)
+        topic_id = await store.create_topic(
+            label=request.label,
+            topic_type=request.type,
+            project_slugs=["test-project"],
+            scope="session",
+            session_id=request.session_id,
+        )
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=request.session_id,
+            summary=request.summary,
+            data={"test": True, "data": "test data"},
+            urgency=request.urgency,
+        )
 
-        # Create topic directly in database
-        import aiosqlite
-        async with aiosqlite.connect(store.db_path) as db:
-            await db.execute(
-                "INSERT INTO topics (id, session_id, label, type, project_slugs, created_at, last_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (topic_id, request.session_id, request.label, request.type, '["test-project"]', int(created_at.timestamp()), int(created_at.timestamp()))
+        # Optionally backdate the topic + result so staleness-driven canvas
+        # tests can simulate an aged card.
+        if request.staleness_seconds > 0:
+            created_ts = int(
+                (datetime.utcnow() - timedelta(seconds=request.staleness_seconds)).timestamp()
             )
-
-            # Create result for the topic
-            result_id = str(uuid.uuid4())
-
-            await db.execute(
-                "INSERT INTO results (id, topic_id, summary, data, urgency, created_at, session_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (result_id, topic_id, request.summary, '{"test": true, "data": "test data"}', request.urgency, int(created_at.timestamp()), request.session_id)
-            )
-
-            await db.commit()
+            async with aiosqlite.connect(store.db_path) as db:
+                await db.execute(
+                    "UPDATE topics SET created_at = ?, last_active = ? WHERE id = ?",
+                    (created_ts, created_ts, topic_id),
+                )
+                await db.execute(
+                    "UPDATE results SET created_at = ? WHERE id = ?",
+                    (created_ts, result_id),
+                )
+                await db.commit()
 
         logger.info(f"[TEST] Created topic {topic_id} with result {result_id}")
 
