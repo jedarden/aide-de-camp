@@ -71,12 +71,12 @@ Output ONLY the bead body as markdown. Do not include explanations or meta-comme
 [Any technical details, constraints, or guidance for Claude Code]
 ```
 
-### 2. Create Bead (br CLI)
+### 2. Create Bead (bf CLI)
 
 **Command:**
 
 ```bash
-br create \
+bf create \
   --title "[project-slug] task-verb..." \
   --type task \
   --metadata '{"session_id":"...","intent_id":"...","origin_surface_id":"..."}'
@@ -135,7 +135,7 @@ The intent router classifies task-profile intents when:
 ## Fallback Behavior
 
 - **LLM timeout**: Retry once, then escalate with simplified bead body
-- **br create failure**: Return error to user, suggest manual bead creation
+- **bf create failure**: Return error to user, suggest manual bead creation
 - **Missing project**: Ask user to specify project context
 
 ## Context Sources

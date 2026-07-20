@@ -259,7 +259,7 @@ async def test_escalate_handler_generate_title():
 
 
 async def test_escalate_handler_extract_bead_id():
-    """Test bead ID extraction from br output."""
+    """Test bead ID extraction from bf output."""
     print("Testing Escalate Handler extract bead ID...")
 
     handler = EscalateHandler()
@@ -329,7 +329,7 @@ async def test_escalate_handler_full_flow():
 
     handler._zai_client = mock_llm
 
-    # Mock br create subprocess
+    # Mock bf create subprocess
     mock_proc = AsyncMock()
     mock_proc.returncode = 0
     mock_proc.communicate.return_value = (b"Created bead test-bead-456\n", b"")
@@ -447,10 +447,10 @@ async def test_escalate_bead_creation_failure():
         intent_type="task-profile",
     )
 
-    # Mock br create failure
+    # Mock bf create failure
     mock_proc = AsyncMock()
     mock_proc.returncode = 1
-    mock_proc.communicate.return_value = (b"", b"br: error: bead creation failed")
+    mock_proc.communicate.return_value = (b"", b"bf: error: bead creation failed")
 
     with patch("src.escalate.handler.asyncio.create_subprocess_exec", return_value=mock_proc):
         try:
