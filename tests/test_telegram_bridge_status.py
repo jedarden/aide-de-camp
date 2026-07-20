@@ -2,6 +2,7 @@
 Test Telegram bridge status tracking and API endpoint.
 """
 
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,6 +20,7 @@ class TestTelegramBridgeStatus:
 
         assert status["reachable"] is None
         assert status["failure_count"] == 0
+        assert status["last_check_time"] is None
         assert status["bridge_url"] == "http://telegram-claude-bridge:8000"
 
     def test_custom_bridge_url(self):
@@ -45,6 +47,8 @@ class TestTelegramBridgeStatus:
 
             status = fallback.get_bridge_status()
             assert status["reachable"] is True
+            assert status["last_check_time"] is not None
+            datetime.fromisoformat(status["last_check_time"])  # valid ISO-8601
 
     @pytest.mark.asyncio
     async def test_check_bridge_available_failure(self):
@@ -61,6 +65,32 @@ class TestTelegramBridgeStatus:
 
             status = fallback.get_bridge_status()
             assert status["reachable"] is False
+            # A failed check still counts as a determination — last_check_time set.
+            assert status["last_check_time"] is not None
+
+    @pytest.mark.asyncio
+    async def test_last_check_time_reflects_most_recent_determination(self):
+        """last_check_time tracks the most recent reachability determination."""
+        fallback = TelegramFallback()
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
+                return_value=mock_response
+            )
+
+            assert fallback.get_bridge_status()["last_check_time"] is None
+
+            await fallback.check_bridge_available()
+            first = fallback.get_bridge_status()["last_check_time"]
+            assert first is not None
+
+            # A second determination produces a timestamp at least as new.
+            await fallback.check_bridge_available()
+            second = fallback.get_bridge_status()["last_check_time"]
+            assert second is not None
+            assert datetime.fromisoformat(second) >= datetime.fromisoformat(first)
 
     @pytest.mark.asyncio
     async def test_send_message_success_updates_status(self):
@@ -79,6 +109,8 @@ class TestTelegramBridgeStatus:
 
             status = fallback.get_bridge_status()
             assert status["reachable"] is True
+            # A successful send is a reactive reachability determination.
+            assert status["last_check_time"] is not None
 
     @pytest.mark.asyncio
     async def test_send_message_failure_increments_count(self):
@@ -95,6 +127,7 @@ class TestTelegramBridgeStatus:
             status = fallback.get_bridge_status()
             assert status["reachable"] is False
             assert status["failure_count"] == 1
+            assert status["last_check_time"] is not None
 
     async def test_handle_send_failure_first_warns_then_rate_limits(self, caplog):
         """First failure WARNINGs; an immediate repeat is rate-limited (suppressed)."""
