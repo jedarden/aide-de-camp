@@ -20,7 +20,7 @@ kubectl --server=${KUBECONTROL_PROXY} get deployment ${DEPLOYMENT} -n ${NAMESPAC
 
 # Action execution (via NEEDLE task bead for safety)
 # Actions are NOT executed directly. Create a task bead with:
-# br create --type action --project ${PROJECT_SLUG} "${ACTION_COMMAND}"
+# bf create --type action --project ${PROJECT_SLUG} "${ACTION_COMMAND}"
 ```
 
 ### Git Actions
