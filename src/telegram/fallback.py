@@ -40,11 +40,23 @@ class TelegramFallback:
         self,
         bridge_url: str | None = None,
         failure_log_interval_seconds: float | None = None,
+        chat_id: str | int | None = None,
     ):
         import os
         self.bridge_url = bridge_url or os.getenv(
             "ADC_TELEGRAM_BRIDGE_URL", self.DEFAULT_BRIDGE_URL
         )
+        # Telegram chat ID for the single user of this personal app (plan.md
+        # Tech Stack: "single-user app"). There is intentionally NO multi-user
+        # session→chat mapping -- one configured chat id is all the routing
+        # exception/workload/bead-close pushes need. Resolution order:
+        # constructor arg → ADC_TELEGRAM_CHAT_ID env var → None.
+        # None (default) means the push methods gracefully no-op with a WARNING
+        # rather than hard-failing, preserving the pre-config behavior.
+        if chat_id is not None:
+            self.chat_id = chat_id
+        else:
+            self.chat_id = os.getenv("ADC_TELEGRAM_CHAT_ID") or None
         # Rate-limit window for repeated-failure DEBUG logs. Resolution order:
         # constructor arg → ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS env var
         # → DEFAULT_FAILURE_LOG_INTERVAL_SECONDS. Invalid env values fall back
@@ -61,6 +73,11 @@ class TelegramFallback:
         # Reachability — a separate logical object; its OTHER writers (send success
         # below, and the health check) are intentionally NOT under the failure lock.
         self._is_reachable = None  # None = unknown, True = reachable, False = unreachable
+        # When reachability was last determined (startup probe or a reactive
+        # send success/failure). Mirrors every write to _is_reachable via
+        # _set_reachable(); None until the first determination. Exposed in the
+        # /api/v1/status/telegram_bridge payload as ``last_check_time``.
+        self._last_check_time: Optional[datetime] = None
 
         # First-failure record: flat instance vars on the singleton, per-startup,
         # no persistence. Exactly one WARNING is emitted per process startup.
@@ -115,7 +132,7 @@ class TelegramFallback:
 
                 if response.status_code == 200:
                     logger.info(f"Sent Telegram message to chat {chat_id}")
-                    self._is_reachable = True  # Update reachability state
+                    self._set_reachable(True)  # Update reachability state
                     return True
                 else:
                     error_msg = f"status {response.status_code} - {response.text}"
@@ -150,16 +167,22 @@ class TelegramFallback:
         """
         Send an exception to Telegram for human attention.
 
-        NOTE: This method requires a session→telegram_chat_id mapping which is not
-        currently implemented. telegram-claude-bridge uses pull-based architecture
-        (manages sessions internally per forum topic), not push-based message delivery.
+        Routes to the single configured chat id (ADC_TELEGRAM_CHAT_ID). When no
+        chat id is configured this is a graceful no-op: a WARNING is logged and
+        False is returned, matching the pre-config behavior. When configured, the
+        exception is formatted via ``_format_exception_message`` and delivered
+        through ``send_message``, returning the bridge's real success/failure.
         """
-        logger.warning(
-            f"send_exception() called for session {session_id} - "
-            f"session→telegram_chat mapping not implemented. "
-            f"telegram-claude-bridge uses pull-based architecture."
-        )
-        return False
+        if self.chat_id is None:
+            logger.warning(
+                f"send_exception() called for session {session_id} - "
+                f"no Telegram chat id configured (set ADC_TELEGRAM_CHAT_ID). "
+                f"Exception push skipped."
+            )
+            return False
+
+        message = self._format_exception_message(exception)
+        return await self.send_message(self.chat_id, message)
 
     async def send_workload_summary(
         self,
@@ -169,16 +192,22 @@ class TelegramFallback:
         """
         Send a workload summary to Telegram.
 
-        NOTE: This method requires a session→telegram_chat_id mapping which is not
-        currently implemented. telegram-claude-bridge uses pull-based architecture
-        (manages sessions internally per forum topic), not push-based message delivery.
+        Routes to the single configured chat id (ADC_TELEGRAM_CHAT_ID). When no
+        chat id is configured this is a graceful no-op: a WARNING is logged and
+        False is returned, matching the pre-config behavior. When configured, the
+        summary is formatted via ``_format_workload_summary`` and delivered
+        through ``send_message``, returning the bridge's real success/failure.
         """
-        logger.warning(
-            f"send_workload_summary() called for session {session_id} - "
-            f"session→telegram_chat mapping not implemented. "
-            f"telegram-claude-bridge uses pull-based architecture."
-        )
-        return False
+        if self.chat_id is None:
+            logger.warning(
+                f"send_workload_summary() called for session {session_id} - "
+                f"no Telegram chat id configured (set ADC_TELEGRAM_CHAT_ID). "
+                f"Workload summary push skipped."
+            )
+            return False
+
+        message = self._format_workload_summary(summary)
+        return await self.send_message(self.chat_id, message)
 
     async def register_surface(self, session_id: str, telegram_chat_id: str) -> bool:
         """
@@ -209,11 +238,27 @@ class TelegramFallback:
                     timeout=5.0,
                 )
                 is_available = response.status_code == 200
-                self._is_reachable = is_available
+                self._set_reachable(is_available)
                 return is_available
         except Exception:
-            self._is_reachable = False
+            self._set_reachable(False)
             return False
+
+    def _set_reachable(self, value: bool, *, now: Optional[datetime] = None) -> None:
+        """Record a reachability determination and when it was made.
+
+        Centralizes every write to ``_is_reachable`` so ``last_check_time``
+        always reflects the most recent determination — whether it came from
+        the startup health probe (``check_bridge_available``) or a reactive
+        update during ``send_message`` (success → True, failure → False).
+
+        Args:
+            value: The reachability value to record.
+            now: Optional precomputed timestamp to reuse (the failure path
+                already computes one); defaults to ``datetime.now()``.
+        """
+        self._is_reachable = value
+        self._last_check_time = now or datetime.now()
 
     def get_bridge_status(self) -> dict:
         """
@@ -225,6 +270,8 @@ class TelegramFallback:
             Dict with keys:
             - reachable: bool or None (None = unknown yet)
             - bridge_url: str
+            - last_check_time: ISO-8601 string or None (when reachability was
+              last determined, via the startup probe or a reactive send)
             - failure_count: int
             - has_logged_first_failure: bool
             - first_failure_timestamp: ISO-8601 string or None
@@ -235,6 +282,9 @@ class TelegramFallback:
         return {
             "reachable": self._is_reachable,
             "bridge_url": self.bridge_url,
+            "chat_id": self.chat_id,
+            "last_check_time": self._last_check_time.isoformat()
+            if self._last_check_time else None,
             "failure_count": self._failure_count,
             "has_logged_first_failure": self._has_logged_first_failure,
             "first_failure_timestamp": self._first_failure_timestamp.isoformat()
@@ -305,7 +355,7 @@ class TelegramFallback:
             "First" is the winner of the claim, not a timestamp comparison.
         """
         now = datetime.now()
-        self._is_reachable = False
+        self._set_reachable(False, now=now)
         self._failure_count += 1
         self._last_failure_timestamp = now
         self._failures_since_last_log += 1
