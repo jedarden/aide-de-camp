@@ -24,6 +24,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.surface.router import RouteDecision
+from src.telegram.fallback import TelegramFallback
 from src.watcher.daemon import BeadWatcher
 
 # --- fixtures ---------------------------------------------------------------
@@ -283,3 +284,91 @@ class TestExtractResult:
         bead = _bead(labels=["session_id=s1", "urgency=critical"])
         result = await BeadWatcher(store, router)._extract_result_from_bead(bead, "s1")
         assert result["urgency"] == "critical"
+
+
+# --- Telegram delivery via the shared fallback (adc-372c) ------------------
+
+class TestSendToTelegram:
+    """_send_to_telegram routes through TelegramFallback instead of being a no-op.
+
+    adc-372c: the bead watcher's bead-close → Telegram path used to log a
+    warning and return without ever calling the bridge. It now delivers via the
+    shared TelegramFallback.send_message using the configured chat_id, with the
+    same graceful no-op-when-unconfigured behavior as send_exception().
+    """
+
+    @staticmethod
+    def _fallback_with_chat_id(chat_id, send_return=True):
+        """A TelegramFallback whose send_message is replaced with a capturing fake."""
+        fb = TelegramFallback(chat_id=chat_id, bridge_url="http://test-bridge:8000")
+        sent = []
+
+        async def fake_send_message(chat_id, message, parse_mode="HTML"):
+            sent.append((chat_id, message, parse_mode))
+            return send_return
+
+        fb.send_message = fake_send_message
+        return fb, sent
+
+    async def test_delivers_to_configured_chat_id(self, store, router):
+        fb, sent = self._fallback_with_chat_id(chat_id=4242)
+        w = BeadWatcher(store, router, telegram_fallback=fb)
+
+        result = {
+            "summary": "Bead adc-1 done",
+            "urgency": "normal",
+            "data": {"bead_id": "adc-1"},
+        }
+        ok = await w._send_to_telegram(result, "session-1")
+
+        assert ok is True
+        assert len(sent) == 1
+        assert sent[0][0] == 4242  # routed to the configured chat id
+        # Body is produced by _format_telegram_message.
+        assert "Bead adc-1 done" in sent[0][1]
+
+    async def test_returns_false_on_bridge_failure(self, store, router):
+        """A real call is made; the bridge's failure propagates, not a hard-coded value."""
+        fb, sent = self._fallback_with_chat_id(chat_id=1, send_return=False)
+        w = BeadWatcher(store, router, telegram_fallback=fb)
+
+        ok = await w._send_to_telegram({"summary": "hi"}, "session-1")
+
+        assert ok is False
+        assert len(sent) == 1  # the call was actually attempted
+
+    async def test_no_op_without_chat_id(self, store, router, caplog):
+        """No chat id configured → graceful WARNING + False, no send attempted."""
+        fb = TelegramFallback(bridge_url="http://test-bridge:8000")
+        assert fb.chat_id is None
+        # Sentinel: if delivery were attempted, this would raise.
+        async def boom(*a, **kw):
+            raise AssertionError("send_message must not be called when chat_id is None")
+        fb.send_message = boom
+        w = BeadWatcher(store, router, telegram_fallback=fb)
+
+        with caplog.at_level("WARNING"):
+            ok = await w._send_to_telegram({"summary": "hi"}, "session-1")
+
+        assert ok is False
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        assert "ADC_TELEGRAM_CHAT_ID" in warnings[0].message
+
+    async def test_uses_injected_fallback_not_singleton(self, store, router, monkeypatch):
+        """The injected fallback wins over the module singleton."""
+        # Poison the singleton so any accidental use of it is caught.
+        async def boom(*a, **kw):
+            raise AssertionError("injected fallback must be used, not the singleton")
+        import src.watcher.daemon as daemon_mod
+        singleton = TelegramFallback(chat_id=1)
+        singleton.send_message = boom
+        monkeypatch.setattr(daemon_mod, "get_telegram_fallback", lambda: singleton)
+
+        fb, sent = self._fallback_with_chat_id(chat_id=4242)
+        w = BeadWatcher(store, router, telegram_fallback=fb)
+
+        ok = await w._send_to_telegram({"summary": "hi"}, "session-1")
+
+        assert ok is True
+        assert sent[0][0] == 4242  # the injected fallback delivered
