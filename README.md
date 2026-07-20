@@ -141,10 +141,20 @@ adc --help
 | `OPENAI_API_KEY` | OpenAI key — required for voice/Realtime API | _(none; voice disabled without it)_ |
 | `ZAI_PROXY_URL` | ZAI proxy endpoint for LLM calls (routing and synthesis) | `https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages` |
 | `ADC_SERVER_URL` | Server URL used by the `adc` CLI | `http://localhost:8000` |
-| `ADC_TELEGRAM_BRIDGE_URL` | Telegram bridge URL for async task notifications | `https://telegram-proxy-telegram-bridge-ardenone-cluster-ts.ardenone.com:8444` ✓ |
+| `ADC_TELEGRAM_BRIDGE_URL` | Telegram bridge URL for async task notifications (see note below) | `https://telegram-proxy-telegram-bridge-ardenone-cluster-ts.ardenone.com:8444` |
 | `ADC_WHISPER_STT_URL` | Whisper STT service URL for browser speech-to-text fallback | `https://whisper.ardenone.com` |
 
 The LLM backend for intent routing and synthesis is configured via the `ZAI_PROXY_URL` environment variable. All LLM calls route through the ZAI proxy.
+
+**Telegram bridge (`ADC_TELEGRAM_BRIDGE_URL`) — reachability.** The value above is the Traefik `vpn`-entrypoint route for the `telegram-proxy` service on `ardenone-cluster` (IngressRoute `telegram-proxy-vpn`, namespace `telegram-bridge` → svc `telegram-proxy:8080`). The route and request contract are verified against the live service:
+
+- `GET /health` → `200 {"ok":true,"polling":true,"contract_version":"1.0"}`
+- `POST /send` accepts `{chat_id, text, parse_mode}` (returns `405` on GET — endpoint exists, POST-only)
+- `GET /send_message` → `404` (the originally-assumed path does **not** exist)
+
+The fallback client in `src/telegram/fallback.py` sends to `/send` and probes `/health`, matching this contract. The in-code default (`http://telegram-claude-bridge:8000`) is the in-cluster service name for a future in-cluster deployment; set `ADC_TELEGRAM_BRIDGE_URL` to the `*-ts.ardenone.com` URL above for the local Phase-0 host.
+
+> **DNS caveat (verified 2026-07-19):** on this host the `*.ts.ardenone.com` split-DNS names — this bridge hostname included — do **not** resolve (`getaddrinfo` fails), while other mesh names such as the ZAI proxy do. The route itself is confirmed reachable when the name resolves (e.g. via the cluster's Tailscale egress). Until the DNS record is created, point `ADC_TELEGRAM_BRIDGE_URL` at a resolvable address or add a local/mesh-DNS mapping; otherwise the startup reachability probe fails and `/api/v1/status/telegram_bridge` reports `reachable: false`.
 
 ### Prompts directory
 
