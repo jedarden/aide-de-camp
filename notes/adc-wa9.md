@@ -74,3 +74,50 @@ The compatibility shims are marked DEPRECATED. Future work should:
 3. Update `src/escalate/commands.py` to import `KUBECTL_PROXIES` from commands.py
 4. Update `src/monitoring/ambient.py` to use `get_orchestrator()` directly
 5. Delete the compatibility shims once all imports are migrated
+
+---
+
+## Re-dispatch Verification (2026-07-20) — FINAL STATE
+
+The "Next Steps" above have **all been completed**. The bead was re-dispatched on
+2026-07-20 with a stale task description (it described the pre-consolidation world
+where `strand.py`/`executor.py` existed). On re-dispatch I verified that the
+consolidation already holds at HEAD. No source changes were required or made this
+session — this section records the verification.
+
+### Commit history of this consolidation
+- `edd1fad` — the real consolidation: deleted the 833-line `strand.py` +
+  488-line `executor.py`, folded their logic into `orchestrator.py` (+808 lines),
+  updated `CLAUDE.md`.
+- `bc75017` — a later agent re-introduced `strand.py` (13-line shim) +
+  `executor.py` (217-line adapter) as backward-compat shims (+ this notes file,
+  + `KUBECTL_PROXIES` in `commands.py`).
+- `34beb3c` — deleted those shims again and migrated the consumers
+  (`prefetch.py`, `warmer.py`, `ambient.py`) off them, onto `..fetch.orchestrator`
+  directly.
+
+### Verified acceptance criteria at HEAD
+- ✅ **Single fetch implementation.** Neither `src/fetch/strand.py` nor
+  `src/fetch/executor.py` exists. `grep -rn "fetch\.strand\|fetch\.executor"`
+  across `src/`, `test/`, root `test_*.py`, `docs/`, `CLAUDE.md`, `README.md`
+  returns zero hits (only `.beads/traces/*` log files mention them, which is
+  expected historical agent output).
+- ✅ **Consumers migrated.** `src/context/warmer.py`, `src/context/prefetch.py`,
+  and `src/monitoring/ambient.py` all import `get_fetch_strand` from
+  `..fetch.orchestrator` and call the `_fetch_*` source methods directly.
+  All six methods consumers call (`_fetch_kubectl_pods`,
+  `_fetch_kubectl_deployments`, `_fetch_argocd_app`, `_fetch_git_log`,
+  `_fetch_bead_list`, `_fetch_ci_status`) exist on `orchestrator.FetchStrand`.
+- ✅ **Tests.** `test_phase3.py` (covers context warmer/prefetch) passes 7/7.
+  Full suite: 130 passed, 5 failed — but the 5 failures are in
+  `tests/test_exceptions_routing.py` (`SurfaceRouter` missing
+  `_get_no_canvas_timeout`, in `src/surface/router.py`), a different subsystem
+  untouched by any of the three consolidation commits. They are pre-existing at
+  HEAD and out of scope for this bead.
+- ✅ **Docs agree.** `CLAUDE.md` (lines 82–83) and `README.md` (lines 187–188)
+  both name exactly `src/fetch/commands.py` and `src/fetch/orchestrator.py`.
+  Neither document mentions `strand.py` or `executor.py`.
+
+### Conclusion
+The dual-implementation consolidation is complete at HEAD. The blocking
+dependency `adc-56ko` (doc update) is closed. Bead `adc-wa9` is ready to close.
