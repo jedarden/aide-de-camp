@@ -73,10 +73,12 @@ async def dispatch_test_utterance(request: TestDispatchRequest) -> TestDispatchR
     store = get_store()
     router = get_router(store)
 
-    # Create session if needed
+    # Create session if needed (pass session_id so the sessions.id PK matches
+    # the session_id used for the utterance/intent/result rows below — otherwise
+    # create_session() mints a fresh unrelated id and leaves an orphan row).
     session = await store.get_session(session_id)
     if not session:
-        await store.create_session()
+        await store.create_session(session_id)
         logger.info(f"[TEST] Created new session: {session_id}")
 
     # Create utterance record

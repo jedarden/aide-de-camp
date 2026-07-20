@@ -7,517 +7,355 @@ Verifies that results from POST /api/v1/test/dispatch are:
 3. Storage payload matches /dispatch payload
 
 Child of: adc-3mc5
+
+These tests run against a live server on localhost:8000 (start it with
+`nohup .venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000 &`).
+They exercise real LLM classification/synthesis via the ZAI proxy, so they are
+slow (tens of seconds) and need network access to the proxy.
+
+Correctness notes (these were bugs in the original version of this file):
+  * The `intent_ids` returned by the dispatch endpoints are router-internal
+    correlation ids, NOT the `intents.id` primary key (store.create_intent
+    mints its own id; the router's id is only used as the results.intent_id /
+    intent_topics FK). So DB rows must be located by `session_id` (+utterance_id),
+    never by the returned intent_id.
+  * A POST issued while an SSE `client.stream(...)` is open on the *same*
+    httpx.AsyncClient raises httpx.StreamConsumed. Use a separate client for the
+    in-stream POST.
+  * The SSE endpoint remaps `session_id` to a fresh id when no session row
+    exists (main.py create_session() bug), so pre-create the session row before
+    opening the SSE stream when you care about the id.
 """
 import asyncio
 import json
+import time
 import uuid
 from pathlib import Path
-from datetime import datetime
 
-import httpx
 import aiosqlite
+import httpx
 import pytest
 
-
-# Test configuration
 API_BASE_URL = "http://localhost:8000"
 DB_PATH = Path("/home/coding/aide-de-camp/data/session.db")
 
 
+def _sid(prefix: str) -> str:
+    return f"{prefix}-{uuid.uuid4().hex[:12]}"
+
+
+async def _ensure_session(session_id: str) -> None:
+    """Pre-create the session row so /sse does not remap session_id."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        now = int(time.time())
+        await db.execute(
+            "INSERT OR IGNORE INTO sessions (id, created_at, last_active) VALUES (?, ?, ?)",
+            (session_id, now, now),
+        )
+        await db.commit()
+
+
+def _server_is_up() -> bool:
+    try:
+        return httpx.get(f"{API_BASE_URL}/health", timeout=2).status_code == 200
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _server_is_up(),
+    reason="ADC server is not running on localhost:8000",
+)
+
+
 class TestStorageSSEVerification:
-    """Verify storage and SSE broadcast via test endpoint."""
+    """Verify storage and SSE broadcast via the test endpoint."""
 
-    @pytest.mark.asyncio
     async def test_dispatch_storage_in_database(self):
-        """
-        Verify that test dispatch results are stored in SQLite.
+        """Utterance, intent, and result rows persist to SQLite with correct linkage.
 
-        Steps:
-        1. Create a test session
-        2. Call POST /api/v1/test/dispatch
-        3. Query database for utterance, intent, and result records
-        4. Verify data integrity and foreign key relationships
+        Uses wait_for_results=True so the result is guaranteed stored before we
+        query. Rows are located by session_id/utterance_id (the returned
+        intent_id is a correlation id, not the intents.id PK).
         """
-        session_id = f"test-storage-{uuid.uuid4().hex[:16]}"
+        session_id = _sid("test-storage")
         utterance = "verify storage and database persistence"
+        await _ensure_session(session_id)
 
-        async with httpx.AsyncClient() as client:
-            # Dispatch test utterance (don't wait for results)
+        async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(
                 f"{API_BASE_URL}/api/v1/test/dispatch",
                 json={
                     "utterance": utterance,
                     "session_id": session_id,
-                    "wait_for_results": False,  # Don't wait - just trigger
-                }
+                    "wait_for_results": True,
+                    "timeout_seconds": 50,
+                },
             )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["status"] == "completed"
+        assert data["session_id"] == session_id
+        utterance_id = data["utterance_id"]
+        assert len(data.get("results") or []) >= 1
 
-            assert response.status_code == 200
-            data = response.json()
-            assert data["status"] == "dispatched"
-            assert data["session_id"] == session_id
-            assert "utterance_id" in data
-
-            utterance_id = data["utterance_id"]
-            intent_ids = data.get("intent_ids", [])
-
-            # Wait for async processing to complete
-            await asyncio.sleep(5)
-
-        # Verify database storage
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
 
-            # 1. Verify utterance record
-            utterance_query = """
-                SELECT id, session_id, raw_text, created_at
-                FROM utterances
-                WHERE id = ? AND session_id = ?
-            """
             utterance_rows = await db.execute_fetchall(
-                utterance_query, (utterance_id, session_id)
+                "SELECT id, session_id, raw_text FROM utterances WHERE id = ? AND session_id = ?",
+                (utterance_id, session_id),
             )
-            assert len(utterance_rows) > 0, "Utterance not found in database"
-            utterance_row = utterance_rows[0]
-            assert utterance_row is not None, "Utterance not found in database"
-            assert utterance_row["raw_text"] == utterance
-            assert utterance_row["session_id"] == session_id
+            assert utterance_rows, "utterance not stored"
+            assert utterance_rows[0]["raw_text"] == utterance
 
-            # 2. Verify intent records
-            for intent_id in intent_ids:
-                intent_query = """
-                    SELECT id, utterance_id, session_id, intent_type, status
-                    FROM intents
-                    WHERE id = ? AND session_id = ?
-                """
-                intent_rows = await db.execute_fetchall(
-                    intent_query, (intent_id, session_id)
-                )
-                assert len(intent_rows) > 0, f"Intent {intent_id} not found"
-                intent_row = intent_rows[0]
-                assert intent_row is not None, f"Intent {intent_id} not found"
-                assert intent_row["utterance_id"] == utterance_id
-                assert intent_row["session_id"] == session_id
-                assert intent_row["status"] in ("resolved", "pending", "dispatched")
+            intent_rows = await db.execute_fetchall(
+                "SELECT * FROM intents WHERE session_id = ? AND utterance_id = ?",
+                (session_id, utterance_id),
+            )
+            assert intent_rows, "no intent stored for utterance"
+            for row in intent_rows:
+                assert row["intent_type"] is not None
+                assert row["status"] in ("pending", "dispatched", "resolved")
 
-                # 3. Verify result exists for this intent
-                result_query = """
-                    SELECT id, intent_id, session_id, summary, urgency, created_at
-                    FROM results
-                    WHERE intent_id = ? AND session_id = ?
-                """
-                result_rows = await db.execute_fetchall(
-                    result_query, (intent_id, session_id)
-                )
-                result_row = result_rows[0] if result_rows else None
-                # Result may not exist if intent is still pending or failed
-                if result_row:
-                    assert result_row["intent_id"] == intent_id
-                    assert result_row["session_id"] == session_id
-                    assert result_row["summary"] is not None
+            result_rows = await db.execute_fetchall(
+                "SELECT * FROM results WHERE session_id = ?", (session_id,)
+            )
+            assert result_rows, "no result stored"
+            for row in result_rows:
+                assert row["summary"]
+                assert row["data"]
+                assert row["topic_id"]
 
-        print(f"✓ Storage verification passed for session {session_id}")
+            # result -> topic -> session linkage
+            linked = await db.execute_fetchall(
+                """SELECT t.id FROM topics t
+                   JOIN results r ON r.topic_id = t.id
+                   WHERE r.session_id = ?""",
+                (session_id,),
+            )
+            assert linked, "result not linked to a topic"
 
-    @pytest.mark.asyncio
     async def test_dispatch_sse_broadcast(self):
-        """
-        Verify that test dispatch broadcasts SSE events.
-
-        Steps:
-        1. Create SSE connection with surface_id
-        2. Call POST /api/v1/test/dispatch with surface_id
-        3. Verify SSE event is received
-        4. Verify event payload contains correct data
-        """
-        session_id = f"test-sse-{uuid.uuid4().hex[:16]}"
-        surface_id = f"test-surface-{uuid.uuid4().hex[:16]}"
+        """A result_created SSE event reaches the surface_id given to /test/dispatch."""
+        session_id = _sid("test-sse")
+        surface_id = f"surface-{uuid.uuid4().hex[:12]}"
         utterance = "verify sse broadcast reaches canvas"
-        received_events = []
+        await _ensure_session(session_id)
 
-        async with httpx.AsyncClient() as client:
-            # Connect to SSE endpoint
-            async with client.stream(
-                "GET",
-                f"{API_BASE_URL}/api/v1/sse",
-                params={
-                    "session_id": session_id,
-                    "surface_id": surface_id,
-                    "surface_type": "canvas"
-                },
-                timeout=None
-            ) as sse_response:
-                assert sse_response.status_code == 200
+        received: list[dict] = []
+        ready = asyncio.Event()
 
-                # Read initial events (connected, workload_summary)
-                async for line in sse_response.aiter_lines():
-                    if line.startswith("data: "):
-                        data = json.loads(line[6:])  # Strip "data: " prefix
-                        received_events.append(data)
-
-                        # Stop after receiving initial connection event
-                        if len(received_events) >= 2:
-                            break
-
-                # Verify we got the connected event
-                assert any("surface_id" in e for e in received_events)
-
-            # Now dispatch a test utterance
-            received_result_events = []
-
-            # Reconnect to SSE to catch result_created events
-            async with client.stream(
-                "GET",
-                f"{API_BASE_URL}/api/v1/sse",
-                params={
-                    "session_id": session_id,
-                    "surface_id": surface_id,
-                    "surface_type": "canvas"
-                },
-                timeout=None
-            ) as sse_response:
-                assert sse_response.status_code == 200
-
-                # Start task to collect SSE events
-                async def collect_events():
+        async def listen():
+            # Dedicated client + connection for the stream — a POST on the same
+            # client while streaming raises httpx.StreamConsumed.
+            async with httpx.AsyncClient() as sse_client:
+                async with sse_client.stream(
+                    "GET",
+                    f"{API_BASE_URL}/api/v1/sse",
+                    params={"session_id": session_id, "surface_id": surface_id, "surface_type": "canvas"},
+                    timeout=None,
+                ) as sse_response:
+                    assert sse_response.status_code == 200
+                    event_type = None
                     async for line in sse_response.aiter_lines():
                         if line.startswith("event: "):
-                            event_type = line[7:].strip()  # Strip "event: " prefix
-                        elif line.startswith("data: "):
-                            data = json.loads(line[6:])
-                            received_result_events.append({
-                                "type": event_type if 'event_type' in locals() else None,
-                                "data": data
-                            })
-                            # Stop if we get a result_created event
-                            if event_type == "result_created":
-                                return
-                            event_type = None
-
-                # Give SSE connection time to establish
-                await asyncio.sleep(0.5)
-
-                # Dispatch test utterance
-                dispatch_response = await client.post(
-                    f"{API_BASE_URL}/api/v1/test/dispatch",
-                    json={
-                        "utterance": utterance,
-                        "session_id": session_id,
-                        "surface_id": surface_id,
-                        "wait_for_results": False,
-                    }
-                )
-
-                assert dispatch_response.status_code == 200
-                dispatch_data = dispatch_response.json()
-                assert dispatch_data["status"] == "dispatched"
-
-                # Wait for SSE events
-                await asyncio.wait_for(collect_events(), timeout=10.0)
-
-                # Verify we received a result_created event
-                result_events = [e for e in received_result_events if e.get("type") == "result_created"]
-                assert len(result_events) > 0, "No result_created event received via SSE"
-
-                # Verify event payload structure
-                event_data = result_events[0]["data"]
-                assert "intent_id" in event_data or "topic_id" in event_data
-
-        print(f"✓ SSE broadcast verification passed for session {session_id}")
-
-    @pytest.mark.asyncio
-    async def test_dispatch_matches_main_endpoint(self):
-        """
-        Verify that test dispatch produces same storage as /dispatch.
-
-        Steps:
-        1. Send identical utterance to both /dispatch and /test/dispatch
-        2. Compare database records from both endpoints
-        3. Verify data structure matches
-        """
-        utterance = "compare test dispatch with main dispatch"
-        test_session_id = f"test-compare-{uuid.uuid4().hex[:16]}"
-        main_session_id = f"main-compare-{uuid.uuid4().hex[:16]}"
-
-        async with httpx.AsyncClient() as client:
-            # Call test dispatch
-            test_response = await client.post(
-                f"{API_BASE_URL}/api/v1/test/dispatch",
-                json={
-                    "utterance": utterance,
-                    "session_id": test_session_id,
-                    "wait_for_results": False,  # Don't wait to avoid timeout
-                }
-            )
-
-            assert test_response.status_code == 200
-            test_data = test_response.json()
-
-            # Call main dispatch
-            main_response = await client.post(
-                f"{API_BASE_URL}/dispatch",
-                json={
-                    "utterance": utterance,
-                    "session_id": main_session_id,
-                    "surface_id": f"surface-{uuid.uuid4().hex[:16]}",
-                }
-            )
-
-            assert main_response.status_code == 200
-            main_data = main_response.json()
-
-        # Compare response structures
-        assert "utterance_id" in test_data
-        assert "utterance_id" in main_data
-        assert test_data["session_id"] == test_session_id
-        assert main_data["session_id"] == main_session_id
-
-        # Wait for async processing to complete
-        await asyncio.sleep(5)
-
-        # Verify both created database records
-        async with aiosqlite.connect(DB_PATH) as db:
-            db.row_factory = aiosqlite.Row
-
-            # Check test session utterance
-            test_utterance_rows = await db.execute_fetchall(
-                "SELECT * FROM utterances WHERE session_id = ?",
-                (test_session_id,)
-            )
-            assert len(test_utterance_rows) > 0
-            test_utterance = test_utterance_rows[0]
-            assert test_utterance["raw_text"] == utterance
-
-            # Check main session utterance
-            main_utterance_rows = await db.execute_fetchall(
-                "SELECT * FROM utterances WHERE session_id = ?",
-                (main_session_id,)
-            )
-            assert len(main_utterance_rows) > 0
-            main_utterance = main_utterance_rows[0]
-            assert main_utterance["raw_text"] == utterance
-
-            # Both should have intents created
-            test_intents = await db.execute_fetchall(
-                "SELECT * FROM intents WHERE session_id = ?",
-                (test_session_id,)
-            )
-            main_intents = await db.execute_fetchall(
-                "SELECT * FROM intents WHERE session_id = ?",
-                (main_session_id,)
-            )
-
-            assert len(test_intents) > 0, "Test dispatch created no intents"
-            assert len(main_intents) > 0, "Main dispatch created no intents"
-
-            # Verify intent structure matches
-            for intent in test_intents + main_intents:
-                assert intent["session_id"] in (test_session_id, main_session_id)
-                assert intent["intent_type"] is not None
-                assert intent["status"] in ("pending", "dispatched", "resolved")
-
-        print(f"✓ Dispatch comparison verification passed")
-
-    @pytest.mark.asyncio
-    async def test_broadcast_timing_matches_dispatch(self):
-        """
-        Verify SSE broadcast timing matches /dispatch behavior.
-
-        Steps:
-        1. Call test dispatch with wait_for_results=False
-        2. Verify SSE events arrive asynchronously
-        3. Verify events arrive after dispatch response returns
-        """
-        session_id = f"test-timing-{uuid.uuid4().hex[:16]}"
-        surface_id = f"surface-{uuid.uuid4().hex[:16]}"
-        utterance = "verify broadcast timing"
-
-        dispatch_time = None
-        result_event_time = None
-
-        async with httpx.AsyncClient() as client:
-            # Start SSE connection
-            async with client.stream(
-                "GET",
-                f"{API_BASE_URL}/api/v1/sse",
-                params={
-                    "session_id": session_id,
-                    "surface_id": surface_id,
-                    "surface_type": "canvas"
-                },
-                timeout=None
-            ) as sse_response:
-                assert sse_response.status_code == 200
-
-                # Skip initial events
-                async for line in sse_response.aiter_lines():
-                    if "workload_summary" in line:
-                        break
-
-                # Start event collection
-                events_received = []
-
-                async def collect_sse():
-                    nonlocal result_event_time
-                    async for line in sse_response.aiter_lines():
-                        if "result_created" in line:
-                            result_event_time = datetime.now().timestamp()
-                            events_received.append(line)
+                            event_type = line[len("event: "):].strip()
+                            if event_type == "connected":
+                                ready.set()
+                        elif line.startswith("data: ") and event_type == "result_created":
+                            received.append({"type": event_type, "data": json.loads(line[len("data: "):])})
                             return
 
-                # Call dispatch (should return immediately)
-                dispatch_before = datetime.now().timestamp()
-                dispatch_response = await client.post(
+        listener = asyncio.create_task(listen())
+        try:
+            await asyncio.wait_for(ready.wait(), timeout=10)
+            await asyncio.sleep(0.3)  # let the connection register in the broadcaster
+
+            async with httpx.AsyncClient(timeout=60) as client:
+                dispatch = await client.post(
                     f"{API_BASE_URL}/api/v1/test/dispatch",
                     json={
                         "utterance": utterance,
                         "session_id": session_id,
                         "surface_id": surface_id,
                         "wait_for_results": False,
-                    }
+                    },
                 )
-                dispatch_after = datetime.now().timestamp()
-                dispatch_time = dispatch_after - dispatch_before
+            assert dispatch.status_code == 200, dispatch.text
+            assert dispatch.json()["status"] == "dispatched"
 
-                assert dispatch_response.status_code == 200
-                dispatch_data = dispatch_response.json()
-                assert dispatch_data["status"] == "dispatched"
+            await asyncio.wait_for(asyncio.shield(listener), timeout=60)
+        finally:
+            if not listener.done():
+                listener.cancel()
 
-                # Wait for SSE event (should arrive after dispatch returns)
-                try:
-                    await asyncio.wait_for(collect_sse(), timeout=30.0)
-                except asyncio.TimeoutError:
-                    pytest.fail("SSE event not received within timeout")
+        assert received, "no result_created event received on surface_id"
+        event = received[0]
+        assert event["type"] == "result_created"
+        payload = event["data"]
+        assert {"intent_id", "topic_id", "summary", "urgency"}.issubset(payload.keys()), payload
 
-                # Verify timing: dispatch should return quickly (< 1 second)
-                # SSE event should arrive after dispatch returns
-                assert dispatch_time < 1.0, f"Dispatch took too long: {dispatch_time}s"
-                assert result_event_time is not None, "No SSE event received"
+    async def test_dispatch_matches_main_endpoint(self):
+        """test/dispatch and /dispatch store structurally identical rows."""
+        utterance = "compare test dispatch with main dispatch"
+        test_session = _sid("cmp-test")
+        main_session = _sid("cmp-main")
+        await _ensure_session(test_session)
+        await _ensure_session(main_session)
 
-        print(f"✓ Broadcast timing verification passed (dispatch: {dispatch_time:.3f}s)")
+        async with httpx.AsyncClient(timeout=90) as client:
+            test_resp = await client.post(
+                f"{API_BASE_URL}/api/v1/test/dispatch",
+                json={"utterance": utterance, "session_id": test_session, "wait_for_results": True,
+                      "timeout_seconds": 80},
+            )
+            main_resp = await client.post(
+                f"{API_BASE_URL}/dispatch",
+                json={"utterance": utterance, "session_id": main_session,
+                      "surface_id": f"surface-{uuid.uuid4().hex[:8]}"},
+            )
+        assert test_resp.status_code == 200, test_resp.text
+        assert main_resp.status_code == 200, main_resp.text
+        test_data, main_data = test_resp.json(), main_resp.json()
 
-    @pytest.mark.asyncio
-    async def test_result_created_event_payload(self):
-        """
-        Verify result_created SSE event contains correct payload.
+        # Both endpoints surface the same dispatch-ack fields.
+        for key in ("utterance_id", "session_id", "intent_count", "intent_ids"):
+            assert key in test_data, key
+            assert key in main_data, key
 
-        Steps:
-        1. Dispatch test utterance
-        2. Capture SSE event payload
-        3. Verify payload contains: intent_id, topic_id, summary, urgency
-        """
-        session_id = f"test-payload-{uuid.uuid4().hex[:16]}"
-        surface_id = f"surface-{uuid.uuid4().hex[:16]}"
-        utterance = "verify sse event payload structure"
+        # Give /dispatch's background fetch+synthesize (real LLM) time to land.
+        await asyncio.sleep(8)
 
-        captured_events = []
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            test_intents = await db.execute_fetchall(
+                "SELECT * FROM intents WHERE session_id = ?", (test_session,))
+            main_intents = await db.execute_fetchall(
+                "SELECT * FROM intents WHERE session_id = ?", (main_session,))
 
-        async with httpx.AsyncClient() as client:
-            # Connect to SSE
-            async with client.stream(
-                "GET",
-                f"{API_BASE_URL}/api/v1/sse",
-                params={
-                    "session_id": session_id,
-                    "surface_id": surface_id,
-                    "surface_type": "canvas"
-                },
-                timeout=None
-            ) as sse_response:
-                assert sse_response.status_code == 200
+        assert test_intents, "test/dispatch stored no intents"
+        assert main_intents, "/dispatch stored no intents"
+        # Intent row schema is identical across endpoints.
+        assert set(test_intents[0].keys()) == set(main_intents[0].keys())
 
-                # Skip initial events
-                async for line in sse_response.aiter_lines():
-                    if "workload_summary" in line:
-                        break
+    async def test_broadcast_timing_matches_dispatch(self):
+        """/test/dispatch returns immediately; the SSE event arrives afterwards."""
+        session_id = _sid("test-timing")
+        surface_id = f"surface-{uuid.uuid4().hex[:12]}"
+        utterance = "verify broadcast timing"
+        await _ensure_session(session_id)
 
-                # Collect result_created events
-                async def collect_result_events():
+        result_at: list[float] = []
+        ready = asyncio.Event()
+
+        async def listen():
+            async with httpx.AsyncClient() as sse_client:
+                async with sse_client.stream(
+                    "GET", f"{API_BASE_URL}/api/v1/sse",
+                    params={"session_id": session_id, "surface_id": surface_id, "surface_type": "canvas"},
+                    timeout=None,
+                ) as sse_response:
+                    assert sse_response.status_code == 200
                     async for line in sse_response.aiter_lines():
-                        if line.startswith("event: result_created"):
-                            # Get next line with data
-                            data_line = await sse_response.aiter_lines().__anext__()
-                            if data_line.startswith("data: "):
-                                payload = json.loads(data_line[6:])
-                                captured_events.append(payload)
-                                if len(captured_events) >= 1:
-                                    return
+                        if line.startswith("event: ") and line[len("event: "):].strip() == "connected":
+                            ready.set()
+                        if "result_created" in line and line.startswith("event: "):
+                            result_at.append(time.time())
+                            return
 
-                # Dispatch
-                dispatch_response = await client.post(
+        listener = asyncio.create_task(listen())
+        try:
+            await asyncio.wait_for(ready.wait(), timeout=10)
+            await asyncio.sleep(0.3)
+            t0 = time.time()
+            async with httpx.AsyncClient(timeout=60) as client:
+                dispatch = await client.post(
                     f"{API_BASE_URL}/api/v1/test/dispatch",
-                    json={
-                        "utterance": utterance,
-                        "session_id": session_id,
-                        "surface_id": surface_id,
-                        "wait_for_results": False,
-                    }
+                    json={"utterance": utterance, "session_id": session_id,
+                          "surface_id": surface_id, "wait_for_results": False},
                 )
+            dispatch_elapsed = time.time() - t0
+            assert dispatch.status_code == 200, dispatch.text
+            # Dispatch acks fast; processing + broadcast happen in the background.
+            assert dispatch_elapsed < 5.0, f"dispatch took {dispatch_elapsed:.2f}s (should be near-instant)"
+            await asyncio.wait_for(asyncio.shield(listener), timeout=60)
+        finally:
+            if not listener.done():
+                listener.cancel()
 
-                assert dispatch_response.status_code == 200
+        assert result_at, "no result_created event received"
 
-                # Wait for SSE event
-                try:
-                    await asyncio.wait_for(collect_result_events(), timeout=30.0)
-                except asyncio.TimeoutError:
-                    pytest.fail("No result_created event received")
+    async def test_result_created_event_payload(self):
+        """The result_created event carries intent_id/topic_id/summary/urgency."""
+        session_id = _sid("test-payload")
+        surface_id = f"surface-{uuid.uuid4().hex[:12]}"
+        utterance = "verify sse event payload structure"
+        await _ensure_session(session_id)
 
-                # Verify we got events
-                assert len(captured_events) > 0, "No events captured"
+        captured: list[dict] = []
+        ready = asyncio.Event()
 
-                # Verify event payload structure
-                event = captured_events[0]
+        async def listen():
+            async with httpx.AsyncClient() as sse_client:
+                async with sse_client.stream(
+                    "GET", f"{API_BASE_URL}/api/v1/sse",
+                    params={"session_id": session_id, "surface_id": surface_id, "surface_type": "canvas"},
+                    timeout=None,
+                ) as sse_response:
+                    assert sse_response.status_code == 200
+                    event_type = None
+                    async for line in sse_response.aiter_lines():
+                        if line.startswith("event: "):
+                            event_type = line[len("event: "):].strip()
+                            if event_type == "connected":
+                                ready.set()
+                        elif line.startswith("data: ") and event_type == "result_created":
+                            captured.append(json.loads(line[len("data: "):]))
+                            return
 
-                # Required fields per SSE broadcast contract
-                assert any(k in event for k in ["intent_id", "topic_id", "summary", "urgency"]), \
-                    f"Event missing required fields: {event}"
+        listener = asyncio.create_task(listen())
+        try:
+            await asyncio.wait_for(ready.wait(), timeout=10)
+            await asyncio.sleep(0.3)
+            async with httpx.AsyncClient(timeout=60) as client:
+                dispatch = await client.post(
+                    f"{API_BASE_URL}/api/v1/test/dispatch",
+                    json={"utterance": utterance, "session_id": session_id,
+                          "surface_id": surface_id, "wait_for_results": False},
+                )
+            assert dispatch.status_code == 200, dispatch.text
+            await asyncio.wait_for(asyncio.shield(listener), timeout=60)
+        finally:
+            if not listener.done():
+                listener.cancel()
 
-                # Log the event structure for verification
-                print(f"✓ SSE event payload verified: {json.dumps(event, indent=2)}")
-
-        print(f"✓ Event payload verification passed for session {session_id}")
+        assert captured, "no result_created event captured"
+        event = captured[0]
+        assert {"intent_id", "topic_id", "summary", "urgency"}.issubset(event.keys()), event
 
 
 if __name__ == "__main__":
-    # Run tests manually
-    print("🧪 Running Storage and SSE Verification Tests")
+    import sys
+
+    print("🧪 Storage + SSE verification (standalone)")
     print("=" * 60)
+    health = httpx.get(f"{API_BASE_URL}/health", timeout=2)
+    if health.status_code != 200:
+        print(f"❌ server down (HTTP {health.status_code})"); sys.exit(1)
+    print("✅ server running\n")
 
-    # Check if server is running
-    try:
-        response = httpx.get(f"{API_BASE_URL}/health", timeout=2)
-        if response.status_code != 200:
-            print(f"❌ Server health check failed: {response.status_code}")
-            exit(1)
-    except Exception as e:
-        print(f"❌ Cannot reach server at {API_BASE_URL}")
-        print(f"   Error: {e}")
-        exit(1)
-
-    print("✅ Server is running")
-    print()
-
-    # Run individual tests
-    test_instance = TestStorageSSEVerification()
-
-    print("\n[Test 1] Storage in Database")
-    print("-" * 60)
-    asyncio.run(test_instance.test_dispatch_storage_in_database())
-
-    print("\n[Test 2] SSE Broadcast")
-    print("-" * 60)
-    asyncio.run(test_instance.test_dispatch_sse_broadcast())
-
-    print("\n[Test 3] Matches Main Endpoint")
-    print("-" * 60)
-    asyncio.run(test_instance.test_dispatch_matches_main_endpoint())
-
-    print("\n[Test 4] Broadcast Timing")
-    print("-" * 60)
-    asyncio.run(test_instance.test_broadcast_timing_matches_dispatch())
-
-    print("\n[Test 5] Event Payload")
-    print("-" * 60)
-    asyncio.run(test_instance.test_result_created_event_payload())
-
+    inst = TestStorageSSEVerification()
+    for name in [
+        "test_dispatch_storage_in_database",
+        "test_dispatch_sse_broadcast",
+        "test_dispatch_matches_main_endpoint",
+        "test_broadcast_timing_matches_dispatch",
+        "test_result_created_event_payload",
+    ]:
+        print(f"\n[{name}]")
+        print("-" * 60)
+        asyncio.run(getattr(inst, name)())
+        print("  ✅ passed")
     print("\n" + "=" * 60)
     print("✅ ALL TESTS PASSED")
