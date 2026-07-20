@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from .realtime.session import VoiceSession, load_voice_prompt, AVAILABLE_VOICES
 from .realtime.dispatch import dispatch_intent, result_listener
 from .realtime.continuity import handle_surface_switch
+from ._version import read_version
 from .session.store import get_store as session_store_get_store
 from .memory.extraction import create_memory_handler
 from .sse.broadcaster import SSEBroadcaster, get_broadcaster, EventType, SSEEvent
@@ -193,15 +194,7 @@ async def lifespan(app: FastAPI):
     logger.info("aide-de-camp shutdown complete")
 
 
-def _read_version() -> str:
-    try:
-        import tomllib
-        pyproject = Path(__file__).parent.parent / "pyproject.toml"
-        return tomllib.loads(pyproject.read_text())["project"]["version"]
-    except Exception:
-        return "0.0.0"
-
-app = FastAPI(title="ADC (aide-de-camp)", version=_read_version(), lifespan=lifespan)
+app = FastAPI(title="ADC (aide-de-camp)", version=read_version(), lifespan=lifespan)
 
 # Include test router
 app.include_router(test_router, prefix="/api/v1", tags=["test"])

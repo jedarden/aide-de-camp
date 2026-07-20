@@ -14,6 +14,15 @@ import httpx
 from .config import get_config
 from . import commands
 
+# Shared version reader (src/_version.py). The CLI is normally launched via
+# ./adc, which puts src/ on sys.path so _version is importable as a top-level
+# module; the fallback covers being imported as src.cli.main (e.g. from the
+# repo root, where src is a package and the helper lives at src._version).
+try:
+    from _version import read_version
+except ImportError:
+    from .._version import read_version
+
 
 class CLIError(Exception):
     """Base exception for CLI errors."""
@@ -38,7 +47,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 0.1.0",
+        version=f"%(prog)s {read_version()}",
     )
 
     parser.add_argument(
