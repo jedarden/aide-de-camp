@@ -443,10 +443,8 @@ aide-de-camp/
 │   │   ├── signals.py           ← implicit feedback signal tracking
 │   │   └── background_analysis.py ← background analysis bead
 │   ├── fetch/               ← fetch strand (deterministic, per intent type)
-│   │   ├── commands.py          ← fetch command matrix
-│   │   ├── executor.py          ← command executor
-│   │   ├── orchestrator.py      ← parallel fetch orchestration
-│   │   └── strand.py            ← fetch strand entry point
+│   │   ├── commands.py          ← fetch command matrix, intent types, data structures
+│   │   └── orchestrator.py      ← FetchStrand: concurrent fetch execution, streaming, coverage tracking
 │   ├── intent/              ← intent router (LLM classification)
 │   │   └── router.py            ← intent segmentation and routing
 │   ├── memory/              ← memory store and extraction
@@ -464,12 +462,15 @@ aide-de-camp/
 │   ├── sse/                 ← SSE broadcasting
 │   │   ├── broadcaster.py       ← SSE connection registry
 │   │   └── events.py            ← SSE event types
+│   ├── stt/                 ← speech-to-text (whisper-stt browser fallback)
+│   │   └── fallback.py          ← STT fallback client behind /api/v1/stt
 │   ├── surface/             ← surface routing
 │   │   └── router.py            ← result surface routing logic
 │   ├── synthesize/          ← synthesize strand (LLM)
 │   │   └── strand.py            ← result synthesis
 │   ├── telegram/            ← Telegram fallback surface
 │   │   └── fallback.py          ← Telegram delivery
+│   ├── test/                ← test-harness endpoints (bypass Web Speech API for e2e tests)
 │   ├── topic/               ← topic model
 │   │   └── model.py             ← topic operations
 │   ├── watcher/             ← bead watcher daemon
