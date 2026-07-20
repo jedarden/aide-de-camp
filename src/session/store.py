@@ -5,6 +5,8 @@ Stores sessions, surfaces, utterances, intents, results, topics, and intent_topi
 Provides concurrent read access with serialized writes via WAL mode.
 """
 
+import os
+
 import aiosqlite
 import sqlite3
 from datetime import datetime
@@ -13,6 +15,10 @@ from typing import Optional
 from uuid import uuid4
 
 import httpx
+
+# Default DB path. Overridable via ADC_DB_PATH env var so tests can point at an
+# isolated temp/in-memory DB instead of the production data/session.db.
+DEFAULT_DB_PATH = Path("/home/coding/aide-de-camp/data/session.db")
 
 # Schema definition
 SCHEMA_SQL = """
@@ -223,6 +229,70 @@ class SessionStore:
                 (surface_id, session_id)
             )
             await db.commit()
+
+    async def delete_session(self, session_id: str) -> dict:
+        """Delete a session and every row tied to it. Returns a removal summary.
+
+        Used by test teardown (DELETE /api/v1/sessions/{id}) to guarantee a
+        session and all its topics/results/intents/utterances/surfaces/signal
+        rows are gone. Note: SQLite FK ``ON DELETE CASCADE`` is *not* enforced
+        here (``PRAGMA foreign_keys`` is never enabled), so child rows are
+        deleted explicitly, in dependency order, within one transaction.
+
+        The topics table references sessions with ``ON DELETE SET NULL``, so
+        topics are *not* cascade-removed even if FKs were on — deleting them
+        explicitly is required for a true clean teardown.
+
+        Returns ``{"session_removed": 0|1, "topics_removed": <int>}``.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+
+            # Count what we're about to remove (before deleting).
+            async with db.execute(
+                "SELECT COUNT(*) FROM topics WHERE session_id = ?", (session_id,)
+            ) as cur:
+                topics_removed = (await cur.fetchone())[0]
+            async with db.execute(
+                "SELECT 1 FROM sessions WHERE id = ?", (session_id,)
+            ) as cur:
+                session_removed = 1 if await cur.fetchone() else 0
+
+            # Children first, parents last (matches FK dependency order).
+            await db.execute(
+                "DELETE FROM feedback_signals WHERE session_id = ?", (session_id,)
+            )
+            await db.execute(
+                "DELETE FROM results WHERE session_id = ?", (session_id,)
+            )
+            await db.execute(
+                "DELETE FROM intent_topics WHERE intent_id IN "
+                "(SELECT id FROM intents WHERE session_id = ?)",
+                (session_id,),
+            )
+            await db.execute(
+                "DELETE FROM intents WHERE session_id = ?", (session_id,)
+            )
+            await db.execute(
+                "DELETE FROM utterances WHERE session_id = ?", (session_id,)
+            )
+            await db.execute(
+                "DELETE FROM topic_context_cache WHERE topic_id IN "
+                "(SELECT id FROM topics WHERE session_id = ?)",
+                (session_id,),
+            )
+            await db.execute(
+                "DELETE FROM topics WHERE session_id = ?", (session_id,)
+            )
+            await db.execute(
+                "DELETE FROM surfaces WHERE session_id = ?", (session_id,)
+            )
+            await db.execute(
+                "DELETE FROM sessions WHERE id = ?", (session_id,)
+            )
+            await db.commit()
+
+        return {"session_removed": session_removed, "topics_removed": topics_removed}
 
     # Surface operations
     async def register_surface(
@@ -793,10 +863,16 @@ _store: SessionStore | None = None
 
 
 def get_store(db_path: Path | None = None) -> SessionStore:
-    """Get or create the global session store instance."""
+    """Get or create the global session store instance.
+
+    When db_path is not given, resolves in this order:
+      1. ADC_DB_PATH env var (used by tests to isolate from production data)
+      2. DEFAULT_DB_PATH (data/session.db)
+    """
     global _store
     if _store is None:
         if db_path is None:
-            db_path = Path("/home/coding/aide-de-camp/data/session.db")
+            env_path = os.environ.get("ADC_DB_PATH")
+            db_path = Path(env_path) if env_path else DEFAULT_DB_PATH
         _store = SessionStore(db_path)
     return _store
