@@ -16,6 +16,7 @@ from typing import Optional
 from ..session.store import SessionStore
 from ..sse.broadcaster import broadcast_result
 from ..surface.router import SurfaceRouter
+from ..telegram.fallback import TelegramFallback, get_telegram_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +66,19 @@ class BeadWatcher:
         store: SessionStore,
         router: SurfaceRouter,
         beads_jsonl: str | None = None,
+        telegram_fallback: TelegramFallback | None = None,
     ):
         self.store = store
         self.router = router
         # Allow tests / alternate workspaces to point at a scratch checkpoint.
         self._beads_jsonl = beads_jsonl or self.BEADS_JSONL
+        # Telegram delivery surface. Defaults to None and is resolved lazily to
+        # the shared singleton (get_telegram_fallback) on first send, so the
+        # bead watcher uses the SAME configured chat id, bridge URL,
+        # reachability, and failure-tracking state as send_exception() /
+        # send_workload_summary() in src/telegram/fallback.py. Injectable so
+        # tests can drive the delivery path with a fake. (adc-372c)
+        self._telegram_fallback = telegram_fallback
         self._running = False
         self._task: Optional[asyncio.Task] = None
         # Bead IDs we have already delivered. In-memory only, so a process
@@ -260,32 +269,30 @@ class BeadWatcher:
             "surfaced_at": int(datetime.now().timestamp()),
         }
 
-    async def _send_to_telegram(self, result: dict, session_id: str) -> None:
-        """Send result to Telegram via telegram-claude-bridge.
+    async def _send_to_telegram(self, result: dict, session_id: str) -> bool:
+        """Send a result to Telegram via the shared TelegramFallback singleton.
 
-        NOTE: This requires a session→telegram_chat_id mapping. Current implementation
-        logs a warning because telegram-claude-bridge uses a pull-based architecture
-        (manages sessions internally per forum topic) rather than push-based message delivery.
+        Uses the single configured chat id (ADC_TELEGRAM_CHAT_ID) -- there is
+        intentionally NO multi-user session→chat mapping, since aide-de-camp is
+        a single-user personal app (plan.md Tech Stack: "single-user app"). When
+        no chat id is configured this is a graceful no-op: a WARNING is logged
+        and False is returned, matching send_exception() /
+        send_workload_summary() and the pre-config behavior. When configured,
+        the result is formatted via ``_format_telegram_message`` and delivered
+        through ``send_message``, returning the bridge's real success/failure.
         """
-        try:
-            # telegram-claude-bridge proxy expects actual Telegram chat_id (int64), not session_id
-            # Since we don't have a session→chat mapping, log this as unavailable
+        fallback = self._telegram_fallback or get_telegram_fallback()
+
+        if fallback.chat_id is None:
             logger.warning(
                 f"Cannot send result to Telegram for session {session_id}: "
-                f"session→telegram_chat mapping not implemented. "
-                f"telegram-claude-bridge uses pull-based architecture (per forum topic sessions)."
+                f"no Telegram chat id configured (set ADC_TELEGRAM_CHAT_ID). "
+                f"Result push skipped."
             )
+            return False
 
-            # Correct contract for reference (if mapping is implemented later):
-            # POST http://telegram-claude-bridge:8000/send
-            # {
-            #   "chat_id": 123456789,  # int64, REQUIRED - actual Telegram chat ID
-            #   "text": "message",     # string, REQUIRED - message content
-            #   "parse_mode": "HTML"   # string, OPTIONAL
-            # }
-
-        except Exception as e:
-            logger.error(f"Error in Telegram send logic: {e}")
+        message = self._format_telegram_message(result)
+        return await fallback.send_message(fallback.chat_id, message)
 
     def _format_telegram_message(self, result: dict) -> str:
         """Format result as Telegram message."""

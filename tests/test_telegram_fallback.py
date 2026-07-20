@@ -4,6 +4,9 @@ Unit tests for Telegram fallback integration.
 
 import os
 
+import httpx
+import pytest
+
 from src.telegram.fallback import TelegramFallback, get_telegram_fallback
 
 
@@ -444,3 +447,158 @@ class TestPerFailureTypeDedup:
         debugs = [r for r in caplog.records if r.levelname == "DEBUG"]
         assert len(warnings) == 2
         assert debugs == []  # no summary spam — window was reseeded
+
+
+# --- configured-chat-id delivery (adc-372c) --------------------------------
+
+class _FakeResponse:
+    """Minimal httpx.Response stand-in."""
+
+    def __init__(self, status_code: int = 200, text: str = "ok"):
+        self.status_code = status_code
+        self.text = text
+
+
+class _FakeAsyncClient:
+    """Stand-in for httpx.AsyncClient that records every POST.
+
+    send_message() does ``async with httpx.AsyncClient() as client: ... await
+    client.post(url, json=..., timeout=...)``. We replace
+    ``httpx.AsyncClient`` in the fallback module with a callable returning this
+    object, so the real network is never touched and the exact payload is
+    captured for assertions.
+    """
+
+    def __init__(self):
+        self.posted: list[tuple] = []  # (url, json, timeout)
+        self.response = _FakeResponse(200, "ok")
+        self.raise_exc: Exception | None = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def post(self, url, json=None, timeout=None):
+        self.posted.append((url, json, timeout))
+        if self.raise_exc is not None:
+            raise self.raise_exc
+        return self.response
+
+
+@pytest.fixture
+def fake_httpx(monkeypatch):
+    """Patch httpx.AsyncClient in the fallback module; return the fake client."""
+    import src.telegram.fallback as fb_module
+    client = _FakeAsyncClient()
+    monkeypatch.setattr(fb_module.httpx, "AsyncClient", lambda: client)
+    return client
+
+
+class TestConfiguredChatIdDelivery:
+    """send_exception / send_workload_summary make a real POST when chat_id is set.
+
+    These pin the adc-372c contract: with ADC_TELEGRAM_CHAT_ID configured the
+    methods actually call send_message → POST /send and return the bridge's real
+    success/failure, instead of unconditionally returning False.
+    """
+
+    def test_chat_id_resolved_from_env(self, monkeypatch):
+        monkeypatch.setenv("ADC_TELEGRAM_CHAT_ID", "424242")
+        fb = TelegramFallback(bridge_url="http://test-bridge:8000")
+        assert fb.chat_id == "424242"
+
+    def test_chat_id_constructor_arg_overrides_env(self, monkeypatch):
+        monkeypatch.setenv("ADC_TELEGRAM_CHAT_ID", "424242")
+        fb = TelegramFallback(bridge_url="http://test-bridge:8000", chat_id=999)
+        assert fb.chat_id == 999
+
+    async def test_send_exception_posts_to_configured_chat_id(self, fake_httpx, monkeypatch):
+        monkeypatch.setenv("ADC_TELEGRAM_CHAT_ID", "424242")
+        fb = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        ok = await fb.send_exception(
+            "session-1",
+            {"title": "Disk full", "urgency": "critical", "context": "cleanup the logs"},
+        )
+
+        assert ok is True
+        assert len(fake_httpx.posted) == 1
+        url, payload, timeout = fake_httpx.posted[0]
+        assert url == "http://test-bridge:8000/send"
+        # str chat_id is coerced to int by send_message (bridge wants int64).
+        assert payload["chat_id"] == 424242
+        assert payload["parse_mode"] == "HTML"
+        # Body is produced by _format_exception_message, not the raw dict.
+        assert "Disk full" in payload["text"]
+        assert "cleanup the logs" in payload["text"]
+
+    async def test_send_workload_summary_posts_to_configured_chat_id(self, fake_httpx, monkeypatch):
+        monkeypatch.setenv("ADC_TELEGRAM_CHAT_ID", "999")
+        fb = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        ok = await fb.send_workload_summary(
+            "session-1",
+            {"pending_intents": 2, "new_results": 1, "unresolved_exceptions": 0},
+        )
+
+        assert ok is True
+        assert len(fake_httpx.posted) == 1
+        url, payload, _ = fake_httpx.posted[0]
+        assert url == "http://test-bridge:8000/send"
+        assert payload["chat_id"] == 999
+        # Body is produced by _format_workload_summary.
+        assert "Workload Summary" in payload["text"]
+        assert "Pending intents: 2" in payload["text"]
+        assert "New results: 1" in payload["text"]
+
+    async def test_send_exception_returns_false_on_non_2xx(self, fake_httpx, monkeypatch):
+        """A real POST is attempted; the bridge's failure is returned, not False-by-default."""
+        monkeypatch.setenv("ADC_TELEGRAM_CHAT_ID", "1")
+        fb = TelegramFallback(bridge_url="http://test-bridge:8000")
+        fake_httpx.response = _FakeResponse(500, "upstream down")
+
+        ok = await fb.send_exception("session-1", {"title": "x"})
+
+        assert ok is False
+        assert len(fake_httpx.posted) == 1  # a real POST was attempted
+
+    async def test_send_exception_returns_false_on_request_error(self, fake_httpx, monkeypatch):
+        monkeypatch.setenv("ADC_TELEGRAM_CHAT_ID", "1")
+        fb = TelegramFallback(bridge_url="http://test-bridge:8000")
+        fake_httpx.raise_exc = httpx.ConnectError("connection refused")
+
+        ok = await fb.send_exception("session-1", {"title": "x"})
+
+        assert ok is False
+        assert len(fake_httpx.posted) == 1
+
+
+class TestUnconfiguredChatIdNoOp:
+    """Without a chat id the push methods gracefully no-op (no regression)."""
+
+    async def test_send_exception_no_op_without_chat_id(self, caplog, monkeypatch):
+        monkeypatch.delenv("ADC_TELEGRAM_CHAT_ID", raising=False)
+        fb = TelegramFallback(bridge_url="http://test-bridge:8000")
+        assert fb.chat_id is None
+
+        with caplog.at_level("WARNING"):
+            ok = await fb.send_exception("session-1", {"title": "x"})
+
+        assert ok is False
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        assert "ADC_TELEGRAM_CHAT_ID" in warnings[0].message
+
+    async def test_send_workload_summary_no_op_without_chat_id(self, caplog, monkeypatch):
+        monkeypatch.delenv("ADC_TELEGRAM_CHAT_ID", raising=False)
+        fb = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("WARNING"):
+            ok = await fb.send_workload_summary("session-1", {"pending_intents": 1})
+
+        assert ok is False
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        assert "ADC_TELEGRAM_CHAT_ID" in warnings[0].message
