@@ -529,3 +529,126 @@ class TestFallbackOnMalformedResponse:
         assert len(classifications) == 1
         assert classifications[0].intent_type == IntentType.STATUS
         assert classifications[0].confidence < 0.6  # flagged as low-confidence
+
+
+# --- 7. edge cases: empty/ambiguous inputs (bead adc-5qdx) ------------------
+#
+# The classes above cover the happy path for every IntentType plus malformed
+# responses. This class closes the edge-case gap called out in the acceptance
+# criteria — empty strings, whitespace-only input, zero-intent responses, and
+# stripped-down LLM payloads missing optional fields. The ZAI client is still
+# mocked, so each case is deterministic: we feed the exact JSON envelope the
+# router would receive for that degenerate input and assert it degrades safely
+# rather than raising.
+
+
+class TestEdgeCases:
+    """Empty, whitespace, and ambiguous inputs must classify without raising."""
+
+    @pytest.mark.asyncio
+    async def test_empty_string_utterance_classifies_to_clarification(self, router):
+        """
+        An empty utterance must flow through classify_utterance without raising.
+        A realistic LLM response for empty input is a single low-confidence
+        clarification; the router must reproduce that verdict.
+        """
+        canned = json.dumps([{
+            "intent_type": "clarification",
+            "utterance_fragment": "",
+            "confidence": 0.2,
+            "reasoning": "empty utterance, nothing to route",
+        }])
+        r = _make_router_with_response(router, canned)
+
+        [classification] = await r.classify_utterance("", "session-test")
+
+        assert classification.intent_type == IntentType.CLARIFICATION
+        assert classification.utterance_fragment == ""
+
+    @pytest.mark.asyncio
+    async def test_whitespace_only_utterance_does_not_crash(self, router):
+        """Whitespace-only input is no different structurally from empty."""
+        canned = json.dumps([{
+            "intent_type": "clarification",
+            "utterance_fragment": "",
+            "confidence": 0.1,
+            "reasoning": "whitespace only",
+        }])
+        r = _make_router_with_response(router, canned)
+
+        [classification] = await r.classify_utterance("   \n\t  ", "session-test")
+
+        assert classification.intent_type == IntentType.CLARIFICATION
+
+    @pytest.mark.asyncio
+    async def test_empty_intent_array_returns_empty_list(self, router):
+        """
+        If the LLM segments the utterance into zero intents (empty JSON array),
+        the router returns an empty list — not None, not a crash, not a
+        synthesized fallback. Callers must tolerate [].
+        """
+        r = _make_router_with_response(router, "[]")
+
+        classifications = await r.classify_utterance(
+            "anything — model returned no intents", "session-test"
+        )
+
+        assert classifications == []
+
+    @pytest.mark.asyncio
+    async def test_missing_optional_fields_use_defaults(self, router):
+        """
+        The router must tolerate a minimal payload containing only intent_type.
+        Every optional field falls back to a defined default rather than
+        KeyError/AttributeError. Locks the .get()-with-default contract in
+        classify_utterance against drift in the IntentClassification dataclass.
+        """
+        utterance = "show me the deploy status"
+        canned = json.dumps([{"intent_type": "status"}])
+        r = _make_router_with_response(router, canned)
+
+        [classification] = await r.classify_utterance(utterance, "session-test")
+
+        assert classification.intent_type == IntentType.STATUS
+        assert classification.project_slug is None
+        assert classification.urgency == "normal"
+        assert classification.reasoning == ""
+        # confidence default in the parser is 0.8 (NOT the dataclass's 1.0).
+        assert classification.confidence == pytest.approx(0.8)
+        # fragment falls back to the full utterance when the LLM omits it.
+        assert classification.utterance_fragment == utterance
+
+    @pytest.mark.asyncio
+    async def test_deeply_ambiguous_fragment_routes_to_clarification(self, router):
+        """
+        Per prompts/router.md, confidence < 0.7 routes to clarification. A
+        maximally ambiguous fragment ("hmm") yields a clarification intent with
+        sub-threshold confidence — the router must surface that meta-type intact
+        rather than forcing a best-guess dispatch.
+        """
+        canned = json.dumps([{
+            "intent_type": "clarification",
+            "utterance_fragment": "hmm",
+            "confidence": 0.35,
+            "reasoning": "no actionable signal in the utterance",
+        }])
+        r = _make_router_with_response(router, canned)
+
+        [classification] = await r.classify_utterance("hmm", "session-test")
+
+        assert classification.intent_type == IntentType.CLARIFICATION
+        assert classification.confidence < 0.7
+
+    @pytest.mark.asyncio
+    async def test_missing_intent_type_field_defaults_to_status(self, router):
+        """
+        An intent object with no intent_type key at all must fall back to STATUS
+        (the parser's documented default) rather than raising — mirrors the
+        unknown-string fallback but for the field-absent case.
+        """
+        canned = json.dumps([{"utterance_fragment": "something"}])
+        r = _make_router_with_response(router, canned)
+
+        [classification] = await r.classify_utterance("something", "session-test")
+
+        assert classification.intent_type == IntentType.STATUS
