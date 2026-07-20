@@ -328,3 +328,119 @@ class TestFailureLogRateLimiting:
         assert fallback._last_repeated_log_timestamp is None
         assert fallback._failures_since_last_log == 0
         assert fallback._failure_count == 4  # diagnostic counter retained
+
+
+class TestPerFailureTypeDedup:
+    """Test per-failure-type deduplication (adc-15u0).
+
+    The pre-existing global cooldown dedups a sustained SAME-type outage. These
+    tests cover the additional requirement: a DIFFERENT failure type appearing
+    mid-outage is logged immediately and independently, never swallowed by the
+    ongoing-outage cooldown.
+    """
+
+    async def test_new_failure_type_logged_immediately_during_cooldown(self, caplog):
+        """A new failure type inside the cooldown window still gets a WARNING."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("WARNING"):
+            # Type A: the umbrella first-failure WARNING.
+            await fallback._handle_send_failure(error=ConnectionError("boom"))
+            # Type B: a different type, still within A's cooldown window, must be
+            # logged immediately rather than silently deduped.
+            await fallback._handle_send_failure(error=TimeoutError("timed out"))
+
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 2
+        assert "First Telegram send failure" in warnings[0].message
+        assert "ConnectionError" in warnings[0].message
+        assert "New Telegram send failure type" in warnings[1].message
+        assert "TimeoutError" in warnings[1].message
+
+    async def test_distinct_failure_types_each_get_own_warning(self, caplog):
+        """Three distinct failure types → three independent WARNINGs."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("WARNING"):
+            await fallback._handle_send_failure(error=ConnectionError("a"))
+            await fallback._handle_send_failure(error=TimeoutError("b"))
+            await fallback._handle_send_failure(error=ValueError("c"))
+
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 3
+        messages = "\n".join(w.message for w in warnings)
+        assert "ConnectionError" in messages
+        assert "TimeoutError" in messages
+        assert "ValueError" in messages
+        assert fallback._failure_count == 3
+        assert fallback._seen_failure_types == {
+            "ConnectionError", "TimeoutError", "ValueError"
+        }
+
+    async def test_repeats_of_seen_types_are_deduped(self, caplog):
+        """Once a type is seen, its repeats within the cooldown are suppressed."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("WARNING"):
+            await fallback._handle_send_failure(error=ConnectionError("a1"))  # WARNING (umbrella)
+            await fallback._handle_send_failure(error=TimeoutError("b1"))     # WARNING (new type)
+            await fallback._handle_send_failure(error=ConnectionError("a2"))  # seen → suppressed
+            await fallback._handle_send_failure(error=TimeoutError("b2"))     # seen → suppressed
+
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 2  # one per distinct type
+        assert fallback._failure_count == 4
+
+    async def test_seen_failure_types_exposed_in_status(self):
+        """get_bridge_status surfaces the distinct types logged this startup."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        await fallback._handle_send_failure(error=ConnectionError("a"))
+        await fallback._handle_send_failure(error=TimeoutError("b"))
+
+        status = fallback.get_bridge_status()
+        assert status["seen_failure_types"] == ["ConnectionError", "TimeoutError"]
+        assert status["distinct_failure_types"] == 2
+
+    async def test_status_seen_types_empty_at_startup(self):
+        """A fresh singleton has seen no failure types yet."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+        status = fallback.get_bridge_status()
+        assert status["seen_failure_types"] == []
+        assert status["distinct_failure_types"] == 0
+
+    async def test_reset_clears_seen_failure_types(self, caplog):
+        """After reset, a previously-seen type is treated as first again."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        await fallback._handle_send_failure(error=ConnectionError("a"))
+        assert fallback._seen_failure_types == {"ConnectionError"}
+
+        await fallback.reset_first_failure_state()
+        assert fallback._seen_failure_types == set()
+
+        caplog.clear()
+        with caplog.at_level("WARNING"):
+            # Same type as before, but reset re-armed detection → umbrella WARNING.
+            await fallback._handle_send_failure(error=ConnectionError("after reset"))
+
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        assert "First Telegram send failure" in warnings[0].message
+
+    async def test_new_type_seeds_cooldown_so_its_repeats_dont_spam(self, caplog):
+        """A new type's immediate WARNING reseeds the window for its own repeats."""
+        fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
+
+        with caplog.at_level("DEBUG"):
+            await fallback._handle_send_failure(error=ConnectionError("a"))  # WARNING
+            await fallback._handle_send_failure(error=TimeoutError("b"))     # WARNING (new)
+            # Repeat of the just-logged new type — must NOT emit a DEBUG summary
+            # because the new-type WARNING reseeded the cooldown window.
+            for _ in range(5):
+                await fallback._handle_send_failure(error=TimeoutError("b-repeat"))
+
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        debugs = [r for r in caplog.records if r.levelname == "DEBUG"]
+        assert len(warnings) == 2
+        assert debugs == []  # no summary spam — window was reseeded

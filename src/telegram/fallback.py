@@ -86,6 +86,12 @@ class TelegramFallback:
         self._first_failure_timestamp: Optional[datetime] = None  # set-once
         self._last_failure_timestamp: Optional[datetime] = None  # updated every failure
 
+        # Distinct failure types already logged (WARNING'd) this startup. Drives
+        # per-failure-type dedup (adc-15u0): a type NOT in this set is logged
+        # immediately and independently, so a new failure type is never swallowed
+        # by the ongoing-outage cooldown. Cleared by reset_first_failure_state.
+        self._seen_failure_types: set[str] = set()
+
         # Rate-limit / dedup window for repeated-failure logs. Failures that occur
         # inside a quiet window are counted silently; when the window elapses one
         # DEBUG summary is emitted reporting the burst size, then a new window
@@ -278,6 +284,9 @@ class TelegramFallback:
             - last_failure_timestamp: ISO-8601 string or None
             - failure_log_interval_seconds: float (configured rate-limit window)
             - failures_since_last_log: int (dedup counter for the current window)
+            - seen_failure_types: list[str] (distinct failure types logged this
+              startup; per-type dedup — adc-15u0)
+            - distinct_failure_types: int (len of seen_failure_types)
         """
         return {
             "reachable": self._is_reachable,
@@ -293,6 +302,8 @@ class TelegramFallback:
             if self._last_failure_timestamp else None,
             "failure_log_interval_seconds": self._failure_log_interval_seconds,
             "failures_since_last_log": self._failures_since_last_log,
+            "seen_failure_types": sorted(self._seen_failure_types),
+            "distinct_failure_types": len(self._seen_failure_types),
         }
 
     async def _handle_send_failure(
@@ -339,12 +350,18 @@ class TelegramFallback:
         inside, so the read-then-set of the flags cannot be interleaved by
         another coroutine.
 
-        Logging policy:
+        Logging policy (per-failure-type dedup, adc-15u0):
         - The FIRST failure after startup emits exactly one WARNING (the
-          ``_has_logged_first_failure`` False→True claim, one per process startup).
-        - Later failures are rate-limited: at most one DEBUG summary per
-          ``_failure_log_interval_seconds`` window. Failures inside a window are
-          counted silently (deduped) so a sustained outage cannot spam the log.
+          ``_has_logged_first_failure`` False→True claim, one per process startup)
+          and seeds that failure type's dedup window.
+        - A later failure of a NEW type (one not in ``_seen_failure_types``) is
+          logged immediately and independently with its own WARNING, so a
+          different failure type is never swallowed by the ongoing-outage
+          cooldown. It also (re)seeds the rate-limit window.
+        - A later failure of an already-seen type is rate-limited: at most one
+          DEBUG summary per ``_failure_log_interval_seconds`` window. Failures
+          inside a window are counted silently (deduped) so a sustained outage
+          cannot spam the log.
 
         ``_failure_count`` and ``_last_failure_timestamp`` are updated on every
         call regardless of whether anything is logged.
@@ -367,10 +384,15 @@ class TelegramFallback:
             error_type = "HTTPError"
             message = error_context or "unknown error"
 
+        is_new_failure_type = error_type not in self._seen_failure_types
+
         if not self._has_logged_first_failure:
             # First failure after startup — WARNING with error type + message.
+            # This is the single per-startup "umbrella" WARNING (adc-hyqc); it
+            # also records + seeds this failure type's dedup window.
             self._has_logged_first_failure = True
             self._first_failure_timestamp = now
+            self._seen_failure_types.add(error_type)
             # Seed the rate-limit window so the WARNING is not immediately
             # followed by a DEBUG storm.
             self._last_repeated_log_timestamp = now
@@ -378,13 +400,33 @@ class TelegramFallback:
             logger.warning(
                 f"First Telegram send failure detected at {self.bridge_url}. "
                 f"Error type: {error_type}. Error: {message}. "
-                f"Subsequent failures are rate-limited (one DEBUG summary per "
-                f"{self._failure_log_interval_seconds:g}s)."
+                f"Subsequent failures of the same type are rate-limited (one "
+                f"DEBUG summary per {self._failure_log_interval_seconds:g}s); "
+                f"a different failure type is logged independently."
             )
             return True
 
-        # Repeated failure — emit a DEBUG summary only when the rate-limit window
-        # has elapsed; otherwise count it silently to avoid log spam.
+        if is_new_failure_type:
+            # A DIFFERENT failure type appeared during an ongoing outage. Log it
+            # immediately and independently so it is never swallowed by the
+            # same-type cooldown (adc-15u0: per-failure-type dedup). (Re)seed the
+            # rate-limit window so this type's immediate repeats are deduped.
+            self._seen_failure_types.add(error_type)
+            self._last_repeated_log_timestamp = now
+            self._failures_since_last_log = 0
+            logger.warning(
+                f"New Telegram send failure type during ongoing outage at "
+                f"{self.bridge_url}: {error_type}. Error: {message}. "
+                f"Logged independently of the "
+                f"{self._failure_log_interval_seconds:g}s same-type cooldown. "
+                f"(Total failures: {self._failure_count}; distinct failure "
+                f"types: {len(self._seen_failure_types)}.)"
+            )
+            return False
+
+        # Repeated failure of an already-seen type — emit a DEBUG summary only
+        # when the rate-limit window has elapsed; otherwise count it silently to
+        # avoid log spam.
         if self._repeated_log_cooldown_elapsed(now):
             batch = self._failures_since_last_log  # failures accumulated since last log
             logger.debug(
@@ -412,6 +454,9 @@ class TelegramFallback:
             self._first_failure_timestamp = None
             self._last_repeated_log_timestamp = None
             self._failures_since_last_log = 0
+            # Re-arm per-type dedup so the next failure (even of a previously
+            # seen type) is treated as a fresh first occurrence.
+            self._seen_failure_types.clear()
 
     def _format_result_message(self, result: dict) -> str:
         """Format a result as a Telegram message."""
