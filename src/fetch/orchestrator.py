@@ -540,11 +540,11 @@ class FetchStrand:
 
         try:
             if context.ssh_target:
-                # Remote: check for .beads and run br via SSH in one shot
+                # Remote: check for .beads and run bf via SSH in one shot
                 proc = await asyncio.create_subprocess_exec(
                     "ssh", "-o", "ConnectTimeout=8", "-o", "BatchMode=yes",
                     context.ssh_target,
-                    f"cd {repo_path} && [ -f .beads/issues.jsonl ] && br list --status=open --limit=50 2>&1 || echo '{{\"error\":\"no beads workspace\"}}'",
+                    f"cd {repo_path} && [ -f .beads/issues.jsonl ] && bf list --status=open --limit=50 2>&1 || echo '{{\"error\":\"no beads workspace\"}}'",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -553,7 +553,7 @@ class FetchStrand:
                 if not (_Path(repo_path) / ".beads" / "issues.jsonl").exists():
                     return {"error": f"No .beads workspace at {repo_path}"}
                 proc = await asyncio.create_subprocess_exec(
-                    "br", "list", "--status=open", "--limit=50",
+                    "bf", "list", "--status=open", "--limit=50",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=repo_path,
@@ -575,10 +575,10 @@ class FetchStrand:
                     "count": len(beads) if isinstance(beads, list) else 0,
                 }
             else:
-                return {"error": stderr.decode().strip() or "br list returned non-zero"}
+                return {"error": stderr.decode().strip() or "bf list returned non-zero"}
 
         except FileNotFoundError:
-            return {"error": "br CLI not found in PATH"}
+            return {"error": "bf CLI not found in PATH"}
         except Exception as e:
             return {"error": str(e)}
 

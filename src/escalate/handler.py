@@ -3,7 +3,7 @@ Escalate handler - handles task-profile intents requiring bead escalation.
 
 For intents that need durable async handling:
 1. Formulate bead body via LLM (sonnet-class via ZAI proxy)
-2. Create bead using br CLI
+2. Create bead using bf CLI
 3. Return pending-card spec with bead reference
 
 The bead watcher bridges bead closure to result delivery.
@@ -29,7 +29,7 @@ from .commands import get_kubectl_executor, CommandExecutionError
 
 logger = getLogger(__name__)
 
-# Project workspace for beads (where br CLI operates)
+# Project workspace for beads (where bf CLI operates)
 BEADS_WORKSPACE = Path.home() / ".beads"
 
 # Escalate prompt path
@@ -479,7 +479,7 @@ class EscalateHandler:
         bead_body: str,
     ) -> str:
         """
-        Create a bead using the br CLI.
+        Create a bead using the bf CLI.
 
         Returns the bead ID.
         """
@@ -501,13 +501,13 @@ class EscalateHandler:
         if request.topic_id:
             metadata["topic_id"] = request.topic_id
 
-        # Build br create command
-        # Using br CLI to create the bead
-        # Note: br uses --description for the main body content
+        # Build bf create command
+        # Using bf CLI to create the bead
+        # Note: bf uses --description for the main body content
         try:
             # Build command with description (escape bead body for shell)
             cmd = [
-                "br",
+                "bf",
                 "create",
                 "--title", title,
                 "--type", "task",  # task-profile intents create task beads
@@ -530,8 +530,8 @@ class EscalateHandler:
 
             if proc.returncode != 0:
                 error_msg = stderr.decode("utf-8", errors="replace")
-                logger.error(f"br create failed: {error_msg}")
-                raise BeadCreationError(f"br create failed: {error_msg}")
+                logger.error(f"bf create failed: {error_msg}")
+                raise BeadCreationError(f"bf create failed: {error_msg}")
 
             # Parse bead ID from output
             output = stdout.decode("utf-8", errors="replace")
@@ -541,8 +541,8 @@ class EscalateHandler:
             return bead_id
 
         except FileNotFoundError:
-            logger.error("br CLI not found")
-            raise BeadCreationError("br CLI not found")
+            logger.error("bf CLI not found")
+            raise BeadCreationError("bf CLI not found")
         except Exception as e:
             logger.error(f"Failed to create bead: {e}")
             raise BeadCreationError(f"Failed to create bead: {e}") from e
@@ -554,7 +554,7 @@ class EscalateHandler:
         bead_type: str,
     ) -> str:
         """
-        Create a bead with a specific type using the br CLI.
+        Create a bead with a specific type using the bf CLI.
 
         Returns the bead ID.
         """
@@ -576,10 +576,10 @@ class EscalateHandler:
         if request.topic_id:
             metadata["topic_id"] = request.topic_id
 
-        # Build br create command
+        # Build bf create command
         try:
             cmd = [
-                "br",
+                "bf",
                 "create",
                 "--title", title,
                 "--type", bead_type,
@@ -601,8 +601,8 @@ class EscalateHandler:
 
             if proc.returncode != 0:
                 error_msg = stderr.decode("utf-8", errors="replace")
-                logger.error(f"br create failed: {error_msg}")
-                raise BeadCreationError(f"br create failed: {error_msg}")
+                logger.error(f"bf create failed: {error_msg}")
+                raise BeadCreationError(f"bf create failed: {error_msg}")
 
             # Parse bead ID from output
             output = stdout.decode("utf-8", errors="replace")
@@ -612,8 +612,8 @@ class EscalateHandler:
             return bead_id
 
         except FileNotFoundError:
-            logger.error("br CLI not found")
-            raise BeadCreationError("br CLI not found")
+            logger.error("bf CLI not found")
+            raise BeadCreationError("bf CLI not found")
         except Exception as e:
             logger.error(f"Failed to create bead: {e}")
             raise BeadCreationError(f"Failed to create bead: {e}") from e
@@ -634,9 +634,9 @@ class EscalateHandler:
         return title
 
     def _extract_bead_id(self, output: str) -> str:
-        """Extract bead ID from br create output.
+        """Extract bead ID from bf create output.
 
-        br create outputs just the bead ID (e.g., "abc-123").
+        bf create outputs just the bead ID (e.g., "abc-123").
         May include prefix text like "Created bead abc-123" in some versions.
         """
         import re
@@ -645,7 +645,7 @@ class EscalateHandler:
         output = output.strip()
 
         if not output:
-            logger.warning(f"Empty br create output")
+            logger.warning(f"Empty bf create output")
             return str(uuid.uuid4())
 
         # Try to extract bead ID pattern: lowercase letters, dash, alphanumeric
@@ -672,8 +672,8 @@ class EscalateHandler:
             logger.warning(f"Using output as bead ID despite non-standard format: {output}")
             return output
 
-        # Last resort: return the whole output (br might have changed format)
-        logger.warning(f"Unexpected br create output format: {output}")
+        # Last resort: return the whole output (bf might have changed format)
+        logger.warning(f"Unexpected bf create output format: {output}")
         return output
 
     def build_pending_card(
