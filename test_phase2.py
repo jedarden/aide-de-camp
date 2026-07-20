@@ -174,7 +174,7 @@ async def test_ui_regen_agent():
     # Since we don't have a perfect match, this should create/use the best fit
     # For now, just verify the agent doesn't crash
     try:
-        rendered = agent.render_result(request)
+        rendered = await agent.render_result(request)
         print(f"  ✅ Rendered result (length: {len(rendered)})")
     except Exception as e:
         print(f"  ❌ Render failed: {e}")

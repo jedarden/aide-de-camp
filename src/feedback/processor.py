@@ -110,8 +110,8 @@ class FeedbackProcessor:
                 artifact_type=None
             )
 
-        # Iterate component
-        updated_component = self.ui_regen_agent.iterate_component(
+        # Iterate component (LLM-driven — now async)
+        updated_component = await self.ui_regen_agent.iterate_component(
             component_id,
             request.feedback,
             result_data
