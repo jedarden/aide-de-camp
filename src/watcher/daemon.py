@@ -33,7 +33,7 @@ class BeadWatcher:
     """
     Watches for bead events and routes results to surfaces.
 
-    Integration with the br CLI (bead-forge, the bf/br superset):
+    Integration with the bf CLI (bead-forge):
     - Reads the bf workspace checkpoint JSONL (`.beads/issues.jsonl`) for
       terminal beads
     - Extracts session_id / origin_surface_id / urgency from the bead's flat

@@ -108,7 +108,7 @@ FETCH_COMMAND_MATRIX: dict[IntentType, list[FetchCommandSpec]] = {
         ),
         FetchCommandSpec(
             source=FetchSource.BEAD_LIST,
-            command_template="br list --project {project_slug} --status open --output json",
+            command_template="bf list --status=open --limit=50",
             timeout_seconds=5,
             required=False,
             cacheable=True,
@@ -153,7 +153,7 @@ FETCH_COMMAND_MATRIX: dict[IntentType, list[FetchCommandSpec]] = {
         ),
         FetchCommandSpec(
             source=FetchSource.BEAD_LIST,
-            command_template="br list --project {project_slug} --status open --output json",
+            command_template="bf list --status=open --limit=50",
             timeout_seconds=5,
             required=False,
             cacheable=False,

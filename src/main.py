@@ -572,7 +572,7 @@ async def escalate_endpoint(request: dict):
 
     For task-profile intents that require tracking and async execution:
     - Formulates bead body via LLM
-    - Creates bead via br CLI
+    - Creates bead via bf CLI
     - Returns pending-card spec
     """
     utterance = request.get("utterance", "")

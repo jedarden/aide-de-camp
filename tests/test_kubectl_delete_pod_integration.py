@@ -165,7 +165,7 @@ class TestDeletePodIntegration:
         handler._zai_client = MagicMock()
         handler._zai_client.call_simple = AsyncMock(return_value="# Bead body for kubectl delete")
 
-        # Mock br CLI (would normally create bead)
+        # Mock bf CLI (would normally create bead)
         from unittest.mock import patch
         with patch('asyncio.create_subprocess_exec') as mock_subprocess:
             mock_proc = MagicMock()
