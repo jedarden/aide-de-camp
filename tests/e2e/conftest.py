@@ -14,7 +14,12 @@ import pytest
 try:
     from playwright.async_api import async_playwright, Browser, BrowserContext, Page
     _HAS_PLAYWRIGHT = True
-except ModuleNotFoundError:  # playwright is optional — only browser tests need it
+except Exception:  # playwright is optional — only browser tests need it
+    # Catch broadly (not just ModuleNotFoundError): a partial/broken install can
+    # raise ImportError instead — e.g. its `greenlet` C-extension failing to
+    # load libstdc++.so.6 on NixOS. In any such case playwright is unusable, so
+    # treat it as absent: the `browser` fixture skips, and the hermetic (non-
+    # browser) e2e tests keep running instead of crashing collection.
     async_playwright = None  # type: ignore[assignment]
     Browser = BrowserContext = Page = None  # type: ignore[assignment]
     _HAS_PLAYWRIGHT = False

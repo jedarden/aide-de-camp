@@ -68,6 +68,9 @@ VOICE_PROMPT_PATH = Path("/home/coding/aide-de-camp/prompts/voice.md")
 # Session store
 DB_PATH = Path("/home/coding/aide-de-camp/data/session.db")
 CANVAS_PATH = Path("/home/coding/aide-de-camp/src/canvas/index.html")
+# Canvas render helpers (createTopicCard + friends) — served separately so they
+# are unit-testable headlessly (tests/e2e/canvas_dom_runner.js).
+CANVAS_JS_PATH = Path("/home/coding/aide-de-camp/src/canvas/canvas.js")
 
 # Global components
 _store = None
@@ -223,6 +226,17 @@ async def serve_canvas():
     This is the main entry point for the aide-de-camp interface.
     """
     return FileResponse(CANVAS_PATH)
+
+
+@app.get("/canvas.js")
+async def serve_canvas_js():
+    """Serve the canvas render helpers (createTopicCard + friends).
+
+    Loaded by index.html via ``<script src="/canvas.js">``. Kept as a separate
+    module so the rendering logic is unit-testable headlessly
+    (``tests/e2e/canvas_dom_runner.js``) without spinning up a browser.
+    """
+    return FileResponse(CANVAS_JS_PATH, media_type="application/javascript")
 
 
 @app.websocket("/voice")
