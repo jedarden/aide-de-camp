@@ -418,6 +418,9 @@
         </div>
     </div>
 
+    <!-- Render helpers (createTopicCard + friends) — loaded before the app
+         script so they're available as globals and unit-testable headlessly. -->
+    <script src="/canvas.js"></script>
     <script>
         // Session and surface IDs from URL params or generate new
         const urlParams = new URLSearchParams(window.location.search);
@@ -437,79 +440,10 @@
             return 'adc-' + Math.random().toString(36).substr(2, 16);
         }
 
-        function formatStaleness(seconds) {
-            if (seconds < 60) return 'just now';
-            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-            return `${Math.floor(seconds / 86400)}d ago`;
-        }
-
-        function getStalenessLevel(seconds) {
-            if (seconds < 600) return 'fresh';      // 10 minutes
-            if (seconds < 3600) return 'stale';     // 1 hour
-            return 'very-stale';
-        }
-
-        function createTopicCard(cardData) {
-            const topic = cardData.topic;
-            const staleness = cardData.staleness;
-            const latestResult = cardData.latest_result;
-
-            const card = document.createElement('div');
-            card.className = 'topic-card';
-            card.dataset.topicId = topic.id;
-
-            const stalenessLevel = getStalenessLevel(staleness.seconds);
-            card.classList.add(stalenessLevel);
-
-            const typeClass = topic.type || 'adhoc';
-
-            let html = `
-                <div class="topic-header">
-                    <div class="topic-label">${escapeHtml(topic.label)}</div>
-                    <div>
-                        <span class="topic-type ${typeClass}">${topic.type || 'adhoc'}</span>
-                        ${stalenessLevel !== 'fresh' ? `<span class="stale-badge ${stalenessLevel}">STALE</span>` : ''}
-                    </div>
-                </div>
-            `;
-
-            // Add latest result if available
-            if (latestResult) {
-                const urgencyClass = latestResult.urgency || 'normal';
-                html += `
-                    <div class="result-content">
-                        <div class="result-summary">
-                            ${escapeHtml(latestResult.summary)}
-                            <span class="urgency-badge ${urgencyClass}">${urgencyClass}</span>
-                        </div>
-                `;
-
-                if (latestResult.data) {
-                    html += `<div class="result-data">${escapeHtml(JSON.stringify(latestResult.data, null, 2))}</div>`;
-                }
-
-                html += `</div>`;
-            }
-
-            // Add staleness indicator
-            const timeAgo = formatStaleness(staleness.seconds);
-            html += `
-                <div class="staleness-indicator ${stalenessLevel}">
-                    <span class="staleness-dot ${stalenessLevel}"></span>
-                    <span>Updated ${timeAgo}</span>
-                </div>
-            `;
-
-            card.innerHTML = html;
-            return card;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+        // createTopicCard / escapeHtml / formatStaleness / getStalenessLevel live
+        // in /canvas.js (loaded below as a blocking <script src> before this
+        // block), so they are available as globals here and unit-testable
+        // headlessly. See src/canvas/canvas.js.
 
         function updateConnectionStatus(status, text) {
             const dot = document.getElementById('statusDot');
