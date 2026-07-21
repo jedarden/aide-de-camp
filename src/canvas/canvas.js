@@ -40,6 +40,12 @@ function createTopicCard(cardData) {
 
     const typeClass = topic.type || 'adhoc';
 
+    // Expose the topic type as a data attribute alongside data-topic-id so cards
+    // are queryable by type with a robust, stable selector (e.g.
+    // [data-topic-type="research"]) rather than relying on class names. The DOM
+    // verification suites assert both dataset attributes are present per card.
+    card.dataset.topicType = typeClass;
+
     let html = `
         <div class="topic-header">
             <div class="topic-label">${escapeHtml(topic.label)}</div>
