@@ -1,6 +1,6 @@
 [project]
 name = "aide-de-camp"
-version = "0.18.0"
+version = "0.19.0"
 description = "A universal personal interface"
 requires-python = ">=3.11"
 dependencies = [
@@ -17,6 +17,11 @@ dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
     "ruff>=0.8.0",
+    # Objective screenshot analysis for the canvas browser suites (bead adc-jr35):
+    # counts distinct rendered colours so a screenshot can be verified to contain
+    # real content — not the identical-blank captures the old suite produced when
+    # Playwright was broken. Only the e2e browser tests need it.
+    "Pillow>=10.0.0",
 ]
 
 [build-system]
