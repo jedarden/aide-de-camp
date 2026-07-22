@@ -6,13 +6,22 @@ Provides browser lifecycle management and common test utilities.
 
 import asyncio
 from pathlib import Path
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 from urllib.parse import urlencode
 
 import pytest
 
+# Make Playwright importable + its bundled browser launchable on NixOS BEFORE we
+# import playwright below. On NixOS the greenlet C-ext can't load libstdc++.so.6
+# (so `import playwright` fails outright) and the chromium subprocess is missing
+# ~22 FHS libs. This preloads libstdc++ (RTLD_GLOBAL) and dynamically resolves
+# the rest from /nix/store into LD_LIBRARY_PATH. See nixos_browser_bootstrap.py.
+from tests.e2e.nixos_browser_bootstrap import bootstrap as _bootstrap_browser_env
+
+_bootstrap_browser_env()
+
 try:
-    from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+    from playwright.async_api import Browser, BrowserContext, Page, async_playwright
     _HAS_PLAYWRIGHT = True
 except Exception:  # playwright is optional — only browser tests need it
     # Catch broadly (not just ModuleNotFoundError): a partial/broken install can
@@ -105,6 +114,52 @@ async def canvas_page_with_session(page: Page) -> AsyncGenerator[tuple[Page, str
     yield page, session_id
 
 
+@pytest.fixture(scope="function")
+async def injector():
+    """A live TestDataInjector against the running server, with teardown.
+
+    Every session it creates is deleted on exit, so browser tests can inject
+    topics freely without polluting the real session.db. Yields None (and skips)
+    if the server isn't reachable.
+    """
+    if not is_server_running():
+        pytest.skip("ADC server is not running on localhost:8000")
+    from tests.e2e.inject import TestDataInjector
+
+    async with TestDataInjector(base_url=CANVAS_URL) as inj:
+        yield inj
+
+
+@pytest.fixture(scope="function")
+async def canvas_session(page: Page, injector):
+    """Canvas pointed at a freshly-injected session: yields (page, session_id, injector).
+
+    Combines :func:`canvas_page_with_session`'s navigation with the live
+    :fixture:`injector`, using the injector's own (trackable, teardown-safe)
+    session id as the URL param. Use this for browser tests that inject topics
+    via the API and then assert on the rendered DOM.
+    """
+    import uuid
+
+    session_id = f"test-inject-e2e-{uuid.uuid4().hex[:12]}"
+    await injector.create_session(session_id)
+
+    params = urlencode({"session_id": session_id})
+    await page.goto(f"{CANVAS_URL}/?{params}", wait_until="domcontentloaded")
+    # Wait until SSE has opened (status flips off "Connecting...") so injected
+    # cards are delivered over a live push channel, not a stale fetch.
+    await page.wait_for_selector("#statusDot", timeout=5000)
+    try:
+        await page.wait_for_function(
+            "() => document.getElementById('statusText').textContent !== 'Connecting...'",
+            timeout=5000,
+        )
+    except Exception:
+        pass  # connecting-then-connected is racy on slow CI; #statusDot is enough
+
+    yield page, session_id, injector
+
+
 def take_screenshot(page: Page, name: str) -> Path:
     """
     Take a screenshot of the current page state.
@@ -127,6 +182,24 @@ def take_screenshot(page: Page, name: str) -> Path:
         page.screenshot(path=str(filepath), full_page=True, animations="disabled")
     )
 
+    return filepath
+
+
+async def screenshot(page: Page, name: str, *, full_page: bool = True) -> Path:
+    """Awaited screenshot helper for async tests.
+
+    The legacy ``take_screenshot`` fires ``asyncio.create_task`` from a sync
+    context and never awaits it, so the file may not be written before the test
+    reads it. Tests that assert on the screenshot existing should use this
+    awaited version instead. Returns the saved file path.
+    """
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = SCREENSHOT_DIR / f"{timestamp}_{name}.png"
+    await page.screenshot(
+        path=str(filepath), full_page=full_page, animations="disabled"
+    )
     return filepath
 
 

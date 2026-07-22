@@ -12,12 +12,21 @@ This test verifies the full pipeline:
 import asyncio
 import json
 import uuid
-from logging import basicConfig, INFO
+from logging import INFO, basicConfig
 
 basicConfig(level=INFO, format="%(levelname)s %(name)s: %(message)s")
 
-import httpx
-import httpx_sse
+# Configured logging above before importing modules that may emit at import time.
+import httpx  # noqa: E402
+import pytest  # noqa: E402
+
+# httpx_sse is an optional SSE-consumer dep used only by this legacy standalone
+# script. Its canvas-rendering coverage is fully superseded by the hermetic,
+# browser-aware suites (test_canvas_sse_render.py et al.). importorskip (vs a
+# bare import) keeps the whole tests/e2e/ tree collectible when the dep is
+# absent — a bare ImportError here otherwise aborts collection of all ~72 e2e
+# tests. Install httpx-sse to run this script's LLM-driven pipeline check.
+httpx_sse = pytest.importorskip("httpx_sse")
 
 
 async def test_canvas_rendering_pipeline():
@@ -28,7 +37,7 @@ async def test_canvas_rendering_pipeline():
     surface_id = str(uuid.uuid4())
 
     print(f"\n{'='*60}")
-    print(f"Testing Canvas Rendering Pipeline")
+    print("Testing Canvas Rendering Pipeline")
     print(f"Session ID: {session_id[:16]}...")
     print(f"Surface ID: {surface_id[:16]}...")
     print(f"{'='*60}\n")

@@ -214,11 +214,12 @@ async def test_create_topic(request: TestCreateTopicRequest) -> dict:
         }
     """
     import uuid
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     import aiosqlite
 
     from ..session.store import get_store
+    from ..sse.broadcaster import SSEEvent, get_broadcaster
 
     logger.info(f"[TEST] Creating test topic: {request.label}")
 
@@ -267,9 +268,15 @@ async def test_create_topic(request: TestCreateTopicRequest) -> dict:
         # Optionally backdate the topic + result so staleness-driven canvas
         # tests can simulate an aged card.
         if request.staleness_seconds > 0:
-            created_ts = int(
-                (datetime.utcnow() - timedelta(seconds=request.staleness_seconds)).timestamp()
-            )
+            # Backdate in epoch seconds using the codebase's standard
+            # `datetime.now().timestamp()` (local-naive → correct epoch on this
+            # host). Do NOT use `datetime.utcnow().timestamp()`: utcnow() is
+            # naive-UTC but .timestamp() reads it as local time, so on a box
+            # whose TZ ≠ UTC (this one is EDT/UTC-4) the result lands 4h in the
+            # FUTURE, making `now - last_active` negative and every backdated
+            # card render "fresh". Caught by the real-browser staleness suite
+            # (bead adc-jr35); the headless shim suite never hit live backdating.
+            created_ts = int(datetime.now().timestamp()) - request.staleness_seconds
             async with aiosqlite.connect(store.db_path) as db:
                 await db.execute(
                     "UPDATE topics SET created_at = ?, last_active = ? WHERE id = ?",
@@ -280,6 +287,27 @@ async def test_create_topic(request: TestCreateTopicRequest) -> dict:
                     (created_ts, result_id),
                 )
                 await db.commit()
+
+        # Broadcast result_created so any already-connected canvas surface for
+        # this session reloads its topics and renders the new card LIVE — matching
+        # the real dispatch pipeline's behaviour. Targets the session (not a
+        # specific surface), so every open surface for it refreshes; if none is
+        # connected (e.g. an inject-then-navigate test) this is a no-op and the
+        # card is picked up by loadTopics() on the next page load / reconnect.
+        broadcaster = get_broadcaster()
+        if broadcaster:
+            await broadcaster.broadcast(
+                SSEEvent(
+                    event_type="result_created",
+                    target_session_id=request.session_id,
+                    data={
+                        "topic_id": topic_id,
+                        "result_id": result_id,
+                        "summary": request.summary,
+                        "urgency": request.urgency,
+                    },
+                )
+            )
 
         logger.info(f"[TEST] Created topic {topic_id} with result {result_id}")
 
@@ -296,3 +324,45 @@ async def test_create_topic(request: TestCreateTopicRequest) -> dict:
     except Exception as e:
         logger.error(f"[TEST] Create topic error: {e}", exc_info=True)
         raise
+
+
+class TestDropSSERequest(BaseModel):
+    """Request body for dropping every live SSE stream for a session."""
+    session_id: str = Field(
+        ..., description="Session whose live SSE streams should be dropped."
+    )
+
+
+@router.post("/test/drop-sse")
+async def api_v1_test_drop_sse(request: TestDropSSERequest) -> dict:
+    """
+    Abruptly drop every live SSE stream for a session.
+
+    Mounted at ``POST /api/v1/test/drop-sse``. Pushes the broadcaster's drop
+    sentinel onto each matching connection so its event generator returns
+    WITHOUT emitting a ``disconnect`` event — the browser's ``EventSource``
+    then sees the stream end abruptly, fires ``onerror``, and performs its
+    native auto-reconnect. This faithfully simulates a real proxy/server
+    connection drop, which Playwright ``context.set_offline`` CANNOT reproduce
+    against a loopback server: Chromium exempts loopback connections from its
+    offline emulation, so an established ``localhost`` SSE stream is never cut
+    (proven by ``tests/e2e/_probe_offline.py`` — statusText stays "Connected"
+    for 25s after ``set_offline(True)``).
+
+    Returns the number of live streams that were signalled:
+
+    ```
+    {"session_id": "...", "dropped_streams": 1}
+    ```
+
+    A count of 0 means no live stream existed for that session at drop time
+    (the canvas surface was not connected, or had already dropped).
+    """
+    from ..sse.broadcaster import get_broadcaster
+
+    broadcaster = get_broadcaster()
+    dropped = broadcaster.drop_session(request.session_id)
+    logger.info(
+        f"[TEST] drop-sse session={request.session_id} streams_dropped={dropped}"
+    )
+    return {"session_id": request.session_id, "dropped_streams": dropped}

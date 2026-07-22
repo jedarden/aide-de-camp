@@ -20,3 +20,9 @@ data/*.db-wal
 
 # nohup output
 nohup.out
+
+# Browser e2e test output (bead adc-jr35): regenerable on every test run, not source.
+# - screenshots/ : Playwright captures analyzed in-test by screenshot_analyze.py
+# - .browser_libpath_cache.json : host-specific /nix/store lib-path cache
+tests/e2e/screenshots/
+tests/e2e/.browser_libpath_cache.json

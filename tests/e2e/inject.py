@@ -275,6 +275,23 @@ class TestDataInjector:
         data = resp.json()
         return data.get("cards", [])
 
+    async def drop_sse(self, session_id: str) -> dict:
+        """Drop every live SSE stream for a session (POST /api/v1/test/drop-sse).
+
+        Server-initiated abrupt stream end — the only faithful way to simulate a
+        proxy/server connection drop against a loopback server. Playwright
+        ``context.set_offline`` cannot cut an established ``localhost`` SSE
+        stream (loopback is exempt from Chromium's offline emulation), so the
+        browser-side reconnect path is exercised through this endpoint instead.
+        Returns ``{"session_id": ..., "dropped_streams": N}``.
+        """
+        session_id = self._resolve_session_id(session_id)
+        resp = await self._client.post(
+            "/api/v1/test/drop-sse", json={"session_id": session_id}
+        )
+        self._check(resp)
+        return resp.json()
+
     # -- teardown ------------------------------------------------------------
 
     async def cleanup(self) -> list[str]:

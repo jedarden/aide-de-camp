@@ -7,12 +7,44 @@ Manages SSE connections and broadcasts events to relevant surfaces.
 import asyncio
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Set
+from typing import Dict
 from uuid import uuid4
 
-from fastapi import Request
+# Idle-stream keepalive. An SSE connection that sends nothing while it waits for
+# events is indistinguishable from a dead one: the browser's EventSource only
+# fires ``onerror`` when there is I/O to fail, so a *silent* network drop on an
+# idle stream leaves the surface showing "Connected" indefinitely (until the
+# OS-level TCP keepalive times out, many minutes later). Emitting a comment
+# line (``": ping\n\n"``) every few seconds keeps traffic flowing, so:
+#
+#   - proxies/load balancers won't reap the connection as idle, and
+#   - the next ping after a real network drop fails to arrive, the client read
+#     errors, ``onerror`` fires, and the native EventSource reconnects — which
+#     is exactly the resync path the canvas relies on.
+#
+# Comment lines are ignored by EventSource (they never surface as messages), so
+# this adds no client-visible events. ``5s`` is frequent enough that a drop is
+# surfaced well inside any realistic reconnect budget, and quiet enough not to
+# be chatty. Lower it (e.g. via ADC_SSE_KEEPALIVE_SECONDS) for faster
+# reconnection tests.
+KEEPALIVE_INTERVAL_SECONDS = float(
+    os.environ.get("ADC_SSE_KEEPALIVE_SECONDS", "5")
+)
+
+# Sentinel pushed onto a connection's queue by :meth:`SSEBroadcaster.drop_session`
+# to make that connection's :meth:`event_generator` return ABRUPTLY — i.e. without
+# emitting a ``disconnect`` event. An abrupt end of the response body is what the
+# browser's ``EventSource`` treats as a dropped connection: it fires ``onerror``
+# and performs its NATIVE auto-reconnect. (The graceful ``disconnect`` event, by
+# contrast, makes the client call ``close()`` and stay down.) This is the only
+# way to faithfully simulate a real proxy/server connection drop from a test
+# against a loopback server — Playwright ``context.set_offline`` cannot break an
+# already-established loopback SSE stream (see tests/e2e/_probe_offline.py).
+_DROP = object()
+
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +123,28 @@ class SSEBroadcaster:
             logger.info(f"Unregistered SSE connection {connection_id} for surface {conn.surface_id}")
             del self.connections[connection_id]
 
+    def drop_session(self, session_id: str) -> int:
+        """Abruptly drop every live SSE stream for ``session_id``.
+
+        Pushes the ``_DROP`` sentinel onto each matching connection's queue so
+        its :meth:`event_generator` returns without emitting a ``disconnect``
+        event — the browser's ``EventSource`` then sees the stream end abruptly,
+        fires ``onerror``, and performs its native auto-reconnect. Returns the
+        number of streams signalled. Used by ``POST /api/v1/test/drop-sse`` to
+        faithfully simulate a real proxy/server connection drop, which
+        ``context.set_offline`` cannot reproduce against a loopback server
+        (loopback connections are exempt from offline emulation — see
+        tests/e2e/_probe_offline.py).
+        """
+        count = 0
+        for conn in self.connections.values():
+            if conn.session_id == session_id:
+                conn.queue.put_nowait(_DROP)
+                count += 1
+        if count:
+            logger.info(f"Drop requested for session {session_id}: {count} stream(s)")
+        return count
+
     def heartbeat(self, connection_id: str) -> bool:
         """Update heartbeat for a connection. Returns True if connection exists."""
         if connection_id in self.connections:
@@ -139,7 +193,30 @@ class SSEBroadcaster:
             })
 
             while True:
-                event = await connection.queue.get()
+                # Block on the next event, but no longer than the keepalive
+                # interval: if nothing arrives, emit a comment-line ping so the
+                # stream is never silent. A silent idle stream is indistinguish-
+                # able from a dead one to the browser — EventSource only fires
+                # ``onerror`` when there is I/O to fail — so without these pings
+                # a real network drop on an idle surface leaves it showing
+                # "Connected" until the OS TCP keepalive times out (minutes
+                # later). The ping is a comment line (``": ping\n\n"``), which
+                # EventSource ignores — it surfaces no message to the client.
+                try:
+                    event = await asyncio.wait_for(
+                        connection.queue.get(),
+                        timeout=KEEPALIVE_INTERVAL_SECONDS,
+                    )
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+                    continue
+
+                # Abrupt drop sentinel (see _DROP): end the stream WITHOUT a
+                # disconnect event so the browser EventSource onerrors + reconnects.
+                if event is _DROP:
+                    logger.info(f"Drop sentinel on connection {connection.connection_id}")
+                    return
+
                 connection.last_heartbeat = datetime.now().timestamp()
 
                 # Format and yield the event
