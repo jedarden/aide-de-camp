@@ -23,39 +23,81 @@ aide-de-camp eliminates that overhead by providing a single input surface that r
 ```
 User utterance (voice or text)
   → STT transcription (Web Speech API or whisper-stt)
-  → Intent Router (one LLM call, haiku-class, ~500ms)
-      output: [{project_slug, intent_type, urgency, utterance_fragment}, ...]
+  → Intent Router (one LLM call, haiku-class, ~500ms est.)
+      output: [{project_slug, intent_type, urgency, utterance_fragment,
+                lookup_kind (lookup intents only)}, ...]
   → N parallel Fetch+Synthesize workers (one per intent thread)
       Fetch: deterministic code, executes command matrix based on intent_type
-      Synthesize: one LLM call per thread (sonnet-class, ~1-2s)
-      output: {data, summary, urgency}
-  → Results streamed via SSE to active canvas
-  → Cards rendered client-side using component templates
+             (lookup intents: intent_type + lookup_kind)
+      Synthesize: one LLM call per thread (sonnet-class, ~1-2s est.)
+      output: {data, summary} — urgency carries through unchanged from the
+              intent thread (see Urgency ownership)
+  → Server-side card render (no LLM): deterministic component lookup via
+      component_usage_patterns, template filled into card_cache;
+      no match → result flagged for the built-in fallback card
+  → Cards streamed via SSE to active canvas — client injects the rendered
+      HTML, or renders fallback-flagged results with its built-in generic card
 ```
 
 Target: < 3 seconds from utterance to first partial result on canvas. No Claude Code session startup on this path.
+
+> The ~500ms and ~1-2s figures above — and every per-stage number in this plan — are design **estimates**. Nothing on the hot path has been measured yet. See Latency Budget & Instrumentation.
+
+### Latency Budget & Instrumentation
+
+The <3s promise is the product's central claim, so it gets a budget, instrumentation, and a gate — not just a diagram annotation. Per-stage targets below are estimates chosen so the end-to-end budget is plausible; the Measured columns are empty because no timing has ever been captured.
+
+| Stage | Target (ESTIMATE) | Measured p50 | Measured p95 |
+|-------|-------------------|--------------|--------------|
+| STT final transcript (Web Speech API) | ~300ms | unmeasured | unmeasured |
+| Intent Router (haiku-class via ZAI proxy) | ~500ms | unmeasured | unmeasured |
+| Fetch — first source returns (surfaces as a per-source progress state on the pending card) | ~500ms | unmeasured | unmeasured |
+| Fetch — window closes (all sources resolved or timed out; gates synthesize start — see Fetch Strand) | ~1s | unmeasured | unmeasured |
+| Synthesize — first token (sonnet-class via ZAI proxy; starts at fetch-window close) | ~1s (cap set by the e2e gate — see internal-consistency note) | unmeasured | unmeasured |
+| SSE emit → first card render | ~100ms | unmeasured | unmeasured |
+| Escalate — bead formulation + safety validation + `bf create` (haiku-class via ZAI proxy; off the first-card path, see note below) | ~2s | unmeasured | unmeasured |
+| **End-to-end: utterance end → first partial card** | **< 3s** | unmeasured | unmeasured |
+
+**Internal consistency — the e2e row is the binding gate.** The hot-path stages are strictly sequential (STT → router → fetch-window close → synthesize first token → SSE emit), so their targets must sum inside the end-to-end budget: 300 + 500 + 1000 + 1000 + 100 ms ≈ 2.9s against the 3s gate, leaving ~100ms of unallocated slack. (The fetch first-source and escalate rows sit off this critical path — the former lands inside the fetch window, the latter is off the first-card path per the note below.) Synthesize-first-token was originally sketched at ~1–2s — the Hot Path diagram's ~1–2s figure survives as the estimate for the *full* synthesize call, first token through completion — but at a 2s first token the stages sum to ~3.9s: every stage could pass its own budget individually while the end-to-end gate fails, a contradiction that would otherwise surface only at rehearsal. Hence the ~1s first-token allocation above. All per-stage targets remain ESTIMATES and are **provisional allocations, not independent pass/fail gates**: once the Measured p50/p95 columns fill, re-derive the stage allocations from measured slack (a stage running under budget donates headroom to one running over) with the e2e row held fixed and overriding — the Gate below then applies against the re-derived allocations. A run where every stage meets its allocation but the e2e row misses is still a failed run.
+
+**Task-profile first card.** The escalate stage does not gate the <3s promise: for a task-profile thread, the ack/pending card (a served built-in template, not a component-library render — see Component Library → Built-in cards) renders as soon as the router resolves the thread (router + SSE emit only) — before bead formulation and `bf create` complete — then updates in place with the bead ref when the escalate stage returns. The escalate row above budgets that in-place update, not the first card; the end-to-end row applies to the ack card.
+
+**Instrumentation requirement.** The server records per-stage timings for every dispatch — `router_ms`, `fetch_first_source_ms`, `fetch_total_ms` (fetch-window close), `synthesize_first_token_ms`, `synthesize_total_ms`, `escalate_ms` (task-profile dispatches: formulation + validation + `bf create`), `sse_emit_ms`, plus client-reported STT and first-render timestamps when available — and persists them to the session store's `dispatch_timings` table (schema in Data Model). This is not optional telemetry: it is the only way the Measured columns get filled, and it doubles as the per-step timing log the Phase 5 rehearsal checklist requires.
+
+**Gate.** The demo cannot be scheduled until the Measured p50/p95 columns are filled from real runs (rehearsal timing logs count). If measured p95 blows a stage's budget, either the stage gets fixed or the on-screen promise changes — the recording must not showcase a number the system doesn't hit.
 
 ### The Async Path
 
 ```
 Task-profile intent (research, coding, long-running work)
-  → NEEDLE task bead created (br create)
+  → Generated-Bead Safety validation + approval (see Escalate Strand)
+  → NEEDLE task bead created (bf create)
   → Existing Claude Code workers pick up bead normally
   → Bead watcher detects closure event
   → Result written to session store results table
   → SSE push to active canvas (or Telegram if no canvas)
 ```
 
+> ⚠ The "or Telegram if no canvas" leg is NON-FUNCTIONAL today — Telegram delivery has never worked in any deployment (stubbed methods, unreachable bridge URL; see ADR-1). Until ADR-1 lands, a result arriving with no active canvas is persisted to the session store but reaches no surface.
+
+The diagram above is the happy path only. Beads also get refused, fail repeatedly, or sit unclaimed — and NEEDLE has no built-in circuit breaker: it re-dispatches a failing bead forever. The async path therefore also specifies:
+
+- **Re-dispatch circuit breaker.** NEEDLE exposes no dispatch-attempt API, so the breaker's signal is the bead's own comment stream: a worker that declines a bead appends a structured refusal comment — `bf comment <id> "REFUSED: <reason>"` — the same convention the live incident's workers followed when they committed refusal records to the bead. Each tick the watcher checks its open tracked beads (every unresolved `intents.bead_ref`) alongside the closed list, parses comments past a per-bead high-water mark, and persists the running refusal count in the watcher-owned `bead_watch` table (see Data Model) — on disk, so breaker state survives watcher restarts. After N refusals (default 3) or T hours without progress (default 24h — no closure and no new non-refusal comment), it fences the bead — `bf update` to `status=blocked`, so workers stop picking it up — sets the intent's status to `stuck`, and pushes a "task stuck — needs your input" card to the active surface with the most recent refusal reason attached.
+- **Terminal failures.** A bead closed as failed/refused resolves its intent to `failed`; the reason surfaces as a card, never silently dropped. User cancellation still maps to `cancelled`.
+- **Visible aging.** Pending cards show elapsed time; a card past its SLA is flagged on canvas before the breaker trips, so a stuck task is never invisible. The SLA is defined, not vibes: built-in per-intent-type defaults (task-profile: 6h; hot-path intents flag at 30s pending, since their budget is 3s) with a per-project `sla_hours` override in the registry entry. Flag ownership is split by path: for bead-backed (task-profile) intents the watcher computes `sla_deadline` at bead creation, stores it in `bead_watch`, and stamps `sla_flagged_at` when the flag fires. Hot-path intents have no bead and no watcher row — their 30s flag is owned by the **canvas client**: a pure client-side timer from the local pending placeholder's creation at submit time (the canvas creates the placeholder before any server response — see Escalate Strand, Pending/ack card render path) applies the aged-pending treatment with no server round-trip, deliberately, because a hung or wedged server is exactly the failure this flag must survive (see the matching Degraded-State UX row).
+
 ### The Self-Improvement Path
 
 ```
 Feedback signal (explicit instruction or implicit engagement pattern)
   → Self-modification agent (Claude Code via NEEDLE task bead)
-      reads target artifact (prompt file, registry YAML, component template)
+      reads target artifact (prompt file, registry YAML)
       generates update
       surfaces diff to user
   → User approves → artifact written → hot-reloaded on next invocation
 ```
+
+Component templates are deliberately absent from the artifact list above: visual/component feedback follows the same feedback → diff → approval loop, but routes through the UI-regen agent, the sole writer of component *definitions* in the library — the `components`, `component_versions`, and `component_tags` tables in `data/components.db`. The hot-path server also writes to that DB on every dispatch, but only mechanical render/usage state (`card_cache` rows and the usage-stat columns), never definitions. One flow, two agents, disjoint write scopes — see Security Model.
 
 ---
 
@@ -80,23 +122,34 @@ One LLM call per utterance. Receives the full utterance text, the project regist
     "intent_type": "status",
     "urgency": "normal",
     "utterance_fragment": "what's the state of the ibkr mcp"
+  },
+  {
+    "project_slug": "ibkr-mcp",
+    "intent_type": "lookup",
+    "lookup_kind": "logs",
+    "urgency": "normal",
+    "utterance_fragment": "and pull up its recent logs"
   }
 ]
 ```
 
+`lookup_kind` appears only on `lookup` threads (see the intent-type list below); no other intent type carries it.
+
 Intent types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`
 
 - **status**: Query current state (pods, pipelines, deployments, beads)
-- **action**: Execute a command (deploy, restart, create)
+- **action**: Execute a command (deploy, restart, create) — executes only through the Action Execution Model (declarative-config Git operations + ArgoCD sync status, or reviewed escalation beads); never direct kubectl mutation
 - **brainstorm**: Explore options, design, architecture discussion
-- **lookup**: Find specific information (logs, configs, docs)
-- **reminder**: Set or query reminders
+- **lookup**: Find specific information. Every lookup thread carries a router-emitted `lookup_kind` — `logs` | `config` | `docs` (default `docs` when the utterance names nothing sharper) — because "recent logs" and "deployment config" for the same project are different fetches and different cards, not one. `lookup_kind` selects the fetch matrix (`prompts/fetch/lookup-{lookup_kind}.md`) and is embedded in the result's `result_type` (`lookup:{lookup_kind}:{project_slug}`, e.g. `lookup:logs:ibkr-mcp` vs `lookup:config:ibkr-mcp`), so log-lookup and config-lookup results select components independently. Persisted on the intent row (`intents.lookup_kind`)
+- **reminder**: Set or query reminders — **NOT YET IMPLEMENTED**: no reminders table, scheduler, or module exists. The router does not dispatch this type; a reminder-shaped utterance is handled as `clarification` with a "reminders aren't available yet" card. Minimal design sketch in Future Work
 - **self-modification**: Instructions to improve the interface itself
 - **monitoring-config**: Configure ambient monitoring rules
 - **task-profile**: Durable async work items that escalate to NEEDLE beads
 - **clarification**: Low-confidence routing outcome requiring user input (meta-type, not dispatched)
 
-The router reads its segmentation prompt and the project registry from disk on each call — no caching. Hot-reload is automatic.
+The router reloads its segmentation prompt and the project registry per call through an mtime-checked cache: each file is stat'd on every call and re-read only when its mtime has changed — the same strategy every hot-reloaded artifact uses (see Hot-Reload Architecture). Hot-reload is automatic; an edit takes effect on the next call.
+
+**Urgency ownership:** the router assigns the initial `urgency` on every intent thread as part of hot-path segmentation, guided by `prompts/urgency.md` (folded into the single router call — no extra LLM call on the hot path). The escalate strand refines urgency when formulating task-profile beads, and rule-driven ambient-monitoring results — which have no intent thread behind them — take their urgency from the firing rule in `config/monitoring.yaml` (see Bead Watcher). No other component assigns urgency; in particular, synthesize never does — it outputs `{data, summary}` and the thread's router-assigned urgency carries through to the result unchanged.
 
 Ambiguous intents: if confidence is below threshold, router returns an `intent_type: "clarification"` thread. The voice model or canvas handles the clarification round-trip before dispatching.
 
@@ -111,42 +164,75 @@ projects:
   options-pipeline:
     aliases: ["the pipeline", "options"]
     description: "Options data pipeline on apexalgo-iad"
-    cluster: apexalgo-iad
+    cluster: apexalgo-iad  # ArgoCD endpoint for this cluster resolves via config/clusters.yaml (see Fetch Strand — Cluster→ArgoCD Endpoint Resolution)
     namespace: options
-    intent_support: [status, action, brainstorm]
+    repo_path: /home/coding/options-pipeline  # local checkout: git-log + per-project bead listing
+    argocd_app: options-pipeline  # ArgoCD Application name for the fetch matrix's sync row; defaults to the project slug when omitted
+    sla_hours: 6          # pending-card SLA override (see The Async Path — Visible aging)
+    intent_support: [status, action, brainstorm, task-profile]
+    # `action` appears in intent_support for routing completeness, but action
+    # dispatch is DISABLED until the Action strand ships — see Action Execution
+    # Model (Status: executor NOT BUILT)
     workflows:
       deploy:
-        steps: [ci-status, image-tag, argocd-sync, pod-status]
+        # DESIGN-ONLY — no executor interprets `steps` yet; the step vocabulary
+        # is defined in Action Execution Model → "Future: Action strand".
+        # Mutating steps follow the Action Execution Model: gitops-commit
+        # edits jedarden/declarative-config; argocd-sync-status polls the
+        # read-only ArgoCD API until the app reports Synced/Healthy
+        steps: [ci-status, image-tag, gitops-commit, argocd-sync-status, pod-status]
 
   ibkr-mcp:
     aliases: ["ibkr", "the mcp"]
     description: "IBKR MCP server"
     cluster: apexalgo-iad
     namespace: ibkr-mcp
-    intent_support: [status, brainstorm, lookup]
+    repo_path: /home/coding/ibkr-mcp  # local checkout with its own .beads/ — without this, bead listing falls back to aide-de-camp-originated beads only, with an on-card caveat (see Beads-Workspace Scoping)
+    argocd_app: ibkr-mcp  # explicit here for clarity; equals the slug default
+    intent_support: [status, brainstorm, lookup, task-profile]
 ```
 
-Updated by the self-modification agent. Hot-reloaded on every router call.
+Updated by the self-modification agent. `src/environment/discovery.py` (the repo scanner) only *seeds* the registry — an initial or explicitly re-run scan that proposes entries; after seeding, the self-modification agent is the sole ongoing author, and the scanner never overwrites an entry the agent has written. Hot-reloaded on every router call.
 
 ### 3. Fetch Strand
 
 **Runtime:** Deterministic code, no LLM
 
-Executes a command matrix based on `intent_type` and the project's registry entry. No LLM decisions — the commands are determined by the intent type and project config.
+Executes a command matrix based on `intent_type` and the project's registry entry — for `lookup` intents, on `intent_type` **plus** the router-emitted `lookup_kind`, so a logs lookup and a config lookup against the same project run different matrices. No LLM decisions — the commands are determined by the intent type (and lookup kind) and project config.
+
+The command matrix itself lives in `prompts/fetch/{intent_type}.md` — except `lookup`, which has one matrix per kind: `prompts/fetch/lookup-{lookup_kind}.md` (`lookup-logs.md`, `lookup-config.md`, `lookup-docs.md`). Despite the directory name, these files are **not LLM prompts** — they are declarative configuration: markdown tables with frontmatter that `src/fetch/commands.py` parses on each invocation (the hot-reload table's "context fetch strategy" row refers to this parse, not a model call). They are self-modifiable and git-versioned like every other artifact. The `prompts/` location is historical; a `config/fetch/` rename would be cosmetic cleanup, not a behavior change.
 
 Example command matrix for `intent_type: status`:
 
 | Source | Command |
 |--------|---------|
 | Pod status | `kubectl get pods -n {namespace}` |
-| ArgoCD sync | `curl argocd-ro-api/applications/{app}` |
+| ArgoCD sync | `curl {argocd_api}/api/v1/applications/{argocd_app}` — `argocd_app` from the registry entry (defaults to the project slug when omitted); `{argocd_api}` resolved from the entry's `cluster` via `config/clusters.yaml` (see Cluster→ArgoCD Endpoint Resolution below) |
 | Git log | `git -C {repo_path} log -10 --oneline` |
-| Bead list | `br list --project {slug} --status open` |
+| Bead list | `bf list --status open` — run in the project's repo checkout when it has one, with **no** `--project` filter (a project's own workspace doesn't tag its beads with its aide-de-camp slug; filtering there returns zero rows). The `--project {slug}` filter applies only on the no-checkout fallback: `bf list --project {slug} --status open` in the aide-de-camp workspace (see Beads-Workspace Scoping) |
 | CI status | `kubectl get workflows -n argo-workflows -l project={slug}` |
 
-Results are structured data passed to the Synthesize strand. Fetch runs each source concurrently; partial results (from sources that respond first) are passed to Synthesize incrementally to support streaming output.
+Results are structured data passed to the Synthesize strand. Fetch runs each source concurrently under per-source timeouts (declared alongside each command in the fetch config); the fetch window closes when every source has resolved or timed out, and only then does Synthesize fire — once, on the full set. Sources that finish early surface immediately as lightweight per-source progress states on the pending card ("3/5 sources in"), which is how fetch progress streams to canvas; sources that miss the window are never re-synthesized — they appear only as `fetch_coverage` caveats.
 
 A `fetch_coverage` field tracks which sources succeeded and which failed. Failed sources are surfaced as caveats in the result.
+
+#### Cluster→ArgoCD Endpoint Resolution
+
+There is no single ArgoCD API. Applications on ardenone-cluster live on ardenone-manager's ArgoCD, which exposes a no-auth read-only proxy; apexalgo-iad and the other iad-* Spot clusters are managed by the ArgoCD instance on **rs-manager**, which today has **no equivalent no-auth read-only proxy** — only the authenticated, Tailscale-only API at `argocd-rs-manager.tail1b1987.ts.net:8080`. Querying the wrong instance returns not-found — indistinguishable from "app doesn't exist" — and puts a `fetch_coverage` caveat strip on the card. The fetch strand therefore resolves the ArgoCD endpoint from the registry entry's `cluster` through `config/clusters.yaml` (hot-reloaded via the same mtime-checked cache as every config artifact):
+
+```yaml
+# config/clusters.yaml — cluster → ArgoCD API mapping
+clusters:
+  ardenone-cluster:
+    argocd_api: https://argocd-ro-ardenone-manager-ts.ardenone.com:8444  # ArgoCD on ardenone-manager
+    access: read-only-proxy   # no auth; the proxy injects a read-only token
+  apexalgo-iad:
+    argocd_api: https://argocd-rs-manager.tail1b1987.ts.net:8080         # ArgoCD on rs-manager
+    access: authenticated     # ⚠ no no-auth RO proxy exists for rs-manager today — see known-issues register
+  # iad-options, iad-kalshi, and other iad-* Spot clusters also map to rs-manager's ArgoCD
+```
+
+A cluster absent from this file, or mapped with an `access` mode the fetch strand cannot satisfy (it holds no ArgoCD credentials, so it can only consume `read-only-proxy` endpoints), resolves the ArgoCD source as **failed** — an honest `fetch_coverage` caveat, never a silent wrong-instance query. **Demo consequence:** both scripted projects declare `cluster: apexalgo-iad`, so their ArgoCD state is readable only from rs-manager — a must-fix-before-demo row in the Phase 5 known-issues register: either provision an rs-manager read-only proxy mirroring the ardenone-manager pattern (and flip its `clusters.yaml` entry to `read-only-proxy`), or every scripted status card carries a caveat strip and criterion 3 fails the take.
 
 ### 4. Synthesize Strand
 
@@ -157,24 +243,45 @@ Takes `{intent_spec, fetched_context}` → produces `{data, summary}`.
 - `data`: structured JSON matching the component library's expected schema for this intent type
 - `summary`: 1-3 sentence narration suitable for audio mode
 
-Single-turn inference. Reads its system prompt from a file per invocation (hot-reload). The synthesize prompt is the highest-leverage artifact in the system — it defines result format, detail level, and what fields to include.
+Single-turn inference, invoked exactly once per thread when the fetch window closes (all sources resolved or timed out — see Fetch Strand); a source arriving after the window never triggers re-synthesis, it shows up only as a `fetch_coverage` caveat. The call streams its output tokens so the card fills progressively — output streaming, not incremental fetch input, is what puts a partial card on canvas early. Reads its system prompt from a file per invocation (hot-reload). The synthesize prompt is the highest-leverage artifact in the system — it defines result format, detail level, and what fields to include.
 
 Runs once per intent thread in parallel across all active threads.
 
 ### 5. Escalate Strand
 
-**Runtime:** Direct API call + `br create`
+**Runtime:** Direct API call + `bf create`
 
 For task-profile intents that need durable async handling:
-1. One LLM call to formulate a bead body from the intent + context
-2. `br create` to create the bead in the appropriate project
-3. Returns a pending-card spec with the bead reference
+1. One LLM call to formulate a bead body from the intent + context, refining the router-assigned urgency for the bead
+2. The body passes Generated-Bead Safety validation (below); action-derived beads additionally wait for user approval
+3. `bf create` in the aide-de-camp beads workspace, tagged `--project {slug}` (see Beads-Workspace Scoping below)
+4. Returns a pending-card spec with the bead reference
+
+**Pending/ack card render path.** The pending/ack card is **not** a component-library render: no `results` row exists until bead closure, so there is nothing for `results.result_type` selection to key on and no `result_id` for `card_cache`. Pending/ack cards — including per-source fetch-progress and elapsed-time states — are built-in frontend templates shipped in `src/canvas/`, exactly like the welcome and generic fallback cards (see Component Library → Built-in cards). The pending lifecycle starts client-side, not with a server event: at submit time the canvas creates a **local per-utterance pending placeholder** — before any server response has arrived, so even a hung server leaves a card on canvas to age — which splits into per-thread pending cards when the dispatch ack arrives. The client fills those from SSE events (dispatch ack, per-source progress, bead ref on `bf create` return) and replaces them with the component-rendered card when the real result lands; the 30s aged-pending timer runs from the local placeholder's creation, not from any SSE event (see the Degraded-State UX aged-pending row).
 
 The bead watcher subsequently bridges bead closure to result delivery.
 
+#### Beads-Workspace Scoping
+
+"The appropriate project" is deliberately **not** another repo's `.beads/`. Every aide-de-camp-originated bead lives in the aide-de-camp repo's own beads workspace, carrying its target project as the `--project {slug}` field. One workspace for create, poll, and fence means the escalate strand and the bead watcher run every `bf` invocation from the aide-de-camp checkout directory and are guaranteed to see every bead they own; NEEDLE workers roam across workspaces and pick these up like any other.
+
+The one exception is read-only: the fetch matrix's per-project bead listing reports on a project's *own* backlog, so it runs `bf list --status open` in that project's repo checkout when the registry entry has a `repo_path` with a `.beads/` workspace — deliberately with **no** `--project` filter: a project's own workspace doesn't tag its beads with its aide-de-camp slug, so `--project {slug}` there would return zero or near-zero rows and render a plausible-looking empty backlog on camera. The `--project {slug}` filter belongs only to the fallback: when there is no local workspace, fetch falls back to the aide-de-camp workspace filtered by `--project {slug}` — still real data, but only aide-de-camp-originated beads — and `fetch_coverage` records the narrower scope so the card carries a caveat ("no local beads workspace for {slug}; showing aide-de-camp-originated beads only").
+
+#### Generated-Bead Safety
+
+An LLM-authored bead body is an instruction that autonomous workers will execute. Unconstrained, this is the system's sharpest edge — live evidence: an escalate-authored bead containing an unscoped `kubectl delete pod` instruction put NEEDLE workers into a refusal loop (workers correctly refuse it; NEEDLE re-dispatches it forever). Every escalate-authored bead body therefore passes a deterministic validation gate before `bf create`:
+
+- **Cluster-mutation verbs are denied.** Bead bodies must not instruct workers to run `kubectl apply/create/delete/scale/patch/edit/annotate/rollout` or any other live mutation of a managed resource. These violate the GitOps rule and workers refuse them.
+- **Mutations must be phrased as declarative-config edits.** Any desired change to cluster state is written as "edit the manifest under `k8s/<cluster>/...` in `jedarden/declarative-config`, commit, push; ArgoCD syncs" — the only sanctioned mutation path (see Action Execution Model).
+- **Scoping is required.** Bead bodies that reference cluster resources must name the cluster, namespace, and specific resource. Unscoped operational instructions ("delete the pod", "restart everything") are rejected.
+
+Validation failure → the bead is not created; the escalate strand re-formulates once with the failure reason in context, and surfaces a clarification card if the second attempt also fails.
+
+**User-approval gate:** no action-derived bead (anything instructing workers to change state — deploys, config edits, restarts, deletions) is created without explicit approval. The proposed bead body is rendered as a card on canvas (narrated in audio mode); approve → `bf create`, reject → discard. Purely informational task-profile beads (research, lookups) skip the approval gate but never the validation pass.
+
 ### 6. Voice Model
 
-**Runtime:** Realtime API (OpenAI or Claude Realtime, persistent session)
+**Runtime:** OpenAI Realtime API (persistent session, via the DUCK-E session handler — see Technology Stack)
 
 The conversational layer. Receives transcribed utterances (or audio directly), calls `dispatch_intent()` tool to trigger routing, and narrates results at appropriate moments.
 
@@ -188,11 +295,16 @@ In audio mode there is no canvas. The voice model reads `result.summary` directl
 
 **Runtime:** Claude Code via NEEDLE (task bead)
 
-Steward of the component library. Given a result's data shape:
-1. Finds the best-fit existing component (semantic match against component descriptions)
+Steward of the component library — asynchronous only. It is never on the hot path and never renders a card a user is waiting on.
+
+**Hot-path selection and rendering happen in the server, not here.** On every dispatch the server picks the component deterministically — highest `match_score` in `component_usage_patterns` for the result's `result_type`, no LLM call (lookup result_types embed the router's `lookup_kind`, so `lookup:logs:ibkr-mcp` and `lookup:config:ibkr-mcp` are distinct keys selecting distinct components) — fills its template with the result data per layout bucket, writes the output to `card_cache`, and streams the rendered HTML over SSE; the client injects it. When nothing matches (a first-ever result shape, or no score above threshold), the server flags the result and the client renders it with the built-in generic fallback card (see Component Library) — a novel shape never blanks the canvas, it just renders plainly until the library catches up.
+
+**Escaping contract (render path).** Template fill is the escaping boundary: every interpolated value — fetch output, `result.data` fields, `summary`, raw log lines — is HTML-escaped at template-fill time, and templates receive data as text only, never raw HTML from results, so a markup-looking log line renders as literal text instead of breaking layout or executing in the canvas. This binds LLM-generated component templates and the built-in generic fallback card's key/value grid alike (the fallback escapes client-side, where it renders). The same contract binds every client-filled built-in card: SSE-event values interpolated into built-in templates on the client — per-source progress states, bead refs, elapsed-time strings, error details, and above all worker/LLM-authored free text like the stuck card's refusal reasons lifted from bead comments — are inserted as text nodes (or escaped identically to the fallback card's values), never as HTML.
+
+The UI-regen agent's job is making the library catch up. Given a result shape that fell to the fallback card or a weak match:
+1. Finds the best-fit existing component (semantic match against component descriptions) and records the mapping in `component_usage_patterns` so the hot-path lookup hits it next time
 2. If no good fit, generates a new component from scratch and stores it
-3. Applies the component template to result data accounting for layout bucket
-4. On feedback, iterates the component (updates library, triggers canvas re-render)
+3. On feedback, iterates the component (updates library, triggers canvas re-render)
 
 Multi-step: reads library, generates or selects, writes back. Claude Code's file access and tool use make this the right runtime.
 
@@ -205,7 +317,7 @@ Created as a task bead; not on the hot path. Canvas updates in place when a comp
 Reads and writes the artifacts that encode system behavior:
 - Router prompt (`prompts/router.md`)
 - Project registry (`config/registry.yaml`)
-- Strand prompts (`prompts/fetch.md`, `prompts/synthesize.md`, etc.)
+- Strand prompts (`prompts/fetch/*.md` — one per intent type, per `lookup_kind` for lookup; `prompts/synthesize.md`; `prompts/escalate/task-profile.md`)
 - Urgency classifier prompt (`prompts/urgency.md`)
 - Voice model prompt (`prompts/voice.md`)
 - Monitoring config (`config/monitoring.yaml`)
@@ -221,8 +333,9 @@ Workflow for every modification:
 
 Safety model:
 - Diffs before every application — no silent changes
-- All artifacts versioned; any update can be rolled back with one instruction
+- Versioning is git: every artifact write (`prompts/*.md`, `config/*.yaml`) is a git commit with a machine-generated message; rolling back any update is one instruction → `git revert` of that commit. Component library artifacts get the same guarantee through the `component_versions` table. No bespoke version store.
 - Confidence threshold: unambiguous changes (adding an alias) can auto-apply with notification; structural changes always require explicit approval
+- Out-of-band kill switch: self-modification can break the very interface used to undo it (a bad router prompt means no more routed instructions). Two escape hatches bypass the interface entirely: `ADC_SELFMOD_FREEZE=1` in the server environment, or `adc freeze` from the CLI (which falls back to touching a `data/FREEZE` sentinel file if the server is unresponsive). While frozen, every self-modification and auto-apply write is refused, and `adc restore-artifacts` git-reverts `prompts/` and `config/` to the last-known-good commit — no canvas, voice session, or router involvement required. **Break-glass caveat:** the sentinel-file fallback and the git revert are local filesystem/git operations against the server's artifact store — `adc` is a thin HTTP client (see adc CLI connectivity), so from a remote machine neither works exactly when the server is unresponsive. The break-glass procedure is: SSH into the server host first, then run `adc freeze` / `adc restore-artifacts` there.
 
 ### 9. Background Analysis Bead
 
@@ -235,19 +348,45 @@ Examples:
 - "User ignores pipeline monitoring pushes for 5 days → propose lowering urgency tier"
 - "After deploy status, user always asks about pod logs within 2 minutes → propose speculative pre-fetch"
 
-Proposals are surfaced as cards on canvas for user review. Auto-apply only above a high confidence threshold.
+Proposals are surfaced as cards on canvas for user review. Auto-apply only above a high confidence threshold — and an auto-apply is not a third artifact writer: the accepted proposal executes through the self-modification agent's write path, inheriting its write scope (`prompts/` and `config/` only), its git-commit-per-write rollback guarantee (one-instruction revert), and the out-of-band kill switch — all auto-apply is refused while the freeze is engaged.
 
 ### 10. Bead Watcher
 
-**Runtime:** Daemon process, no LLM
+**Runtime:** In-process daemon loop — an asyncio background task spawned by FastAPI lifespan startup, inside the same process as the server (see Deploy Stage A process model). No LLM
 
-Watches for bead close events from NEEDLE workers. On close:
-1. Reads `session_id` from closed bead metadata
+Watches for bead close events from NEEDLE workers. Detection is CLI-only: the watcher polls `bf list --status closed` on a fixed interval (default 30s) and keeps a high-water mark (newest close timestamp already processed) to pick out new closures. On the same tick it checks each open tracked bead — every unresolved `intents.bead_ref` — via `bf show`, parsing comments past a per-bead high-water mark for `REFUSED:` entries (the circuit-breaker signal; see The Async Path). All `bf` invocations run from the aide-de-camp repo's beads workspace (see Beads-Workspace Scoping under the Escalate Strand). It never reads `.beads/` files directly — the SQLite db is the CLI's private store, and `issues.jsonl` is only a flush checkpoint that misses unflushed mutations; both are documented corruption/staleness footguns in this workspace.
+
+On close:
+1. Resolves the closed bead to its intent via `intents.bead_ref` and reads `session_id` from the intent row — the bead itself carries no session metadata; the mapping lives entirely in the session store
 2. Looks up active surface in session store
-3. Writes result to `results` table
+3. Writes result to `results` table and marks the intent `resolved` (or `failed`, per The Async Path's terminal-failure rule)
 4. Fires SSE push to canvas or Telegram push if no canvas active
 
-Pure I/O. Runs as a long-running process (Deployment, not a K8s Job per infrastructure conventions).
+> ⚠ The Telegram push in step 4 is NON-FUNCTIONAL until ADR-1 lands — `src/telegram/fallback.py`'s delivery methods are stubs pointed at an unreachable bridge URL (see ADR-1). Today, a bead closing with no active canvas writes to `results` but notifies no one.
+
+The same poll loop drives the async-path circuit breaker (see The Async Path): each tick it folds newly parsed refusal comments into `bead_watch` (refusal count, last reason, comment high-water mark), flags cards whose `sla_deadline` has passed, and fences stuck beads to `status=blocked`, flipping their intents to `stuck`. Breaker and SLA state live in `bead_watch` in the session store — never only in memory — so a watcher restart loses nothing.
+
+**Ambient monitoring tick.** The watcher daemon is also the runtime for ambient monitoring — there is no separate monitoring process. On its own timer (`tick_interval_seconds` in `config/monitoring.yaml`, default 300; the config hot-reloads per tick per the Hot-Reload Architecture), the daemon evaluates each rule in `config/monitoring.yaml` against its watched topic: `src/monitoring/ambient.py` runs the relevant fetch-matrix sources through the fetch strand, diffs the output against `topic_context_cache`, and when a rule fires writes a `results` row directly — `topic_id` set, `intent_id` NULL (system-originated, no utterance behind it), `urgency` and exception type taken from the rule via `config/monitoring.yaml` and `config/exceptions.yaml`, `summary` filled from the rule's deterministic template (no LLM anywhere on the tick). From there the result enters Surface Routing Rules like any other: SSE push to the active surface, exception-class handling when urgency is critical.
+
+Pure I/O. Not a separately started process: FastAPI's lifespan startup spawns the watcher loop in-process, so the single Stage A run command brings up hot path, watcher, ambient monitoring, and circuit breaker together — the server cannot be up with the watcher silently absent. Liveness is verified, not assumed: the watcher stamps `last_tick_at` after every poll tick, and `GET /health` exposes a `watcher` block (`alive`, `last_tick_at`, tick count) where `alive` is true only while the task is running **and** `last_tick_at` is within 2× the poll interval. A crashed watcher task is logged and restarted with backoff by the lifespan supervisor; the `/health` gap makes the crash observable. Under Deploy Stage B the same in-process model ships inside the aide-de-camp Deployment (never a K8s Job/CronJob, per infrastructure conventions).
+
+---
+
+## Degraded-State UX
+
+"Failed sources are surfaced as caveats" is not a design. Every failure mode below maps to a **designed error card rendered from a fixed template** — these templates ship as built-in cards in the served frontend, the fourth built-in family (see Component Library → Built-in cards), filled client-side from SSE error events — so the canvas never shows a blank region, a spinner that never resolves, raw JSON, or a stack trace. These cards are what the Phase 5 known-issues register's degraded-state row points at.
+
+| Failure mode | Canvas presentation | Recovery action |
+|--------------|---------------------|-----------------|
+| One fetch source fails or times out | Normal card built from the surviving sources; a caveat strip (from `fetch_coverage`) names what's missing — e.g. "ArgoCD unreachable — sync status omitted" | Per-source retry on the caveat; the next dispatch on the topic refetches everything |
+| ALL fetch sources fail | "No data" error card: intent header + per-source failure list. Fixed template, no LLM call — synthesize is skipped, there is nothing to synthesize | Retry button re-runs fetch for the intent; utterance and intent are preserved |
+| ZAI proxy down / timeout / quota-exhausted at the **router** stage | Dispatch-level error card: "Router unavailable — LLM proxy unreachable", with the raw utterance shown so nothing is lost | Retry re-dispatches the persisted utterance. ⚠ No fallback LLM endpoint exists — a proxy outage kills the entire hot path (router **and** synthesize); a direct-API fallback is tracked as Open Question 8 |
+| ZAI proxy failure at the **synthesize** stage | Degraded "raw data" card: the structured fetch output renders under a "summary unavailable" banner — fetched data is never discarded | Retry-synthesize action reuses the fetched context (no refetch) |
+| SSE connection drops | Unobtrusive "reconnecting…" indicator; existing cards stay visible, marked stale | Client auto-reconnects (EventSource backoff + `Last-Event-ID`); on reconnect the workload-summary replay delivers anything surfaced while disconnected |
+| Hot-path card still pending at 30s (server hung, dispatch lost — no SSE event will ever arrive) | Aged-pending treatment applied by the **canvas client itself**: the card exists to age at all because the canvas creates a local per-utterance pending placeholder at submit time, before any server response (split into per-thread pending cards on the dispatch ack — see Escalate Strand, Pending/ack card render path); a client-side timer from the placeholder's creation, no server dependency, shows elapsed time plus "taking longer than expected" (see The Async Path — Visible aging) | Retry re-dispatches the card's utterance; the aged card is replaced by the retry's result |
+| Router returns malformed JSON / schema-invalid output | After one automatic corrective retry, a clarification-style card: "Couldn't parse that into intents", showing the utterance with an edit-and-resend action. Raw model output goes to logs, never the canvas | User edits or resends; malformed output is logged as fodder for router-prompt iteration |
+
+Quota exhaustion on the ZAI proxy presents identically to the proxy being down — same rows, same cards. The proxy is a single point of failure for the entire hot path; that is a deliberate Deploy Stage A trade-off (tracked as Open Question 8), and it stays visible here rather than hidden.
 
 ---
 
@@ -268,7 +407,7 @@ surfaces (
   session_id      TEXT,
   type            TEXT,  -- 'canvas' | 'telegram' | 'audio'
   state           TEXT,  -- 'active' | 'idle' | 'disconnected'
-  always_available INTEGER DEFAULT 0,  -- 1 for Telegram
+  always_available INTEGER DEFAULT 0,  -- 1 for Telegram (⚠ aspirational: Telegram delivery non-functional; ADR-1 removes session-bound Telegram surfaces)
   last_seen       INTEGER
 )
 
@@ -283,18 +422,42 @@ intents (
   id           TEXT PRIMARY KEY,
   utterance_id TEXT,
   session_id   TEXT,
-  topic_id     TEXT,
+  topic_id     TEXT,  -- primary topic, authoritative and always set; see intent_topics
   project_slug TEXT,
   intent_type  TEXT,
-  status       TEXT,  -- 'pending' | 'dispatched' | 'resolved' | 'cancelled'
+  lookup_kind  TEXT,  -- lookup intents only: 'logs' | 'config' | 'docs' (router-emitted; see Intent Router). NULL otherwise
+  status       TEXT,  -- 'pending' | 'dispatched' | 'resolved' | 'stuck' | 'failed' | 'cancelled'
   bead_ref     TEXT,  -- set for task-profile intents
   created_at   INTEGER,
   resolved_at  INTEGER
 )
 
+dispatch_timings (
+  intent_id                 TEXT PRIMARY KEY,
+  router_ms                 INTEGER,  -- shared across intents from the same utterance
+  fetch_first_source_ms     INTEGER,
+  fetch_total_ms            INTEGER,
+  synthesize_first_token_ms INTEGER,
+  synthesize_total_ms       INTEGER,
+  escalate_ms               INTEGER,  -- task-profile dispatches only; null otherwise
+  sse_emit_ms               INTEGER,
+  stt_ms                    INTEGER,  -- client-reported; null when unavailable
+  first_render_ms           INTEGER,  -- client-reported; null when unavailable
+  created_at                INTEGER
+)
+
 results (
   id          TEXT PRIMARY KEY,
-  intent_id   TEXT,
+  intent_id   TEXT,  -- NULL for monitoring-originated results (see Bead Watcher)
+  result_type TEXT,  -- deterministic card-selector key, set at result-write time:
+                     -- "{intent_type}:{project_slug}" for intent-derived results — one per
+                     -- intent thread (the aggregated thread card), never per fetch source;
+                     -- lookup threads insert the intent's lookup_kind:
+                     -- "lookup:{lookup_kind}:{project_slug}" (e.g. "lookup:logs:ibkr-mcp"
+                     -- vs "lookup:config:ibkr-mcp" — distinct keys, distinct cards);
+                     -- "monitoring:{project_slug}" for monitoring-originated rows.
+                     -- The hot-path component lookup keys on this column, no LLM
+                     -- (see UI-Regen Agent / component_usage_patterns)
   topic_id    TEXT,
   session_id  TEXT,
   summary     TEXT,
@@ -303,7 +466,13 @@ results (
   created_at  INTEGER,
   surfaced_at INTEGER,
   acked_at    INTEGER,
-  previous_result_id TEXT,  -- link to prior result on same topic for diffing
+  previous_result_id TEXT,  -- prior result of the SAME result_type on the same topic
+                            -- (diff scope; NULL when none exists) — a status result
+                            -- never diffs against a brainstorm result. Pure lineage,
+                            -- set across sessions (project topics are cross-session):
+                            -- the diff strip renders only when this points at a result
+                            -- from the current session (see Cold start & demo seed —
+                            -- Topic scope vs. session scope)
   diff_summary TEXT,  -- human-readable diff summary
   diff_data    TEXT   -- JSON: detailed field diffs
 )
@@ -340,10 +509,29 @@ feedback_signals (
   processed_at INTEGER
 )
 
+-- Additional memberships for compound topics only: intents.topic_id is the
+-- primary topic (always set, authoritative); this table never replaces it,
+-- it only holds the extra topics a compound intent also belongs to.
 intent_topics (
   intent_id TEXT,
   topic_id  TEXT,
   PRIMARY KEY (intent_id, topic_id)
+)
+
+-- Watcher-owned: circuit-breaker and SLA state per tracked bead.
+-- Persisted here (not in watcher memory) so refusal counts and SLA
+-- flags survive watcher restarts. See The Async Path and Bead Watcher.
+bead_watch (
+  bead_ref            TEXT PRIMARY KEY,
+  intent_id           TEXT,
+  refusal_count       INTEGER DEFAULT 0,
+  last_refusal_reason TEXT,
+  last_refusal_at     INTEGER,
+  comment_high_water  TEXT,     -- newest comment id/timestamp already parsed
+  sla_deadline        INTEGER,  -- set at bead creation: intent-type default or registry sla_hours
+  sla_flagged_at      INTEGER,
+  fenced_at           INTEGER,
+  created_at          INTEGER
 )
 ```
 
@@ -388,13 +576,22 @@ component_tags (
 
 component_usage_patterns (
   component_id TEXT,
-  result_type TEXT,  -- e.g., "pod-status", "git-log"
+  result_type TEXT,  -- thread-level key matching results.result_type, e.g.
+                     -- "status:options-pipeline", "lookup:logs:ibkr-mcp",
+                     -- "lookup:config:ibkr-mcp" (lookup keys carry lookup_kind,
+                     -- so log-lookup and config-lookup components select
+                     -- independently) — never per-source ("pod-status")
+                     -- granularity; a thread's sources aggregate into one card
   match_score REAL,  -- 0-1
   sample_count INTEGER,
   last_matched INTEGER,
   PRIMARY KEY (component_id, result_type)
 )
 ```
+
+**Built-in generic fallback card.** The hot-path selector (see The Hot Path / UI-Regen Agent) is a deterministic lookup: highest `match_score` in `component_usage_patterns` for the result's `result_type`, no LLM. When no component matches — a first-ever result shape, or nothing above threshold — the card does not come from this DB at all: the served frontend ships a generic fallback card (key/value grid over `result.data` plus the `summary` line, all values HTML-escaped per the render-path escaping contract — see UI-Regen Agent) as part of `src/canvas/`, and the server flags the result so the client uses it. Novel shapes therefore always render something legible even with zero library rows; the UI-regen agent later promotes recurring fallback shapes into real components. `card_cache` rows are written only for real component renders.
+
+**Built-in cards.** The fallback card is one of four card families that ship as fixed templates in the served frontend (`src/canvas/`) and never come from this DB: (1) the generic fallback card above, (2) the first-run welcome card (see Cold start & demo seed), (3) the pending/ack cards — the task-profile ack/pending card and the hot-path pending card with its per-source progress states — and (4) the error/clarification cards: the fixed-template cards Degraded-State UX defines (router-unavailable, all-sources-failed, degraded raw-data, malformed-router-output) plus the no-match clarification card (see Cold start & demo seed), filled client-side from SSE error events. Pending/ack cards cannot be library components even in principle: component selection keys on `results.result_type` and `card_cache` keys on `result_id`, and neither exists before the result does (task-profile results only appear at bead closure) — which is also why their lifecycle starts as a local per-utterance placeholder the canvas creates at submit time, before any server event (see Escalate Strand, Pending/ack card render path). The client fills these templates from SSE events (dispatch ack, per-source progress, bead ref, elapsed time, error details) and swaps in the component-rendered card when the result arrives. Consequence for Phase 5: built-in cards across all four families are exempt from — and never seeded for — the component-library requirements in the seeding runbook and rehearsal checklist.
 
 ---
 
@@ -403,8 +600,11 @@ component_usage_patterns (
 ```
 aide-de-camp/
 ├── adc                      ← CLI entry point (shell script or Python package)
+├── README.md                ← operational/configuration reference (env vars, configuration table — the file ADR-1 cites)
+├── README-PHASE4.md         ← Phase 4 verification evidence (cited by Implementation Phases)
 ├── config/
 │   ├── registry.yaml        ← project registry (hot-reloaded by router)
+│   ├── clusters.yaml        ← cluster → ArgoCD endpoint mapping (see Fetch Strand)
 │   ├── monitoring.yaml      ← ambient monitoring rules
 │   └── exceptions.yaml      ← exception routing rules
 ├── prompts/
@@ -415,6 +615,9 @@ aide-de-camp/
 │   ├── fetch/               ← per-intent-type fetch instructions
 │   │   ├── status.md
 │   │   ├── action.md
+│   │   ├── lookup-logs.md   ← lookup matrices are per lookup_kind (see Intent Router)
+│   │   ├── lookup-config.md
+│   │   ├── lookup-docs.md
 │   │   └── ...
 │   └── escalate/            ← escalate/task-profile prompts
 │       └── task-profile.md
@@ -433,7 +636,7 @@ aide-de-camp/
 │   ├── conversation/        ← multi-turn conversation handling
 │   ├── diff/                ← diff generation for results
 │   ├── environment/         ← environment and repo discovery
-│   │   └── discovery.py        ← repo scanner and registry
+│   │   └── discovery.py        ← repo scanner: seeds registry.yaml (one-time/on-demand scan); self-mod agent is sole ongoing author (see Project Registry)
 │   ├── escalate/            ← escalate strand for task-profile intents
 │   │   ├── handler.py           ← escalate request handler
 │   │   ├── llm.py               ← LLM calls for bead formulation
@@ -447,7 +650,7 @@ aide-de-camp/
 │   │   └── orchestrator.py      ← FetchStrand: concurrent fetch execution, streaming, coverage tracking
 │   ├── intent/              ← intent router (LLM classification)
 │   │   └── router.py            ← intent segmentation and routing
-│   ├── memory/              ← memory store and extraction
+│   ├── memory/              ← memory store and extraction (supporting store for cross-session context; not yet surfaced by any component — Future Work)
 │   │   ├── store.py             ← memory persistence
 │   │   └── extraction.py        ← memory extraction from results
 │   ├── monitoring/          ← ambient monitoring
@@ -490,6 +693,7 @@ aide-de-camp/
     ├── plan/
     │   └── plan.md          ← this file
     └── notes/
+        ├── core-verification-evidence.md  ← phase verification evidence (cited by Implementation Phases)
         └── naming.md
 ```
 
@@ -499,6 +703,8 @@ aide-de-camp/
 
 aide-de-camp is a **live web application**, not a static site. The FastAPI server is the intelligence layer — it handles SSE connections, maintains session state, runs the router and synthesize strands, and serves the frontend HTML. There is no CDN path (no CF Pages).
 
+*Naming note: deployment stages are **Deploy Stage A** (bare-metal) and **Deploy Stage B** (k8s) — deliberately not "Phase 0/1+", which collided with the Implementation Phases numbering (deployment "Phase 1+" had nothing to do with implementation Phase 1). References elsewhere to the "Phase 0 deployment" (e.g., ADR-1) mean Deploy Stage A. Stage A is the hosting model through the screen-capture demo and public launch; Stage B is post-launch hardening.*
+
 ### Why not static
 
 - SSE connections are long-lived; CDNs cannot proxy them
@@ -506,9 +712,9 @@ aide-de-camp is a **live web application**, not a static site. The FastAPI serve
 - The session store (SQLite) and artifact store (prompts, registry) require a writable filesystem
 - Hot-reload depends on the running server reading updated files from disk on each invocation
 
-### Current Deployment: Phase 0 (Hetzner server directly)
+### Current Deployment: Deploy Stage A (bare-metal — Hetzner server directly)
 
-**Status: COMPLETE** ✅
+**Status: LIVE** ✅ — running server confirmed 2026-07-20 (ADR-1 audit)
 
 The server runs as a process on the Hetzner server itself, not in k8s:
 - NEEDLE workers and the aide-de-camp server share the same filesystem
@@ -518,19 +724,21 @@ The server runs as a process on the Hetzner server itself, not in k8s:
 
 Running command: `uvicorn src.main:app --host 0.0.0.0 --port 8000`
 
+**Stage A process model — exactly one process, by design.** The command above is the complete process inventory. The bead watcher (which also hosts ambient monitoring and the async-path circuit breaker — see Bead Watcher) is **not** a second command an operator must remember: FastAPI's lifespan startup spawns the watcher loop as an asyncio background task inside this same uvicorn process. A separately documented daemon is exactly the step that gets skipped, and its absence is silent — closures never surface, SLAs never fire, monitoring never ticks, while every test still passes (the "verified-in-tests, dead live" pattern). Startup-spawning makes that failure impossible; liveness is still checked, not assumed: `GET /health` reports `watcher.alive` / `watcher.last_tick_at` (see Bead Watcher), and the pre-demo seeding runbook verifies it in item (3).
+
 No container, no CI, no ArgoCD. Managed as a long-running process (see CLAUDE.md for restart commands).
 
-### Release flow (Phase 0)
+### Release flow (Deploy Stage A)
 
 Version is in `pyproject.toml` only. No CI build — runs from source.
 
 Release: `bump version in pyproject.toml` → `commit` → `git tag vX.Y.Z` → `push`.
 
-### Future: Phase 1+ (containerized, ardenone-cluster)
+### Future: Deploy Stage B (containerized, ardenone-cluster)
 
 **Status: NOT BUILT** ❌
 
-Once session persistence and multi-surface routing are needed, containerize and move to k8s:
+Session persistence and multi-surface routing are implementation Phase 1 deliverables and run on Stage A (currently PARTIAL — see Implementation Phases); they are not the trigger for this stage. The Stage B trigger is operational: uptime independent of the Hetzner box, container isolation, and standard CI/ArgoCD management. Not needed for the demo or launch. When that point arrives, containerize and move to k8s:
 
 ```
 Docker image: ronaldraygun/aide-de-camp
@@ -542,9 +750,9 @@ PVC: /data/ (SATA, ReadWriteOnce)
   /data/config/           ← registry.yaml, monitoring.yaml, exceptions.yaml
 ```
 
-The artifact store (prompts, registry) moves from the repo's working directory to the PVC. The self-modification agent updates artifacts via the aide-de-camp API (`PATCH /artifacts/{name}`), which writes to the PVC path the server reads from.
+The artifact store (prompts, registry) moves from the repo's working directory to the PVC. The self-modification agent updates artifacts via the aide-de-camp API (`PATCH /artifacts/{name}`), which writes to the PVC path the server reads from. The PVC artifact directory is itself a git repository: the server commits every `PATCH /artifacts/{name}` write with the same machine-generated message convention, so the "versioning is git" safety model — one-instruction rollback, `adc restore-artifacts` — survives the move to Stage B unchanged.
 
-### Future: Traefik configuration for SSE and WebSocket (Phase 1+)
+### Future: Traefik configuration for SSE and WebSocket (Deploy Stage B)
 
 **Status: NOT BUILT** ❌
 
@@ -602,13 +810,15 @@ The `adc` CLI is a thin HTTP client. It talks to the running server over Tailsca
 
 ```bash
 # ~/.config/adc/config
-server_url = "http://localhost:8000"   # Phase 0 (local)
-# Future: "http://aide-de-camp.ardenone.com" (Phase 1+)
+server_url = "http://localhost:8000"   # Deploy Stage A (local)
+# Future: "http://aide-de-camp.ardenone.com" (Deploy Stage B)
 ```
 
 No local inference. The CLI sends requests to the FastAPI backend and streams the SSE response to the terminal.
 
-### Future: CI/CD (Phase 1+)
+One exception: the kill-switch fallbacks (`adc freeze`'s `data/FREEZE` sentinel, `adc restore-artifacts`' git revert) act on the server's local filesystem, not over HTTP — they only work when `adc` runs on the server host itself. SSH in first; see the Self-Modification Agent safety model's break-glass procedure.
+
+### Future: CI/CD (Deploy Stage B)
 
 **Status: NOT BUILT** ❌
 
@@ -631,20 +841,27 @@ Same pattern as every other containerized service in the stack.
 | LLM calls | ZAI proxy (`llm-proxy.ardenone.com`) | Pay-per-token, no subscription pressure on hot path |
 | Task workers | NEEDLE + Claude Code | Existing infrastructure, unchanged |
 | Session store | SQLite (WAL mode) | Lightweight, local, additive-only schema; single-user app |
-| Artifact store | PVC-mounted filesystem (Phase 1+) / local filesystem (Phase 0) | Writable at runtime; hot-reload reads per-invocation |
-| Frontend | Vanilla JS + Web Components | No build pipeline; SSE consumer + client-side card renderer |
-| Phase 0 hosting | Hetzner server, local process | Simplest path; shared filesystem with NEEDLE workers |
-| Phase 1+ hosting | ardenone-cluster, k8s Deployment | Behind existing Traefik + Tailscale ingress |
+| Artifact store | PVC-mounted filesystem (Deploy Stage B) / local filesystem (Deploy Stage A) | Writable at runtime; hot-reload reads per-invocation |
+| Frontend | Vanilla JS + Web Components | No build pipeline; SSE consumer injects server-rendered component-card HTML. Client-side rendering is limited to the built-in card templates shipped with the served frontend (`src/canvas/`): the generic fallback card, the first-run welcome card, the pending/ack card with its progress states, the error/clarification cards (see Degraded-State UX), and the aged-pending treatment on overdue cards — every component-library card arrives server-rendered |
+| Deploy Stage A hosting | Hetzner server, local process | Simplest path; shared filesystem with NEEDLE workers |
+| Deploy Stage B hosting | ardenone-cluster, k8s Deployment | Behind existing Traefik + Tailscale ingress |
 
 ---
 
 ## Implementation Phases
 
+**Status vocabulary.** Every phase status below carries one of two verification tiers — never read "COMPLETE" without its tier:
+
+- **verified-in-tests** — deliverables pass the automated test harness / smoke tests (the `src/test/` endpoints that bypass the Web Speech API). Says nothing about behavior on the live server for a real user.
+- **verified-live** — observed working on the running server, with the date and how it was observed recorded on the status line.
+
+As of 2026-07-22 no phase has reached verified-live end-to-end; the only live check on record (2026-07-20, ADR-1) disproved a Phase 1 deliverable.
+
 ### Phase 0 — Minimal Viable Surface (~2 days)
 
-**Status: COMPLETE** ✅
+**Status: COMPLETE (verified-in-tests)** — not yet verified-live
 
-*Verification evidence:* see `docs/notes/core-verification-evidence.md` (smoke test results, 20+ runs with all tests passing)
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` — smoke test results, 20+ runs with all tests passing (test harness, not live; date unrecorded — re-verify)
 
 Validates the core question: does routing + parallel dispatch reduce friction?
 
@@ -657,26 +874,26 @@ Deliverable: the core query loop working end-to-end.
 
 ### Phase 1 — Session and Topics (~1 week)
 
-**Status: COMPLETE** ✅
+**Status: PARTIAL** ⚠️ — session store, topics, and bead watcher are verified-in-tests; the Telegram fallback deliverable is non-functional in every deployment to date (stub methods returning `False`, unreachable hardcoded bridge URL, architectural mismatch — see ADR-1, observed live 2026-07-20). Re-opened pending ADR-1 implementation.
 
-*Verification evidence:* see `docs/notes/core-verification-evidence.md` (session store, SSE, surface registration all verified)
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` — session store, SSE, surface registration (test harness, not live; date unrecorded — re-verify). Those tests passed while the Telegram stubs shipped — this is exactly why the two-tier vocabulary above exists.
 
 Results persist; the canvas has memory.
 
 - Session store (SQLite, 7+ tables with topic_context_cache and feedback_signals)
-- Topic model: canvas shows one card per active topic, updated in place
+- Topic model: canvas shows one card per **(active topic, result_type)** pair, each updated in place — a status card and a brainstorm card on the same project topic coexist as distinct cards, grouped under the topic; a new result replaces only the card sharing both its topic and its result_type
 - Telegram surface fallback (reuse telegram-claude-bridge)
 - Bead watcher: closed NEEDLE beads push results to active surface
 - Workload summary on reconnect
 - Staleness indicators on cards
 
-Deliverable: sessions that survive browser refresh; Telegram fallback working.
+Deliverable: sessions that survive browser refresh (verified-in-tests); Telegram fallback working (**not met** — see ADR-1).
 
 ### Phase 2 — Self-Improvement Loop (~2 weeks)
 
-**Status: COMPLETE** ✅
+**Status: COMPLETE (verified-in-tests)** — not yet verified-live
 
-*Verification evidence:* see `docs/notes/core-verification-evidence.md` (component library, hot-reload manager verified)
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` — component library, hot-reload manager (test harness, not live; date unrecorded — re-verify)
 
 The interface can be improved by talking into it.
 
@@ -690,9 +907,9 @@ Deliverable: at least one end-to-end self-modification cycle working (user instr
 
 ### Phase 3 — Responsiveness (~2-3 weeks)
 
-**Status: COMPLETE** ✅
+**Status: COMPLETE (verified-in-tests)** — not yet verified-live
 
-*Verification evidence:* see `docs/notes/core-verification-evidence.md` (ambient monitoring, context warmer verified)
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` — ambient monitoring, context warmer (test harness, not live; date unrecorded — re-verify)
 
 The interface feels alive, not just reactive.
 
@@ -708,9 +925,9 @@ Deliverable: monitoring fires unprompted for a watched topic; follow-up question
 
 ### Phase 4 — Audio Surface (~1-2 weeks)
 
-**Status: COMPLETE** ✅
+**Status: COMPLETE (verified-in-tests)** — not yet verified-live
 
-*Verification evidence:* see `README-PHASE4.md` (full voice session implementation with Realtime API) and `docs/notes/core-verification-evidence.md`
+*Verification evidence:* see `README-PHASE4.md` (repo root; full voice session implementation with Realtime API) and `docs/notes/core-verification-evidence.md` (both test harness, not live; date unrecorded — re-verify)
 
 Full audio mode via Realtime API.
 
@@ -721,19 +938,88 @@ Full audio mode via Realtime API.
 
 Deliverable: full voice session with canvas catch-up on surface switch.
 
+### Phase 5 — Demo Readiness (~3-5 days)
+
+**Status: NOT STARTED** ❌
+
+Phases 0-4 make the system work end-to-end; none of them make a screen-capture of it smooth. **Public launch gates on this phase, not on Phases 0-4** — the launch artifact is a recording, and a complete-and-verified core is necessary but not sufficient to produce one. This phase turns "the demo isn't smooth" from a feeling into a checklist with pass/fail criteria.
+
+#### Demo script (golden path)
+
+One scripted run, recorded in a single unedited take. The take is **canvas-only**: utterances enter through the canvas page's Web Speech STT — the Realtime API voice session (Phase 4's audio surface) is not part of the launch recording; a voice-session demo is post-launch work (see Open Question 6). Every utterance uses a registered project (options-pipeline, ibkr-mcp) and only intents the registry supports for that project — step 5's `task-profile` included: both example entries list it in `intent_support`. The `action` intent is deliberately excluded from the script — its execution model carries its own constraints and adds risk without adding demo value.
+
+| Step | Utterance | Intent(s) | Expected canvas output |
+|------|-----------|-----------|------------------------|
+| 1 | "Has the options pipeline caught up, and what's the state of the ibkr mcp?" | status ×2 (options-pipeline, ibkr-mcp) | Router splits into two threads; two cards appear and resolve **in parallel** — pod status, ArgoCD sync state, recent commits, open beads per project |
+| 2 | "Pull up the recent logs for the ibkr mcp." | lookup/logs (ibkr-mcp) | Log-lookup card (`lookup:logs:ibkr-mcp`) with recent log lines, appearing under the existing ibkr-mcp topic as its own card beside the step-1 status card — one card per (topic, result_type): grouped, not a new pile |
+| 3 | "Should the options pipeline keep writing straight to SQLite, or is it time to batch through a queue? Give me the trade-offs." | brainstorm (options-pipeline) | Brainstorm card: structured trade-off summary, visually distinct from status cards and coexisting with the step-1 options-pipeline status card on the same topic (distinct result_type → distinct card, per the (topic, result_type) granularity) |
+| 4 | "Find the ibkr mcp's deployment config — which cluster and namespace is it on?" | lookup/config (ibkr-mcp) | Config-lookup card (`lookup:config:ibkr-mcp`) with cluster/namespace and manifest pointers from registry + fetched config — a different `lookup_kind` than step 2, so a different fetch matrix, result_type, and component; it renders as its own card, it does not overwrite step 2's log card |
+| 5 | "Queue up a research task: compare the last month of options pipeline errors against the ibkr mcp's and write up common failure patterns — no rush." | task-profile | Escalate strand fires; ack/pending card appears immediately on router completion with an explicit "queuing async" state, then updates in place with the `bf` bead reference once `bf create` returns (see the Latency Budget's escalate row). Bead **closure is not part of the take** — the pending card is the demo-visible outcome |
+| 6 | "Anything new on the options pipeline since we started?" | status (options-pipeline) | Existing options-pipeline **status** card updates **in place** — no new card — with a diff summary naming exactly what changed since step 1. The diff runs against the step-1 status result via `previous_result_id`, which is scoped to the same result_type on the same topic: step 3's brainstorm card is a different result_type, stays on canvas untouched, and never enters the diff. The diff strip renders here because step 1's result is in-session — the same session-scoped display rule that suppresses "changes since the seed run" strips on step 1 (see Cold start & demo seed — Topic scope vs. session scope). If nothing changed, an explicit "no changes since" diff state (also a passing outcome). No speed contrast is claimed: seeding warms both scripted topics, so step 1 is just as warm |
+
+#### Definition of "smooth" (measurable)
+
+The take passes only if all of the following hold — each is observable in the recording or in the timing log:
+
+1. First partial card ≤ 3s after end of utterance, on **every** scripted step — for the task-profile step (5) the qualifying card is the ack/pending card rendered on router completion, per the Latency Budget's task-profile note (this finally verifies the plan's own hot-path target on camera)
+2. Every thread from a multi-intent utterance renders as its own card — zero dropped or merged threads
+3. Zero visible error states: no raw JSON, no stack traces, no empty cards, no failed-fetch caveats on scripted topics — and scope caveats count as failures here, explicitly: the Beads-Workspace Scoping fallback's "showing aide-de-camp-originated beads only" strip on a scripted card fails the take (the seeding runbook's `repo_path` verification exists to make it impossible)
+4. Zero dead-end cards: every card either resolves with data or shows an honest pending state the script accounts for (step 5)
+5. The SSE connection never visibly drops and the page is never refreshed during the take
+6. STT accepts each scripted utterance on the first attempt (a mis-transcription restarts the take, it is not edited around)
+7. The full take completes in a single unedited capture
+
+#### Known-issues register
+
+Seeded from what this plan already establishes. The rule: an issue either blocks the take or is explicitly routed around by the script — never silently hoped past.
+
+| Issue | Established by | Must fix before demo? | Demo handling |
+|-------|----------------|-----------------------|---------------|
+| Telegram fallback has never worked in any deployment (push API the code assumes doesn't exist) | ADR-1 | No | Demo is canvas-only; Telegram stays out of the script and the take. ADR-1 implementation lands post-launch |
+| < 3s first-card target never measured under real fetch load | Open Questions 2 & 4; verification evidence is smoke tests, not timed runs | **Yes** | Timed rehearsal runs are the measurement; any step over budget files a defect bead |
+| Task-profile pending-card lifecycle (24h/3-failure circuit breaker, `stuck` status, visible aging) is designed in The Async Path but not yet implemented or verified | Async Path — re-dispatch circuit breaker + visible aging | **Yes** (pending-card honesty: bead ref, explicit async state, elapsed time); No (breaker trip / closure on camera) | Pending card must show the bead ref, an explicit async state, and elapsed time — never an endless spinner. Script waits for neither closure nor the breaker |
+| Degraded-state error cards are fully specified in Degraded-State UX but not yet implemented or verified against real source timeouts | Degraded-State UX (card templates); Open Question 2 (timeout behavior unmeasured) | **Yes** | Implement and verify the fixed card templates; a mid-take kubectl/ArgoCD timeout must render as the designed caveat strip on an otherwise-complete card, not as an error or a blank |
+| Clarification round-trip flow unresolved | Open Question 7 | No | Script uses exact registry aliases so clarification never triggers; the no-match card (below) is the insurance if it does |
+| Both scripted projects declare `cluster: apexalgo-iad`, whose ArgoCD applications live on rs-manager — and rs-manager has **no no-auth read-only ArgoCD proxy** today; querying the ardenone-manager proxy returns not-found → `fetch_coverage` caveat strip on every scripted status card, a criterion-3 failure on every take | Cluster→ArgoCD Endpoint Resolution (Fetch Strand); `config/clusters.yaml` | **Yes** | Provision an rs-manager read-only ArgoCD proxy mirroring the ardenone-manager pattern (small no-auth token-injecting proxy deployment exposed on the Tailscale mesh, deployed via declarative-config), flip its `clusters.yaml` entry to `read-only-proxy`, and verify per seeding-runbook item (3). Fallback if the proxy can't land in time: re-script the demo around projects whose ArgoCD state is already readable — never record with the caveat strip |
+
+New defects found during rehearsal are appended here with the same must-fix triage before the real take.
+
+#### Cold start & demo seed
+
+The recording starts from a first-run canvas, so the first frame of the demo *is* the cold-start experience — it cannot be undefined.
+
+- **First-run canvas state:** never a blank page. A welcome card renders on first load: one-line description of aide-de-camp, the list of registered projects (served from `registry.yaml`), and 2-3 example utterances drawn from those projects' supported intents. It is **built into the served frontend** (`src/canvas/`, exactly like the generic fallback card) — not a component-library row — so the demo's first frame renders correctly even against an empty `components.db`, with zero dependence on DB state or a prior UI-regen run. The first real result replaces it.
+- **No-match routing:** an utterance that resolves to no registered project returns a `clarification` thread, rendered as a friendly clarification card — "no project matching *X*; registered projects are: …" with the nearest-alias suggestion. Never an empty canvas, never a raw router error.
+- **Pre-demo seeding (runbook, not hidden magic):** before recording — (1) registry populated and alias-verified for every project in the script, with `intent_support` confirmed to cover every scripted intent — including `task-profile` on both options-pipeline and ibkr-mcp, or step 5 dies in routing — and `repo_path` confirmed present and pointing at a checkout with a `.beads/` workspace for every scripted project, or step 1's bead listing falls to the Beads-Workspace Scoping fallback and its on-card caveat, a criterion-3 failure; (2) context warmer run against both scripted topics so `topic_context_cache` is warm and step 1 lands inside budget; (3) one throwaway dispatch per scripted topic to confirm every fetch source (kubectl proxies, ArgoCD, git, `bf`) is reachable *before* the take starts — for ArgoCD this means confirming each scripted project's `argocd_app` exists and returns application state on the instance its `cluster` maps to in `config/clusters.yaml` (for both scripted projects: rs-manager's ArgoCD, which requires the known-issues register's read-only-proxy row closed first), not merely that some ArgoCD endpoint answers — and confirming `GET /health` reports `watcher.alive: true` (see Deploy Stage A process model); (4) **component library seeded for every scripted result shape** — UI-regen is async and nothing guarantees it has ever run, so left alone every scripted card renders as the generic key/value fallback (killing step 3's "visually distinct" expectation, among others). For each distinct result_type the script produces — `status:options-pipeline`, `status:ibkr-mcp`, `lookup:logs:ibkr-mcp`, `lookup:config:ibkr-mcp`, `brainstorm:options-pipeline` (selection keys on the **full** result_type, so each needs its own `component_usage_patterns` mapping row, even where one component template serves two of them) — file a UI-regen bead from a throwaway dispatch's output and confirm it closed; then re-run the step-(3) dispatches and confirm every scripted **result** card renders a real component-library card — **no scripted result card falls to the generic fallback** is a hard runbook exit condition. Step 5's ack/pending card is deliberately absent from this list: pending/ack cards are served built-ins (see Component Library → Built-in cards), not component-library shapes — there is nothing to seed for them and nothing UI-regen could produce. The recording still opens on the first-run welcome card — seeding warms the caches and the component library behind it, it doesn't fake the output.
+- **Topic scope vs. session scope (what seeding carries over, and what it must not):** project topics are **cross-session** (`topics.scope: 'cross-session'`, `session_id` NULL). That is what makes runbook items (2)–(4) work at all: the take starts a fresh session, and a fresh session reuses the seeded topics — same topic_ids, warm `topic_context_cache` — instead of minting new ones and cold-fetching step 1 straight through the 3s gate. Card display is scoped the other way: the canvas renders only the **current session's** results, so a fresh session opens on the welcome card, never on replayed seed cards (the reconnect workload-summary replay is within-session recovery, not cross-session history). Diff display follows the same session scoping: `previous_result_id` is pure lineage — set whenever a prior result of the same result_type exists on the topic, regardless of session, so step 1's results do point at the seed dispatches — but the server includes the diff strip at card-render time only when the previous result belongs to the current session. Step 1 therefore renders clean cards with no unscripted "changes since the seed run" strips, while step 6 still diffs legitimately against step 1, which is in-session (see the `previous_result_id` schema comment and demo step 6).
+
+#### Rehearsal checklist
+
+- [ ] 3 consecutive clean end-to-end runs of the golden path, each meeting every "smooth" criterion, before the real take
+- [ ] Every rehearsal starts from the demo's actual starting state: fresh session, seeded registry, warm cache, seeded component library (per Cold start & demo seed)
+- [ ] Every scripted **result** card is a real component-library card — any result card falling to the generic fallback is a defect that reopens seeding-runbook item (4). Pending/ack and welcome cards are exempt by design: they are served built-ins (see Component Library → Built-in cards), so step 5's qualifying ack/pending card rendering from the built-in template is correct behavior, not a fallback defect
+- [ ] Rehearsals are recorded and reviewed — visual glitches invisible in the moment are still defects
+- [ ] Per-step timing log (utterance end → first card) captured each run; any step > 3s files a defect bead
+- [ ] Mid-take failure fallback decided **in advance**: a visible error discards the take and restarts from cold — never narrated around, never edited out
+- [ ] Known-issues register re-reviewed on demo day; any open must-fix blocks the take
+
+Deliverable: one unedited screen-capture recording of the full golden path meeting every criterion in the smooth definition.
+
 ### Future Work
 
 **Status: NOT STARTED** ❌
 
-*Note: Phases 0-4 (core surface, sessions, self-improvement, responsiveness, and audio) are complete and verified. The following items are potential enhancements beyond Phase 4:*
+*Note: Phases 0 and 2-4 are complete at the verified-in-tests tier only, Phase 1 is PARTIAL (Telegram fallback non-functional — see ADR-1), and Phase 5 (Demo Readiness) — the launch gate — has not started. No phase is verified-live yet; closing that gap — starting with ADR-1 — and shipping Phase 5 come before any item below.*
 
-Potential enhancements beyond Phase 4:
+Potential enhancements beyond Phase 5:
 - Multi-modal input (image processing for UI feedback via Agentation)
 - Advanced topic clustering and auto-archival
 - Cross-session context persistence with summarization
 - Mobile-native surface (iOS/Android app)
 - Collaborative sessions (multi-user shared canvases)
 - Advanced memory extraction with semantic search
+- Reminders (the `reminder` intent, currently NOT YET IMPLEMENTED — see Intent Router). Minimal sketch: a `reminders` table in the session store (text, due_at, recurrence, status), a due-check folded into the bead watcher's existing poll tick (no new daemon, per the no-CronJob convention), and delivery via Surface Routing Rules — which makes firing with no canvas open gated on ADR-1's Telegram channel
+- Claude Realtime migration for the voice session (today: OpenAI Realtime API via the DUCK-E session handler)
 
 ---
 
@@ -745,14 +1031,14 @@ Every artifact that encodes behavior is readable, writable, and reloaded per-inv
 |----------|----------|-------------|
 | Utterance segmentation | `prompts/router.md` | Each router call |
 | Intent→project routing | `config/registry.yaml` | Each router call |
-| Context fetch strategy | `prompts/fetch/{type}.md` | Each fetch invocation |
+| Context fetch strategy | `prompts/fetch/{type}.md` (lookup: `lookup-{kind}.md`) | Each fetch invocation |
 | Result format and detail | `prompts/synthesize.md` | Each synthesize call |
 | Voice narration style | `prompts/voice.md` | Each session turn |
-| Urgency classification | `prompts/urgency.md` | Each escalate call |
+| Urgency classification | `prompts/urgency.md` | Each router call (initial assignment); each escalate call (bead refinement) |
 | Visual rendering | Component library (DB) | Each card render |
 | Monitoring rules | `config/monitoring.yaml` | Each monitoring tick |
 
-Per-invocation reload is the implementation strategy (read file, check mtime). File watching adds complexity for no benefit — prompts change rarely and file reads are cheap.
+Per-invocation reload is the implementation strategy, via an mtime-checked cache: stat the artifact on each invocation, re-read only when the mtime has changed, serve the cached parse otherwise. This is the single reload strategy for every file-backed artifact above — no component reads uncached, and none caches past an mtime change. File watching adds complexity for no benefit — prompts change rarely and stat calls are cheap.
 
 ---
 
@@ -763,9 +1049,11 @@ When a result is ready to surface, the bead watcher or synthesize strand uses th
 1. The surface the utterance originated from (if still connected)
 2. Most recently active connected surface
 3. Any connected surface
-4. Telegram (always-available fallback)
+4. Telegram (always-available fallback) — ⚠ NON-FUNCTIONAL until ADR-1 lands
 
 Exception-class results (urgency: critical, type: exception) push to Telegram regardless of canvas state if no canvas has been active within the past N minutes.
+
+> ⚠ Tier 4 and the exception-class push do not work today: Telegram delivery has never functioned in any deployment of aide-de-camp — the delivery methods are stubs pointed at an unreachable bridge URL (see ADR-1). Until ADR-1 lands, a result that falls through to tier 4 is persisted to the session store but reaches no one. "Always-available fallback" is design intent, not shipped behavior.
 
 ---
 
@@ -773,45 +1061,98 @@ Exception-class results (urgency: critical, type: exception) push to Telegram re
 
 aide-de-camp adds a routing and rendering layer on top of existing infrastructure without replacing any of it:
 
-- **NEEDLE workers** — unchanged. Task beads work exactly as before. The bead watcher is a new daemon that observes bead closure events.
-- **telegram-claude-bridge** — reused for Telegram surface and HUMAN bead push delivery.
+- **NEEDLE workers** — unchanged. Task beads work exactly as before. The bead watcher is a new in-process watcher loop inside the aide-de-camp server that observes bead closure events.
+- **telegram-claude-bridge** — ⚠ planned reuse for the Telegram surface and HUMAN bead push delivery turned out to be architecturally infeasible: the bridge is a Claude Code session router, not a push-notification API, and this integration has never worked in any deployment. See ADR-1, which proposes replacing it with a direct Telegram Bot API integration.
 - **whisper-stt** — already deployed on ardenone-cluster; available as STT backend.
 - **ZAI proxy** — all direct API calls (router, synthesize, escalate) route through `llm-proxy.ardenone.com`.
 - **claude-governor** — governs subscription token consumption for self-modification and UI-regen task beads.
 - **DUCK-E** — FastAPI scaffolding, WebSocket handling, OpenAI Realtime API session management, and middleware reused as the voice layer foundation.
-- **beads (br CLI)** — task work items and HUMAN exceptions only. Conversational session state lives in a separate SQLite session store.
+- **beads (bf CLI)** — task work items and HUMAN exceptions only. Conversational session state lives in a separate SQLite session store.
 - **kubectl proxies** — fetch strand uses existing kubectl proxy access per cluster.
-- **ArgoCD read-only proxy** — fetch strand reads ArgoCD application state via `argocd-ro-ardenone-manager-ts.ardenone.com:8444`.
+- **ArgoCD** — fetch strand reads ArgoCD application state via the endpoint mapped to the project's `cluster` in `config/clusters.yaml`: the no-auth read-only proxy `argocd-ro-ardenone-manager-ts.ardenone.com:8444` for ardenone-cluster apps (ArgoCD on ardenone-manager); apexalgo-iad and the other iad-* Spot clusters are managed by rs-manager's ArgoCD, which has no equivalent read-only proxy today (must-fix before the demo — see the Phase 5 known-issues register).
 
-Net-new code: aide-de-camp is a substantial implementation spanning multiple subsystems. The current codebase contains approximately **15,400 lines** of Python code across 80+ modules. See the File System Layout section for the full module breakdown.
+Net-new code: the codebase measures approximately **15,400 lines** of Python. That is a size figure, not a completeness figure — the count includes stubbed paths (ADR-1's Telegram fallback methods, which log a warning and return `False`, count the same as working code). For an honest completeness picture, use the per-phase statuses in Implementation Phases (verified-in-tests vs. verified-live) plus a stub sweep of `src/`, not line or module counts. See the File System Layout section for the module breakdown.
 
 ---
 
 ## Security Model
 
-- aide-de-camp runs on the Hetzner server; all cluster access via read-only kubectl proxies (same as existing tooling)
-- No cluster credentials stored by aide-de-camp; existing proxy infrastructure holds them
-- Self-modification agent writes only to the `prompts/` and `config/` directories within the repo
+- aide-de-camp runs on the Hetzner server; all kubectl access is read-only via the kubectl proxies (same as existing tooling) — cluster mutations happen only as Git operations (see Action Execution Model below)
+- No cluster credentials stored by aide-de-camp; existing proxy infrastructure holds them. aide-de-camp holds no admin kubeconfigs and must never be granted one
+- Write scopes are per-agent and disjoint: the self-modification agent writes only the `prompts/` and `config/` directories within the repo; the UI-regen agent writes only component definitions in the component library — the `components`, `component_versions`, and `component_tags` tables in `data/components.db`, plus the `match_score` mappings it records in `component_usage_patterns`. The hot-path server is the one other writer to that DB, confined to mechanical render/usage state on each dispatch: `card_cache` rows and the usage-stat columns (`components.usage_count`/`last_used`, `component_usage_patterns.sample_count`/`last_matched`) — bookkeeping, never templates or definitions. Background-analysis auto-applies are not a third artifact writer: they execute through the self-modification agent's write path, inheriting its scope, freeze/kill-switch behavior, and git-commit rollback (see Background Analysis Bead). Neither agent writes the other's artifacts
 - All artifact changes go through diff-review before application
-- Rollback available for any artifact via version history
+- Rollback available for any artifact via git history (see Self-Modification Agent safety model)
+
+### Action Execution Model
+
+**Status: policy in force; executor NOT BUILT ❌ (design-only).** The rules below already bind the one mutation path that exists (escalate-strand beads under Generated-Bead Safety), but no runtime component executes `action` intents: there is no `src/action/` module and nothing interprets the registry's `workflows.steps`. Until the Action strand sketched below ships, `action` intents are **not dispatched** — the server renders a fixed "action execution isn't built yet" card offering to requeue the request as a task-profile, which flows through the escalate strand's reviewed-bead path. This is why the Phase 5 demo script excludes `action`.
+
+The `action` intent and the registry's mutating workflow steps never translate into direct kubectl mutation — the read-only proxies could not execute one, and the GitOps rule forbids it even where credentials exist (live edits fight ArgoCD's selfHeal and don't stick). Every permitted action resolves to exactly one of:
+
+1. **GitOps mutation** — deploys, restarts, scaling, and config changes execute as edits to manifests in `jedarden/declarative-config` (k8s/ path): commit, push, ArgoCD syncs. A "restart" is a manifest-level change (e.g., a rollout-trigger annotation bump) committed to the repo, not `kubectl rollout restart`.
+2. **ArgoCD sync status polling** — after a GitOps commit, aide-de-camp polls the read-only ArgoCD API until the Application reports Synced/Healthy, then reports the outcome. aide-de-camp itself performs no ArgoCD writes; if a sync is genuinely stuck and needs a forced sync or other operator action, that escalates as a reviewed bead (next item), not an API call from aide-de-camp.
+3. **Reviewed escalation bead** — anything not expressible as (1)+(2) becomes an escalate-strand bead, subject to Generated-Bead Safety validation and the user-approval gate, executed by NEEDLE/Claude Code workers under their own credentials.
+
+Credentials per action class:
+
+| Action class | Credential used | Held by |
+|--------------|-----------------|---------|
+| Fetch / status reads | read-only kubectl proxies, read-only ArgoCD proxy | proxy pods (no tokens on disk) |
+| GitOps mutation | git credentials for `jedarden/declarative-config` | existing git credential helper |
+| Sync status polling | none (read-only ArgoCD proxy injects its own token) | proxy |
+| Escalated beads | workers' own credentials | NEEDLE workers, outside aide-de-camp |
+
+#### Future: Action strand (executor sketch — NOT BUILT ❌)
+
+When built, `action` execution gets exactly one owner: a deterministic step runner (`src/action/executor.py`, no LLM) that interprets a registry workflow's `steps` list. The step vocabulary the registry example uses:
+
+| Step | Class | Semantics |
+|------|-------|-----------|
+| `ci-status` | read | Latest Argo Workflow for the project (same source as the fetch matrix's CI row); a green build gates the rest of the workflow |
+| `image-tag` | read | Resolves the image tag/digest that build produced (never `:latest`) |
+| `gitops-commit` | GitOps mutation | **The executor itself authors the declarative-config edit** — a templated field substitution (e.g., the image-tag field in the project's manifest under `k8s/<cluster>/...` in `jedarden/declarative-config`), committed and pushed under the standard git identity via the existing credential helper. Never free-form and never LLM-authored: any edit beyond a templated substitution is out of vocabulary and must go through a reviewed escalation bead |
+| `argocd-sync-status` | read | Polls the read-only ArgoCD API until the Application reports Synced/Healthy, or a timeout expires and the step fails |
+| `pod-status` | read | Post-sync `kubectl get pods -n {namespace}` via the read-only proxy, confirming the rollout actually landed |
+
+Each step's outcome streams to the canvas as a progress card; a failed step halts the workflow and renders per Degraded-State UX. Building the executor — and only then removing the dispatch gate above — is post-launch work, deliberately off the demo path.
 
 ---
 
 ## Open Questions
 
+Triaged 2026-07-22 against the corrected phase statuses above. A question is marked ANSWERED only where this document itself records the answer; nothing below cites measurements that were never taken.
+
 1. **Routing accuracy** — how reliably can a haiku-class model split a rambling multi-project utterance into clean tagged threads? What's the false-split / under-split rate in practice?
+
+   **OPEN — blocks demo.** Phase 0's smoke tests exercise the split path but no false-split / under-split rate was recorded. Needs live utterance data; part of taking Phase 0 to verified-live.
 
 2. **Context latency** — can the fetch strand reliably hit kubectl + ArgoCD + git + beads within a 2-3s window? Which sources need timeouts and what's the degraded-result behavior?
 
+   **OPEN — blocks demo.** Degraded-result behavior is answered in design (partial results + `fetch_coverage` caveats, see Fetch Strand), but the 2-3s window has never been measured against real kubectl/ArgoCD/git/beads latencies. Part of Phase 3's verified-live work.
+
 3. **Component selection** — when does the UI-regen agent generate a new component vs. stretch an existing one? How is "good enough" match defined?
+
+   **OPEN — reopens Phase 2 at the live tier.** `component_usage_patterns.match_score` exists to hold this signal, but no "good enough" threshold is defined anywhere in this plan; the generate-vs-stretch policy remains implicit in the UI-regen agent.
 
 4. **Concurrency budget** — how many parallel synthesize calls can the ZAI proxy handle without queue pressure affecting the <3s target?
 
+   **OPEN — blocks demo.** No concurrency measurement against the ZAI proxy is recorded in this plan or the cited evidence; the <3s target under parallel synthesize load is unverified.
+
 5. **Topic vague reference resolution** — "the pipeline" vs. "options pipeline" vs. "options-pipeline". When does the router resolve from context vs. ask for clarification?
+
+   **ANSWERED (mechanism) — see Intent Router and Project Registry.** Known names resolve via registry `aliases`; below the confidence threshold the router emits an `intent_type: "clarification"` thread instead of guessing. The threshold value itself is untuned — a live-usage task, not a demo blocker.
 
 6. **Voice UX** — push-to-talk vs. continuous listening + VAD silence detection. What's the right default for the audio surface?
 
+   **OPEN — does not block launch.** Phase 4 shipped the Realtime API session (verified-in-tests), but this plan records no push-to-talk vs. VAD decision. The launch recording is canvas-only — Phase 5's golden path enters every utterance through the canvas page's Web Speech STT, and no voice-session step exists in the script — so this question gates the *post-launch* voice-session demo, not the launch take. Extract the implemented default from `README-PHASE4.md` and record it here before any voice-session demo is scripted.
+
 7. **Disambiguation flow** — when router confidence is below threshold, how does the clarification round-trip work without breaking conversational flow in audio mode?
+
+   **OPEN — reopens Phase 4 at the live tier.** The mechanism is designed (clarification meta-type; "the voice model or canvas handles the clarification round-trip" — see Intent Router), but the audio-mode round-trip has never been observed live, and conversational-flow quality is precisely what verified-in-tests cannot show.
+
+8. **LLM-proxy single point of failure** — the ZAI proxy is the sole LLM endpoint for both router and synthesize; should a direct-API fallback endpoint exist, and at what stage?
+
+   **OPEN — demo severity: a proxy outage or quota exhaustion during the take kills the entire hot path** (router and synthesize both fail; the Degraded-State UX error cards are the only mitigation, and per the rehearsal checklist a visible error discards the take). No fallback endpoint is designed anywhere in this plan — accepted as a deliberate Deploy Stage A trade-off; revisit at Deploy Stage B.
 
 ---
 
@@ -819,13 +1160,20 @@ Net-new code: aide-de-camp is a substantial implementation spanning multiple sub
 
 **Status:** Proposed
 
+**Decision needed by owner.** Nothing below is in effect until this ADR is accepted (or an alternative is chosen). Until then the Telegram tier stays NON-FUNCTIONAL — there is no working channel for reaching the user when no canvas is open — and every ⚠ annotation in the plan body pointing here stays true. On acceptance, the implementing steps are:
+
+1. **Provisioning bead (one-time human step):** create the dedicated bot (or confirm reuse of the bridge's stateless proxy `/send`/`/edit` endpoints), capture the bot token and `chat_id`, configure `ADC_TELEGRAM_CHAT_ID` and the token secret.
+2. **Rewrite `src/telegram/fallback.py`** against the Telegram Bot API (`sendMessage`/`editMessageText`), replacing the three stubbed methods (`send_exception`, `send_workload_summary`, `register_surface`).
+3. **Remove `register_surface()` and the session→Telegram binding from the surfaces model** — Telegram stops being a session-bound surface row and becomes a fixed notification destination.
+4. **Verify end-to-end and clean up:** force an exception-class result with no canvas connected, confirm the message arrives, then remove the ⚠ NON-FUNCTIONAL annotations from the plan body and update `README.md`'s configuration table.
+
 ### Context
 
 The plan's "Surface Routing Rules" section makes Telegram the fallback of last resort:
 
 > Exception-class results (urgency: critical, type: exception) push to Telegram regardless of canvas state if no canvas has been active within the past N minutes.
 
-Phase 1 ("Session and Topics") is marked `Status: COMPLETE ✅` with "Telegram surface fallback (reuse telegram-claude-bridge)" listed as a shipped deliverable, and "Relationship to Existing Infrastructure" states `telegram-claude-bridge` is reused for the Telegram surface.
+At the time of the 2026-07-20 audit, Phase 1 ("Session and Topics") was marked `Status: COMPLETE ✅` with "Telegram surface fallback (reuse telegram-claude-bridge)" listed as a shipped deliverable, and "Relationship to Existing Infrastructure" stated that `telegram-claude-bridge` was reused for the Telegram surface. (The plan body has since been corrected in light of this ADR: Phase 1 is now PARTIAL, and the reuse is recorded as architecturally infeasible.)
 
 Live verification on 2026-07-20 against the running server (PID confirmed serving from this checkout, `git -C /home/coding/aide-de-camp` cwd) shows this promise does not hold:
 
