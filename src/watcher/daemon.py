@@ -8,6 +8,8 @@ to active surfaces via SSE or Telegram fallback.
 import asyncio
 import json
 import logging
+import os
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -47,7 +49,18 @@ class BeadWatcher:
     `_processed_beads` to dedup already-delivered beads.
     """
 
-    CHECK_INTERVAL_SECONDS = 5
+    # Poll interval (plan §10 Bead Watcher: "default 30s"). Kept as the
+    # class-level default; the effective per-instance interval lives in
+    # ``self.check_interval_seconds`` (constructor arg > env > this default).
+    CHECK_INTERVAL_SECONDS = 30
+    # Exponential backoff schedule for supervisor restarts of a crashed watch
+    # task (plan §10: "restarted with backoff"). Each consecutive crash
+    # advances one entry; the final value is the cap, so a pathological
+    # crash loop cannot spin faster than every 32s.
+    RESTART_BACKOFF_SECONDS = (2.0, 4.0, 8.0, 16.0, 32.0)
+    # Env override for the poll interval (seconds). Honored when no explicit
+    # constructor arg is passed, so operators can tune without code changes.
+    INTERVAL_ENV = "ADC_WATCHER_CHECK_INTERVAL_SECONDS"
     # bf (bead-forge) workspace checkpoint. The live store is beads.db; this is
     # the flushed checkpoint bf writes on `bf sync --flush-only`. Absolute path
     # because the server may be launched from any CWD (matches DB_PATH in
@@ -67,6 +80,7 @@ class BeadWatcher:
         router: SurfaceRouter,
         beads_jsonl: str | None = None,
         telegram_fallback: TelegramFallback | None = None,
+        check_interval_seconds: float | None = None,
     ):
         self.store = store
         self.router = router
@@ -79,40 +93,180 @@ class BeadWatcher:
         # send_workload_summary() in src/telegram/fallback.py. Injectable so
         # tests can drive the delivery path with a fake. (adc-372c)
         self._telegram_fallback = telegram_fallback
+        # Effective poll interval: explicit arg > env override > class default
+        # (30s, plan §10). Resolved once at construction; the lifespan wiring in
+        # src/main.py passes no arg, so production honors the env/default.
+        if check_interval_seconds is None:
+            env_val = os.getenv(self.INTERVAL_ENV)
+            check_interval_seconds = (
+                float(env_val) if env_val else self.CHECK_INTERVAL_SECONDS
+            )
+        self.check_interval_seconds = float(check_interval_seconds)
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        # The supervisor task owns the watch-task lifecycle (spawn, await,
+        # restart-on-crash). _watch_task is the currently-running poll loop;
+        # it is reassigned by the supervisor on each restart. (adc-4afi)
+        self._supervisor_task: Optional[asyncio.Task] = None
+        self._watch_task: Optional[asyncio.Task] = None
+        # Consecutive crashes since the last healthy tick; drives the backoff
+        # schedule. Reset to 0 whenever a tick completes successfully.
+        self._restart_count = 0
+        # Liveness state, read by the GET /health watcher block (child 3).
+        # last_tick_at is epoch seconds (time.time()); 0.0 means "never ticked".
+        self.last_tick_at: float = 0.0
+        self.tick_count: int = 0
         # Bead IDs we have already delivered. In-memory only, so a process
         # restart re-delivers currently-terminal beads (pre-existing behavior).
         self._processed_beads: set[str] = set()
 
     async def start(self) -> None:
-        """Start the bead watcher daemon."""
+        """Start the bead watcher daemon.
+
+        Spawns a single lifespan supervisor task that owns the watch-task
+        lifecycle: it runs the poll loop, and if the loop's task itself dies
+        (an exception that escapes its per-iteration catch, or an unexpected
+        return) it restarts the task with exponential backoff. start()/stop()
+        keep their signatures and the lifespan wiring in src/main.py is
+        unchanged — ``_bead_watcher`` stays the module-level instance.
+        """
         self._running = True
-        self._task = asyncio.create_task(self._watch_loop())
-        logger.info("Bead watcher started")
+        self._supervisor_task = asyncio.create_task(
+            self._supervise(), name="bead-watcher-supervisor"
+        )
+        logger.info("Bead watcher started (interval=%ss)", self.check_interval_seconds)
 
     async def stop(self) -> None:
-        """Stop the bead watcher daemon."""
+        """Stop the bead watcher daemon.
+
+        Flags shutdown, then cancels and awaits the supervisor (which in turn
+        tears down the watch task it spawned). The watch task is cancelled
+        explicitly as well: cancelling a supervisor awaiting another task does
+        not automatically cancel the awaited task.
+        """
         self._running = False
-        if self._task:
-            self._task.cancel()
+        supervisor = self._supervisor_task
+        if supervisor and not supervisor.done():
+            supervisor.cancel()
             try:
-                await self._task
+                await supervisor
             except asyncio.CancelledError:
+                pass
+        watch = self._watch_task
+        if watch and not watch.done():
+            watch.cancel()
+            try:
+                await watch
+            except BaseException:  # noqa: BLE001 — tearing down, swallow anything
                 pass
         logger.info("Bead watcher stopped")
 
+    async def _supervise(self) -> None:
+        """Supervise the watch task: restart it on crash with backoff.
+
+        The watch loop catches per-iteration (transient) exceptions itself and
+        keeps polling — those never reach here. This layer handles the case the
+        inner loop cannot: the task ending outright (an exception that is not a
+        transient ``Exception`` -- e.g. a ``BaseException`` raised mid-tick --
+        or the loop returning). On such a death, while we are still meant to be
+        running, we log and respawn the task after an exponentially-growing
+        backoff (2s, 4s, 8s, ... capped at 32s). Backoff resets to the short
+        end once a tick completes successfully (see ``_watch_loop``).
+
+        ``stop()`` sets ``_running = False`` before cancelling the supervisor,
+        so a clean shutdown is distinguished from an unexpected task death by
+        the ``_running`` flag rather than by exception type.
+        """
+        while self._running:
+            self._watch_task = asyncio.create_task(
+                self._watch_loop(),
+                name=f"bead-watcher-tick-{self._restart_count}",
+            )
+            crash_reason: Optional[BaseException] = None
+            try:
+                await self._watch_task
+            except asyncio.CancelledError:
+                # Supervisor itself cancelled -- only stop() does that. Exit.
+                return
+            except (KeyboardInterrupt, SystemExit):
+                # Process-level signals: never swallow, let them propagate.
+                raise
+            except BaseException as exc:  # noqa: BLE001 — must catch task death
+                crash_reason = exc
+
+            if not self._running:
+                # stop() raced with the task ending -- clean shutdown.
+                return
+
+            self._restart_count += 1
+            backoff = self._next_backoff()
+            if crash_reason is not None:
+                logger.warning(
+                    "Bead watcher task crashed (%s); restarting in %.1fs "
+                    "(restart #%d)",
+                    type(crash_reason).__name__,
+                    backoff,
+                    self._restart_count,
+                    exc_info=True,
+                )
+            else:
+                logger.warning(
+                    "Bead watcher task ended unexpectedly; restarting in %.1fs "
+                    "(restart #%d)",
+                    backoff,
+                    self._restart_count,
+                )
+            try:
+                await asyncio.sleep(backoff)
+            except asyncio.CancelledError:
+                return
+
+    def _next_backoff(self) -> float:
+        """Backoff (seconds) for the upcoming restart, growing with crashes.
+
+        ``_restart_count`` is incremented to >= 1 before each call, so the
+        first restart waits RESTART_BACKOFF_SECONDS[0] (2s), the next the
+        following entry (4s), and so on; once the count exceeds the schedule
+        the final (cap) value is reused.
+        """
+        idx = min(self._restart_count - 1, len(self.RESTART_BACKOFF_SECONDS) - 1)
+        return self.RESTART_BACKOFF_SECONDS[idx]
+
+    def _stamp_tick(self) -> None:
+        """Record liveness after a completed poll tick.
+
+        Called after every tick body resolves (success or a caught transient
+        error). GET /health's watcher block reads these: ``last_tick_at``
+        within 2x the interval means the task is alive, and ``tick_count`` is
+        the cumulative tick count. (adc-4afi, consumed by child 3.)
+        """
+        self.last_tick_at = time.time()
+        self.tick_count += 1
+
     async def _watch_loop(self) -> None:
-        """Main watch loop - checks for new bead events."""
+        """Main watch loop - checks for new bead events each interval.
+
+        Each iteration runs the detection tick (``_check_for_events``), stamps
+        liveness, then sleeps for the poll interval. Per-iteration exceptions
+        are caught and logged so a transient error never ends the task -- the
+        supervisor layer restarts the task only when it truly dies. A completed
+        tick (success or caught transient error) resets the crash backoff.
+        """
         while self._running:
             try:
                 await self._check_for_events()
-                await asyncio.sleep(self.CHECK_INTERVAL_SECONDS)
             except asyncio.CancelledError:
-                break
+                raise  # shutdown signal -- let the supervisor see it
             except Exception as e:
                 logger.error(f"Error in bead watch loop: {e}", exc_info=True)
-                await asyncio.sleep(self.CHECK_INTERVAL_SECONDS)
+            # Stamp liveness after the tick body resolves. A completed tick --
+            # success or a caught transient error -- means the task is healthy,
+            # so reset the crash backoff schedule.
+            self._stamp_tick()
+            self._restart_count = 0
+            try:
+                await asyncio.sleep(self.check_interval_seconds)
+            except asyncio.CancelledError:
+                raise
 
     async def _check_for_events(self) -> None:
         """Check for terminal bead events and process them."""
