@@ -1158,9 +1158,9 @@ Triaged 2026-07-22 against the corrected phase statuses above. A question is mar
 
 ## ADR-1: 2026-07-20 — Decouple the Telegram fallback surface from telegram-claude-bridge
 
-**Status:** Proposed
+**Status:** Accepted — 2026-07-22 (owner decision, recorded in bead adc-614p)
 
-**Decision needed by owner.** Nothing below is in effect until this ADR is accepted (or an alternative is chosen). Until then the Telegram tier stays NON-FUNCTIONAL — there is no working channel for reaching the user when no canvas is open — and every ⚠ annotation in the plan body pointing here stays true. On acceptance, the implementing steps are:
+**Decision recorded 2026-07-22: ACCEPTED** (bead adc-614p). The bridge-stateless-proxy variant of the Decision — reusing telegram-claude-bridge's stateless proxy /send and /edit endpoints with a fixed chat_id, avoiding a second bot — is explicitly permitted; the implementer of bead adc-2uye chooses between it and a dedicated bot at implementation time, with the credential/chat_id provisioning tracked in bead adc-1oxl. The Telegram tier stays NON-FUNCTIONAL until those implementing steps ship and are verified live — every ⚠ annotation in the plan body pointing here stays true until then. The implementing steps are:
 
 1. **Provisioning bead (one-time human step):** create the dedicated bot (or confirm reuse of the bridge's stateless proxy `/send`/`/edit` endpoints), capture the bot token and `chat_id`, configure `ADC_TELEGRAM_CHAT_ID` and the token secret.
 2. **Rewrite `src/telegram/fallback.py`** against the Telegram Bot API (`sendMessage`/`editMessageText`), replacing the three stubbed methods (`send_exception`, `send_workload_summary`, `register_surface`).
