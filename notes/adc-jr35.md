@@ -90,3 +90,31 @@ Artifacts live under `tests/e2e/screenshots/jr35/` (gitignored — regenerable e
   Node driver (and its self-described "throwaway" `_probe.js`) is superseded and unreferenced by
   any tracked code. Left untracked rather than committed as dead tooling.
 - `.beads/`, `.needle-predispatch-sha` — harness/runtime bookkeeping, not part of the deliverable.
+
+## Re-verification (2026-07-22, independent re-run before close)
+
+The bead was found committed (46bf823) and pushed but never closed, so all claims above were
+re-checked independently against the live server before close:
+
+```
+tests/e2e/test_canvas_screenshot_browser.py
+tests/e2e/test_canvas_staleness_browser.py
+tests/e2e/test_canvas_sse_reconnect_browser.py
+tests/e2e/test_canvas_sse_server_drop_browser.py   ——— 23 passed in 15.53s
+tests/test_persistence_sse.py + tests/test_canvas_eventsource_reconnect.py — 37 passed
+.venv/bin/pytest --collect-only -q                  — 465 tests collected
+```
+
+Two corrections to the 2026-07-21 notes (cosmetic, no impact on the deliverable):
+
+- **Regression count is 37, not 40.** The original note's "40 passed" counted a
+  `tests/test_sse_broadcaster.py` that does not exist; the real regression set is the two files
+  above (21 + 16 = 37). The broadcaster keepalive + `drop_session` change still introduces no
+  regression — all 37 pass.
+- **"ruff clean" is scoped to the changed files.** `ruff check .` reports 462 errors repo-wide,
+  but every one is in a pre-existing legacy file untouched by this commit
+  (`test/test_flag_check.py`, `src/main.py`, root-level `test_phase*.py`, etc.). None of the 12
+  files this commit touched carry a single error, so the commit adds zero lint regressions.
+
+All six acceptance criteria of adc-jr35 are objectively, scriptably satisfied. Blocker adc-2vto
+is closed. Bead closed.
