@@ -17,7 +17,9 @@ No live SSE / Telegram / LLM calls: the surface router is an AsyncMock and we
 assert on the routing attempt (route_result call kwargs).
 """
 
+import asyncio
 import json
+import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -372,3 +374,183 @@ class TestSendToTelegram:
 
         assert ok is True
         assert sent[0][0] == 4242  # the injected fallback delivered
+
+
+# --- lifespan supervision, liveness, interval (adc-4afi) -------------------
+
+class _TaskCrash(BaseException):
+    """A task-killing crash.
+
+    Subclasses BaseException (not Exception) so it escapes the watch loop's
+    transient ``except Exception`` catch -- simulating a real task death that
+    only the supervisor layer can recover from. Normal exceptions raised from
+    ``_check_for_events`` are caught by the loop and never reach the supervisor.
+    """
+
+
+class TestInterval:
+    """Poll interval defaults to 30s (plan §10) and is overridable.
+
+    Resolution order: explicit constructor arg > ADC_WATCHER_CHECK_INTERVAL_SECONDS
+    env > class default (30s).
+    """
+
+    def test_default_interval_is_30(self, store, router, monkeypatch):
+        # Guard against a stray env var in the test environment.
+        monkeypatch.delenv("ADC_WATCHER_CHECK_INTERVAL_SECONDS", raising=False)
+        assert BeadWatcher.CHECK_INTERVAL_SECONDS == 30
+        w = BeadWatcher(store, router)
+        assert w.check_interval_seconds == 30.0
+
+    def test_constructor_arg_overrides_default(self, store, router):
+        w = BeadWatcher(store, router, check_interval_seconds=7)
+        assert w.check_interval_seconds == 7.0
+
+    def test_env_overrides_default_when_no_arg(self, store, router, monkeypatch):
+        monkeypatch.setenv("ADC_WATCHER_CHECK_INTERVAL_SECONDS", "12")
+        w = BeadWatcher(store, router)
+        assert w.check_interval_seconds == 12.0
+
+    def test_explicit_arg_beats_env(self, store, router, monkeypatch):
+        monkeypatch.setenv("ADC_WATCHER_CHECK_INTERVAL_SECONDS", "12")
+        w = BeadWatcher(store, router, check_interval_seconds=9)
+        assert w.check_interval_seconds == 9.0
+
+
+class TestLiveness:
+    """last_tick_at / tick_count advance on every tick under normal run."""
+
+    def test_initial_liveness_state(self, store, router):
+        w = BeadWatcher(store, router)
+        assert w.last_tick_at == 0.0   # 0.0 == "never ticked" sentinel
+        assert w.tick_count == 0
+
+    async def test_loop_stamps_last_tick_at_and_increments_tick_count(
+        self, store, router, tmp_path, monkeypatch
+    ):
+        checkpoint = _write_checkpoint(tmp_path / "issues.jsonl", [])
+        w = BeadWatcher(store, router, beads_jsonl=str(checkpoint), check_interval_seconds=0.0)
+
+        # Patch asyncio.sleep in the daemon module: the loop's interval sleep
+        # (seconds < 1.0, since we set the interval to 0.0) becomes instant and
+        # terminates the task after 3 completed ticks, so the test is
+        # deterministic and never waits real time.
+        real_sleep = asyncio.sleep
+        interval_sleeps = {"n": 0}
+
+        async def fast_sleep(seconds):
+            await real_sleep(0)  # yield to the scheduler
+            if seconds < 1.0:
+                interval_sleeps["n"] += 1
+                if interval_sleeps["n"] >= 3:
+                    raise asyncio.CancelledError()  # end the watch task
+
+        monkeypatch.setattr("src.watcher.daemon.asyncio.sleep", fast_sleep)
+
+        await w.start()
+        for _ in range(200):
+            if w._supervisor_task is None or w._supervisor_task.done():
+                break
+            await real_sleep(0.002)
+        await w.stop()
+
+        # Each completed tick stamped liveness and bumped the counter.
+        assert w.tick_count >= 3
+        assert w.last_tick_at > 0.0
+
+
+class TestSupervisorRestart:
+    """A crashed watch task is restarted by the supervisor with growing backoff.
+
+    adc-4afi: the old bare create_task loop caught per-iteration exceptions but
+    never restarted a task that ended -- once dead it stayed dead. The supervisor
+    layer now respawns it on death with exponential backoff (2s, 4s, 8s, capped).
+    """
+
+    async def test_crashed_task_restarts_with_increasing_backoff(
+        self, store, router, tmp_path, monkeypatch, caplog
+    ):
+        checkpoint = _write_checkpoint(tmp_path / "issues.jsonl", [])
+        w = BeadWatcher(store, router, beads_jsonl=str(checkpoint), check_interval_seconds=0.0)
+
+        # Every tick crashes the task outright (escapes the transient catch).
+        async def crash():
+            raise _TaskCrash("forced crash")
+
+        monkeypatch.setattr(w, "_check_for_events", crash)
+
+        # Capture the backoff durations the supervisor requests, without really
+        # sleeping. After the 3rd backoff sleep, stop the supervisor so the test
+        # terminates deterministically.
+        real_sleep = asyncio.sleep
+        requested = []
+
+        async def capture_sleep(seconds):
+            requested.append(seconds)
+            await real_sleep(0)
+            if seconds >= 1.0 and sum(1 for s in requested if s >= 1.0) >= 3:
+                raise asyncio.CancelledError()
+
+        monkeypatch.setattr("src.watcher.daemon.asyncio.sleep", capture_sleep)
+
+        with caplog.at_level(logging.WARNING, logger="src.watcher.daemon"):
+            await w.start()
+            for _ in range(200):
+                if w._supervisor_task is None or w._supervisor_task.done():
+                    break
+                await real_sleep(0.002)
+            await w.stop()
+
+        backoffs = [s for s in requested if s >= 1.0]
+        # Three crashes, each followed by a logged restart with growing backoff.
+        assert len(backoffs) >= 3
+        assert backoffs[0] == pytest.approx(2.0)
+        assert backoffs[1] == pytest.approx(4.0)
+        assert backoffs[2] == pytest.approx(8.0)
+        assert w._restart_count >= 3
+        restart_logs = [
+            r for r in caplog.records if "restarting" in r.getMessage().lower()
+        ]
+        assert len(restart_logs) >= 3
+
+    async def test_transient_exception_does_not_trigger_restart(
+        self, store, router, tmp_path, monkeypatch
+    ):
+        """A normal Exception is caught by the loop -- no supervisor restart.
+
+        Pins the two-layer split: transient per-iteration errors stay absorbed
+        by the watch loop (pre-supervisor behavior preserved); only a real task
+        death reaches the supervisor. So no backoff is ever requested and the
+        task keeps ticking despite the recurring error.
+        """
+        checkpoint = _write_checkpoint(tmp_path / "issues.jsonl", [])
+        w = BeadWatcher(store, router, beads_jsonl=str(checkpoint), check_interval_seconds=0.0)
+
+        async def transient():
+            raise RuntimeError("transient per-iteration error")
+
+        monkeypatch.setattr(w, "_check_for_events", transient)
+
+        real_sleep = asyncio.sleep
+        sleeps = []
+
+        async def fast_sleep(seconds):
+            sleeps.append(seconds)
+            await real_sleep(0)
+            if seconds < 1.0 and len([s for s in sleeps if s < 1.0]) >= 4:
+                raise asyncio.CancelledError()
+
+        monkeypatch.setattr("src.watcher.daemon.asyncio.sleep", fast_sleep)
+
+        await w.start()
+        for _ in range(200):
+            if w._supervisor_task is None or w._supervisor_task.done():
+                break
+            await real_sleep(0.002)
+        await w.stop()
+
+        # No backoff (>= 1.0) sleep was ever requested, and the task never died.
+        assert not any(s >= 1.0 for s in sleeps)
+        assert w._restart_count == 0
+        # The loop kept ticking -- liveness advanced despite the errors.
+        assert w.tick_count >= 4
