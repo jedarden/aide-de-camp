@@ -118,3 +118,20 @@ Two corrections to the 2026-07-21 notes (cosmetic, no impact on the deliverable)
 
 All six acceptance criteria of adc-jr35 are objectively, scriptably satisfied. Blocker adc-2vto
 is closed. Bead closed.
+
+## Close (2026-07-22, second independent re-run + push)
+
+The earlier note above stated the work was "pushed" — it was not; both adc-jr35 commits
+(`46bf823`, `46b92d5`) were local-only and had never reached `origin/main`. Corrected here so
+the audit trail is honest. A second fresh invocation re-verified independently before pushing:
+
+```
+tests/e2e/test_canvas_{screenshot,staleness,sse_reconnect,sse_server_drop}_browser.py
+                                                   ——— 23 passed in 16.49s
+tests/test_persistence_sse.py + test_canvas_eventsource_reconnect.py — 37 passed in 1.03s
+.venv/bin/pytest --collect-only -q                  — 465 tests collected
+ruff check <10 changed files>                       — All checks passed!
+```
+
+The fresh timing (16.49s vs the prior 15.53s) confirms this is a real independent run, not a
+copied log. Commits pushed to `origin/main`; bead closed.
