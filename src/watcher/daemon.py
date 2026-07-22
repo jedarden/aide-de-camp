@@ -12,7 +12,6 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 from ..session.store import SessionStore
@@ -34,19 +33,20 @@ class BeadEvent:
 
 class BeadWatcher:
     """
-    Watches for bead events and routes results to surfaces.
+    Watches for bead close events and routes results to surfaces.
 
-    Integration with the bf CLI (bead-forge):
-    - Reads the bf workspace checkpoint JSONL (`.beads/issues.jsonl`) for
-      terminal beads
-    - Extracts session_id / origin_surface_id / urgency from the bead's flat
-      `labels` array -- escalate/handler.py encodes these as `key=value` labels
-    - Pushes results to active surfaces via SSE
-    - Falls back to Telegram if no surface available
+    Detection is CLI-only (plan §10 Bead Watcher): each tick runs
+    `bf list --status closed --json` via a subprocess from the aide-de-camp
+    checkout (the beads workspace) and emits only beads whose close time is
+    newer than an in-memory close-timestamp high-water mark. The CLI is the
+    sole source of bead state -- the watcher never reads the bf workspace's
+    private SQLite store or its flush checkpoint directly (both are documented
+    corruption/staleness footguns in this workspace).
 
-    The checkpoint is rewritten in full on every `bf sync --flush-only` (it is
-    not append-only), so each tick re-reads the whole file and relies on
-    `_processed_beads` to dedup already-delivered beads.
+    Once a closure is detected, the existing per-event stage resolves routing
+    metadata from the bead's flat `labels` array -- escalate/handler.py encodes
+    session_id / origin_surface_id / urgency as `key=value` labels -- and pushes
+    the result to active surfaces via SSE, falling back to Telegram.
     """
 
     # Poll interval (plan §10 Bead Watcher: "default 30s"). Kept as the
@@ -61,31 +61,45 @@ class BeadWatcher:
     # Env override for the poll interval (seconds). Honored when no explicit
     # constructor arg is passed, so operators can tune without code changes.
     INTERVAL_ENV = "ADC_WATCHER_CHECK_INTERVAL_SECONDS"
-    # bf (bead-forge) workspace checkpoint. The live store is beads.db; this is
-    # the flushed checkpoint bf writes on `bf sync --flush-only`. Absolute path
-    # because the server may be launched from any CWD (matches DB_PATH in
-    # src/main.py). The old value ".beads/beads.jsonl" never existed -- this file
-    # is the real one and has always been named issues.jsonl.
-    BEADS_JSONL = "/home/coding/aide-de-camp/.beads/issues.jsonl"
-    # Terminal statuses meaning "work is done, deliver the result". bf uses
-    # "closed" for normally-completed beads and "resolved" for beads closed via
-    # the escalate auto-approve path. Both warrant delivery (see adc-5wtm); the
-    # session_id-label guard below scopes delivery to escalate-tracked beads
-    # regardless of status, so including "resolved" is safe.
-    TERMINAL_STATUSES = ("closed", "resolved")
+    # bf (bead-forge) CLI binary used for detection (plan §10: "Detection is
+    # CLI-only: the watcher polls `bf list --status closed`"). Resolved via
+    # PATH; inject an absolute path (or a missing one) for tests. The server is
+    # launched by a user whose PATH includes ~/.local/bin, where bf lives.
+    BF_BIN = "bf"
+    # Directory bf runs from -- the aide-de-camp checkout, which is this app's
+    # beads workspace (plan: "All bf invocations run from the aide-de-camp
+    # repo's beads workspace" / Beads-Workspace Scoping). Absolute because the
+    # server may be launched from any CWD; bf resolves its workspace from cwd.
+    BF_WORKSPACE = "/home/coding/aide-de-camp"
+    # Per-invocation cap on `bf list` (seconds). bf reads a local SQLite store,
+    # so this is normally sub-second; the cap only bounds a wedged CLI so one
+    # tick cannot stall the watch loop. A timeout is logged, not fatal.
+    SUBPROCESS_TIMEOUT_SECONDS = 10.0
 
     def __init__(
         self,
         store: SessionStore,
         router: SurfaceRouter,
-        beads_jsonl: str | None = None,
+        bf_bin: str | None = None,
+        bf_workspace: str | None = None,
+        subprocess_timeout_seconds: float | None = None,
         telegram_fallback: TelegramFallback | None = None,
         check_interval_seconds: float | None = None,
     ):
         self.store = store
         self.router = router
-        # Allow tests / alternate workspaces to point at a scratch checkpoint.
-        self._beads_jsonl = beads_jsonl or self.BEADS_JSONL
+        # bf (bead-forge) CLI invocation config (plan §10: detection is
+        # CLI-only -- poll `bf list --status closed`). The binary runs from the
+        # aide-de-camp checkout (the beads workspace; Beads-Workspace Scoping)
+        # and never reads the CLI's private store files directly. Injectable so
+        # tests can point at a fake/missing binary without touching PATH.
+        self._bf_bin = bf_bin or self.BF_BIN
+        self._bf_workspace = bf_workspace or self.BF_WORKSPACE
+        self._subprocess_timeout = (
+            subprocess_timeout_seconds
+            if subprocess_timeout_seconds is not None
+            else self.SUBPROCESS_TIMEOUT_SECONDS
+        )
         # Telegram delivery surface. Defaults to None and is resolved lazily to
         # the shared singleton (get_telegram_fallback) on first send, so the
         # bead watcher uses the SAME configured chat id, bridge URL,
@@ -115,9 +129,14 @@ class BeadWatcher:
         # last_tick_at is epoch seconds (time.time()); 0.0 means "never ticked".
         self.last_tick_at: float = 0.0
         self.tick_count: int = 0
-        # Bead IDs we have already delivered. In-memory only, so a process
-        # restart re-delivers currently-terminal beads (pre-existing behavior).
-        self._processed_beads: set[str] = set()
+        # Close-timestamp high-water mark: the newest bead close time (UTC epoch
+        # seconds) already processed. In-memory only. Each tick emits only
+        # closures strictly newer than this mark, then advances it. On the first
+        # tick (and after any restart, since the mark is in-memory) the mark is
+        # seeded to the newest existing close time and nothing is emitted -- so
+        # a restart re-reads but does NOT re-deliver already-closed beads.
+        # (adc-qw85: replaces the former in-memory _processed_beads ID set.)
+        self._close_highwater: Optional[float] = None
 
     async def start(self) -> None:
         """Start the bead watcher daemon.
@@ -269,61 +288,163 @@ class BeadWatcher:
                 raise
 
     async def _check_for_events(self) -> None:
-        """Check for terminal bead events and process them."""
-        beads_path = Path(self._beads_jsonl)
-        if not beads_path.exists():
-            return
+        """Poll for newly-closed bead events and route each to surfaces.
 
-        events = await self._read_terminal_events(beads_path)
-
+        Detection is CLI-only (plan §10): each tick runs `bf list --status
+        closed` and emits only closures newer than the close-timestamp
+        high-water mark. Every emitted record is handed to the next stage
+        (``_process_bead_event``); this layer does not resolve intents or write
+        results itself (child 4 owns the close -> result path).
+        """
+        events = await self._poll_closed_beads()
         for event in events:
             await self._process_bead_event(event)
 
-    async def _read_terminal_events(self, beads_path: Path) -> list[BeadEvent]:
-        """
-        Read terminal (closed/resolved) bead events from the checkpoint.
+    async def _poll_closed_beads(self) -> list[BeadEvent]:
+        """Poll closed beads via the CLI and return the newly-closed subset.
 
-        The bf checkpoint is rewritten in full on each flush (not appended to),
-        so byte-offset tracking would silently miss beads whose status changed
-        on an earlier line. We therefore re-read the whole file each tick;
-        `_processed_beads` guards against re-delivering beads already routed.
+        Maintains ``self._close_highwater`` (newest close timestamp already
+        processed, UTC epoch seconds). Each tick returns only beads closed
+        strictly AFTER that mark and advances the mark to the newest close
+        time seen this tick.
+
+        First poll (and first after any restart, since the mark is in-memory):
+        seed the mark to the newest existing close time and emit nothing,
+        instead of delivering the entire already-closed backlog. This is the
+        documented high-water-mark semantics -- a restart re-reads but does
+        not re-deliver already-closed beads; only closures after the mark
+        surface. (adc-qw85)
         """
-        events: list[BeadEvent] = []
+        records = await self._run_bf_list_closed()
+
+        # (close_epoch, record) for records whose close time parsed; sorted
+        # ascending so the last entry is the newest close this tick.
+        parsed: list[tuple[float, dict]] = []
+        for rec in records:
+            ts = self._parse_close_epoch(rec.get("closed_at"))
+            if ts is None:
+                continue
+            parsed.append((ts, rec))
+        parsed.sort(key=lambda pair: pair[0])
+
+        if self._close_highwater is None:
+            # Baseline against the current backlog without delivering it.
+            if parsed:
+                self._close_highwater = parsed[-1][0]
+                logger.debug(
+                    "Bead watcher baseline: high-water mark set to %.6f "
+                    "(%d closed beads already seen; none re-delivered).",
+                    self._close_highwater, len(parsed),
+                )
+            return []
+
+        # Emit only closures strictly newer than the mark.
+        new_events: list[BeadEvent] = []
+        for ts, rec in parsed:
+            if ts <= self._close_highwater:
+                continue
+            new_events.append(BeadEvent(
+                bead_id=rec.get("id", ""),
+                event_type="closed",
+                timestamp=int(ts),
+                data=rec,
+            ))
+        if new_events:
+            # Advance to the newest close seen overall this tick (parsed is
+            # sorted ascending, so the last is the max). Every record newer
+            # than the old mark was emitted, so this is also the newest emitted.
+            self._close_highwater = parsed[-1][0]
+        return new_events
+
+    @staticmethod
+    def _parse_close_epoch(closed_at: object) -> Optional[float]:
+        """Parse a bf ``closed_at`` (RFC3339, up to nanosecond) to UTC epoch.
+
+        bf emits close times with nanosecond precision and a trailing ``Z`` --
+        e.g. ``2026-07-22T12:47:22.595899004Z`` -- though some records omit the
+        fractional part entirely. ``datetime.fromisoformat`` (3.11+) accepts
+        both forms and yields a UTC-aware datetime, so ``.timestamp()`` is
+        correct regardless of the host's local timezone. Returns None on any
+        parse failure (a malformed/missing close time is logged, not fatal).
+        """
+        if not isinstance(closed_at, str) or not closed_at.strip():
+            return None
+        try:
+            return datetime.fromisoformat(closed_at.strip()).timestamp()
+        except (ValueError, TypeError) as e:
+            logger.warning("Could not parse closed_at %r: %s", closed_at, e)
+            return None
+
+    async def _run_bf_list_closed(self) -> list[dict]:
+        """Run `bf list --status closed --json` and return parsed bead records.
+
+        The CLI is the sole source of bead state (plan §10: never read the bf
+        workspace's private store files directly). bf runs from the
+        aide-de-camp checkout (the beads workspace; Beads-Workspace Scoping) so
+        it sees every bead this app owns.
+
+        Output is JSONL -- one JSON object per line; each non-blank line is
+        parsed independently so one malformed line does not discard the rest.
+        Every failure mode (missing binary, spawn error, timeout, non-zero
+        exit, unparseable line) is caught and logged, returning an empty list:
+        one tick's failure must not kill the watch task -- the lifespan
+        supervisor (child 1) is the backstop. A caught failure simply means
+        "no new closures detected this tick." (adc-qw85)
+        """
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                self._bf_bin,
+                "list", "--status", "closed", "--json",
+                cwd=self._bf_workspace,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except FileNotFoundError:
+            logger.error(
+                "bf binary %r not found -- bead-close detection skipped this "
+                "tick. Ensure bead-forge (bf) is installed and on PATH.",
+                self._bf_bin,
+            )
+            return []
+        except OSError as e:
+            logger.error("Failed to spawn bf list: %s", e, exc_info=True)
+            return []
 
         try:
-            with open(beads_path, "r") as f:
-                lines = f.readlines()
-        except Exception as e:
-            logger.error(f"Error reading beads file: {e}")
-            return events
+            stdout_b, stderr_b = await asyncio.wait_for(
+                proc.communicate(), timeout=self._subprocess_timeout
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            logger.warning(
+                "bf list --status closed timed out after %.1fs",
+                self._subprocess_timeout,
+            )
+            return []
 
-        for line in lines:
-            if not line.strip():
+        if proc.returncode != 0:
+            logger.warning(
+                "bf list --status closed exited %s: %s",
+                proc.returncode,
+                stderr_b.decode(errors="replace").strip()[:500],
+            )
+            return []
+
+        records: list[dict] = []
+        for lineno, line in enumerate(
+            stdout_b.decode(errors="replace").splitlines(), start=1
+        ):
+            line = line.strip()
+            if not line:
                 continue
-
             try:
-                bead = json.loads(line)
+                records.append(json.loads(line))
             except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse bead JSON: {e}")
-                continue
-
-            bead_id = bead.get("id")
-            status = bead.get("status")
-
-            if not bead_id or bead_id in self._processed_beads:
-                continue
-
-            # Process terminal beads (closed or resolved)
-            if status in self.TERMINAL_STATUSES:
-                events.append(BeadEvent(
-                    bead_id=bead_id,
-                    event_type=status,  # 'closed' or 'resolved'
-                    timestamp=int(datetime.now().timestamp()),
-                    data=bead,
-                ))
-                self._processed_beads.add(bead_id)
-
-        return events
+                logger.warning(
+                    "Skipping unparseable bf list line %d: %s", lineno, e
+                )
+        return records
 
     def _extract_metadata(self, bead: dict) -> dict:
         """
