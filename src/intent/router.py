@@ -23,6 +23,7 @@ from ..session.store import get_store
 from ..fetch.commands import FetchRequest, FetchContext, IntentType as FetchIntentType
 from ..fetch.orchestrator import execute_fetch
 from ..synthesize.strand import SynthesizeRequest, synthesize_intent
+from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
 
 
 logger = getLogger(__name__)
@@ -499,23 +500,205 @@ class IntentRouter:
         }
         return type_map.get(intent_type, FetchIntentType.STATUS)
 
+    async def _check_fence_for_bead(
+        self,
+        bead_ref: str,
+    ) -> dict | None:
+        """
+        Check if a bead has been fenced (has last_refusal_reason or fenced_at set).
+
+        Args:
+            bead_ref: The bead reference to check
+
+        Returns:
+            Fence context dict with bead_id, refusal_reason, refusal_count, fenced_at
+            if fenced, None otherwise.
+        """
+        try:
+            store = await self._get_store()
+            bead_watch = await store.get_bead_watch(bead_ref)
+
+            if not bead_watch:
+                return None
+
+            # Check if bead is fenced (has last_refusal_reason or fenced_at)
+            last_refusal_reason = bead_watch.get("last_refusal_reason")
+            fenced_at = bead_watch.get("fenced_at")
+            refusal_count = bead_watch.get("refusal_count", 0)
+
+            if last_refusal_reason or fenced_at:
+                # Bead is fenced - extract fence context
+                return {
+                    "bead_id": bead_ref,
+                    "refusal_reason": last_refusal_reason or "Fenced (no reason provided)",
+                    "refusal_count": refusal_count,
+                    "fenced_at": fenced_at,
+                }
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error checking fence status for bead {bead_ref}: {e}")
+            return None
+
+    async def _create_stuck_card_from_fence(
+        self,
+        routed_intent: RoutedIntent,
+        fence_context: dict,
+    ) -> dict:
+        """
+        Create a stuck card when a fenced bead is detected during intent routing.
+
+        Args:
+            routed_intent: The routed intent
+            fence_context: Fence context from _check_fence_for_bead
+
+        Returns:
+            Result dictionary with stuck card details
+        """
+        from datetime import datetime
+
+        bead_id = fence_context["bead_id"]
+        refusal_reason = fence_context["refusal_reason"]
+        refusal_count = fence_context["refusal_count"]
+
+        logger.info(
+            f"Creating stuck card for fenced bead {bead_id} "
+            f"(intent {routed_intent.intent_id})"
+        )
+
+        try:
+            store = await self._get_store()
+
+            # Get or create topic for this stuck card
+            topic_type = "project" if routed_intent.classification.project_slug else "research"
+            topic_id, _ = await store.find_or_create_topic(
+                label=f"Fenced: {routed_intent.utterance[:80]}",
+                topic_type=topic_type,
+                project_slugs=[routed_intent.classification.project_slug] if routed_intent.classification.project_slug else [],
+                session_id=routed_intent.session_id,
+            )
+
+            # Link intent to topic
+            await store.link_intent_to_topic(routed_intent.intent_id, topic_id)
+
+            # Create stuck result
+            summary = f"Task stuck — needs your input"
+            data = {
+                "bead_id": bead_id,
+                "stuck_reason": refusal_reason,
+                "refusal_count": refusal_count,
+                "message": f"This task has been blocked after {refusal_count} refusals.",
+                "action_hint": "Review the bead and provide the missing information or context needed to proceed.",
+                "fence_detected_during": "intent_routing",
+            }
+
+            result_id = await store.create_result(
+                intent_id=routed_intent.intent_id,
+                topic_id=topic_id,
+                session_id=routed_intent.session_id,
+                summary=summary,
+                data=data,
+                urgency="high",
+            )
+
+            logger.info(f"Created stuck card {result_id} for fenced bead {bead_id}")
+
+            # Broadcast task_stuck event via SSE
+            broadcaster = get_broadcaster()
+            await broadcaster.broadcast(
+                SSEEvent(
+                    event_type=EventType.TASK_STUCK,
+                    data={
+                        "bead_id": bead_id,
+                        "stuck_reason": refusal_reason,
+                        "refusal_count": refusal_count,
+                        "intent_id": routed_intent.intent_id,
+                        "session_id": routed_intent.session_id,
+                        "topic_id": topic_id,
+                        "timestamp": int(datetime.now().timestamp()),
+                    },
+                    target_session_id=routed_intent.session_id,
+                )
+            )
+
+            return {
+                "intent_id": routed_intent.intent_id,
+                "intent_type": routed_intent.classification.intent_type.value,
+                "status": "stuck",
+                "bead_id": bead_id,
+                "topic_id": topic_id,
+                "result_id": result_id,
+                "stuck_reason": refusal_reason,
+                "refusal_count": refusal_count,
+                "message": "Fenced bead detected during intent routing",
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to create stuck card from fence: {e}")
+            return {
+                "intent_id": routed_intent.intent_id,
+                "intent_type": routed_intent.classification.intent_type.value,
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to create stuck card from fence context",
+            }
+
     async def _escalate_to_bead(
         self,
         routed_intent: RoutedIntent,
         timings: DispatchTimings,
     ) -> dict:
         """
-        Escalate a task-profile intent to a NEEDLE bead.
+        Escalate a task-profile intent to a NEEDLESS bead.
 
         Args:
             routed_intent: The routed intent to escalate
             timings: Per-stage timing collector; records escalate_ms.
 
         Returns:
-            Result dictionary with pending card
+            Result dictionary with pending card or stuck card if fence detected
         """
         classification = routed_intent.classification
 
+        # Step 1: Check for existing fenced beads in the session before escalating
+        # This detects fence events when last_refusal_reason is set on existing beads
+        try:
+            store = await self._get_store()
+            fenced_beads = await store.get_fenced_beads_for_session(
+                routed_intent.session_id
+            )
+
+            # If there are fenced beads, extract fence context and create stuck card
+            if fenced_beads:
+                # Get the most recently fenced bead
+                most_recent_fenced = fenced_beads[0]
+                bead_ref = most_recent_fenced["bead_ref"]
+                refusal_reason = most_recent_fenced.get("last_refusal_reason", "Fenced (no reason provided)")
+                refusal_count = most_recent_fenced.get("refusal_count", 0)
+
+                fence_context = {
+                    "bead_id": bead_ref,
+                    "refusal_reason": refusal_reason,
+                    "refusal_count": refusal_count,
+                    "fenced_at": most_recent_fenced.get("fenced_at"),
+                }
+
+                logger.info(
+                    f"Detected fenced bead {bead_ref} for session {routed_intent.session_id} "
+                    f"(intent {routed_intent.intent_id})"
+                )
+
+                # Create stuck card with fence context
+                return await self._create_stuck_card_from_fence(
+                    routed_intent, fence_context
+                )
+
+        except Exception as e:
+            logger.warning(f"Error checking for fenced beads: {e}")
+            # Continue to escalation if fence check fails
+
+        # Step 2: No fenced beads detected - proceed with escalation
         # Build escalate request
         escalate_request = EscalateRequest(
             intent_id=routed_intent.intent_id,
@@ -539,6 +722,20 @@ class IntentRouter:
             esc_start = timings.clock()
             result = await escalate_intent(escalate_request)
             timings.record("escalate_ms", timings.elapsed_ms(esc_start))
+
+            # Check if the created bead is immediately fenced (race condition:
+            # watcher may have fenced it between escalate request and now)
+            if result.bead_id:
+                fence_context = await self._check_fence_for_bead(result.bead_id)
+                if fence_context:
+                    logger.info(
+                        f"Detected immediate fence for bead {result.bead_id} "
+                        f"(intent {routed_intent.intent_id})"
+                    )
+                    # Return stuck card instead of pending card
+                    return await self._create_stuck_card_from_fence(
+                        routed_intent, fence_context
+                    )
 
             return {
                 "intent_id": routed_intent.intent_id,
