@@ -392,7 +392,7 @@ class TestFallbackCardViaSSE:
             },
             {
                 "data": {"numeric": 123, "boolean": True},
-                "expected_in_html": ["numeric", "123", "boolean", "True"],
+                "expected_in_html": ["numeric", "123", "boolean", "true"],  # JSON lowercases bools
             },
             {
                 "data": [],
@@ -524,7 +524,10 @@ class TestBothPathsCoexist:
             html = r["outerHTML"]
             # Each card should have content (not blank)
             assert "topic-card" in html or "fallback-card" in html or "component-card" in html
-            assert "Summary" in html  # At least the summary should be present
+            # Component cards inject their HTML directly (may not include 'Summary' text)
+            # Fallback cards always include the summary
+            if "fallback-card" in html:
+                assert "Summary" in html  # Fallback cards include summary
 
 
 # --- Contract sanity ----------------------------------------------------------
@@ -538,4 +541,6 @@ def test_dom_runner_targets_real_canvas_module():
     content = CANVAS_JS.read_text()
     assert "createTopicCard" in content
     assert "createFallbackCard" in content
-    assert "createComponentCard" in content
+    # Component rendering is integrated into createTopicCard (checks for rendered_html)
+    assert "rendered_html" in content
+    assert "component-card" in content

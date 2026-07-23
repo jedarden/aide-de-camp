@@ -18,6 +18,7 @@ UI-regen agent's job alone, so the two never race on a component's identity.
 """
 
 import html
+import json
 import re
 from dataclasses import dataclass
 from logging import getLogger
@@ -107,6 +108,7 @@ class HotPathRenderer:
         result_type: str,
         result_data: dict[str, Any],
         summary: Optional[str] = None,
+        urgency: Optional[str] = None,
         layout_bucket: Optional[str] = None,
     ) -> RenderOutcome:
         """Select + render a card for one result. Deterministic, no LLM.
@@ -114,8 +116,8 @@ class HotPathRenderer:
         On a match: fills the template (escaped), writes card_cache keyed
         ``(result_id, component_id, layout_bucket)``, and records the usage
         pattern + usage stats. On no match / below threshold: returns a fallback
-        outcome and writes nothing to the component DB (the client renders the
-        built-in generic fallback card from result.data + summary).
+        outcome with the rendered fallback HTML and writes nothing to the
+        component DB.
         """
         bucket = layout_bucket or self.layout_bucket
 
@@ -130,8 +132,14 @@ class HotPathRenderer:
                 self.match_threshold,
                 result_id,
             )
+            # Render the fallback card server-side for SSE streaming
+            fallback_html = render_fallback_card(
+                summary=summary,
+                data=result_data,
+                urgency=urgency,
+            )
             return RenderOutcome(
-                rendered_html=None,
+                rendered_html=fallback_html,
                 component_id=None,
                 card_fallback=True,
                 layout_bucket=bucket,
@@ -205,6 +213,116 @@ def _get_nested_value(data: dict[str, Any], path: str) -> Any:
         else:
             return None
     return value
+
+
+# ---------------------------------------------------------------------------
+# Generic fallback card renderer (server-side)
+# ---------------------------------------------------------------------------
+
+def _stringify_value(value: Any) -> str:
+    """Stringify a value for fallback card display (mirrors client-side _stringify)."""
+    if value is None:
+        return ''
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    try:
+        return json.dumps(value)
+    except Exception:
+        return str(value)
+
+
+def _fallback_rows(data: Any) -> list[tuple[str, str]]:
+    """Flatten result.data into [key, value] string pairs (mirrors client-side _fallbackRows)."""
+    if data is None:
+        return []
+
+    obj = data
+
+    # Handle string - try to parse as JSON
+    if isinstance(data, str):
+        try:
+            obj = json.loads(data)
+        except json.JSONDecodeError:
+            return [('value', data)]
+
+    # Handle array
+    if isinstance(obj, list):
+        rows = []
+        for i, v in enumerate(obj[:50]):  # Max 50 rows
+            rows.append((str(i), _stringify_value(v)))
+        return rows
+
+    # Handle object
+    if isinstance(obj, dict):
+        rows = []
+        for k in list(obj.keys())[:50]:  # Max 50 rows
+            rows.append((k, _stringify_value(obj[k])))
+        return rows
+
+    # Handle primitive
+    return [('value', str(obj))]
+
+
+def render_fallback_card(
+    summary: str | None = None,
+    data: dict[str, Any] | None = None,
+    urgency: str | None = None,
+) -> str:
+    """Render the generic fallback card HTML (server-side version of createFallbackCard).
+
+    This generates the same HTML structure as the client-side createFallbackCard()
+    function in canvas.js, ensuring the fallback card can be streamed via SSE
+    and injected directly into the canvas without a blank canvas state.
+
+    All dynamic values are HTML-escaped per the escaping contract.
+
+    Args:
+        summary: Optional result summary
+        data: Optional result data dict for key/value grid
+        urgency: Optional urgency level for badge
+
+    Returns:
+        HTML string for the fallback card
+    """
+    try:
+        # Build fallback card HTML
+        card_parts = ['<div class="builtin-card fallback-card" data-builtin="fallback">']
+
+        # Header with icon and title
+        card_parts.append('  <div class="builtin-header">')
+        card_parts.append(f'    <span class="builtin-icon">{html.escape("🗒️", quote=False)}</span>')
+        card_parts.append(f'    <span class="builtin-title">{html.escape("Result", quote=False)}</span>')
+        card_parts.append('  </div>')
+
+        # Summary paragraph
+        if summary:
+            card_parts.append(f'  <p class="fallback-summary">{html.escape(summary, quote=False)}</p>')
+
+        # Key/value grid from data
+        if data:
+            rows = _fallback_rows(data)
+            if rows:
+                card_parts.append('  <div class="fallback-grid">')
+                for key, value in rows:
+                    card_parts.append(f'    <div class="fallback-key">{html.escape(key, quote=False)}</div>')
+                    card_parts.append(f'    <div class="fallback-val">{html.escape(value, quote=False)}</div>')
+                card_parts.append('  </div>')
+
+        # Urgency badge
+        if urgency:
+            card_parts.append(f'  <span class="urgency-badge {html.escape(urgency, quote=False)}">{html.escape(urgency, quote=False)}</span>')
+
+        card_parts.append('</div>')
+
+        return '\n'.join(card_parts)
+
+    except Exception as e:
+        # Fallback render failures should not crash the dispatch flow
+        logger.error(f"Fallback card render failed: {e}")
+        # Return minimal safe fallback HTML
+        return f'<div class="builtin-card fallback-card" data-builtin="fallback"><p class="fallback-summary">{html.escape(summary or "Result", quote=False)}</p></div>'
 
 
 # ---------------------------------------------------------------------------

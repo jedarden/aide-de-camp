@@ -410,6 +410,7 @@ class AmbientMonitor:
             result_type=result_type,
             result_data=result_data,
             summary=summary_text,
+            urgency=rule.urgency,
         )
 
         # Update result's card_fallback flag
