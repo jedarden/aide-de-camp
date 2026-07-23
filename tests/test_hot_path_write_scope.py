@@ -208,7 +208,12 @@ class TestWriteScopeSeparation:
             "last_matched was not updated in component_usage_patterns"
 
     def test_fallback_path_writes_nothing(self, library, renderer):
-        """When no component matches (fallback), hot-path writes nothing to component DB."""
+        """When no component matches (fallback), hot-path writes nothing to component DB.
+
+        The server now renders the fallback HTML server-side (for SSE streaming),
+        but still writes nothing to card_cache or component_usage_patterns — the
+        fallback path is read-only against the component DB.
+        """
         # Get initial row counts
         def count_rows(table):
             conn = sqlite3.connect(library.db_path)
@@ -228,12 +233,15 @@ class TestWriteScopeSeparation:
             result_data={"test": "data"},
         )
 
-        # Verify fallback outcome
-        assert render_outcome.rendered_html is None
+        # Verify fallback outcome (server now renders fallback HTML)
+        assert render_outcome.rendered_html is not None, \
+            "fallback path should generate fallback HTML server-side"
+        assert "fallback-card" in render_outcome.rendered_html, \
+            "fallback HTML should contain fallback-card class"
         assert render_outcome.card_fallback is True
         assert render_outcome.component_id is None
 
-        # Verify nothing was written to component DB
+        # Verify nothing was written to component DB (fallback is read-only)
         cache_after = count_rows("card_cache")
         components_after = count_rows("components")
         patterns_after = count_rows("component_usage_patterns")
