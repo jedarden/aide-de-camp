@@ -675,18 +675,21 @@ function createStuckCard(data) {
     }
 
     const meta = el('div', 'stuck-meta');
+    let metaChildCount = 0;
     if (data.refusal_count != null) {
         meta.appendChild(el('span', 'stuck-refusal-count', [
             'Refusals: ' + String(data.refusal_count)
         ]));
+        metaChildCount++;
     }
     if (data.bead_id) {
-        if (meta.children.length > 0) {
+        if (metaChildCount > 0) {
             meta.appendChild(document.createTextNode(' • '));
         }
         meta.appendChild(el('span', 'stuck-bead-id', ['Bead: ' + data.bead_id]));
+        metaChildCount++;
     }
-    if (meta.children.length > 0) {
+    if (metaChildCount > 0) {
         card.appendChild(meta);
     }
 
