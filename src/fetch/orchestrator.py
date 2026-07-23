@@ -124,6 +124,9 @@ class FetchStrand:
 
                 if result.status == "success":
                     succeeded.append(source)
+                    # Check if the source data contains a caveat (e.g., fallback path with narrower scope)
+                    if isinstance(result.data, dict) and "caveat" in result.data:
+                        caveats.append(result.data["caveat"])
                 elif result.status == "timeout":
                     timed_out.append(source)
                     caveats.append(f"{source.value} timed out")
@@ -559,12 +562,20 @@ class FetchStrand:
             return {"error": str(e), "changed_files": []}
 
     async def _fetch_bead_list(self, context: FetchContext) -> dict:
-        """Fetch bead list from the repo's .beads/ workspace (local or remote)."""
+        """
+        Fetch bead list from the appropriate workspace.
+
+        Per plan Beads-Workspace Scoping:
+        - Primary path: run `bf list --status open` (NO --project filter) inside the
+          project's repo_path checkout when it has a .beads/ workspace
+        - Fallback (no repo_path/.beads): list from the adc workspace filtered
+          --project {slug}, with a fetch_coverage caveat naming the narrower scope
+        """
         repo_path = context.repo_path
         project_slug = context.project_slug
 
-        if not repo_path:
-            return {"error": "No repo path resolved for this project"}
+        # ADC workspace for fallback path (all aide-de-camp-originated beads live here)
+        adc_workspace = "/home/coding/aide-de-camp"
 
         try:
             if context.ssh_target:
@@ -576,15 +587,105 @@ class FetchStrand:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
+
+                stdout, stderr = await proc.communicate()
+
+                if proc.returncode == 0:
+                    import json as _json
+                    try:
+                        beads = _json.loads(stdout.decode())
+                    except Exception:
+                        beads = []
+                    return {
+                        "project": project_slug,
+                        "repo": context.display_path if hasattr(context, "display_path") else repo_path,
+                        "host": context.host_alias,
+                        "beads": beads,
+                        "count": len(beads) if isinstance(beads, list) else 0,
+                        "scope": "project_workspace",  # Primary path
+                    }
+                else:
+                    error_output = stderr.decode().strip() or stdout.decode().strip()
+                    if "no beads workspace" in error_output or "No such file" in error_output:
+                        # Fallback path: no local .beads workspace at remote
+                        # Use adc workspace with --project filter
+                        return await self._fetch_bead_list_from_adc(project_slug, repo_path, context, remote_ssh=context.ssh_target)
+                    return {"error": error_output or "bf list returned non-zero"}
             else:
+                # Local: check for .beads workspace first
                 from pathlib import Path as _Path
-                if not (_Path(repo_path) / ".beads" / "issues.jsonl").exists():
-                    return {"error": f"No .beads workspace at {repo_path}"}
+
+                if repo_path and (_Path(repo_path) / ".beads" / "issues.jsonl").exists():
+                    # Primary path: project has its own .beads/ workspace
+                    # Run bf list without --project filter (a project's own workspace
+                    # doesn't tag its beads with the aide-de-camp slug)
+                    proc = await asyncio.create_subprocess_exec(
+                        "bf", "list", "--status=open", "--limit=50",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        cwd=repo_path,
+                    )
+
+                    stdout, stderr = await proc.communicate()
+
+                    if proc.returncode == 0:
+                        import json as _json
+                        try:
+                            beads = _json.loads(stdout.decode())
+                        except Exception:
+                            beads = []
+                        return {
+                            "project": project_slug,
+                            "repo": repo_path,
+                            "beads": beads,
+                            "count": len(beads) if isinstance(beads, list) else 0,
+                            "scope": "project_workspace",  # Primary path
+                        }
+                    else:
+                        return {"error": stderr.decode().strip() or "bf list returned non-zero"}
+                else:
+                    # Fallback path: no local .beads workspace or no repo_path
+                    # Use adc workspace with --project filter
+                    return await self._fetch_bead_list_from_adc(project_slug, repo_path, context)
+
+        except FileNotFoundError:
+            return {"error": "bf CLI not found in PATH"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _fetch_bead_list_from_adc(
+        self, project_slug: str | None, repo_path: str | None, context: FetchContext, remote_ssh: str | None = None
+    ) -> dict:
+        """
+        Fetch bead list from adc workspace with --project filter (fallback path).
+
+        Per plan Beads-Workspace Scoping fallback:
+        "showing aide-de-camp-originated beads only" with caveat about narrower scope.
+
+        Returns beads filtered by --project {slug} from adc workspace.
+        """
+        adc_workspace = "/home/coding/aide-de-camp"
+
+        if not project_slug:
+            return {"error": "No project_slug for fallback bead list"}
+
+        try:
+            if remote_ssh:
+                # Remote fallback: run bf list from adc workspace via SSH
                 proc = await asyncio.create_subprocess_exec(
-                    "bf", "list", "--status=open", "--limit=50",
+                    "ssh", "-o", "ConnectTimeout=8", "-o", "BatchMode=yes",
+                    remote_ssh,
+                    f"cd {adc_workspace} && bf list --project={project_slug} --status=open --limit=50",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=repo_path,
+                )
+            else:
+                # Local fallback: run bf list from adc workspace
+                proc = await asyncio.create_subprocess_exec(
+                    "bf", "list", f"--project={project_slug}", "--status=open", "--limit=50",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=adc_workspace,
                 )
 
             stdout, stderr = await proc.communicate()
@@ -597,10 +698,11 @@ class FetchStrand:
                     beads = []
                 return {
                     "project": project_slug,
-                    "repo": context.display_path if hasattr(context, "display_path") else repo_path,
-                    "host": context.host_alias,
+                    "repo": repo_path,
                     "beads": beads,
                     "count": len(beads) if isinstance(beads, list) else 0,
+                    "scope": "adc_workspace_filtered",  # Fallback path
+                    "caveat": f"No local beads workspace for {project_slug}; showing aide-de-camp-originated beads only",
                 }
             else:
                 return {"error": stderr.decode().strip() or "bf list returned non-zero"}

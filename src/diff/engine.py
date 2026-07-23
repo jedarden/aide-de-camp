@@ -135,6 +135,9 @@ class DiffEngine:
             return "git_log"
         if "beads" in data or "open_count" in data:
             return "bead_list"
+        # For generic results, check if data looks like a status result
+        if "status" in data or "health" in data or "replicas" in data:
+            return "generic_status"
         return "generic"
 
     def _compute_field_diffs(
@@ -146,7 +149,14 @@ class DiffEngine:
         """Compute field-level diffs."""
         fields = []
 
-        for field_name in significant_fields:
+        # If no significant fields defined, compare all keys from both data dicts
+        if not significant_fields:
+            all_keys = set(prev_data.keys()) | set(curr_data.keys())
+            field_names = sorted(all_keys)
+        else:
+            field_names = significant_fields
+
+        for field_name in field_names:
             old_value = prev_data.get(field_name)
             new_value = curr_data.get(field_name)
 
