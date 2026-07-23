@@ -22,6 +22,7 @@ from ..fetch.orchestrator import get_fetch_strand, execute_fetch, FetchRequest
 from ..fetch.commands import FetchContext, FetchSource, IntentType
 from ..sse.broadcaster import get_broadcaster, SSEEvent, broadcast_result
 from ..render.hot_path import derive_result_type, get_renderer
+from .config_loader import get_monitoring_config_loader
 
 
 logger = getLogger(__name__)
@@ -97,6 +98,11 @@ class AmbientMonitor:
         self._fetch_strand = get_fetch_strand()
         # Use provided store or get default
         self._store = session_store or get_store()
+        # Create config loader instance (not singleton) to respect config_path
+        from .config_loader import ConfigLoader
+        self._config_loader = ConfigLoader(config_path=config_path, default_tick_interval_seconds=300)
+        self._ticker_task: Optional[asyncio.Task] = None
+        self._last_tick_config_hash: Optional[int] = None
 
     async def _get_http_client(self) -> ClientSession:
         """Get or create HTTP client."""
@@ -105,10 +111,11 @@ class AmbientMonitor:
         return self._http_client
 
     async def load_config(self) -> MonitoringConfig:
-        """Load monitoring configuration from YAML file."""
-        logger.info(f"Loading monitoring config from {self.config_path}")
-        with open(self.config_path, "r") as f:
-            data = yaml.safe_load(f)
+        """Load monitoring configuration from YAML file (with hot-reload cache)."""
+        logger.info(f"Loading monitoring config from {self.config_path} (via hot-reload cache)")
+
+        # Use config loader which handles mtime checking and caching
+        data = await self._config_loader.get_config()
 
         # Parse active topics
         active_topics = []
@@ -548,7 +555,51 @@ class AmbientMonitor:
             task = asyncio.create_task(self.monitor_topic(rule))
             self.tasks.append(task)
 
-        logger.info(f"Started {len(self.tasks)} topic monitors")
+        # Start the ticker task for config hot-reload
+        self._ticker_task = asyncio.create_task(self._config_ticker())
+        self.tasks.append(self._ticker_task)
+
+        logger.info(f"Started {len(self.tasks)} topic monitors (including config ticker)")
+
+    async def _config_ticker(self) -> None:
+        """
+        Config hot-reload ticker.
+
+        Periodically checks if the config file has changed (via mtime) and reloads if needed.
+        Runs on the tick_interval_seconds from the config.
+        """
+        logger.info("Config ticker started")
+
+        while self.running:
+            try:
+                # Get current tick interval (may have changed from config)
+                tick_interval = await self._config_loader.get_tick_interval_seconds()
+                logger.debug(f"Config ticker: checking for changes (interval: {tick_interval}s)")
+
+                # Get current config (auto-reloads if mtime changed)
+                current_config = await self._config_loader.get_config()
+
+                # Create a simple hash of the active topics to detect structural changes
+                import json
+                current_hash = hash(json.dumps(current_config.get("monitoring", {}).get("active_topics", []), sort_keys=True))
+
+                if self._last_tick_config_hash != current_hash:
+                    logger.info("Config structure changed, reloading monitors")
+                    await self.reload_config()
+                    self._last_tick_config_hash = current_hash
+                else:
+                    logger.debug("Config structure unchanged, no reload needed")
+
+                # Wait for next tick
+                await asyncio.sleep(tick_interval)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in config ticker: {e}", exc_info=True)
+                await asyncio.sleep(tick_interval)
+
+        logger.info("Config ticker stopped")
 
     async def stop(self) -> None:
         """Stop ambient monitoring."""
@@ -563,6 +614,7 @@ class AmbientMonitor:
         await asyncio.gather(*self.tasks, return_exceptions=True)
 
         self.tasks.clear()
+        self._ticker_task = None
 
         # Close HTTP client
         if self._http_client:
@@ -571,16 +623,17 @@ class AmbientMonitor:
         logger.info("Ambient monitoring stopped")
 
     async def reload_config(self) -> None:
-        """Reload monitoring configuration."""
+        """Reload monitoring configuration and restart topic monitors."""
         logger.info("Reloading monitoring configuration")
 
-        old_tasks = self.tasks
-        self.tasks = []
+        # Separate ticker task from monitor tasks
+        monitor_tasks = [t for t in self.tasks if t != self._ticker_task]
+        self.tasks = [self._ticker_task] if self._ticker_task else []
 
-        # Cancel old monitors
-        for task in old_tasks:
+        # Cancel old monitor tasks (but not the ticker)
+        for task in monitor_tasks:
             task.cancel()
-        await asyncio.gather(*old_tasks, return_exceptions=True)
+        await asyncio.gather(*monitor_tasks, return_exceptions=True)
 
         # Load new config and restart monitors
         config = await self.load_config()
