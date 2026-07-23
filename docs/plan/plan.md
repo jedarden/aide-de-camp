@@ -45,18 +45,19 @@ Target: < 3 seconds from utterance to first partial result on canvas. No Claude 
 
 ### Latency Budget & Instrumentation
 
-The <3s promise is the product's central claim, so it gets a budget, instrumentation, and a gate — not just a diagram annotation. Per-stage targets below are estimates chosen so the end-to-end budget is plausible; the Measured columns are empty because no timing has ever been captured.
+The <3s promise is the product's central claim, so it gets a budget, instrumentation, and a gate — not just a diagram annotation. Per-stage targets below are estimates chosen so the end-to-end budget is plausible; the Measured columns show actual captured timings from 206 production-like runs across three test shapes (see bead adc-2xf52 for detailed analysis).
 
 | Stage | Target (ESTIMATE) | Measured p50 | Measured p95 |
 |-------|-------------------|--------------|--------------|
-| STT final transcript (Web Speech API) | ~300ms | unmeasured | unmeasured |
-| Intent Router (haiku-class via ZAI proxy) | ~500ms | unmeasured | unmeasured |
-| Fetch — first source returns (surfaces as a per-source progress state on the pending card) | ~500ms | unmeasured | unmeasured |
-| Fetch — window closes (all sources resolved or timed out; gates synthesize start — see Fetch Strand) | ~1s | unmeasured | unmeasured |
-| Synthesize — first token (sonnet-class via ZAI proxy; starts at fetch-window close) | ~1s (cap set by the e2e gate — see internal-consistency note) | unmeasured | unmeasured |
-| SSE emit → first card render | ~100ms | unmeasured | unmeasured |
-| Escalate — bead formulation + safety validation + `bf create` (haiku-class via ZAI proxy; off the first-card path, see note below) | ~2s | unmeasured | unmeasured |
-| **End-to-end: utterance end → first partial card** | **< 3s** | unmeasured | unmeasured |
+| STT final transcript (Web Speech API) | ~300ms | *Not measured* (client-side) | *Not measured* (client-side) |
+| Intent Router (haiku-class via ZAI proxy) | ~500ms | **1,587-2,074ms** ❌ | **2,527-4,301ms** ❌ |
+| Fetch — first source returns (surfaces as a per-source progress state on the pending card) | ~500ms | **0-16ms** ✅ | **0-21ms** ✅ |
+| Fetch — window closes (all sources resolved or timed out; gates synthesize start — see Fetch Strand) | ~1s | **0-51ms** ✅ | **0-191ms** ✅ |
+| Synthesize — first token (sonnet-class via ZAI proxy; starts at fetch-window close) | ~1s (cap set by the e2e gate — see internal-consistency note) | *Not measured* (instrumentation gap) | *Not measured* (instrumentation gap) |
+| Synthesize — total (first token through completion) | ~1-2s | **3,108-3,984ms** ❌ | **4,663-7,877ms** ❌ |
+| SSE emit → first card render | ~100ms | *Not measured* | *Not measured* |
+| Escalate — bead formulation + safety validation + `bf create` (haiku-class via ZAI proxy; off the first-card path, see note below) | ~2s | **3,992ms** ❌ | **5,445ms** ❌ |
+| **End-to-end: utterance end → first partial card** | **< 3s** | **5,219-5,571ms** ❌ | **8,853-10,404ms** ❌ |
 
 **Internal consistency — the e2e row is the binding gate.** The hot-path stages are strictly sequential (STT → router → fetch-window close → synthesize first token → SSE emit), so their targets must sum inside the end-to-end budget: 300 + 500 + 1000 + 1000 + 100 ms ≈ 2.9s against the 3s gate, leaving ~100ms of unallocated slack. (The fetch first-source and escalate rows sit off this critical path — the former lands inside the fetch window, the latter is off the first-card path per the note below.) Synthesize-first-token was originally sketched at ~1–2s — the Hot Path diagram's ~1–2s figure survives as the estimate for the *full* synthesize call, first token through completion — but at a 2s first token the stages sum to ~3.9s: every stage could pass its own budget individually while the end-to-end gate fails, a contradiction that would otherwise surface only at rehearsal. Hence the ~1s first-token allocation above. All per-stage targets remain ESTIMATES and are **provisional allocations, not independent pass/fail gates**: once the Measured p50/p95 columns fill, re-derive the stage allocations from measured slack (a stage running under budget donates headroom to one running over) with the e2e row held fixed and overriding — the Gate below then applies against the re-derived allocations. A run where every stage meets its allocation but the e2e row misses is still a failed run.
 
@@ -988,6 +989,8 @@ Seeded from what this plan already establishes. The rule: an issue either blocks
 | Degraded-state error cards are fully specified in Degraded-State UX but not yet implemented or verified against real source timeouts | Degraded-State UX (card templates); Open Question 2 (timeout behavior unmeasured) | **Yes** | Implement and verify the fixed card templates; a mid-take kubectl/ArgoCD timeout must render as the designed caveat strip on an otherwise-complete card, not as an error or a blank |
 | Clarification round-trip flow unresolved | Open Question 7 | No | Script uses exact registry aliases so clarification never triggers; the no-match card (below) is the insurance if it does |
 | Both scripted projects NOW declare `cluster: ardenone-cluster`, whose ArgoCD applications live on ardenone-manager — and ardenone-manager HAS a no-auth read-only ArgoCD proxy (`https://argocd-ro-ardenone-manager-ts.ardenone.com:8444`) that the fetch strand can consume directly. Zero ArgoCD-source caveats on scripted status cards. | Cluster→ArgoCD Endpoint Resolution (Fetch Strand); `config/clusters.yaml`; HUMAN decision bead adc-359d (Option B: re-script demo onto ardenone-cluster projects) | **No — RESOLVED (VERIFIED 2026-07-23)** | Demo re-scripted onto pbx-web and whisper-stt (both ardenone-cluster-hosted). Their ArgoCD apps resolve via the existing ardenone-manager read-only proxy (access: read-only-proxy), so scripted status cards render caveat-free. **Verified via seeding tool run 2026-07-23T16:08:59**: Dispatch Execution check PASSED with all 5 scripted test dispatches succeeding and zero warnings about failed ArgoCD sources (see `docs/notes/seeding-report-latest.md`). The seeding runbook's item (3) verifies each scripted project's `argocd_app` exists and returns application state on the correct instance (ardenone-manager's ArgoCD, not rs-manager's). Option A (rs-manager RO proxy) deferred post-launch as the better end-state. |
+| Synthesize latency exceeds budget by 2-3× — p50 3,108-3,984ms against ~1-2s target; p95 reaches 7,877ms. Accounts for ~60% of e2e latency. Demo-blocking per plan gate. | Latency baseline (bead adc-2xf52); docs/notes/latency-baseline-2026-07.md | **Yes** | Synthesis must be optimized to meet budget before demo can proceed. Bead adc-1btyk filed for investigation. |
+| Intent Router latency exceeds budget by 3-4× — p50 1,587-2,074ms against ~500ms target; p95 reaches 4,301ms. Accounts for ~40% of e2e latency. Demo-blocking per plan gate. | Latency baseline (bead adc-2xf52); docs/notes/latency-baseline-2026-07.md | **Yes** | Router must be optimized to meet budget before demo can proceed. Bead adc-25sn9 filed for investigation. |
 
 New defects found during rehearsal are appended here with the same must-fix triage before the real take.
 
