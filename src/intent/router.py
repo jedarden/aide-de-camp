@@ -15,9 +15,12 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Optional
 
+import httpx
+
 from ..components.hot_reload import get_reload_manager
 from ..escalate.handler import EscalateRequest, escalate_intent
-from ..escalate.llm import get_zai_client, ModelClass
+from ..escalate.llm import get_zai_client, ModelClass, LLMTimeoutError, LLMRateLimitError, LLMError
+from ..errors.degraded_state import get_degraded_state_handler
 from ..instrument.timings import DispatchTimings
 from ..render.hot_path import derive_result_type, get_renderer
 from ..session.store import get_store
@@ -28,6 +31,37 @@ from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
 
 
 logger = getLogger(__name__)
+
+
+# Router error types for degraded-state handling
+class RouterError(Exception):
+    """Base exception for router errors."""
+    pass
+
+
+class RouterTimeoutError(RouterError):
+    """Router LLM call timed out."""
+    pass
+
+
+class RouterQuotaError(RouterError):
+    """Router LLM call quota exhausted."""
+    pass
+
+
+class RouterProxyError(RouterError):
+    """Router LLM proxy unreachable."""
+    pass
+
+
+class RouterMalformedError(RouterError):
+    """Router returned malformed JSON (after corrective retry)."""
+
+    def __init__(self, parse_error: str, raw_output: str, retry_count: int = 0):
+        self.parse_error = parse_error
+        self.raw_output = raw_output
+        self.retry_count = retry_count
+        super().__init__(f"Malformed router output (retry {retry_count}): {parse_error}")
 
 
 class IntentType(Enum):
@@ -151,6 +185,7 @@ class IntentRouter:
         self,
         utterance: str,
         session_id: str,
+        retry_on_malformed: bool = True,
     ) -> list[IntentClassification]:
         """
         Classify an utterance into intents.
@@ -160,9 +195,16 @@ class IntentRouter:
         Args:
             utterance: The user utterance
             session_id: Session ID for context
+            retry_on_malformed: If True, perform one corrective retry on JSON parse failure
 
         Returns:
             List of IntentClassification objects
+
+        Raises:
+            RouterTimeoutError: LLM call timed out
+            RouterQuotaError: LLM quota exhausted
+            RouterProxyError: LLM proxy unreachable
+            RouterMalformedError: Malformed JSON after corrective retry
         """
         client = await self._get_zai_client()
 
@@ -189,6 +231,10 @@ class IntentRouter:
         # so edits to either prompt take effect without a server restart.
         system_prompt = self._build_system_prompt()
 
+        # Track retry attempt for malformed JSON
+        retry_count = 0
+        raw_response = None
+
         try:
             response = await client.call_simple(
                 system_prompt=system_prompt,
@@ -197,6 +243,9 @@ class IntentRouter:
                 max_tokens=2048,
                 temperature=0.3,  # Lower temperature for consistent classification
             )
+
+            # Store raw response for error reporting
+            raw_response = response
 
             # Strip markdown code fences if present (ZAI proxy wraps in ```json...```)
             raw = response.strip()
@@ -233,18 +282,49 @@ class IntentRouter:
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse router response as JSON: {e}")
-            # Fallback: return single status intent
-            return [
-                IntentClassification(
-                    intent_type=IntentType.STATUS,
-                    utterance_fragment=utterance,
-                    confidence=0.5,
-                    reasoning="Classification failed, defaulting to status",
-                )
-            ]
+
+            # Implement one corrective retry on malformed JSON
+            if retry_on_malformed and retry_count == 0:
+                logger.info("Malformed JSON detected, attempting corrective retry...")
+                retry_count += 1
+                try:
+                    # Retry once with same parameters
+                    return await self.classify_utterance(
+                        utterance=utterance,
+                        session_id=session_id,
+                        retry_on_malformed=False,  # Prevent infinite retry
+                    )
+                except json.JSONDecode as retry_e:
+                    # Retry also failed - raise RouterMalformedError
+                    raise RouterMalformedError(
+                        parse_error=str(e),
+                        raw_output=raw_response or "",
+                        retry_count=retry_count,
+                    ) from retry_e
+
+            # No retry or retry failed - raise RouterMalformedError
+            raise RouterMalformedError(
+                parse_error=str(e),
+                raw_output=raw_response or "",
+                retry_count=retry_count,
+            ) from e
+
+        except (LLMTimeoutError, asyncio.TimeoutError) as e:
+            logger.error(f"Router LLM call timed out: {e}")
+            raise RouterTimeoutError(f"Router LLM call timed out: {e}") from e
+
+        except (LLMRateLimitError,) as e:
+            logger.error(f"Router LLM call quota exhausted: {e}")
+            raise RouterQuotaError(f"Router LLM call quota exhausted: {e}") from e
+
+        except (LLMError, httpx.HTTPError) as e:
+            logger.error(f"Router LLM proxy unreachable: {e}")
+            raise RouterProxyError(f"Router LLM proxy unreachable: {e}") from e
+
         except Exception as e:
-            logger.error(f"Classification failed: {e}")
-            raise
+            logger.error(f"Classification failed with unexpected error: {e}")
+            # Wrap unknown errors as RouterProxyError for graceful degradation
+            raise RouterProxyError(f"Router LLM call failed: {e}") from e
 
     async def route_utterance(
         self,
@@ -264,29 +344,86 @@ class IntentRouter:
 
         Returns:
             List of RoutedIntent objects
+
+        Raises:
+            RouterError: If router fails and broadcasts error event
         """
-        # Classify the utterance (one LLM call per utterance — the router stage
-        # is shared across every intent thread it produces, so its duration is
-        # measured once here and stamped onto each RoutedIntent).
-        classify_start = time.monotonic()
-        classifications = await self.classify_utterance(utterance, session_id)
-        router_ms = int((time.monotonic() - classify_start) * 1000)
+        # Generate a fallback intent_id for error reporting
+        error_intent_id = str(uuid.uuid4())
 
-        routed_intents = []
-        for classification in classifications:
-            # Create intent ID
-            intent_id = str(uuid.uuid4())
+        try:
+            # Classify the utterance (one LLM call per utterance — the router stage
+            # is shared across every intent thread it produces, so its duration is
+            # measured once here and stamped onto each RoutedIntent).
+            classify_start = time.monotonic()
+            classifications = await self.classify_utterance(utterance, session_id)
+            router_ms = int((time.monotonic() - classify_start) * 1000)
 
-            routed_intent = RoutedIntent(
-                intent_id=intent_id,
-                classification=classification,
+            routed_intents = []
+            for classification in classifications:
+                # Create intent ID
+                intent_id = str(uuid.uuid4())
+
+                routed_intent = RoutedIntent(
+                    intent_id=intent_id,
+                    classification=classification,
+                    session_id=session_id,
+                    utterance=classification.utterance_fragment,
+                    router_ms=router_ms,
+                )
+                routed_intents.append(routed_intent)
+
+            return routed_intents
+
+        except RouterMalformedError as e:
+            # Malformed JSON after corrective retry - broadcast clarification card
+            logger.error(f"Router malformed after retry: {e.parse_error}")
+            handler = get_degraded_state_handler()
+            await handler.broadcast_clarification_card(
+                utterance=utterance,
+                intent_id=error_intent_id,
                 session_id=session_id,
-                utterance=classification.utterance_fragment,
-                router_ms=router_ms,
+                parse_error=e.parse_error,
+                retry_count=e.retry_count,
+                raw_output_snippet=e.raw_output[:200] if e.raw_output else None,
             )
-            routed_intents.append(routed_intent)
+            raise  # Re-raise so caller knows routing failed
 
-        return routed_intents
+        except RouterTimeoutError as e:
+            # Router LLM timeout - broadcast router_unavailable
+            logger.error(f"Router timeout: {e}")
+            handler = get_degraded_state_handler()
+            await handler.broadcast_router_unavailable(
+                utterance=utterance,
+                intent_id=error_intent_id,
+                session_id=session_id,
+                error_reason="timeout",
+            )
+            raise  # Re-raise so caller knows routing failed
+
+        except RouterQuotaError as e:
+            # Router quota exhausted - broadcast router_unavailable
+            logger.error(f"Router quota exhausted: {e}")
+            handler = get_degraded_state_handler()
+            await handler.broadcast_router_unavailable(
+                utterance=utterance,
+                intent_id=error_intent_id,
+                session_id=session_id,
+                error_reason="quota_exhausted",
+            )
+            raise  # Re-raise so caller knows routing failed
+
+        except RouterProxyError as e:
+            # Router proxy unreachable - broadcast router_unavailable
+            logger.error(f"Router proxy error: {e}")
+            handler = get_degraded_state_handler()
+            await handler.broadcast_router_unavailable(
+                utterance=utterance,
+                intent_id=error_intent_id,
+                session_id=session_id,
+                error_reason="proxy_down",
+            )
+            raise  # Re-raise so caller knows routing failed
 
     async def process_intent(
         self,
@@ -429,6 +566,50 @@ class IntentRouter:
                     timings.elapsed_ms(fetch_start, first_source_at[0]),
                 )
 
+            # Check for terminal failure: ALL sources failed (Degraded-State UX)
+            if fetch_result.terminal_failure == "all_sources_failed":
+                logger.error(
+                    f"All fetch sources failed for intent {routed_intent.intent_id}: "
+                    f"{len(fetch_result.coverage.failed)} failed, "
+                    f"{len(fetch_result.coverage.timed_out)} timed out"
+                )
+
+                # Build failed sources list for error event
+                failed_sources = []
+                for source, result in fetch_result.sources.items():
+                    failed_sources.append({
+                        "source": source.value,
+                        "status": result.status,
+                        "error": result.error,
+                    })
+
+                # Broadcast all_sources_failed error event
+                handler = get_degraded_state_handler()
+                await handler.broadcast_all_sources_failed(
+                    intent_id=routed_intent.intent_id,
+                    intent_type=classification.intent_type.value,
+                    session_id=routed_intent.session_id,
+                    utterance=routed_intent.utterance,
+                    failed_sources=failed_sources,
+                )
+
+                # Update intent status to failed
+                store = get_store()
+                await store.update_intent_status(
+                    routed_intent.intent_id,
+                    "failed",
+                    "All fetch sources failed",
+                )
+
+                return {
+                    "intent_id": routed_intent.intent_id,
+                    "intent_type": classification.intent_type.value,
+                    "status": "failed",
+                    "error": "all_sources_failed",
+                    "message": "No data — all required sources failed",
+                    "terminal_failure": "all_sources_failed",
+                }
+
             # Check for required source failures (terminal condition)
             required_sources_failed = [
                 s for s in fetch_result.coverage.failed
@@ -466,7 +647,42 @@ class IntentRouter:
             )
 
             synth_start = timings.clock()
-            synthesize_result = await synthesize_intent(synthesize_request)
+            try:
+                synthesize_result = await synthesize_intent(synthesize_request)
+            except Exception as synth_e:
+                # ZAI failure at synthesize stage - broadcast degraded_raw_data
+                # (Degraded-State UX: fetched data is never discarded)
+                logger.error(
+                    f"Synthesize failed for intent {routed_intent.intent_id}: {synth_e}"
+                )
+
+                handler = get_degraded_state_handler()
+                await handler.broadcast_degraded_raw_data(
+                    intent_id=routed_intent.intent_id,
+                    intent_type=classification.intent_type.value,
+                    session_id=routed_intent.session_id,
+                    utterance=routed_intent.utterance,
+                    fetched_context=fetch_result,
+                    error_reason=str(synth_e),
+                )
+
+                # Update intent status to failed
+                store = get_store()
+                await store.update_intent_status(
+                    routed_intent.intent_id,
+                    "failed",
+                    f"Synthesize failed: {synth_e}",
+                )
+
+                return {
+                    "intent_id": routed_intent.intent_id,
+                    "intent_type": classification.intent_type.value,
+                    "status": "failed",
+                    "error": "synthesize_failed",
+                    "message": "Summary unavailable — showing raw fetch data",
+                    "degraded": True,
+                }
+
             timings.record("synthesize_total_ms", timings.elapsed_ms(synth_start))
             # synthesize_first_token_ms is not measurable on the current
             # call_simple path (no token stream) and is left NULL until the

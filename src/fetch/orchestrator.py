@@ -186,6 +186,16 @@ class FetchStrand:
             f"{len(timed_out)} timed out, {len(failed)} failed"
         )
 
+        # Detect if ALL sources failed - this is a terminal failure condition
+        # The caller (intent router) should broadcast all_sources_failed event
+        if len(succeeded) == 0 and coverage.total_sources > 0:
+            logger.error(
+                f"All fetch sources failed for intent {request.intent_id}: "
+                f"{len(failed)} failed, {len(timed_out)} timed out"
+            )
+            # Mark result with terminal failure flag
+            result.terminal_failure = "all_sources_failed"
+
         return result
 
     async def _execute_source(

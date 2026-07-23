@@ -333,6 +333,13 @@ class EventType:
     TASK_STUCK = "task_stuck"
     TASK_FAILED = "task_failed"
 
+    # Degraded-state error events (see docs/plan/plan.md: Degraded-State UX)
+    ROUTER_UNAVAILABLE = "router_unavailable"
+    ALL_SOURCES_FAILED = "all_sources_failed"
+    DEGRADED_RAW_DATA = "degraded_raw_data"
+    CLARIFICATION_CARD = "clarification_card"
+    MALFORMED_RESPONSE = "malformed_response"
+
 
 async def broadcast_result(
     result: dict,
