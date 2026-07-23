@@ -138,3 +138,65 @@ def parse_sse_stream(text: str) -> list[tuple[str, dict]]:
         if etype:
             events.append((etype, data))
     return events
+
+
+def render_builtin_card(card_type: str, data: dict[str, Any]) -> dict[str, Any]:
+    """Render a single builtin card (stuck or failed) through the canvas DOM runner.
+
+    Drives ``canvas_dom_runner.js --builtin <type>`` which calls
+    ``createStuckCard(data)`` or ``createFailedCard(data)`` from the real
+    ``src/canvas/canvas.js`` module.
+
+    Args:
+        card_type: Either "stuck" or "failed"
+        data: Card data dict matching the shape the SSE event provides
+
+    Returns:
+        A dict with ``{outerHTML, className, dataset}`` for the rendered card
+
+    Raises:
+        RuntimeError: If node is missing or the runner exits non-zero
+    """
+    if NODE is None:
+        raise RuntimeError("node not found on PATH — cannot drive canvas DOM runner")
+    payload = {"type": card_type, "data": data}
+    proc = subprocess.run(
+        [NODE, str(DOM_RUNNER), "--builtin"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"canvas_dom_runner --builtin exited {proc.returncode}: {proc.stderr.strip()}"
+        )
+    result = json.loads(proc.stdout)
+    if not isinstance(result, list) or len(result) != 1:
+        raise RuntimeError(f"expected single card output, got: {result}")
+    return result[0]
+
+
+def render_builtin_cards(
+    card_type: str, cards: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Render multiple builtin cards of the same type.
+
+    Args:
+        card_type: Either "stuck" or "failed"
+        cards: List of card data dicts
+
+    Returns:
+        List of ``{outerHTML, className, dataset}`` dicts, one per card
+
+    Raises:
+        RuntimeError: If node is missing or the runner exits non-zero
+    """
+    if NODE is None:
+        raise RuntimeError("node not found on PATH — cannot drive canvas DOM runner")
+    results = []
+    for card_data in cards:
+        result = render_builtin_card(card_type, card_data)
+        results.append(result)
+    return results

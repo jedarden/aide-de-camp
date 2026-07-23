@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /*
  * Headless DOM runner for the REAL production canvas render module
- * (src/canvas/canvas.js). Bead adc-1l8w; ``--container`` mode (bead adc-4nd25).
+ * (src/canvas/canvas.js). Bead adc-1l8w; ``--container`` mode (bead adc-4nd25);
+ * ``--builtin`` mode (bead adc-1a551).
  *
  * canvas.js is written so its render helpers (createTopicCard et al.) can be
  * exercised without a browser — its module docstring promises exactly this
@@ -18,7 +19,7 @@
  * actual src/canvas/canvas.js and renders the card dicts the canvas really
  * receives from GET /api/v1/sessions/{id}/topics.
  *
- * Two modes:
+ * Three modes:
  *
  *   1. DEFAULT (bead adc-1l8w) — render an array of card dicts through
  *      createTopicCard(), the function loadTopics() calls per card. Drives the
@@ -34,16 +35,24 @@
  *      acceptance criteria name: "welcome card renders from a zero-card
  *      session and is dropped on first result."
  *
- * The Python contract tests (tests/test_canvas_render.py and
- * tests/e2e/test_canvas_welcome_card.py) feed it JSON and assert the rendered
- * outerHTML, so a regression in the render contract is caught headlessly, in
- * CI, with no browser.
+ *   3. ``--builtin`` (bead adc-1a551) — render builtin cards (stuck or failed)
+ *      through createStuckCard(data) or createFailedCard(data). Tests the
+ *      render contract for task_stuck and task_failed SSE event cards. Input
+ *      is {"type":"stuck|failed","data":{...}}; output is a single-element
+ *      array [{outerHTML, className, dataset}].
+ *
+ * The Python contract tests (tests/test_canvas_render.py,
+ * tests/e2e/test_canvas_welcome_card.py, and tests/test_canvas_builtin_cards.py)
+ * feed it JSON and assert the rendered outerHTML, so a regression in the
+ * render contract is caught headlessly, in CI, with no browser.
  *
  * Usage:
  *   node canvas_dom_runner.js '<json array of card dicts>'
  *   echo '<json array>' | node canvas_dom_runner.js        # stdin fallback
  *   node canvas_dom_runner.js --container '{"cards":[...],"projects":[...],"description":"..."}'
  *   echo '{...}' | node canvas_dom_runner.js --container   # stdin fallback
+ *   node canvas_dom_runner.js --builtin '{"type":"stuck|failed","data":{...}}'
+ *   echo '{...}' | node canvas_dom_runner.js --builtin     # stdin fallback
  *
  * Stdout: a JSON array of { outerHTML, className, dataset } per rendered node.
  */
@@ -195,7 +204,7 @@ global.document = {
 // --- load the REAL canvas.js ------------------------------------------------
 
 const canvasPath = path.resolve(__dirname, "..", "..", "src", "canvas", "canvas.js");
-const canvas = require(canvasPath); // { createTopicCard, escapeHtml, formatStaleness, getStalenessLevel }
+const canvas = require(canvasPath); // { createTopicCard, createStuckCard, createFailedCard, escapeHtml, formatStaleness, getStalenessLevel }
 
 // --- render driver ----------------------------------------------------------
 
@@ -244,9 +253,34 @@ function runContainerMode() {
     process.stdout.write(JSON.stringify(rendered));
 }
 
+// --builtin mode: render builtin cards (stuck or failed) through
+// createStuckCard() or createFailedCard(). Used for testing the render
+// contract of task_stuck and task_failed event cards.
+function runBuiltinMode() {
+    const payload = readPayload(3);
+    const cardType = payload && payload.type; // "stuck" or "failed"
+    const data = (payload && payload.data) || {};
+
+    if (cardType !== "stuck" && cardType !== "failed") {
+        throw new Error("--builtin mode requires type 'stuck' or 'failed'");
+    }
+
+    let node;
+    if (cardType === "stuck") {
+        node = canvas.createStuckCard(data);
+    } else {
+        node = canvas.createFailedCard(data);
+    }
+
+    const rendered = serialize(node);
+    process.stdout.write(JSON.stringify([rendered]));
+}
+
 function main() {
     if (process.argv[2] === "--container") {
         runContainerMode();
+    } else if (process.argv[2] === "--builtin") {
+        runBuiltinMode();
     } else {
         runCardsMode();
     }
