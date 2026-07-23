@@ -860,3 +860,72 @@ async def escalate_intent(request: EscalateRequest) -> EscalateResult:
     """
     handler = get_escalate_handler()
     return await handler.escalate_intent(request)
+
+
+async def handle_terminal_failure(
+    intent_id: str,
+    session_id: str,
+    topic_id: str | None,
+    failure_reason: str,
+    error_type: str = "unknown",
+    bead_ref: str | None = None,
+) -> None:
+    """
+    Handle a terminal failure for an intent.
+
+    Plan §10 The Async Path: terminal failure handling.
+    - Sets intents.status = 'failed'
+    - Stores failure reason in bead_watch.last_refusal_reason (if bead exists)
+    - Broadcasts task_failed SSE event
+
+    Args:
+        intent_id: The intent that failed
+        session_id: The session ID
+        topic_id: The topic ID (optional)
+        failure_reason: Human-readable failure reason
+        error_type: Type of error (e.g., "worker_crash", "invalid_input")
+        bead_ref: Associated bead reference (optional)
+    """
+    from ..session.store import get_store as get_session_store
+    from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
+
+    store = get_session_store()
+
+    logger.info(f"Handling terminal failure for intent {intent_id}: {failure_reason}")
+
+    # Step 1: Update intent status to 'failed'
+    await store.update_intent_status(intent_id, "failed")
+    logger.info(f"Set intent {intent_id} to failed status")
+
+    # Step 2: Store failure reason in bead_watch if bead exists
+    if bead_ref:
+        try:
+            await store.update_bead_watch_refusal(
+                bead_ref=bead_ref,
+                refusal_reason=failure_reason,
+                comment_index=-1,  # No comment index for terminal failures
+                refusal_count_add=1,
+            )
+            logger.info(f"Stored failure reason for bead {bead_ref}")
+        except Exception as e:
+            logger.warning(f"Failed to update bead_watch for {bead_ref}: {e}")
+
+    # Step 3: Broadcast task_failed event via SSE
+    broadcaster = get_broadcaster()
+    await broadcaster.broadcast(
+        SSEEvent(
+            event_type=EventType.TASK_FAILED,
+            data={
+                "bead_ref": bead_ref,
+                "intent_id": intent_id,
+                "session_id": session_id,
+                "topic_id": topic_id,
+                "failure_reason": failure_reason,
+                "error_type": error_type,
+                "message": f"Task failed: {failure_reason}",
+            },
+            target_session_id=session_id,
+        )
+    )
+
+    logger.info(f"Broadcast task_failed event for intent {intent_id}")
