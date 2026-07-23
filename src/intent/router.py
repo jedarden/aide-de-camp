@@ -19,7 +19,7 @@ from ..components.hot_reload import get_reload_manager
 from ..escalate.handler import EscalateRequest, escalate_intent
 from ..escalate.llm import get_zai_client, ModelClass
 from ..instrument.timings import DispatchTimings
-from ..render.hot_path import derive_result_type
+from ..render.hot_path import derive_result_type, get_renderer
 from ..session.store import get_store
 from ..fetch.commands import FetchRequest, FetchContext, IntentType as FetchIntentType, get_fetch_commands
 from ..fetch.orchestrator import execute_fetch
@@ -499,6 +499,18 @@ class IntentRouter:
                 result_type=result_type,
             )
 
+            # Render card via hot-path selector (deterministic, no LLM)
+            renderer = get_renderer()
+            render_outcome = renderer.render(
+                result_id=result_id,
+                result_type=result_type,
+                result_data=synthesize_result.data,
+                summary=synthesize_result.summary,
+            )
+
+            # Update result's card_fallback flag so client knows which path to take
+            await store.update_result_card_fallback(result_id, render_outcome.card_fallback)
+
             return {
                 "intent_id": routed_intent.intent_id,
                 "intent_type": classification.intent_type.value,
@@ -510,6 +522,9 @@ class IntentRouter:
                 "urgency": synthesize_result.urgency.value,
                 "coverage": synthesize_result.coverage,
                 "caveats": synthesize_result.caveats,
+                "card_fallback": render_outcome.card_fallback,
+                "rendered_html": render_outcome.rendered_html,
+                "component_id": render_outcome.component_id,
                 "message": "Intent synthesized successfully",
             }
 
@@ -702,6 +717,18 @@ class IntentRouter:
                 urgency="high",
                 result_type=result_type,
             )
+
+            # Render stuck card via hot-path selector (deterministic, no LLM)
+            renderer = get_renderer()
+            render_outcome = renderer.render(
+                result_id=result_id,
+                result_type=result_type,
+                result_data=data,
+                summary=summary,
+            )
+
+            # Update result's card_fallback flag
+            await store.update_result_card_fallback(result_id, render_outcome.card_fallback)
 
             logger.info(f"Created stuck card {result_id} for fenced bead {bead_id}")
 
