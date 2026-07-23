@@ -497,6 +497,31 @@
             }
         }
 
+        // Registry project list for the first-run welcome card
+        // (config/registry.yaml → GET /api/v1/registry). DB/result independent —
+        // the welcome card renders even against an empty component store. Cached
+        // after the first fetch so the per-SSE-event reloads don't refetch it.
+        let welcomeProjects = null;
+
+        async function loadWelcomeProjects() {
+            if (welcomeProjects) return welcomeProjects;
+            try {
+                const resp = await fetch('/api/v1/registry');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    welcomeProjects = (data && data.projects) || [];
+                    return welcomeProjects;
+                }
+            } catch (error) {
+                console.error('Error loading registry for welcome card:', error);
+            }
+            // Graceful fallback: an empty list still renders the welcome card
+            // (with default example utterances), so a wedged registry endpoint
+            // never leaves the canvas bare.
+            welcomeProjects = [];
+            return welcomeProjects;
+        }
+
         async function loadTopics() {
             try {
                 const response = await fetch(`/api/v1/sessions/${sessionId}/topics`);
@@ -504,20 +529,21 @@
 
                 const data = await response.json();
                 const container = document.getElementById('topicsContainer');
+                const cards = data.cards || [];
 
-                if (!data.cards || data.cards.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <h2>No active topics</h2>
-                            <p>Topics will appear here as you interact with ADC.</p>
-                        </div>
-                    `;
-                    return;
-                }
+                // Fresh session (zero topics): show the first-run welcome card
+                // instead of the bare empty-state. Its project list + example
+                // utterances come from the registry (never the DB), so we only
+                // need to fetch it on the zero-card branch. The welcome card is
+                // dropped — not duplicated — the moment the first real result
+                // lands: the next SSE result_created → loadTopics() reload
+                // yields a non-empty card set, so buildContainerChildren()
+                // returns topic cards only (clearing the welcome card).
+                const projects = cards.length ? [] : await loadWelcomeProjects();
 
                 container.innerHTML = '';
-                data.cards.forEach(cardData => {
-                    container.appendChild(createTopicCard(cardData));
+                buildContainerChildren(cards, projects).forEach(node => {
+                    container.appendChild(node);
                 });
             } catch (error) {
                 console.error('Error loading topics:', error);
