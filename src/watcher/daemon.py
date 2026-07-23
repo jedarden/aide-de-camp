@@ -744,9 +744,9 @@ class BeadWatcher:
         refusals: list[dict] = []
 
         for idx, comment in enumerate(comments):
-            # Skip comments strictly before the high-water mark
-            # (we want to process the high-water mark comment itself and all after it)
-            if idx < since_index:
+            # Skip comments at or before the high-water mark
+            # (only process comments with index > since_index)
+            if idx <= since_index:
                 continue
 
             comment_body = comment.get("body", "")

@@ -120,11 +120,22 @@ class TestRefusalParsing:
             {"body": "REFUSED: Old reason", "created_at": "2026-07-22T10:00:00Z"},
             {"body": "REFUSED: New reason", "created_at": "2026-07-22T11:00:00Z"},
         ]
-        # high_water=0 means only index 1+ is checked (index 0 is skipped)
+        # high_water=0 means comment 0 has been processed, so only index 1+ is checked
         refusals = BeadWatcher._parse_refusals_from_comments(comments, since_index=0)
         assert len(refusals) == 1
         assert refusals[0]["reason"] == "New reason"
         assert refusals[0]["index"] == 1
+
+    def test_initial_state_parses_all_comments(self):
+        """Initial state (-1) parses all comments (none have been processed yet)."""
+        comments = [
+            {"body": "REFUSED: Reason 1", "created_at": "2026-07-22T10:00:00Z"},
+            {"body": "REFUSED: Reason 2", "created_at": "2026-07-22T11:00:00Z"},
+        ]
+        # high_water=-1 means no comments have been processed, so all are parsed
+        refusals = BeadWatcher._parse_refusals_from_comments(comments, since_index=-1)
+        assert len(refusals) == 2
+        assert [r["reason"] for r in refusals] == ["Reason 1", "Reason 2"]
 
     def test_multiple_refusals_parsed(self):
         """Multiple REFUSED: comments are all parsed."""
@@ -166,7 +177,7 @@ class TestBeadWatchLifecycle:
         assert row is not None
         assert row["bead_ref"] == bead_ref
         assert row["refusal_count"] == 0
-        assert row["comment_high_water"] == 0
+        assert row["comment_high_water"] == -1
         assert row["last_refusal_reason"] is None
         assert row["last_refusal_at"] is None
         assert row["sla_flagged_at"] is None
@@ -428,12 +439,11 @@ class TestCircuitBreakerIntegration:
     async def test_full_refusal_to_fence_flow(self, store, router, watcher, monkeypatch):
         """Full flow: 3 refusals -> fence -> stuck card."""
         bead_ref = "adc-integration-test"
-        intent_id = "intent-1"
         session_id = "session-1"
         topic_id = "topic-1"
 
         # Create a real intent in the store
-        await store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id="utterance-1",
             session_id=session_id,
             project_slug="test-project",
@@ -460,9 +470,9 @@ class TestCircuitBreakerIntegration:
                 return {
                     "id": bref,
                     "comments": [
-                        {"body": "REFUSED: Reason 1"},
-                        {"body": "REFUSED: Reason 2"},
-                        {"body": "REFUSED: Reason 3"},
+                        {"body": "REFUSED: Reason 1", "created_at": "2026-07-22T10:00:00Z"},
+                        {"body": "REFUSED: Reason 2", "created_at": "2026-07-22T11:00:00Z"},
+                        {"body": "REFUSED: Reason 3", "created_at": "2026-07-22T12:00:00Z"},
                     ],
                 }
             return None
