@@ -28,6 +28,13 @@
  * module.exports for the DOM tests.
  */
 
+// Node.js compatibility: ensure document is available in Node for headless tests
+// When loaded in Node (module.exports exists), make the global document accessible
+// to the el() helper function which uses document.createElement() and .createTextNode()
+if (typeof module !== 'undefined' && module.exports && typeof document === 'undefined') {
+    var document = global.document;
+}
+
 // ---------------------------------------------------------------------------
 // Tunables (exported so tests can assert against the same constants)
 // ---------------------------------------------------------------------------
@@ -312,10 +319,9 @@ function buildContainerChildren(cards, projects, description) {
  * @returns {HTMLElement} a .pending-card.placeholder (data-builtin="pending")
  */
 function createPendingPlaceholderCard(utterance, createdAt, pendingId) {
-    const card = _createPendingCard(utterance, createdAt, pendingId);
+    const card = _createPendingCard(utterance, createdAt, pendingId, 'Sending…');
     card.classList.add('placeholder');
     card.dataset.pendingKind = 'placeholder';
-    card.querySelector('.pending-title').textContent = 'Sending…';
     return card;
 }
 
@@ -330,10 +336,9 @@ function createPendingPlaceholderCard(utterance, createdAt, pendingId) {
  * @returns {HTMLElement} a .pending-card.thread (data-builtin="pending")
  */
 function createPendingThreadCard(intentId, utterance, createdAt, progress) {
-    const card = _createPendingCard(utterance, createdAt, intentId);
+    const card = _createPendingCard(utterance, createdAt, intentId, 'Working on it…');
     card.classList.add('thread');
     card.dataset.pendingKind = 'thread';
-    card.querySelector('.pending-title').textContent = 'Working on it…';
     if (progress) _setProgress(card, progress);
     return card;
 }
@@ -364,7 +369,7 @@ function splitPlaceholderToThreads(utterance, createdAt, intentIds) {
 }
 
 // Shared skeleton for both placeholder + per-thread pending cards.
-function _createPendingCard(utterance, createdAt, pendingId) {
+function _createPendingCard(utterance, createdAt, pendingId, titleText) {
     const card = el('div', 'builtin-card pending-card');
     card.dataset.builtin = 'pending';
     card.dataset.createdAt = String(createdAt || 0);
@@ -372,7 +377,7 @@ function _createPendingCard(utterance, createdAt, pendingId) {
 
     card.appendChild(el('div', 'builtin-header', [
         el('span', 'pending-spinner'),
-        el('span', 'builtin-title pending-title', ['Pending…'])
+        el('span', 'builtin-title pending-title', [titleText || 'Pending…'])
     ]));
 
     if (utterance) {
@@ -652,5 +657,13 @@ if (typeof module !== 'undefined' && module.exports) {
         normalizeErrorVariant: _normalizeVariant,
         deriveExamples: _deriveExamples,
         PENDING_AGE_THRESHOLD_MS: PENDING_AGE_THRESHOLD_MS,
+        _setProgress: _setProgress,  // Also export internal helper
     };
+}
+
+// Also expose to inline script in browser (buildContainerChildren is used by loadTopics)
+if (typeof window !== 'undefined') {
+    window.buildContainerChildren = buildContainerChildren;
+    window._setProgress = _setProgress;
+    window.el = el;  // DOM helper for pending cards
 }

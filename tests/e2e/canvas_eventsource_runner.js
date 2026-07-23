@@ -73,6 +73,10 @@ function escapeAttr(s) {
     return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
+// --- setup mock document FIRST (before loading canvas.js) --------------------
+
+const elementsById = {};
+
 class El {
     constructor(tag) {
         this._tag = tag;
@@ -87,6 +91,8 @@ class El {
         this._value = "";
         this._title = "";
         this._textHistory = [];
+        // For style.display, wrap in a proxy to track changes
+        this._display = "";
     }
     set className(v) {
         this._classes = String(v).split(/\s+/).filter(Boolean);
@@ -102,7 +108,24 @@ class El {
         };
     }
     get dataset() { return this._dataset; }
-    get style() { return this._style; }
+    get style() {
+        // Return a proxy that tracks style.display changes
+        return new Proxy(this._style, {
+            set: (target, prop, value) => {
+                if (prop === 'display') {
+                    this._display = value;
+                }
+                target[prop] = value;
+                return true;
+            },
+            get: (target, prop) => {
+                if (prop === 'display') {
+                    return this._display;
+                }
+                return target[prop];
+            }
+        });
+    }
     get disabled() { return this._disabled; }
     set disabled(v) { this._disabled = !!v; }
     get value() { return this._value; }
@@ -121,16 +144,93 @@ class El {
         if (this._innerHTML === "") this._children = [];   // container.innerHTML = ''
     }
     get innerHTML() {
-        if (this._children.length) return this._children.map((c) => c.outerHTML).join("");
+        if (this._children.length) {
+            return this._children.map((c) => {
+                // Render text nodes (tag === "#text") as escaped text
+                if (c._tag === "#text") {
+                    return c._innerHTML || escapeText(c._textContent || "");
+                }
+                // Render element nodes via outerHTML
+                return c.outerHTML || "";
+            }).join("");
+        }
         return this._innerHTML;
     }
-    appendChild(c) { this._children.push(c); return c; }
+    appendChild(c) {
+        // Handle DocumentFragment: spill its children into this element
+        if (c && c._children && Array.isArray(c._children)) {
+            // Append all children from the fragment
+            c._children.forEach((child) => {
+                // For elements, add them to _children
+                if (child && child._tag !== "#text") {
+                    this._children.push(child);
+                } else if (child) {
+                    // Text nodes
+                    this._children.push(child);
+                }
+            });
+            return c;
+        }
+        // Skip text nodes in _children tracking (they don't have nested structure)
+        // but still append them so innerHTML can render them
+        if (c && c._tag !== "#text") {
+            this._children.push(c);
+        } else if (c) {
+            // Text nodes are appended but not tracked in _children for querySelector
+            this._children.push(c);  // Keep for innerHTML rendering
+        }
+        return c;
+    }
+    querySelector(selector) {
+        // Minimal querySelector support for class selectors (e.g., ".pending-progress")
+        if (selector.startsWith(".")) {
+            const className = selector.slice(1);
+            // Check this element
+            if (this._classes && this._classes.includes(className)) {
+                return this;
+            }
+            // Recursively search all descendants
+            function searchDeep(children) {
+                for (const child of children) {
+                    // Skip text nodes in search
+                    if (!child || child._tag === "#text") continue;
+
+                    if (child._classes && child._classes.includes(className)) {
+                        return child;
+                    }
+                    if (child._children && child._children.length) {
+                        const found = searchDeep(child._children);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+            // Fall back to searching all elements with matching class
+            function searchAllElements(element) {
+                if (element._classes && element._classes.includes(className)) {
+                    return element;
+                }
+                if (element._children && element._children.length) {
+                    for (const child of element._children) {
+                        if (child && child._tag !== "#text") {
+                            const found = searchAllElements(child);
+                            if (found) return found;
+                        }
+                    }
+                }
+                return null;
+            }
+            return searchAllElements(this);
+            return searchDeep(this._children);
+        }
+        return null;
+    }
     addEventListener() {}   // handlers are not driven by this harness
     _datasetAttrs() {
         const out = [];
         for (const key of Object.keys(this._dataset)) {
             const name = "data-" + key.replace(/([A-Z])/g, "-$1").toLowerCase();
-            out.push(`${name}="${escapeAttr(this._dataset[key])}"`);
+            out.push(name + '="' + escapeAttr(this._dataset[key]) + '"');
         }
         return out;
     }
@@ -138,17 +238,104 @@ class El {
         const cls = this._classes.length ? ` class="${this._classes.join(" ")}"` : "";
         const attrs = this._datasetAttrs();
         const attrStr = attrs.length ? " " + attrs.join(" ") : "";
-        return `<${this._tag}${cls}${attrStr}>${this.innerHTML}</${this._tag}>`;
+        // For text nodes, just return the escaped text content
+        if (this._tag === "#text") {
+            return this._textContent || "";
+        }
+        // Render element with its children
+        let childrenHTML = "";
+        if (this._children && this._children.length) {
+            childrenHTML = this._children.map((c) => {
+                if (c._tag === "#text") {
+                    return c._textContent ? escapeText(c._textContent) : "";
+                }
+                return c.outerHTML || "";
+            }).join("");
+        }
+        return `<${this._tag}${cls}${attrStr}>${childrenHTML}</${this._tag}>`;
+    }
+    insertBefore(newNode, referenceNode) {
+        if (!referenceNode) {
+            // If referenceNode is null, append to the end
+            return this.appendChild(newNode);
+        }
+        // Find the index of the reference node in _children
+        const refIndex = this._children.indexOf(referenceNode);
+        if (refIndex === -1) {
+            // Reference node not found, append to end
+            return this.appendChild(newNode);
+        }
+        // Insert the new node before the reference node
+        this._children.splice(refIndex, 0, newNode);
+        return newNode;
     }
 }
 
-const elementsById = {};
 global.document = {
+    querySelector(selector) {
+        // Search through all registered elements for a matching selector
+        // Only supports attribute selectors like [data-pending-id="..."]
+        if (selector.startsWith('[') && selector.endsWith(']')) {
+            const attrMatch = selector.match(/\[data-([^-]+)="([^"]+)"\]/);
+            if (attrMatch) {
+                const attrName = attrMatch[1];
+                const attrValue = attrMatch[2];
+                // Convert attrName from kebab-case to camelCase
+                const camelAttrName = attrName.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+                // Search through all elements
+                for (const id in elementsById) {
+                    const el = elementsById[id];
+                    if (el._dataset && el._dataset[camelAttrName] === attrValue) {
+                        return el;
+                    }
+                    // Search recursively through children
+                    function searchDeep(children) {
+                        for (const child of children) {
+                            if (!child || child._tag === "#text") continue;
+                            if (child._dataset && child._dataset[camelAttrName] === attrValue) {
+                                return child;
+                            }
+                            if (child._children && child._children.length) {
+                                const found = searchDeep(child._children);
+                                if (found) return found;
+                            }
+                        }
+                        return null;
+                    }
+                    const found = searchDeep(el._children || []);
+                    if (found) return found;
+                }
+            }
+        }
+        return null;
+    },
     getElementById(id) {
         if (!elementsById[id]) elementsById[id] = new El("div");
         return elementsById[id];
     },
     createElement(tag) { return new El(tag); },
+    createTextNode(text) {
+        // Return a minimal text node shim — the el() helper appends these
+        // and our outerHTML render serializes them as escaped text.
+        const node = new El("#text");
+        node._textContent = text == null ? "" : String(text);
+        node._innerHTML = escapeText(node._textContent);
+        return node;
+    },
+    createDocumentFragment() {
+        // Return a minimal fragment shim — appendChild tracks children,
+        // and when appended to a real element it spills the children.
+        const frag = {
+            _children: [],
+            childNodes: [],
+            appendChild(child) {
+                this._children.push(child);
+                this.childNodes.push(child);
+                return child;
+            },
+        };
+        return frag;
+    },
 };
 
 // --- mock fetch + EventSource ------------------------------------------------
@@ -241,6 +428,16 @@ global.createTopicCard = canvas.createTopicCard;
 global.escapeHtml = canvas.escapeHtml;
 global.formatStaleness = canvas.formatStaleness;
 global.getStalenessLevel = canvas.getStalenessLevel;
+global.buildContainerChildren = canvas.buildContainerChildren;  // Needed by loadTopics()
+global._setProgress = canvas._setProgress;  // Internal helper, exported for tests
+// Pending card functions for bead adc-22b1g
+global.createPendingPlaceholderCard = canvas.createPendingPlaceholderCard;
+global.createPendingThreadCard = canvas.createPendingThreadCard;
+global.splitPlaceholderToThreads = canvas.splitPlaceholderToThreads;
+global.tickPendingElapsed = canvas.tickPendingElapsed;
+global.applyAgedTreatment = canvas.applyAgedTreatment;
+global.setPendingProgress = canvas._setProgress;  // Alias for consistency
+global.el = canvas.el;  // DOM helper for pending cards
 
 // --- extract + run the REAL inline app script --------------------------------
 
@@ -350,6 +547,25 @@ async function run() {
     // Fallback: if the label class name shifts, best-effort labels from dataset.
     const containerCardCount = (containerHTML.match(/class="topic-card/g) || []).length;
 
+    // Count pending cards in the container (placeholders + threads)
+    const pendingPlaceholderCount = (containerHTML.match(/data-pending-kind="placeholder"/g) || []).length;
+    const pendingThreadCount = (containerHTML.match(/data-pending-kind="thread"/g) || []).length;
+    const pendingCardCount = (containerHTML.match(/class="[^"]*pending-card[^"]*"/g) || []).length;
+
+    // Extract pending card details for testing
+    const pendingCards = [];
+    const pendingCardMatches = containerHTML.match(/<div class="[^"]*builtin-card pending-card[^"]*"[^>]*>[\s\S]*?<\/div>/g) || [];
+    pendingCardMatches.forEach((cardHTML) => {
+        const pendingIdMatch = cardHTML.match(/data-pending-id="([^"]+)"/);
+        const pendingKindMatch = cardHTML.match(/data-pending-kind="([^"]+)"/);
+        const utteranceMatch = cardHTML.match(/<p class="pending-utterance">([^<]*)<\/p>/);
+        pendingCards.push({
+            pendingId: pendingIdMatch ? pendingIdMatch[1] : null,
+            pendingKind: pendingKindMatch ? pendingKindMatch[1] : null,
+            utterance: utteranceMatch ? utteranceMatch[1].trim() : null,
+        });
+    });
+
     process.stdout.write(JSON.stringify({
         initCompleted: eventSources.length > 0,
         eventSourcesCreated: eventSources.length,
@@ -360,6 +576,11 @@ async function run() {
         containerHTML,
         containerCardCount,
         containerCardLabels,
+        // Pending card telemetry for bead adc-22b1g
+        pendingPlaceholderCount,
+        pendingThreadCount,
+        pendingCardCount,
+        pendingCards,
     }));
 }
 

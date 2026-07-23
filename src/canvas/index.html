@@ -682,6 +682,10 @@
         let surfaceId = null;
         let eventSource = null;
 
+        // Track pending placeholders so we can find/replace them later.
+        // Key: pendingId (utterance_id), Value: placeholder HTMLElement.
+        var pendingPlaceholders = {};
+
         // Update URL with session_id for reload persistence
         if (!urlParams.get('session_id')) {
             urlParams.set('session_id', sessionId);
@@ -828,6 +832,63 @@
                 showWorkloadSummary(summary);
             });
 
+            // Dispatch ack: backup path for intent_ids if the fetch response didn't
+            // include them (e.g., the response arrived before the intent was routed).
+            eventSource.addEventListener('dispatch_ack', (event) => {
+                const data = JSON.parse(event.data);
+                const utteranceId = data.utterance_id;
+                const intentIds = data.intent_ids;
+                const utterance = data.utterance;
+
+                if (!utteranceId || !intentIds || !Array.isArray(intentIds)) return;
+
+                // Check if there's an existing placeholder to split
+                const placeholder = pendingPlaceholders[utteranceId];
+                const createdAt = placeholder
+                    ? parseInt(placeholder.dataset.createdAt, 10)
+                    : Date.now();
+
+                // Split into per-thread pending cards
+                const threadCards = splitPlaceholderToThreads(utterance, createdAt, intentIds);
+
+                const container = document.getElementById('topicsContainer');
+
+                if (placeholder && placeholder.parentNode) {
+                    // Replace the placeholder with the thread cards
+                    const frag = document.createDocumentFragment();
+                    threadCards.forEach(function (c) { frag.appendChild(c); });
+                    placeholder.parentNode.replaceChild(frag, placeholder);
+                } else {
+                    // No placeholder (test scenario or race condition): prepend thread cards
+                    const frag = document.createDocumentFragment();
+                    threadCards.forEach(function (c) { frag.appendChild(c); });
+                    container.insertBefore(frag, container.firstChild);
+                }
+
+                // No longer track this placeholder
+                delete pendingPlaceholders[utteranceId];
+            });
+
+            // Per-source progress update for a thread
+            eventSource.addEventListener('progress_update', (event) => {
+                const data = JSON.parse(event.data);
+                const intentId = data.intent_id;
+                const completed = data.completed;
+                const total = data.total;
+
+                if (!intentId) return;
+
+                // Find the pending thread card by intent_id
+                const threadCard = document.querySelector('[data-pending-id="' + intentId + '"]');
+                if (threadCard && threadCard.classList.contains('pending-card')) {
+                    // Use the internal _setProgress function from canvas.js
+                    // (it's exported as setPendingProgress in Node for tests)
+                    if (typeof _setProgress === 'function') {
+                        _setProgress(threadCard, { completed: completed, total: total });
+                    }
+                }
+            });
+
             eventSource.addEventListener('result_created', (event) => {
                 const result = JSON.parse(event.data);
                 console.log('New result:', result);
@@ -847,6 +908,18 @@
                 eventSource.close();
             });
         }
+
+        // Elapsed-time ticker for pending cards
+        // Every second, update the elapsed-time footer on all pending cards
+        // and apply aged treatment if they've exceeded the 30s threshold.
+        setInterval(function () {
+            var now = Date.now();
+            var pendingCards = document.querySelectorAll('.pending-card[data-pending-id]');
+            pendingCards.forEach(function (card) {
+                tickPendingElapsed(card, now);
+                applyAgedTreatment(card, now);
+            });
+        }, 1000);
 
         // Heartbeat to keep surface alive
         setInterval(() => {
@@ -893,15 +966,70 @@
             textarea.style.height = 'auto';
             btnSend.disabled = true;
 
+            // Generate a client-side pending ID for the placeholder. We'll swap it
+            // for the server's utterance_id when the response arrives.
+            var pendingId = 'pending-' + Date.now() + '-' + Math.random().toString(36).substr(2, 8);
+            var createdAt = Date.now();
+
+            // Create the pending placeholder NOW, before the server round-trip,
+            // so a hung server still leaves a card on canvas to age.
+            var placeholder = createPendingPlaceholderCard(utterance, createdAt, pendingId);
+            var container = document.getElementById('topicsContainer');
+
+            // Clear the empty-state/loading spinner if present
+            if (container.querySelector('.loading') || container.querySelector('.empty-state')) {
+                container.innerHTML = '';
+            }
+
+            // Prepend the placeholder (newest first)
+            container.insertBefore(placeholder, container.firstChild);
+
+            // Track it so we can find/replace it later
+            pendingPlaceholders[pendingId] = placeholder;
+
             try {
-                const resp = await fetch('/dispatch', {
+                var resp = await fetch('/dispatch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ utterance, session_id: sessionId, surface_id: surfaceId }),
+                    body: JSON.stringify({ utterance, session_id: sessionId, surface_id: surfaceId, pending_id: pendingId }),
                 });
+
                 if (!resp.ok) {
-                    const err = await resp.text();
-                    console.error('Dispatch error:', err);
+                    var errText = await resp.text();
+                    console.error('Dispatch error:', errText);
+                    // Try to parse as JSON for structured error
+                    var errData;
+                    try { errData = JSON.parse(errText); } catch (e) {}
+                    if (errData && errData.error_type) {
+                        // Replace placeholder with error card
+                        var errorCard = createErrorCard(errData);
+                        if (placeholder && placeholder.parentNode) {
+                            placeholder.parentNode.replaceChild(errorCard, placeholder);
+                        }
+                        delete pendingPlaceholders[pendingId];
+                    }
+                    return;
+                }
+
+                var data = await resp.json();
+                // Swap to the server's utterance_id for consistency
+                var utteranceId = data.utterance_id || pendingId;
+                placeholder.dataset.pendingId = utteranceId;
+
+                // Move the placeholder tracking to the new key
+                delete pendingPlaceholders[pendingId];
+                pendingPlaceholders[utteranceId] = placeholder;
+
+                // If intent_ids are present, split into per-thread pending cards
+                if (data.intent_ids && Array.isArray(data.intent_ids) && data.intent_ids.length > 0) {
+                    var threadCards = splitPlaceholderToThreads(utterance, createdAt, data.intent_ids);
+                    // Replace the placeholder with the thread cards
+                    if (placeholder && placeholder.parentNode) {
+                        var frag = document.createDocumentFragment();
+                        threadCards.forEach(function (c) { frag.appendChild(c); });
+                        placeholder.parentNode.replaceChild(frag, placeholder);
+                    }
+                    delete pendingPlaceholders[utteranceId];
                 }
             } catch (err) {
                 console.error('Dispatch failed:', err);
