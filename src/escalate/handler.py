@@ -34,7 +34,9 @@ from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
 logger = getLogger(__name__)
 
 # Project workspace for beads (where bf CLI operates)
-BEADS_WORKSPACE = Path.home() / ".beads"
+# Per plan Beads-Workspace Scoping: all aide-de-camp-originated beads live in
+# the aide-de-camp repo's own workspace, tagged --project {slug}
+BEADS_WORKSPACE = Path("/home/coding/aide-de-camp")
 
 # Escalate prompt path
 ESCALATE_PROMPT_PATH = Path("/home/coding/aide-de-camp/prompts/escalate/task-profile.md")
@@ -538,8 +540,15 @@ class EscalateHandler:
                 if value is not None:
                     cmd.extend(["--label", f"{key}={value}"])
 
+            # Add --project flag if project_slug is available
+            # Per plan Beads-Workspace Scoping: all aide-de-camp-originated beads
+            # are tagged with their target project as the --project field
+            if request.project_slug:
+                cmd.extend(["--project", request.project_slug])
+
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
+                cwd=BEADS_WORKSPACE,  # Run from aide-de-camp workspace
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -609,8 +618,15 @@ class EscalateHandler:
                 if value is not None:
                     cmd.extend(["--label", f"{key}={value}"])
 
+            # Add --project flag if project_slug is available
+            # Per plan Beads-Workspace Scoping: all aide-de-camp-originated beads
+            # are tagged with their target project as the --project field
+            if request.project_slug:
+                cmd.extend(["--project", request.project_slug])
+
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
+                cwd=BEADS_WORKSPACE,  # Run from aide-de-camp workspace
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
