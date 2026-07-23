@@ -5,6 +5,7 @@ Stores sessions, surfaces, utterances, intents, results, topics, and intent_topi
 Provides concurrent read access with serialized writes via WAL mode.
 """
 
+import logging
 import os
 
 import aiosqlite
@@ -15,6 +16,8 @@ from typing import Optional
 from uuid import uuid4
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 # Default DB path. Overridable via ADC_DB_PATH env var so tests can point at an
 # isolated temp/in-memory DB instead of the production data/session.db.
@@ -80,7 +83,7 @@ CREATE INDEX IF NOT EXISTS idx_intents_status ON intents(status);
 -- Results: structured data returned by agents
 CREATE TABLE IF NOT EXISTS results (
     id          TEXT PRIMARY KEY,
-    intent_id   TEXT NOT NULL,
+    intent_id   TEXT,  -- NULL for monitoring-originated results (system-originated, no utterance)
     topic_id    TEXT NOT NULL,
     session_id  TEXT NOT NULL,
     summary     TEXT NOT NULL,
@@ -195,6 +198,27 @@ CREATE TABLE IF NOT EXISTS dispatch_timings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dispatch_timings_created ON dispatch_timings(created_at);
+
+-- Bead watch table: circuit breaker tracking for async beads
+-- Persistence layer for the async-path circuit breaker (plan §10 The Async Path).
+-- Tracks open beads watched by the BeadWatcher, recording refusal counts,
+-- last refusal reasons, SLA deadlines, and fencing state. All state is persisted
+-- so a watcher restart loses nothing -- breaker state lives in the database,
+-- not only in memory.
+CREATE TABLE IF NOT EXISTS bead_watch (
+    bead_ref           TEXT PRIMARY KEY,  -- References bead ID (intents.bead_ref)
+    refusal_count      INTEGER NOT NULL DEFAULT 0,  -- Number of REFUSED: comments seen
+    last_refusal_reason TEXT,  -- Most recent refusal reason
+    last_refusal_at    INTEGER,  -- Timestamp of most recent refusal
+    comment_high_water INTEGER NOT NULL DEFAULT 0,  -- Latest comment index processed
+    sla_deadline       INTEGER NOT NULL,  -- Unix timestamp when SLA expires
+    sla_flagged_at     INTEGER,  -- Timestamp when SLA was flagged (NULL if not flagged)
+    fenced_at          INTEGER,  -- Timestamp when bead was fenced to status=blocked (NULL if not fenced)
+    created_at         INTEGER NOT NULL  -- When this watch row was created
+);
+
+CREATE INDEX IF NOT EXISTS idx_bead_watch_sla_deadline ON bead_watch(sla_deadline);
+CREATE INDEX IF NOT EXISTS idx_bead_watch_fenced ON bead_watch(fenced_at);
 """
 
 # The set of dispatch_timings timing columns record_dispatch_timings() may set.
@@ -210,6 +234,25 @@ DISPATCH_TIMING_COLUMNS = (
     "stt_ms",
     "first_render_ms",
 )
+
+# Valid intent status values (plan §10 The Async Path: stuck/failed added for circuit breaker)
+INTENT_STATUSES = ('pending', 'dispatched', 'resolved', 'cancelled', 'stuck', 'failed')
+
+# Default SLA hours per intent type (plan §10 The Async Path: Visible Aging)
+# task-profile: 6h (async bead-backed tasks)
+# hot-path intents: 30s (budget is 3s, flag at 10x for aged pending)
+DEFAULT_SLA_HOURS: dict[str, float] = {
+    "task-profile": 6.0,  # 6 hours for async bead-backed tasks
+    "status": 0.008,     # 30 seconds for hot-path status intents
+    "action": 0.008,     # 30 seconds for hot-path action intents
+    "lookup": 0.008,     # 30 seconds for hot-path lookup intents
+    "brainstorm": 0.5,   # 30 minutes for brainstorm (may need user iteration)
+    "reminder": 24.0,    # 24 hours for reminders
+}
+
+# Circuit breaker thresholds (plan §10 The Async Path)
+CIRCUIT_BREAKER_REFUSAL_THRESHOLD = 3  # Fence after N refusals
+CIRCUIT_BREAKER_AGE_THRESHOLD_HOURS = 24.0  # Fence after N hours without progress
 
 
 class SessionStore:
@@ -253,7 +296,182 @@ class SessionStore:
         if "lookup_kind" not in intent_cols:
             await db.execute("ALTER TABLE intents ADD COLUMN lookup_kind TEXT")
 
+        # Migrate intents.status CHECK constraint to include 'stuck' and 'failed'
+        # SQLite doesn't support ALTER CONSTRAINT, so we need to recreate the table
+        # First, check if the table still has the old constraint (without stuck/failed)
+        await SessionStore._migrate_intents_status_enum(db)
+
+        # Migrate results.intent_id to allow NULL for monitoring-originated results
+        await SessionStore._migrate_results_intent_id_nullable(db)
+
         await db.commit()
+
+    @staticmethod
+    async def _migrate_intents_status_enum(db: aiosqlite.Connection) -> None:
+        """Migrate intents table to support 'stuck' and 'failed' status values.
+
+        Plan §10 The Async Path: extend intents status enum with stuck/failed.
+        SQLite doesn't support ALTER CONSTRAINT, so we recreate the table.
+        """
+        # Check if migration is needed by looking for 'stuck' in the schema
+        async with db.execute("PRAGMA table_info(intents)") as cur:
+            cols = await cur.fetchall()
+            status_col = None
+            for col in cols:
+                if col[1] == "status":
+                    status_col = col
+                    break
+
+        # If no status column or already has stuck/failed, skip migration
+        if not status_col:
+            return
+
+        # Check if the CHECK constraint already includes stuck/failed
+        # by inspecting the SQL for the intents table
+        async with db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='intents'"
+        ) as cur:
+            table_sql = await cur.fetchone()
+            if table_sql and ("'stuck'" in table_sql[0] or "'failed'" in table_sql[0]):
+                # Already migrated
+                return
+
+        # Migration needed: recreate table with new constraint
+        logger.info("Migrating intents.status to include 'stuck' and 'failed' values")
+
+        # Begin transaction for data migration
+        await db.execute("BEGIN IMMEDIATE TRANSACTION")
+
+        try:
+            # Create new table with updated constraint
+            await db.execute("""
+                CREATE TABLE intents_new (
+                    id           TEXT PRIMARY KEY,
+                    utterance_id TEXT NOT NULL,
+                    session_id   TEXT NOT NULL,
+                    topic_id     TEXT,
+                    project_slug TEXT,
+                    intent_type  TEXT NOT NULL,
+                    lookup_kind  TEXT,
+                    status       TEXT NOT NULL CHECK(status IN ('pending', 'dispatched', 'resolved', 'cancelled', 'stuck', 'failed')) DEFAULT 'pending',
+                    bead_ref     TEXT,
+                    created_at   INTEGER NOT NULL,
+                    resolved_at  INTEGER,
+                    FOREIGN KEY (utterance_id) REFERENCES utterances(id) ON DELETE CASCADE,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+                    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL
+                )
+            """)
+
+            # Copy data from old table to new table
+            await db.execute("""
+                INSERT INTO intents_new
+                SELECT id, utterance_id, session_id, topic_id, project_slug,
+                       intent_type, lookup_kind, status, bead_ref, created_at, resolved_at
+                FROM intents
+            """)
+
+            # Recreate indexes
+            await db.execute("DROP INDEX IF EXISTS idx_intents_session")
+            await db.execute("DROP INDEX IF EXISTS idx_intents_topic")
+            await db.execute("DROP INDEX IF EXISTS idx_intents_status")
+
+            await db.execute("CREATE INDEX idx_intents_session ON intents_new(session_id)")
+            await db.execute("CREATE INDEX idx_intents_topic ON intents_new(topic_id)")
+            await db.execute("CREATE INDEX idx_intents_status ON intents_new(status)")
+
+            # Drop old table and rename new table
+            await db.execute("DROP TABLE intents")
+            await db.execute("ALTER TABLE intents_new RENAME TO intents")
+
+            await db.commit()
+            logger.info("Migration complete: intents.status now supports 'stuck' and 'failed'")
+
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Failed to migrate intents.status: {e}")
+            raise
+
+    @staticmethod
+    async def _migrate_results_intent_id_nullable(db: aiosqlite.Connection) -> None:
+        """Migrate results table to allow NULL intent_id for monitoring-originated results.
+
+        Plan §10 Bead Watcher: monitoring-originated results have intent_id=NULL.
+        SQLite doesn't support ALTER COLUMN to drop NOT NULL, so we recreate the table.
+        """
+        # Check if migration is needed by inspecting the results table schema
+        async with db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='results'"
+        ) as cur:
+            table_sql = await cur.fetchone()
+            if not table_sql:
+                return  # Table doesn't exist yet
+
+            # If intent_id is already nullable (NOT NULL not present), skip migration
+            if "intent_id   TEXT," in table_sql[0] or "intent_id TEXT," in table_sql[0]:
+                if "NOT NULL" not in table_sql[0].split("intent_id")[1].split(",")[0]:
+                    # Already migrated
+                    return
+
+        # Migration needed: recreate table with nullable intent_id
+        logger.info("Migrating results.intent_id to allow NULL for monitoring-originated results")
+
+        # Begin transaction for data migration
+        await db.execute("BEGIN IMMEDIATE TRANSACTION")
+
+        try:
+            # Create new table with nullable intent_id
+            await db.execute("""
+                CREATE TABLE results_new (
+                    id          TEXT PRIMARY KEY,
+                    intent_id   TEXT,
+                    topic_id    TEXT NOT NULL,
+                    session_id  TEXT NOT NULL,
+                    summary     TEXT NOT NULL,
+                    data        TEXT NOT NULL,
+                    urgency     TEXT NOT NULL CHECK(urgency IN ('critical', 'high', 'normal', 'low')) DEFAULT 'normal',
+                    result_type TEXT,
+                    card_fallback INTEGER NOT NULL DEFAULT 0 CHECK(card_fallback IN (0, 1)),
+                    created_at  INTEGER NOT NULL,
+                    surfaced_at INTEGER,
+                    acked_at    INTEGER,
+                    previous_result_id TEXT,
+                    diff_summary TEXT,
+                    diff_data    TEXT,
+                    FOREIGN KEY (intent_id) REFERENCES intents(id) ON DELETE CASCADE,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+                    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
+                    FOREIGN KEY (previous_result_id) REFERENCES results(id) ON DELETE SET NULL
+                )
+            """)
+
+            # Copy data from old table to new table
+            await db.execute("""
+                INSERT INTO results_new
+                SELECT * FROM results
+            """)
+
+            # Recreate indexes
+            await db.execute("DROP INDEX IF EXISTS idx_results_session")
+            await db.execute("DROP INDEX IF EXISTS idx_results_topic")
+            await db.execute("DROP INDEX IF EXISTS idx_results_created")
+            await db.execute("DROP INDEX IF EXISTS idx_results_previous")
+
+            await db.execute("CREATE INDEX idx_results_session ON results_new(session_id)")
+            await db.execute("CREATE INDEX idx_results_topic ON results_new(topic_id)")
+            await db.execute("CREATE INDEX idx_results_created ON results_new(created_at)")
+            await db.execute("CREATE INDEX idx_results_previous ON results_new(previous_result_id)")
+
+            # Drop old table and rename new table
+            await db.execute("DROP TABLE results")
+            await db.execute("ALTER TABLE results_new RENAME TO results")
+
+            await db.commit()
+            logger.info("Migration complete: results.intent_id now allows NULL")
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Failed to migrate results.intent_id: {e}")
+            raise
 
     async def close(self) -> None:
         """Close database connection pool."""
@@ -541,29 +759,43 @@ class SessionStore:
     # Result operations
     async def create_result(
         self,
-        intent_id: str,
+        intent_id: str | None,
         topic_id: str,
         session_id: str,
         summary: str,
         data: dict,
         urgency: str = "normal",
+        result_type: str | None = None,
         previous_result_id: str | None = None,
         diff_summary: str | None = None,
         diff_data: dict | None = None,
     ) -> str:
-        """Create a new result and return its ID."""
+        """Create a new result and return its ID.
+
+        Args:
+            intent_id: Intent thread ID (None for monitoring-originated results)
+            topic_id: Topic ID
+            session_id: Session ID
+            summary: Result summary
+            data: Result data (dict)
+            urgency: Urgency level
+            result_type: Result type for component selection (e.g., 'monitoring:{project_slug}')
+            previous_result_id: Previous result ID for diff
+            diff_summary: Human-readable diff summary
+            diff_data: Detailed diff data
+        """
         import json
         result_id = str(uuid4())
         now = int(datetime.now().timestamp())
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """INSERT INTO results
-                   (id, intent_id, topic_id, session_id, summary, data, urgency, created_at, surfaced_at,
+                   (id, intent_id, topic_id, session_id, summary, data, urgency, result_type, created_at, surfaced_at,
                     previous_result_id, diff_summary, diff_data)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     result_id, intent_id, topic_id, session_id, summary, json.dumps(data),
-                    urgency, now, now, previous_result_id, diff_summary,
+                    urgency, result_type, now, now, previous_result_id, diff_summary,
                     json.dumps(diff_data) if diff_data else None
                 )
             )
@@ -1085,6 +1317,208 @@ class SessionStore:
         )
 
         return result_id, has_diff
+
+    # Bead watch operations (circuit breaker tracking)
+
+    async def create_bead_watch(
+        self,
+        bead_ref: str,
+        sla_hours: float | None = None,
+        intent_type: str = "task-profile",
+    ) -> None:
+        """Create a bead watch row for circuit breaker tracking.
+
+        Args:
+            bead_ref: The bead ID to watch
+            sla_hours: SLA in hours (defaults to intent type's SLA)
+            intent_type: Intent type for SLA default lookup
+        """
+        from datetime import datetime
+        import json
+
+        # Resolve SLA deadline
+        if sla_hours is None:
+            sla_hours = DEFAULT_SLA_HOURS.get(intent_type, 6.0)
+        now = int(datetime.now().timestamp())
+        sla_deadline = int(now + (sla_hours * 3600))
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                """INSERT OR REPLACE INTO bead_watch
+                   (bead_ref, refusal_count, comment_high_water, sla_deadline, created_at)
+                   VALUES (?, 0, 0, ?, ?)""",
+                (bead_ref, sla_deadline, now),
+            )
+            await db.commit()
+
+    async def get_bead_watch(self, bead_ref: str) -> Optional[dict]:
+        """Get bead watch row by bead_ref."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM bead_watch WHERE bead_ref = ?",
+                (bead_ref,),
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
+    async def update_bead_watch_refusal(
+        self,
+        bead_ref: str,
+        refusal_reason: str,
+        comment_index: int,
+        refusal_count_add: int = 1,
+    ) -> None:
+        """Update bead watch with a new refusal.
+
+        Args:
+            bead_ref: The bead ID
+            refusal_reason: The refusal reason from REFUSED: comment
+            comment_index: The comment high-water mark to advance to
+            refusal_count_add: Number of refusals to add (default 1, but can be higher
+                              if multiple refusals are found in one tick)
+        """
+        from datetime import datetime
+
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            # Increment refusal_count by refusal_count_add, update last_refusal_*, advance high-water
+            await db.execute(
+                """UPDATE bead_watch
+                   SET refusal_count = refusal_count + ?,
+                       last_refusal_reason = ?,
+                       last_refusal_at = ?,
+                       comment_high_water = ?
+                   WHERE bead_ref = ?""",
+                (refusal_count_add, refusal_reason, now, comment_index, bead_ref),
+            )
+            await db.commit()
+
+    async def update_bead_watch_comment_high_water(
+        self,
+        bead_ref: str,
+        comment_index: int,
+    ) -> None:
+        """Update only the comment high-water mark (for non-refusal comments)."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE bead_watch SET comment_high_water = ? WHERE bead_ref = ?",
+                (comment_index, bead_ref),
+            )
+            await db.commit()
+
+    async def fence_bead(self, bead_ref: str) -> None:
+        """Mark a bead as fenced (circuit breaker tripped).
+
+        Sets fenced_at timestamp. Caller is responsible for:
+        - Running `bf update --status blocked` on the bead
+        - Setting intent status to 'stuck'
+        - Creating a stuck card
+        """
+        from datetime import datetime
+
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE bead_watch SET fenced_at = ? WHERE bead_ref = ?",
+                (now, bead_ref),
+            )
+            await db.commit()
+
+    async def flag_sla(self, bead_ref: str) -> None:
+        """Mark SLA as flagged (bead past its deadline)."""
+        from datetime import datetime
+
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE bead_watch SET sla_flagged_at = ? WHERE bead_ref = ?",
+                (now, bead_ref),
+            )
+            await db.commit()
+
+    async def get_open_watched_beads(self) -> list[dict]:
+        """Get all watched beads that are not yet fenced.
+
+        Returns list of bead_ref, sla_deadline, refusal_count, etc.
+        for all beads where fenced_at IS NULL.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM bead_watch
+                   WHERE fenced_at IS NULL
+                   ORDER BY created_at DESC""",
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_beads_past_sla(self) -> list[dict]:
+        """Get all watched beads that have passed their SLA deadline but not yet flagged.
+
+        Returns beads where sla_deadline < now AND sla_flagged_at IS NULL.
+        """
+        from datetime import datetime
+
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM bead_watch
+                   WHERE sla_deadline < ? AND sla_flagged_at IS NULL
+                   ORDER BY sla_deadline ASC""",
+                (now,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_beads_needing_fencing(self) -> list[dict]:
+        """Get beads that meet fencing criteria but are not yet fenced.
+
+        Returns beads where either:
+        - refusal_count >= 3 (CIRCUIT_BREAKER_REFUSAL_THRESHOLD)
+        - OR age > 24h without progress (CIRCUIT_BREAKER_AGE_THRESHOLD_HOURS)
+
+        Age is computed as: (now - last_refusal_at) > threshold when there are refusals,
+        or (now - created_at) > threshold when there are no refusals yet.
+        """
+        from datetime import datetime
+
+        now = int(datetime.now().timestamp())
+        age_threshold_seconds = int(CIRCUIT_BREAKER_AGE_THRESHOLD_HOURS * 3600)
+        refusal_threshold = CIRCUIT_BREAKER_REFUSAL_THRESHOLD
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            # Beads needing fencing based on refusal count OR age
+            # Age logic: if last_refusal_at is set, check time since last refusal;
+            # otherwise check time since creation.
+            async with db.execute(
+                f"""SELECT * FROM bead_watch
+                   WHERE fenced_at IS NULL
+                     AND (
+                       refusal_count >= {refusal_threshold}
+                       OR (
+                         CASE
+                           WHEN last_refusal_at IS NOT NULL
+                           THEN ({now} - last_refusal_at) > {age_threshold_seconds}
+                           ELSE ({now} - created_at) > {age_threshold_seconds}
+                         END
+                       )
+                     )
+                   ORDER BY created_at DESC""",
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def delete_bead_watch(self, bead_ref: str) -> None:
+        """Delete a bead watch row (when bead is closed/resolved)."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "DELETE FROM bead_watch WHERE bead_ref = ?",
+                (bead_ref,),
+            )
+            await db.commit()
 
 
 # Global session store instance

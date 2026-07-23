@@ -9,12 +9,20 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
-from ..session.store import SessionStore
+import aiosqlite
+
+from ..session.store import (
+    SessionStore,
+    CIRCUIT_BREAKER_REFUSAL_THRESHOLD,
+    CIRCUIT_BREAKER_AGE_THRESHOLD_HOURS,
+)
 from ..sse.broadcaster import broadcast_result
 from ..surface.router import SurfaceRouter
 from ..telegram.fallback import TelegramFallback, get_telegram_fallback
@@ -75,6 +83,10 @@ class BeadWatcher:
     # so this is normally sub-second; the cap only bounds a wedged CLI so one
     # tick cannot stall the watch loop. A timeout is logged, not fatal.
     SUBPROCESS_TIMEOUT_SECONDS = 10.0
+    # Monitoring config path (plan §10: Ambient monitoring tick)
+    MONITORING_CONFIG_PATH = "/home/coding/aide-de-camp/config/monitoring.yaml"
+    # Default monitoring tick interval (seconds) - plan §10: default 300 (5 minutes)
+    MONITORING_TICK_INTERVAL_SECONDS = 300
 
     def __init__(
         self,
@@ -137,6 +149,17 @@ class BeadWatcher:
         # a restart re-reads but does NOT re-deliver already-closed beads.
         # (adc-qw85: replaces the former in-memory _processed_beads ID set.)
         self._close_highwater: Optional[float] = None
+
+        # Ambient monitoring state (plan §10: Ambient monitoring tick)
+        # Monitoring config mtime for hot-reload detection
+        self._monitoring_config_mtime: float = 0.0
+        # Loaded monitoring config (cached between hot-reloads)
+        self._monitoring_config: dict = {}
+        # Monitoring tick interval (seconds) - loaded from config, hot-reloaded
+        self._monitoring_tick_interval: float = float(self.MONITORING_TICK_INTERVAL_SECONDS)
+        # Last monitoring tick time (for health tracking)
+        self.last_monitoring_tick_at: float = 0.0
+        self.monitoring_tick_count: int = 0
 
     async def start(self) -> None:
         """Start the bead watcher daemon.
@@ -269,6 +292,8 @@ class BeadWatcher:
         ``last_tick_at`` (epoch seconds or None if never ticked), ``tick_count``,
         and ``interval`` (seconds). If ``last_tick_at`` is 0.0 (never ticked),
         ``last_tick_at`` is None and ``alive`` is False.
+
+        Also includes monitoring tick stats (plan §10: Ambient monitoring tick).
         """
         now = time.time()
         # Task is running if the supervisor task exists and is not done/cancelled
@@ -286,6 +311,12 @@ class BeadWatcher:
             "last_tick_at": int(self.last_tick_at) if self.last_tick_at > 0.0 else None,
             "tick_count": self.tick_count,
             "interval": int(self.check_interval_seconds),
+            "monitoring": {
+                "last_tick_at": int(self.last_monitoring_tick_at) if self.last_monitoring_tick_at > 0.0 else None,
+                "tick_count": self.monitoring_tick_count,
+                "interval": int(self._monitoring_tick_interval),
+                "config_mtime": self._monitoring_config_mtime,
+            },
         }
 
     async def _watch_loop(self) -> None:
@@ -322,10 +353,23 @@ class BeadWatcher:
         high-water mark. Every emitted record is handed to the next stage
         (``_process_bead_event``); this layer does not resolve intents or write
         results itself (child 4 owns the close -> result path).
+
+        Also runs circuit breaker check (plan §10 The Async Path):
+        polls open tracked beads for REFUSED comments, updates bead_watch state,
+        fences beads that meet criteria, and creates stuck cards.
+
+        Also runs ambient monitoring tick (plan §10 Ambient monitoring tick):
+        hot-reloads config and evaluates monitoring rules.
         """
         events = await self._poll_closed_beads()
         for event in events:
             await self._process_bead_event(event)
+
+        # Circuit breaker tick (plan §10 The Async Path)
+        await self._check_circuit_breaker()
+
+        # Ambient monitoring tick (plan §10 Ambient monitoring tick)
+        await self._ambient_monitoring_tick()
 
     async def _poll_closed_beads(self) -> list[BeadEvent]:
         """Poll closed beads via the CLI and return the newly-closed subset.
@@ -382,6 +426,344 @@ class BeadWatcher:
             # than the old mark was emitted, so this is also the newest emitted.
             self._close_highwater = parsed[-1][0]
         return new_events
+
+    async def _check_circuit_breaker(self) -> None:
+        """Check circuit breaker conditions for all open watched beads.
+
+        Plan §10 The Async Path:
+        - Poll open tracked beads (every unresolved intents.bead_ref) via bf show
+        - Parse REFUSED: comments past the high-water mark
+        - Persist refusal counts and reasons in bead_watch table
+        - Fence beads meeting criteria (3 refusals OR 24h age)
+        - Set intent status to 'stuck'
+        - Push 'task stuck — needs your input' card to active surface
+        """
+        try:
+            # Step 1: Get all open watched beads
+            watched_beads = await self.store.get_open_watched_beads()
+
+            if not watched_beads:
+                logger.debug("No open watched beads for circuit breaker check")
+                return
+
+            logger.debug(f"Circuit breaker checking {len(watched_beads)} open beads")
+
+            # Step 2: For each bead, fetch comments and parse refusals
+            for watch_row in watched_beads:
+                bead_ref = watch_row["bead_ref"]
+                high_water = watch_row["comment_high_water"]
+
+                # Fetch bead details via bf show
+                bead_details = await self._run_bf_show(bead_ref)
+
+                if not bead_details:
+                    logger.warning(f"Could not fetch bead {bead_ref} for circuit breaker check")
+                    continue
+
+                # Parse comments for refusals
+                refusals = self._parse_refusals_from_comments(
+                    bead_details.get("comments", []),
+                    since_index=high_water,
+                )
+
+                # Update bead_watch state if we found new refusals
+                if refusals:
+                    # Count ALL refusals found, not just the latest one
+                    refusal_count = len(refusals)
+                    latest_refusal = refusals[-1]  # Most recent
+                    latest_index = latest_refusal["index"]
+                    latest_reason = latest_refusal["reason"]
+
+                    # Update refusal count by the number of refusals found
+                    # (not just 1, since we may have multiple new refusals in one tick)
+                    await self.store.update_bead_watch_refusal(
+                        bead_ref=bead_ref,
+                        refusal_reason=latest_reason,
+                        comment_index=latest_index,
+                        refusal_count_add=refusal_count,
+                    )
+
+                    logger.info(
+                        f"Bead {bead_ref}: recorded {refusal_count} refusals "
+                        f"(reason: {latest_reason[:50]}...)"
+                    )
+
+            # Step 3: Check SLA flags and flag beads past deadline
+            await self._check_and_flag_sla_beads()
+
+            # Step 4: Fence beads that meet criteria
+            await self._fence_needs_fencing_beads()
+
+        except Exception as e:
+            logger.error(f"Error in circuit breaker check: {e}", exc_info=True)
+
+    async def _check_and_flag_sla_beads(self) -> None:
+        """Flag beads that have passed their SLA deadline.
+
+        Plan §10 The Async Path: Visible Aging - cards past SLA are flagged.
+        """
+        try:
+            past_sla = await self.store.get_beads_past_sla()
+
+            for bead_watch in past_sla:
+                bead_ref = bead_watch["bead_ref"]
+                await self.store.flag_sla(bead_ref)
+                logger.info(f"Flagged SLA for bead {bead_ref} (past deadline)")
+
+        except Exception as e:
+            logger.error(f"Error checking SLA deadlines: {e}", exc_info=True)
+
+    async def _fence_needs_fencing_beads(self) -> None:
+        """Fence beads that meet circuit breaker criteria.
+
+        Plan §10 The Async Path: after N refusals (default 3) or T hours without
+        progress (default 24h), fence the bead to status=blocked, set intent status
+        to 'stuck', and push a 'task stuck — needs your input' card.
+        """
+        try:
+            needs_fencing = await self.store.get_beads_needing_fencing()
+
+            for bead_watch in needs_fencing:
+                bead_ref = bead_watch["bead_ref"]
+                refusal_count = bead_watch["refusal_count"]
+                last_reason = bead_watch.get("last_refusal_reason", "No refusal reason provided")
+
+                await self._fence_bead(bead_ref, last_reason, refusal_count)
+
+        except Exception as e:
+            logger.error(f"Error fencing beads: {e}", exc_info=True)
+
+    async def _fence_bead(self, bead_ref: str, refusal_reason: str, refusal_count: int) -> None:
+        """Fence a single bead: block it, mark intent stuck, create stuck card.
+
+        Args:
+            bead_ref: The bead ID to fence
+            refusal_reason: The reason for fencing (most recent refusal or age)
+            refusal_count: Number of refusals recorded
+        """
+        logger.info(f"Fencing bead {bead_ref} (refusals: {refusal_count})")
+
+        # Step 1: Run bf update --status blocked
+        try:
+            await self._run_bf_update_status(bead_ref, "blocked")
+            logger.info(f"Set bead {bead_ref} to blocked status")
+        except Exception as e:
+            logger.error(f"Failed to block bead {bead_ref}: {e}")
+            # Continue to intent update even if bf fails
+
+        # Step 2: Mark fenced in bead_watch
+        await self.store.fence_bead(bead_ref)
+
+        # Step 3: Find intent and set status to 'stuck'
+        intent = await self.store.get_intent_by_bead_ref(bead_ref)
+
+        if not intent:
+            logger.warning(f"No intent found for bead {bead_ref}; cannot set stuck status")
+            return
+
+        intent_id = intent["id"]
+        session_id = intent["session_id"]
+        topic_id = intent.get("topic_id")
+
+        if not topic_id:
+            logger.warning(f"Intent {intent_id} has no topic_id; cannot create stuck card")
+            return
+
+        # Step 4: Update intent status to 'stuck'
+        await self.store.update_intent_status(intent_id, "stuck")
+        logger.info(f"Set intent {intent_id} to stuck status")
+
+        # Step 5: Create stuck result card
+        await self._create_stuck_card(
+            bead_ref=bead_ref,
+            intent_id=intent_id,
+            session_id=session_id,
+            topic_id=topic_id,
+            refusal_reason=refusal_reason,
+            refusal_count=refusal_count,
+        )
+
+    async def _create_stuck_card(
+        self,
+        bead_ref: str,
+        intent_id: str,
+        session_id: str,
+        topic_id: str,
+        refusal_reason: str,
+        refusal_count: int,
+    ) -> None:
+        """Create a 'task stuck — needs your input' result card.
+
+        Plan §10 The Async Path: push a stuck card with the latest refusal reason.
+        """
+        summary = f"Task stuck — needs your input"
+
+        # Build card data
+        data = {
+            "bead_id": bead_ref,
+            "stuck_reason": refusal_reason,
+            "refusal_count": refusal_count,
+            "message": f"This task has been blocked after {refusal_count} refusals.",
+            "action_hint": "Review the bead and provide the missing information or context needed to proceed.",
+        }
+
+        # Create result
+        result_id = await self.store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary=summary,
+            data=data,
+            urgency="high",  # Stuck tasks are high urgency
+        )
+
+        logger.info(f"Created stuck card {result_id} for bead {bead_ref}")
+
+        # Broadcast result to active surfaces
+        result_for_broadcast = {
+            "id": result_id,
+            "result_id": result_id,
+            "intent_id": intent_id,
+            "topic_id": topic_id,
+            "session_id": session_id,
+            "summary": summary,
+            "data": data,
+            "urgency": "high",
+            "created_at": int(datetime.now().timestamp()),
+        }
+
+        decision = await self.router.route_result(
+            session_id=session_id,
+            origin_surface_id=None,
+            urgency="high",
+        )
+
+        if decision.target_surfaces:
+            for surface in decision.target_surfaces:
+                if surface.type == "telegram":
+                    await self._send_to_telegram(result_for_broadcast, session_id)
+                else:
+                    await broadcast_result(
+                        result=result_for_broadcast,
+                        session_id=session_id,
+                        target_surface_id=surface.id,
+                    )
+        elif decision.fallback_used:
+            await self._send_to_telegram(result_for_broadcast, session_id)
+        else:
+            logger.info(f"No surface available for stuck card of bead {bead_ref}")
+
+    async def _run_bf_show(self, bead_ref: str) -> Optional[dict]:
+        """Run `bf show <bead_ref>` and return parsed bead details.
+
+        Returns bead dict with comments list, or None on failure.
+        Comments are returned as a list of {index, body, created_at} dicts.
+        """
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                self._bf_bin,
+                "show", bead_ref, "--json",
+                cwd=self._bf_workspace,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except (FileNotFoundError, OSError) as e:
+            logger.error(f"Failed to spawn bf show {bead_ref}: {e}")
+            return None
+
+        try:
+            stdout_b, stderr_b = await asyncio.wait_for(
+                proc.communicate(), timeout=self._subprocess_timeout
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            logger.warning(f"bf show {bead_ref} timed out")
+            return None
+
+        if proc.returncode != 0:
+            logger.warning(
+                f"bf show {bead_ref} exited {proc.returncode}: "
+                f"{stderr_b.decode(errors='replace').strip()[:200]}"
+            )
+            return None
+
+        try:
+            bead_data = json.loads(stdout_b.decode(errors="replace").strip())
+            return bead_data
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse bf show output for {bead_ref}: {e}")
+            return None
+
+    async def _run_bf_update_status(self, bead_ref: str, status: str) -> None:
+        """Run `bf update --status <status> <bead_ref>` to fence a bead.
+
+        Raises an exception if the command fails (non-zero exit, timeout, etc.).
+        """
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                self._bf_bin,
+                "update", "--status", status, bead_ref,
+                cwd=self._bf_workspace,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except (FileNotFoundError, OSError) as e:
+            raise RuntimeError(f"Failed to spawn bf update: {e}") from e
+
+        try:
+            stdout_b, stderr_b = await asyncio.wait_for(
+                proc.communicate(), timeout=self._subprocess_timeout
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise RuntimeError(f"bf update {bead_ref} timed out")
+
+        if proc.returncode != 0:
+            error_msg = stderr_b.decode(errors="replace").strip()
+            raise RuntimeError(
+                f"bf update {bead_ref} exited {proc.returncode}: {error_msg[:200]}"
+            )
+
+    @staticmethod
+    def _parse_refusals_from_comments(
+        comments: list, since_index: int
+    ) -> list[dict]:
+        """Parse REFUSED: comments from bead comment list.
+
+        Args:
+            comments: List of comment dicts from bf show
+            since_index: Only parse comments with index > this
+
+        Returns:
+            List of {index, reason, created_at} for each REFUSED: comment found
+        """
+        REFUSED_PATTERN = re.compile(r"^\s*REFUSED:\s*(.+)$", re.MULTILINE)
+
+        refusals: list[dict] = []
+
+        for idx, comment in enumerate(comments):
+            # Skip comments strictly before the high-water mark
+            # (we want to process the high-water mark comment itself and all after it)
+            if idx < since_index:
+                continue
+
+            comment_body = comment.get("body", "")
+            if not isinstance(comment_body, str):
+                continue
+
+            # Check for REFUSED: prefix
+            match = REFUSED_PATTERN.search(comment_body)
+            if match:
+                reason = match.group(1).strip()
+                refusals.append({
+                    "index": idx,
+                    "reason": reason,
+                    "created_at": comment.get("created_at"),
+                })
+
+        return refusals
 
     @staticmethod
     def _parse_close_epoch(closed_at: object) -> Optional[float]:
@@ -605,6 +987,13 @@ class BeadWatcher:
             # No surface available - result stays in queue
             logger.info(f"No surface available for bead {bead_id}, result queued")
 
+        # Step 6: Clean up bead_watch row (bead is closed, no longer watched)
+        try:
+            await self.store.delete_bead_watch(bead_id)
+            logger.debug(f"Deleted bead_watch row for closed bead {bead_id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete bead_watch row for {bead_id}: {e}")
+
     async def _extract_result_from_bead(self, bead: dict, session_id: str) -> Optional[dict]:
         """Extract result data from a terminal bead (real bf schema)."""
         metadata = self._extract_metadata(bead)
@@ -679,6 +1068,396 @@ class BeadWatcher:
             lines.append(f"Bead: {data['bead_id']}")
 
         return "\n".join(lines)
+
+    async def _ambient_monitoring_tick(self) -> None:
+        """Run ambient monitoring tick (plan §10: Ambient monitoring tick).
+
+        - Hot-reloads config/monitoring.yaml (mtime-checked cache)
+        - Evaluates each rule against watched topics
+        - Runs fetch-matrix sources via src/monitoring/ambient.py
+        - Diffs against topic_context_cache
+        - Writes results rows with intent_id=NULL when rules fire
+        - Broadcasts via SSE per Surface Routing Rules
+        """
+        try:
+            # Step 1: Hot-reload monitoring config if changed
+            await self._hot_reload_monitoring_config()
+
+            # Step 2: Get monitoring rules from config
+            active_topics = self._monitoring_config.get("monitoring", {}).get("active_topics", [])
+
+            if not active_topics:
+                logger.debug("No active monitoring topics configured")
+                return
+
+            logger.debug(f"Ambient monitoring tick: checking {len(active_topics)} topics")
+
+            # Step 3: Import ambient monitor module (lazy import to avoid circular deps)
+            from ..monitoring.ambient import AmbientMonitor
+
+            # Create a temporary ambient monitor instance for this tick
+            # (We don't keep a long-running instance - each tick creates its own
+            # to ensure config hot-reload is respected)
+            ambient_monitor = AmbientMonitor()
+
+            # Step 4: Evaluate each rule
+            for topic_rule in active_topics:
+                topic_id = topic_rule.get("topic_id")
+                project_slug = topic_rule.get("project_slug")
+                intent_type = topic_rule.get("intent_type")
+                urgency = topic_rule.get("urgency", "normal")
+                filters = topic_rule.get("filters", [])
+                notification_threshold = topic_rule.get("notification_threshold", "any_change")
+
+                if not topic_id:
+                    continue
+
+                try:
+                    # Check current state using ambient monitor
+                    from ..monitoring.ambient import MonitoringRule
+                    rule = MonitoringRule(
+                        topic_id=topic_id,
+                        project_slug=project_slug,
+                        intent_type=intent_type,
+                        check_interval=0,  # Not used for one-shot check
+                        urgency=urgency,
+                        filters=filters,
+                        notification_threshold=notification_threshold,
+                    )
+
+                    current_state = await ambient_monitor.check_topic_state(rule)
+
+                    if not current_state:
+                        logger.debug(f"No state data for topic {topic_id}")
+                        continue
+
+                    # Step 5: Get topic context cache for diffing
+                    cached_context = await self._get_topic_context_cache(topic_id)
+
+                    # Step 6: Detect state change
+                    has_change = self._detect_state_change(
+                        current_state=current_state,
+                        cached_context=cached_context,
+                        notification_threshold=notification_threshold,
+                    )
+
+                    if has_change:
+                        logger.info(f"Monitoring rule fired for topic {topic_id}")
+                        await self._write_monitoring_result(
+                            topic_id=topic_id,
+                            project_slug=project_slug or "unknown",
+                            current_state=current_state,
+                            cached_context=cached_context,
+                            urgency=urgency,
+                        )
+
+                    # Update topic context cache (even on first check, to establish baseline)
+                    await self._update_topic_context_cache(topic_id, current_state)
+
+                except Exception as e:
+                    logger.error(f"Error evaluating monitoring rule for topic {topic_id}: {e}", exc_info=True)
+                    continue
+
+            # Stamp monitoring tick time for health tracking
+            self.last_monitoring_tick_at = time.time()
+            self.monitoring_tick_count += 1
+
+        except Exception as e:
+            logger.error(f"Error in ambient monitoring tick: {e}", exc_info=True)
+
+    async def _hot_reload_monitoring_config(self) -> None:
+        """Hot-reload monitoring config if file has changed (mtime-checked cache).
+
+        Loads tick_interval_seconds from config and updates the tick interval.
+        Plan §10: Hot-Reload Architecture - mtime-checked cache like all artifacts.
+        """
+        try:
+            config_path = Path(self.MONITORING_CONFIG_PATH)
+            if not config_path.exists():
+                logger.warning(f"Monitoring config not found: {self.MONITORING_CONFIG_PATH}")
+                return
+
+            # Check mtime
+            current_mtime = config_path.stat().st_mtime
+            if current_mtime <= self._monitoring_config_mtime:
+                # Config unchanged, skip reload
+                return
+
+            logger.info(f"Hot-reloading monitoring config from {self.MONITORING_CONFIG_PATH}")
+
+            # Load YAML config
+            import yaml
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+
+            # Update cached config
+            self._monitoring_config = config
+            self._monitoring_config_mtime = current_mtime
+
+            # Update tick interval from config
+            new_interval = config.get("tick_interval_seconds", self.MONITORING_TICK_INTERVAL_SECONDS)
+            self._monitoring_tick_interval = float(new_interval)
+
+            logger.info(f"Monitoring config reloaded: tick_interval={self._monitoring_tick_interval}s")
+
+        except Exception as e:
+            logger.error(f"Error hot-reloading monitoring config: {e}", exc_info=True)
+
+    async def _get_topic_context_cache(self, topic_id: str) -> Optional[dict]:
+        """Get cached context data for a topic from topic_context_cache table."""
+        try:
+            async with aiosqlite.connect(self.store.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute(
+                    "SELECT context_data FROM topic_context_cache WHERE topic_id = ?",
+                    (topic_id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    if row:
+                        import json
+                        return json.loads(row["context_data"])
+        except Exception as e:
+            logger.warning(f"Error getting topic context cache for {topic_id}: {e}")
+        return None
+
+    async def _update_topic_context_cache(self, topic_id: str, context_data: dict) -> None:
+        """Update topic context cache with fresh data."""
+        try:
+            import json
+            from datetime import datetime, timezone
+
+            now = int(datetime.now(timezone.utc).timestamp())
+            # Set expiry to 1 hour from now
+            expires_at = now + 3600
+
+            context_json = json.dumps(context_data)
+
+            async with aiosqlite.connect(self.store.db_path) as db:
+                # Use INSERT OR REPLACE to upsert
+                await db.execute(
+                    """INSERT OR REPLACE INTO topic_context_cache
+                       (topic_id, context_data, fetched_at, expires_at)
+                       VALUES (?, ?, ?, ?)""",
+                    (topic_id, context_json, now, expires_at)
+                )
+                await db.commit()
+
+            logger.debug(f"Updated topic context cache for {topic_id}")
+
+        except Exception as e:
+            logger.warning(f"Error updating topic context cache for {topic_id}: {e}")
+
+    def _detect_state_change(
+        self,
+        current_state: dict,
+        cached_context: Optional[dict],
+        notification_threshold: str,
+    ) -> bool:
+        """Detect if state has changed since last check.
+
+        Args:
+            current_state: Current state from fetch
+            cached_context: Previous state from topic_context_cache
+            notification_threshold: 'any_change' | 'state_change'
+
+        Returns:
+            True if significant change detected
+        """
+        if not cached_context:
+            # First check - baseline state, no notification
+            return False
+
+        if notification_threshold == "any_change":
+            # Any field change triggers notification
+            return current_state != cached_context
+        elif notification_threshold == "state_change":
+            # Only notify if specific state fields change
+            state_fields = ["phase", "status", "health", "ready", "sync_status", "restarts"]
+            return any(
+                str(current_state.get(field)) != str(cached_context.get(field))
+                for field in state_fields
+            )
+
+        return False
+
+    async def _write_monitoring_result(
+        self,
+        topic_id: str,
+        project_slug: str,
+        current_state: dict,
+        cached_context: Optional[dict],
+        urgency: str,
+    ) -> None:
+        """Write a monitoring result to the session store.
+
+        Plan §10: monitoring-originated results have:
+        - topic_id set
+        - intent_id NULL (system-originated, no utterance)
+        - result_type 'monitoring:{project_slug}'
+        - urgency from monitoring config
+        - deterministic summary (no LLM)
+
+        Result enters Surface Routing Rules like any other.
+        """
+        try:
+            import json
+
+            # Find or get the topic (should already exist from monitoring setup)
+            # Use default monitoring session for now
+            session_id = "monitoring"
+
+            # Find or create topic
+            topic_found, created = await self.store.find_or_create_topic(
+                label=topic_id,
+                session_id=session_id,
+                topic_type="project",
+                project_slugs=[project_slug] if project_slug else None,
+            )
+
+            # Build result data
+            result_data = {
+                "monitoring": True,
+                "current_state": current_state,
+                "previous_state": cached_context,
+                "project_slug": project_slug,
+            }
+
+            # Add diff if we have previous state
+            if cached_context:
+                result_data["diff"] = self._compute_state_diff(cached_context, current_state)
+
+            # Generate deterministic summary (no LLM)
+            summary = self._generate_monitoring_summary(
+                topic_id=topic_id,
+                current_state=current_state,
+                previous_state=cached_context,
+            )
+
+            # Write result with intent_id=NULL (plan §10: monitoring-originated results)
+            result_id = await self.store.create_result(
+                intent_id=None,  # NULL for monitoring-originated results
+                topic_id=topic_found,
+                session_id=session_id,
+                summary=summary,
+                data=result_data,
+                urgency=urgency,
+                result_type=f"monitoring:{project_slug}",  # Monitoring result type
+            )
+
+            logger.info(f"Created monitoring result {result_id} for topic {topic_id} (intent_id=NULL)")
+
+            # Broadcast via SSE per Surface Routing Rules
+            await self._broadcast_monitoring_result(
+                result_id=result_id,
+                topic_id=topic_found,
+                session_id=session_id,
+                summary=summary,
+                data=result_data,
+                urgency=urgency,
+            )
+
+        except Exception as e:
+            logger.error(f"Error writing monitoring result for topic {topic_id}: {e}", exc_info=True)
+
+    def _compute_state_diff(self, previous: dict, current: dict) -> dict:
+        """Compute diff between previous and current state."""
+        diff = {}
+        for key in set(list(previous.keys()) + list(current.keys())):
+            prev_val = previous.get(key)
+            curr_val = current.get(key)
+            if prev_val != curr_val:
+                diff[key] = {"from": prev_val, "to": curr_val}
+        return diff
+
+    def _generate_monitoring_summary(
+        self,
+        topic_id: str,
+        current_state: dict,
+        previous_state: Optional[dict],
+    ) -> str:
+        """Generate deterministic monitoring summary (no LLM).
+
+        Plan §10: deterministic template summary - no LLM anywhere on the tick.
+        """
+        if not previous_state:
+            return f"Monitoring: {topic_id} initial state"
+
+        # Check for specific state changes
+        if "phase" in current_state:
+            curr_phase = current_state["phase"]
+            prev_phase = previous_state.get("phase")
+            if curr_phase != prev_phase:
+                return f"Monitoring: {topic_id} phase changed from {prev_phase} to {curr_phase}"
+
+        if "sync_status" in current_state:
+            curr_sync = current_state["sync_status"]
+            prev_sync = previous_state.get("sync_status")
+            if curr_sync != prev_sync:
+                return f"Monitoring: {topic_id} sync status changed from {prev_sync} to {curr_sync}"
+
+        if "status" in current_state:
+            curr_status = current_state["status"]
+            prev_status = previous_state.get("status")
+            if curr_status != prev_status:
+                return f"Monitoring: {topic_id} status changed from {prev_status} to {curr_status}"
+
+        return f"Monitoring: {topic_id} state changed"
+
+    async def _broadcast_monitoring_result(
+        self,
+        result_id: str,
+        topic_id: str,
+        session_id: str,
+        summary: str,
+        data: dict,
+        urgency: str,
+    ) -> None:
+        """Broadcast monitoring result via SSE per Surface Routing Rules.
+
+        Plan §10: Result enters Surface Routing Rules like any other.
+        """
+        try:
+            # Build result dict for broadcast
+            result_for_broadcast = {
+                "id": result_id,
+                "result_id": result_id,
+                "intent_id": None,  # Monitoring results have no intent
+                "topic_id": topic_id,
+                "session_id": session_id,
+                "summary": summary,
+                "data": data,
+                "urgency": urgency,
+                "created_at": int(datetime.now().timestamp()),
+            }
+
+            # Get routing decision via Surface Router
+            decision = await self.router.route_result(
+                session_id=session_id,
+                origin_surface_id=None,
+                urgency=urgency,
+            )
+
+            # Route to target surfaces
+            if decision.target_surfaces:
+                for surface in decision.target_surfaces:
+                    if surface.type == "telegram":
+                        await self._send_to_telegram(result_for_broadcast, session_id)
+                    else:
+                        # SSE broadcast
+                        await broadcast_result(
+                            result=result_for_broadcast,
+                            session_id=session_id,
+                            target_surface_id=surface.id,
+                        )
+            elif decision.fallback_used:
+                # Fallback to Telegram
+                await self._send_to_telegram(result_for_broadcast, session_id)
+            else:
+                # No surface available - result stays in queue
+                logger.info(f"No surface available for monitoring result {result_id}, result queued")
+
+        except Exception as e:
+            logger.error(f"Error broadcasting monitoring result {result_id}: {e}", exc_info=True)
 
 
 async def create_bead_watcher(store: SessionStore, router: SurfaceRouter) -> BeadWatcher:

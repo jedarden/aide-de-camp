@@ -313,7 +313,8 @@ class AmbientMonitor:
         """
         Push a monitoring result to the active surface.
 
-        Creates a result in the session store and pushes to appropriate surface.
+        Creates a result in the session store with intent_id=NULL (system-originated).
+        Plan §10 Bead Watcher: monitoring results write directly with no intent.
         """
         store = get_store()
 
@@ -323,14 +324,6 @@ class AmbientMonitor:
             session_id=session_id,
             topic_type="project",
             project_slugs=[rule.project_slug] if rule.project_slug else None,
-        )
-
-        # Create a monitoring intent
-        intent_id = await store.create_intent(
-            utterance_id=f"monitoring-{datetime.now(timezone.utc).isoformat()}",
-            session_id=session_id,
-            project_slug=rule.project_slug,
-            intent_type=rule.intent_type,
         )
 
         # Create result with diff info if available
@@ -348,16 +341,19 @@ class AmbientMonitor:
         if previous_state:
             result_data["diff"] = self._compute_diff(previous_state, current_state)
 
+        # Write result with intent_id=NULL (system-originated, no utterance behind it)
+        # result_type is 'monitoring:{project_slug}' per plan §10
         result_id = await store.create_result(
-            intent_id=intent_id,
+            intent_id=None,  # NULL for monitoring-originated results
             topic_id=topic_id,
             session_id=session_id,
             summary=self._generate_summary(rule, current_state, previous_state),
             data=result_data,
             urgency=rule.urgency,
+            result_type=f"monitoring:{rule.project_slug}",  # Monitoring result type
         )
 
-        logger.info(f"Created monitoring result {result_id} for topic {rule.topic_id}")
+        logger.info(f"Created monitoring result {result_id} for topic {rule.topic_id} (intent_id=NULL)")
 
         # Update last state
         self.last_state[topic_key] = current_state

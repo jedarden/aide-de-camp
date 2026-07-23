@@ -618,6 +618,45 @@ class EscalateHandler:
             logger.error(f"Failed to create bead: {e}")
             raise BeadCreationError(f"Failed to create bead: {e}") from e
 
+    async def _create_bead_watch(
+        self,
+        bead_ref: str,
+        project_slug: str | None,
+        intent_type: str,
+    ) -> None:
+        """Create bead_watch row for circuit breaker tracking.
+
+        Plan §10 The Async Path: watcher tracks open beads for refusals/SLA.
+        SLA defaults by intent_type, with per-project sla_hours override.
+
+        Args:
+            bead_ref: The bead ID to watch
+            project_slug: Project slug for SLA override lookup
+            intent_type: Intent type for default SLA lookup
+        """
+        from ..registry import get_project
+
+        sla_hours = None
+
+        # Check for per-project SLA override
+        if project_slug:
+            project = get_project(project_slug)
+            if project:
+                sla_hours = project.get("sla_hours")
+                if sla_hours is not None:
+                    logger.info(
+                        f"Using per-project SLA override for {project_slug}: "
+                        f"{sla_hours} hours"
+                    )
+
+        store = await self._get_store()
+        await store.create_bead_watch(
+            bead_ref=bead_ref,
+            sla_hours=sla_hours,
+            intent_type=intent_type,
+        )
+        logger.debug(f"Created bead_watch row for {bead_ref}")
+
     def _generate_bead_title(self, request: EscalateRequest) -> str:
         """Generate a bead title from the request."""
         # Use utterance prefix as title
@@ -762,6 +801,14 @@ class EscalateHandler:
 
             # Step 5: Create bead with determined type
             bead_id = await self._create_bead_with_type(request, bead_body, bead_type)
+
+            # Step 5.5: Create bead_watch row for circuit breaker tracking
+            # (plan §10 The Async Path: watcher tracks open beads for refusals/SLA)
+            await self._create_bead_watch(
+                bead_ref=bead_id,
+                project_slug=request.project_slug,
+                intent_type=request.intent_type,
+            )
 
             # Step 6: Build pending card
             pending_card = self.build_pending_card(request, bead_id, bead_type)

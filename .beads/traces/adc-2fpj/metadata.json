@@ -1,15 +1,15 @@
 {
-  "bead_id": "adc-c847",
+  "bead_id": "adc-2fpj",
   "agent": "claude-code-glm-4.7",
   "provider": "zai",
   "model": "glm-4.7",
   "exit_code": 0,
   "outcome": "success",
-  "duration_ms": 173980,
+  "duration_ms": 189900,
   "input_tokens": null,
   "output_tokens": null,
   "cost_usd": null,
-  "captured_at": "2026-07-23T02:43:59.403064393Z",
+  "captured_at": "2026-07-23T03:08:09.184837490Z",
   "trace_format": "claude_json",
   "pruned": false,
   "template_version": null
