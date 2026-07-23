@@ -495,6 +495,8 @@ global.applyAgedTreatment = canvas.applyAgedTreatment;
 global.setPendingProgress = canvas._setProgress;  // Alias for consistency
 global.el = canvas.el;  // DOM helper for pending cards
 global.createErrorCard = canvas.createErrorCard;  // Error card renderer for SSE error events
+global.createStuckCard = canvas.createStuckCard;  // Stuck card renderer for task_stuck events
+global.createFailedCard = canvas.createFailedCard;  // Failed card renderer for task_failed events
 
 // --- extract + run the REAL inline app script --------------------------------
 

@@ -403,10 +403,24 @@
 
         .builtin-card.stuck-card {
             border-left: 4px solid #f59e0b;
+            background: #1a1a0f;
+            border: 1px solid #78350f;
+        }
+
+        .builtin-card.stuck-card:hover {
+            border-color: #92400e;
+            background: #1f1f12;
         }
 
         .builtin-card.failed-card {
             border-left: 4px solid #ef4444;
+            background: #1a0f0f;
+            border: 1px solid #7f1d1d;
+        }
+
+        .builtin-card.failed-card:hover {
+            border-color: #991b1b;
+            background: #1f1212;
         }
 
         @keyframes pulse-border {
@@ -421,9 +435,25 @@
             margin-bottom: 12px;
         }
 
+        .stuck-card .builtin-header .builtin-title {
+            color: #fcd34d;
+        }
+
+        .failed-card .builtin-header .builtin-title {
+            color: #fca5a5;
+        }
+
         .builtin-icon {
             font-size: 20px;
             line-height: 1;
+        }
+
+        .stuck-card .builtin-icon {
+            filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.4));
+        }
+
+        .failed-card .builtin-icon {
+            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
         }
 
         .builtin-title {
@@ -633,8 +663,12 @@
 
         .stuck-meta {
             font-size: 12px;
-            color: #94a3b8;
+            color: #fcd34d;
             margin: 8px 0;
+            background: rgba(245, 158, 11, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(245, 158, 11, 0.2);
         }
 
         .stuck-refusal-count,
@@ -648,24 +682,29 @@
 
         .stuck-action-hint {
             font-size: 13px;
-            color: #cbd5e1;
+            color: #e2e8f0;
             margin: 12px 0;
+            line-height: 1.4;
         }
 
         .stuck-view-bead {
             background: #f59e0b;
             border: none;
             color: #1f2937;
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 6px;
             font-size: 13px;
             cursor: pointer;
             margin-top: 12px;
-            font-weight: 500;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
         }
 
         .stuck-view-bead:hover {
             background: #d97706;
+            box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+            transform: translateY(-1px);
         }
 
         /* Failed card specific */
@@ -695,30 +734,45 @@
 
         .failed-error-type {
             font-size: 12px;
-            color: #94a3b8;
+            color: #fca5a5;
             margin: 8px 0;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: inline-block;
         }
 
         .failed-bead-id {
             font-size: 12px;
-            color: #94a3b8;
+            color: #fca5a5;
             font-family: 'Monaco', 'Menlo', monospace;
             margin: 8px 0;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: inline-block;
         }
 
         .failed-retry {
-            background: #3b82f6;
+            background: #ef4444;
             border: none;
             color: #f8fafc;
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 6px;
             font-size: 13px;
             cursor: pointer;
             margin-top: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
         }
 
         .failed-retry:hover {
-            background: #2563eb;
+            background: #dc2626;
+            box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+            transform: translateY(-1px);
         }
 
         /* Fallback card specific */
