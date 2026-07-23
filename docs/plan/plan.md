@@ -112,19 +112,19 @@ One LLM call per utterance. Receives the full utterance text, the project regist
 ```json
 [
   {
-    "project_slug": "options-pipeline",
+    "project_slug": "pbx-web",
     "intent_type": "status",
     "urgency": "normal",
-    "utterance_fragment": "has the options pipeline caught up?"
+    "utterance_fragment": "has the pbx web caught up?"
   },
   {
-    "project_slug": "ibkr-mcp",
+    "project_slug": "whisper-stt",
     "intent_type": "status",
     "urgency": "normal",
-    "utterance_fragment": "what's the state of the ibkr mcp"
+    "utterance_fragment": "what's the state of whisper stt"
   },
   {
-    "project_slug": "ibkr-mcp",
+    "project_slug": "whisper-stt",
     "intent_type": "lookup",
     "lookup_kind": "logs",
     "urgency": "normal",
@@ -140,7 +140,7 @@ Intent types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modi
 - **status**: Query current state (pods, pipelines, deployments, beads)
 - **action**: Execute a command (deploy, restart, create) — executes only through the Action Execution Model (declarative-config Git operations + ArgoCD sync status, or reviewed escalation beads); never direct kubectl mutation
 - **brainstorm**: Explore options, design, architecture discussion
-- **lookup**: Find specific information. Every lookup thread carries a router-emitted `lookup_kind` — `logs` | `config` | `docs` (default `docs` when the utterance names nothing sharper) — because "recent logs" and "deployment config" for the same project are different fetches and different cards, not one. `lookup_kind` selects the fetch matrix (`prompts/fetch/lookup-{lookup_kind}.md`) and is embedded in the result's `result_type` (`lookup:{lookup_kind}:{project_slug}`, e.g. `lookup:logs:ibkr-mcp` vs `lookup:config:ibkr-mcp`), so log-lookup and config-lookup results select components independently. Persisted on the intent row (`intents.lookup_kind`)
+- **lookup**: Find specific information. Every lookup thread carries a router-emitted `lookup_kind` — `logs` | `config` | `docs` (default `docs` when the utterance names nothing sharper) — because "recent logs" and "deployment config" for the same project are different fetches and different cards, not one. `lookup_kind` selects the fetch matrix (`prompts/fetch/lookup-{lookup_kind}.md`) and is embedded in the result's `result_type` (`lookup:{lookup_kind}:{project_slug}`, e.g. `lookup:logs:whisper-stt` vs `lookup:config:whisper-stt`), so log-lookup and config-lookup results select components independently. Persisted on the intent row (`intents.lookup_kind`)
 - **reminder**: Set or query reminders — **NOT YET IMPLEMENTED**: no reminders table, scheduler, or module exists. The router does not dispatch this type; a reminder-shaped utterance is handled as `clarification` with a "reminders aren't available yet" card. Minimal design sketch in Future Work
 - **self-modification**: Instructions to improve the interface itself
 - **monitoring-config**: Configure ambient monitoring rules
@@ -161,15 +161,15 @@ Defines projects the router knows about:
 
 ```yaml
 projects:
-  options-pipeline:
-    aliases: ["the pipeline", "options"]
-    description: "Options data pipeline on apexalgo-iad"
-    cluster: apexalgo-iad  # ArgoCD endpoint for this cluster resolves via config/clusters.yaml (see Fetch Strand — Cluster→ArgoCD Endpoint Resolution)
-    namespace: options
-    repo_path: /home/coding/options-pipeline  # local checkout: git-log + per-project bead listing
-    argocd_app: options-pipeline  # ArgoCD Application name for the fetch matrix's sync row; defaults to the project slug when omitted
+  pbx-web:
+    aliases: ["pbx", "the pbx", "phone system"]
+    description: "PBX web interface on ardenone-cluster"
+    cluster: ardenone-cluster  # ArgoCD endpoint for this cluster resolves via config/clusters.yaml (see Fetch Strand — Cluster→ArgoCD Endpoint Resolution)
+    namespace: pbx-web
+    repo_path: /home/coding/declarative-config  # local checkout: git-log + per-project bead listing (pbx-web manifests live in k8s/ardenone-cluster/pbx-web/)
+    argocd_app: pbx-web  # ArgoCD Application name for the fetch matrix's sync row; defaults to the project slug when omitted
     sla_hours: 6          # pending-card SLA override (see The Async Path — Visible aging)
-    intent_support: [status, action, brainstorm, task-profile]
+    intent_support: [status, action, brainstorm, lookup, task-profile]
     # `action` appears in intent_support for routing completeness, but action
     # dispatch is DISABLED until the Action strand ships — see Action Execution
     # Model (Status: executor NOT BUILT)
@@ -182,13 +182,13 @@ projects:
         # read-only ArgoCD API until the app reports Synced/Healthy
         steps: [ci-status, image-tag, gitops-commit, argocd-sync-status, pod-status]
 
-  ibkr-mcp:
-    aliases: ["ibkr", "the mcp"]
-    description: "IBKR MCP server"
-    cluster: apexalgo-iad
-    namespace: ibkr-mcp
-    repo_path: /home/coding/ibkr-mcp  # local checkout with its own .beads/ — without this, bead listing falls back to aide-de-camp-originated beads only, with an on-card caveat (see Beads-Workspace Scoping)
-    argocd_app: ibkr-mcp  # explicit here for clarity; equals the slug default
+  whisper-stt:
+    aliases: ["whisper", "stt", "speech-to-text"]
+    description: "Whisper STT service on ardenone-cluster"
+    cluster: ardenone-cluster
+    namespace: whisper-stt
+    repo_path: /home/coding/declarative-config  # local checkout: git-log + per-project bead listing (whisper-stt manifests live in k8s/ardenone-cluster/whisper-stt/)
+    argocd_app: whisper-stt  # explicit here for clarity; equals the slug default
     intent_support: [status, brainstorm, lookup, task-profile]
 ```
 
@@ -297,7 +297,7 @@ In audio mode there is no canvas. The voice model reads `result.summary` directl
 
 Steward of the component library — asynchronous only. It is never on the hot path and never renders a card a user is waiting on.
 
-**Hot-path selection and rendering happen in the server, not here.** On every dispatch the server picks the component deterministically — highest `match_score` in `component_usage_patterns` for the result's `result_type`, no LLM call (lookup result_types embed the router's `lookup_kind`, so `lookup:logs:ibkr-mcp` and `lookup:config:ibkr-mcp` are distinct keys selecting distinct components) — fills its template with the result data per layout bucket, writes the output to `card_cache`, and streams the rendered HTML over SSE; the client injects it. When nothing matches (a first-ever result shape, or no score above threshold), the server flags the result and the client renders it with the built-in generic fallback card (see Component Library) — a novel shape never blanks the canvas, it just renders plainly until the library catches up.
+**Hot-path selection and rendering happen in the server, not here.** On every dispatch the server picks the component deterministically — highest `match_score` in `component_usage_patterns` for the result's `result_type`, no LLM call (lookup result_types embed the router's `lookup_kind`, so `lookup:logs:whisper-stt` and `lookup:config:whisper-stt` are distinct keys selecting distinct components) — fills its template with the result data per layout bucket, writes the output to `card_cache`, and streams the rendered HTML over SSE; the client injects it. When nothing matches (a first-ever result shape, or no score above threshold), the server flags the result and the client renders it with the built-in generic fallback card (see Component Library) — a novel shape never blanks the canvas, it just renders plainly until the library catches up.
 
 **Escaping contract (render path).** Template fill is the escaping boundary: every interpolated value — fetch output, `result.data` fields, `summary`, raw log lines — is HTML-escaped at template-fill time, and templates receive data as text only, never raw HTML from results, so a markup-looking log line renders as literal text instead of breaking layout or executing in the canvas. This binds LLM-generated component templates and the built-in generic fallback card's key/value grid alike (the fallback escapes client-side, where it renders). The same contract binds every client-filled built-in card: SSE-event values interpolated into built-in templates on the client — per-source progress states, bead refs, elapsed-time strings, error details, and above all worker/LLM-authored free text like the stuck card's refusal reasons lifted from bead comments — are inserted as text nodes (or escaped identically to the fallback card's values), never as HTML.
 
@@ -453,8 +453,8 @@ results (
                      -- "{intent_type}:{project_slug}" for intent-derived results — one per
                      -- intent thread (the aggregated thread card), never per fetch source;
                      -- lookup threads insert the intent's lookup_kind:
-                     -- "lookup:{lookup_kind}:{project_slug}" (e.g. "lookup:logs:ibkr-mcp"
-                     -- vs "lookup:config:ibkr-mcp" — distinct keys, distinct cards);
+                     -- "lookup:{lookup_kind}:{project_slug}" (e.g. "lookup:logs:whisper-stt"
+                     -- vs "lookup:config:whisper-stt" — distinct keys, distinct cards);
                      -- "monitoring:{project_slug}" for monitoring-originated rows.
                      -- The hot-path component lookup keys on this column, no LLM
                      -- (see UI-Regen Agent / component_usage_patterns)
@@ -577,8 +577,8 @@ component_tags (
 component_usage_patterns (
   component_id TEXT,
   result_type TEXT,  -- thread-level key matching results.result_type, e.g.
-                     -- "status:options-pipeline", "lookup:logs:ibkr-mcp",
-                     -- "lookup:config:ibkr-mcp" (lookup keys carry lookup_kind,
+                     -- "status:pbx-web", "lookup:logs:whisper-stt",
+                     -- "lookup:config:whisper-stt" (lookup keys carry lookup_kind,
                      -- so log-lookup and config-lookup components select
                      -- independently) — never per-source ("pod-status")
                      -- granularity; a thread's sources aggregate into one card
@@ -946,16 +946,18 @@ Phases 0-4 make the system work end-to-end; none of them make a screen-capture o
 
 #### Demo script (golden path)
 
-One scripted run, recorded in a single unedited take. The take is **canvas-only**: utterances enter through the canvas page's Web Speech STT — the Realtime API voice session (Phase 4's audio surface) is not part of the launch recording; a voice-session demo is post-launch work (see Open Question 6). Every utterance uses a registered project (options-pipeline, ibkr-mcp) and only intents the registry supports for that project — step 5's `task-profile` included: both example entries list it in `intent_support`. The `action` intent is deliberately excluded from the script — its execution model carries its own constraints and adds risk without adding demo value.
+One scripted run, recorded in a single unedited take. The take is **canvas-only**: utterances enter through the canvas page's Web Speech STT — the Realtime API voice session (Phase 4's audio surface) is not part of the launch recording; a voice-session demo is post-launch work (see Open Question 6). Every utterance uses a registered project (pbx-web, whisper-stt) and only intents the registry supports for that project — step 5's `task-profile` included: both example entries list it in `intent_support`. The `action` intent is deliberately excluded from the script — its execution model carries its own constraints and adds risk without adding demo value.
+
+**Note:** Both scripted projects (pbx-web, whisper-stt) are hosted on ardenone-cluster, whose ArgoCD applications live on ardenone-manager and are readable via the existing no-auth read-only proxy at `https://argocd-ro-ardenone-manager-ts.ardenone.com:8444`. This ArgoCD-readability path (Option B, per HUMAN decision bead adc-359d) ensures the scripted status cards render without `fetch_coverage` caveat strips, satisfying smooth criterion 3.
 
 | Step | Utterance | Intent(s) | Expected canvas output |
 |------|-----------|-----------|------------------------|
-| 1 | "Has the options pipeline caught up, and what's the state of the ibkr mcp?" | status ×2 (options-pipeline, ibkr-mcp) | Router splits into two threads; two cards appear and resolve **in parallel** — pod status, ArgoCD sync state, recent commits, open beads per project |
-| 2 | "Pull up the recent logs for the ibkr mcp." | lookup/logs (ibkr-mcp) | Log-lookup card (`lookup:logs:ibkr-mcp`) with recent log lines, appearing under the existing ibkr-mcp topic as its own card beside the step-1 status card — one card per (topic, result_type): grouped, not a new pile |
-| 3 | "Should the options pipeline keep writing straight to SQLite, or is it time to batch through a queue? Give me the trade-offs." | brainstorm (options-pipeline) | Brainstorm card: structured trade-off summary, visually distinct from status cards and coexisting with the step-1 options-pipeline status card on the same topic (distinct result_type → distinct card, per the (topic, result_type) granularity) |
-| 4 | "Find the ibkr mcp's deployment config — which cluster and namespace is it on?" | lookup/config (ibkr-mcp) | Config-lookup card (`lookup:config:ibkr-mcp`) with cluster/namespace and manifest pointers from registry + fetched config — a different `lookup_kind` than step 2, so a different fetch matrix, result_type, and component; it renders as its own card, it does not overwrite step 2's log card |
-| 5 | "Queue up a research task: compare the last month of options pipeline errors against the ibkr mcp's and write up common failure patterns — no rush." | task-profile | Escalate strand fires; ack/pending card appears immediately on router completion with an explicit "queuing async" state, then updates in place with the `bf` bead reference once `bf create` returns (see the Latency Budget's escalate row). Bead **closure is not part of the take** — the pending card is the demo-visible outcome |
-| 6 | "Anything new on the options pipeline since we started?" | status (options-pipeline) | Existing options-pipeline **status** card updates **in place** — no new card — with a diff summary naming exactly what changed since step 1. The diff runs against the step-1 status result via `previous_result_id`, which is scoped to the same result_type on the same topic: step 3's brainstorm card is a different result_type, stays on canvas untouched, and never enters the diff. The diff strip renders here because step 1's result is in-session — the same session-scoped display rule that suppresses "changes since the seed run" strips on step 1 (see Cold start & demo seed — Topic scope vs. session scope). If nothing changed, an explicit "no changes since" diff state (also a passing outcome). No speed contrast is claimed: seeding warms both scripted topics, so step 1 is just as warm |
+| 1 | "Has the pbx web caught up, and what's the state of whisper stt?" | status ×2 (pbx-web, whisper-stt) | Router splits into two threads; two cards appear and resolve **in parallel** — pod status, ArgoCD sync state, recent commits (from declarative-config, where both apps' manifests live), per-project status. Both projects are on ardenone-cluster; their ArgoCD apps (pbx-web, whisper-stt) resolve via the ardenone-manager read-only proxy, so no `fetch_coverage` caveat appears. |
+| 2 | "Pull up the recent logs for whisper stt." | lookup/logs (whisper-stt) | Log-lookup card (`lookup:logs:whisper-stt`) with recent log lines, appearing under the existing whisper-stt topic as its own card beside the step-1 status card — one card per (topic, result_type): grouped, not a new pile |
+| 3 | "Should pbx web keep using the static site generator, or is it time to move to a dynamic frontend? Give me the trade-offs." | brainstorm (pbx-web) | Brainstorm card: structured trade-off summary, visually distinct from status cards and coexisting with the step-1 pbx-web status card on the same topic (distinct result_type → distinct card, per the (topic, result_type) granularity) |
+| 4 | "Find whisper stt's deployment config — which cluster and namespace is it on?" | lookup/config (whisper-stt) | Config-lookup card (`lookup:config:whisper-stt`) with cluster/namespace and manifest pointers from registry + fetched config — a different `lookup_kind` than step 2, so a different fetch matrix, result_type, and component; it renders as its own card, it does not overwrite step 2's log card |
+| 5 | "Queue up a research task: compare the last month of pbx web deployment patterns against whisper stt's and write up common failure patterns — no rush." | task-profile | Escalate strand fires; ack/pending card appears immediately on router completion with an explicit "queuing async" state, then updates in place with the `bf` bead reference once `bf create` returns (see the Latency Budget's escalate row). Bead **closure is not part of the take** — the pending card is the demo-visible outcome |
+| 6 | "Anything new on pbx web since we started?" | status (pbx-web) | Existing pbx-web **status** card updates **in place** — no new card — with a diff summary naming exactly what changed since step 1. The diff runs against the step-1 status result via `previous_result_id`, which is scoped to the same result_type on the same topic: step 3's brainstorm card is a different result_type, stays on canvas untouched, and never enters the diff. The diff strip renders here because step 1's result is in-session — the same session-scoped display rule that suppresses "changes since the seed run" strips on step 1 (see Cold start & demo seed — Topic scope vs. session scope). If nothing changed, an explicit "no changes since" diff state (also a passing outcome). No speed contrast is claimed: seeding warms both scripted topics, so step 1 is just as warm |
 
 #### Definition of "smooth" (measurable)
 
@@ -980,7 +982,7 @@ Seeded from what this plan already establishes. The rule: an issue either blocks
 | Task-profile pending-card lifecycle (24h/3-failure circuit breaker, `stuck` status, visible aging) is designed in The Async Path but not yet implemented or verified | Async Path — re-dispatch circuit breaker + visible aging | **Yes** (pending-card honesty: bead ref, explicit async state, elapsed time); No (breaker trip / closure on camera) | Pending card must show the bead ref, an explicit async state, and elapsed time — never an endless spinner. Script waits for neither closure nor the breaker |
 | Degraded-state error cards are fully specified in Degraded-State UX but not yet implemented or verified against real source timeouts | Degraded-State UX (card templates); Open Question 2 (timeout behavior unmeasured) | **Yes** | Implement and verify the fixed card templates; a mid-take kubectl/ArgoCD timeout must render as the designed caveat strip on an otherwise-complete card, not as an error or a blank |
 | Clarification round-trip flow unresolved | Open Question 7 | No | Script uses exact registry aliases so clarification never triggers; the no-match card (below) is the insurance if it does |
-| Both scripted projects declare `cluster: apexalgo-iad`, whose ArgoCD applications live on rs-manager — and rs-manager has **no no-auth read-only ArgoCD proxy** today; querying the ardenone-manager proxy returns not-found → `fetch_coverage` caveat strip on every scripted status card, a criterion-3 failure on every take | Cluster→ArgoCD Endpoint Resolution (Fetch Strand); `config/clusters.yaml` | **Yes** | Provision an rs-manager read-only ArgoCD proxy mirroring the ardenone-manager pattern (small no-auth token-injecting proxy deployment exposed on the Tailscale mesh, deployed via declarative-config), flip its `clusters.yaml` entry to `read-only-proxy`, and verify per seeding-runbook item (3). Fallback if the proxy can't land in time: re-script the demo around projects whose ArgoCD state is already readable — never record with the caveat strip |
+| Both scripted projects NOW declare `cluster: ardenone-cluster`, whose ArgoCD applications live on ardenone-manager — and ardenone-manager HAS a no-auth read-only ArgoCD proxy (`https://argocd-ro-ardenone-manager-ts.ardenone.com:8444`) that the fetch strand can consume directly. Zero ArgoCD-source caveats on scripted status cards. | Cluster→ArgoCD Endpoint Resolution (Fetch Strand); `config/clusters.yaml`; HUMAN decision bead adc-359d (Option B: re-script demo onto ardenone-cluster projects) | **No — RESOLVED** | Demo re-scripted onto pbx-web and whisper-stt (both ardenone-cluster-hosted). Their ArgoCD apps resolve via the existing ardenone-manager read-only proxy (access: read-only-proxy), so scripted status cards render caveat-free. The seeding runbook's item (3) verifies each scripted project's `argocd_app` exists and returns application state on the correct instance (ardenone-manager's ArgoCD, not rs-manager's). Option A (rs-manager RO proxy) deferred post-launch as the better end-state. |
 
 New defects found during rehearsal are appended here with the same must-fix triage before the real take.
 
@@ -990,7 +992,7 @@ The recording starts from a first-run canvas, so the first frame of the demo *is
 
 - **First-run canvas state:** never a blank page. A welcome card renders on first load: one-line description of aide-de-camp, the list of registered projects (served from `registry.yaml`), and 2-3 example utterances drawn from those projects' supported intents. It is **built into the served frontend** (`src/canvas/`, exactly like the generic fallback card) — not a component-library row — so the demo's first frame renders correctly even against an empty `components.db`, with zero dependence on DB state or a prior UI-regen run. The first real result replaces it.
 - **No-match routing:** an utterance that resolves to no registered project returns a `clarification` thread, rendered as a friendly clarification card — "no project matching *X*; registered projects are: …" with the nearest-alias suggestion. Never an empty canvas, never a raw router error.
-- **Pre-demo seeding (runbook, not hidden magic):** before recording — (1) registry populated and alias-verified for every project in the script, with `intent_support` confirmed to cover every scripted intent — including `task-profile` on both options-pipeline and ibkr-mcp, or step 5 dies in routing — and `repo_path` confirmed present and pointing at a checkout with a `.beads/` workspace for every scripted project, or step 1's bead listing falls to the Beads-Workspace Scoping fallback and its on-card caveat, a criterion-3 failure; (2) context warmer run against both scripted topics so `topic_context_cache` is warm and step 1 lands inside budget; (3) one throwaway dispatch per scripted topic to confirm every fetch source (kubectl proxies, ArgoCD, git, `bf`) is reachable *before* the take starts — for ArgoCD this means confirming each scripted project's `argocd_app` exists and returns application state on the instance its `cluster` maps to in `config/clusters.yaml` (for both scripted projects: rs-manager's ArgoCD, which requires the known-issues register's read-only-proxy row closed first), not merely that some ArgoCD endpoint answers — and confirming `GET /health` reports `watcher.alive: true` (see Deploy Stage A process model); (4) **component library seeded for every scripted result shape** — UI-regen is async and nothing guarantees it has ever run, so left alone every scripted card renders as the generic key/value fallback (killing step 3's "visually distinct" expectation, among others). For each distinct result_type the script produces — `status:options-pipeline`, `status:ibkr-mcp`, `lookup:logs:ibkr-mcp`, `lookup:config:ibkr-mcp`, `brainstorm:options-pipeline` (selection keys on the **full** result_type, so each needs its own `component_usage_patterns` mapping row, even where one component template serves two of them) — file a UI-regen bead from a throwaway dispatch's output and confirm it closed; then re-run the step-(3) dispatches and confirm every scripted **result** card renders a real component-library card — **no scripted result card falls to the generic fallback** is a hard runbook exit condition. Step 5's ack/pending card is deliberately absent from this list: pending/ack cards are served built-ins (see Component Library → Built-in cards), not component-library shapes — there is nothing to seed for them and nothing UI-regen could produce. The recording still opens on the first-run welcome card — seeding warms the caches and the component library behind it, it doesn't fake the output.
+- **Pre-demo seeding (runbook, not hidden magic):** before recording — (1) registry populated and alias-verified for every project in the script, with `intent_support` confirmed to cover every scripted intent — including `task-profile` on both pbx-web and whisper-stt, or step 5 dies in routing — and `repo_path` confirmed present and pointing at a checkout for every scripted project (for pbx-web and whisper-stt: `/home/coding/declarative-config`, where both apps' ArgoCD manifests live; this provides git log source even though the projects have no separate code repos), or step 1's git log source fails; (2) context warmer run against both scripted topics so `topic_context_cache` is warm and step 1 lands inside budget; (3) one throwaway dispatch per scripted topic to confirm every fetch source (kubectl proxies, ArgoCD, git, `bf`) is reachable *before* the take starts — for ArgoCD this means confirming each scripted project's `argocd_app` exists and returns application state on the instance its `cluster` maps to in `config/clusters.yaml` (for both scripted projects: ardenone-cluster maps to ardenone-manager's ArgoCD at `https://argocd-ro-ardenone-manager-ts.ardenone.com:8444`, which is a read-only-proxy endpoint and requires no additional provisioning), not merely that some ArgoCD endpoint answers — and confirming `GET /health` reports `watcher.alive: true` (see Deploy Stage A process model); (4) **component library seeded for every scripted result shape** — UI-regen is async and nothing guarantees it has ever run, so left alone every scripted card renders as the generic key/value fallback (killing step 3's "visually distinct" expectation, among others). For each distinct result_type the script produces — `status:pbx-web`, `status:whisper-stt`, `lookup:logs:whisper-stt`, `lookup:config:whisper-stt`, `brainstorm:pbx-web` (selection keys on the **full** result_type, so each needs its own `component_usage_patterns` mapping row, even where one component template serves two of them) — file a UI-regen bead from a throwaway dispatch's output and confirm it closed; then re-run the step-(3) dispatches and confirm every scripted **result** card renders a real component-library card — **no scripted result card falls to the generic fallback** is a hard runbook exit condition. Step 5's ack/pending card is deliberately absent from this list: pending/ack cards are served built-ins (see Component Library → Built-in cards), not component-library shapes — there is nothing to seed for them and nothing UI-regen could produce. The recording still opens on the first-run welcome card — seeding warms the caches and the component library behind it, it doesn't fake the output.
 - **Topic scope vs. session scope (what seeding carries over, and what it must not):** project topics are **cross-session** (`topics.scope: 'cross-session'`, `session_id` NULL). That is what makes runbook items (2)–(4) work at all: the take starts a fresh session, and a fresh session reuses the seeded topics — same topic_ids, warm `topic_context_cache` — instead of minting new ones and cold-fetching step 1 straight through the 3s gate. Card display is scoped the other way: the canvas renders only the **current session's** results, so a fresh session opens on the welcome card, never on replayed seed cards (the reconnect workload-summary replay is within-session recovery, not cross-session history). Diff display follows the same session scoping: `previous_result_id` is pure lineage — set whenever a prior result of the same result_type exists on the topic, regardless of session, so step 1's results do point at the seed dispatches — but the server includes the diff strip at card-render time only when the previous result belongs to the current session. Step 1 therefore renders clean cards with no unscripted "changes since the seed run" strips, while step 6 still diffs legitimately against step 1, which is in-session (see the `previous_result_id` schema comment and demo step 6).
 
 #### Rehearsal checklist
