@@ -923,6 +923,42 @@ Output ONLY the revised bead body as markdown.
             },
         }
 
+    def _build_approval_narration(
+        self,
+        request: EscalateRequest,
+        bead_type: str,
+        validation_result: dict,
+    ) -> str:
+        """
+        Build an approval narration for voice mode.
+
+        Creates a spoken message explaining why approval is needed.
+        """
+        bead_type_friendly = bead_type.replace("_", " ")
+
+        # Start with the core message
+        narration_parts = [
+            f"I need your approval before I can create this {bead_type_friendly} bead.",
+        ]
+
+        # Add the reason if available
+        if validation_result and validation_result.get("approval_requirement"):
+            approval_req = validation_result["approval_requirement"]
+            reason = approval_req.get("reason", "")
+            if reason:
+                narration_parts.append(f"Reason: {reason}")
+
+        # Add the request summary
+        utterance_preview = request.utterance[:100]
+        if len(request.utterance) > 100:
+            utterance_preview += "..."
+        narration_parts.append(f"Request: {utterance_preview}")
+
+        # Add instructions
+        narration_parts.append("Please approve or reject this request on the canvas.")
+
+        return " ".join(narration_parts)
+
     def build_pending_card(
         self,
         request: EscalateRequest,
@@ -1091,7 +1127,7 @@ Output ONLY the revised bead body as markdown.
             )
 
         except BeadApprovalRequired as e:
-            # Approval required - broadcast approval event and return approval card
+            # Approval required - store pending approval and broadcast approval event
             logger.info(f"Approval required for intent {request.intent_id}")
 
             # Update intent status
@@ -1099,6 +1135,29 @@ Output ONLY the revised bead body as markdown.
             await store.update_intent_status(
                 intent_id=request.intent_id,
                 status="awaiting_approval",
+            )
+
+            # Store pending approval in database
+            approval_id = await store.create_pending_approval(
+                intent_id=request.intent_id,
+                session_id=request.session_id,
+                bead_body=e.bead_body,
+                bead_type=e.bead_type,
+                validation_result=e.approval_card.get("validation_result", {}),
+                utterance=request.utterance,
+                project_slug=request.project_slug,
+                topic_id=request.topic_id,
+            )
+            logger.info(f"Stored pending approval {approval_id} for intent {request.intent_id}")
+
+            # Add approval_id to approval card for reference
+            e.approval_card["approval_id"] = approval_id
+
+            # Build approval narration for voice mode
+            approval_narration = self._build_approval_narration(
+                request=request,
+                bead_type=e.bead_type,
+                validation_result=e.approval_card.get("validation_result", {}),
             )
 
             # Broadcast approval_required event to canvas
@@ -1109,10 +1168,12 @@ Output ONLY the revised bead body as markdown.
                     data={
                         "intent_id": request.intent_id,
                         "session_id": request.session_id,
+                        "approval_id": approval_id,
                         "approval_card": e.approval_card,
                         "bead_body": e.bead_body,
                         "bead_type": e.bead_type,
                         "utterance": request.utterance,
+                        "narration": approval_narration,  # For voice mode
                     },
                     target_session_id=request.session_id,
                 )
