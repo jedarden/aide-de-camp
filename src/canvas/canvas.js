@@ -66,12 +66,26 @@ function getStalenessLevel(seconds) {
  * Build a topic card from topic data.
  *
  * @param {TopicCardData} cardData - Topic card data structure
- * @returns {HTMLElement} a .topic-card element
+ * @returns {HTMLElement} a .topic-card element (or fallback-card element if card_fallback is set)
  */
 function createTopicCard(cardData) {
     const topic = cardData.topic;
     const staleness = cardData.staleness;
     const latestResult = cardData.latest_result;
+
+    // When the result has card_fallback=True, render the built-in generic fallback card
+    // instead of the standard topic card. The fallback card is a complete card showing
+    // result.data as a key/value grid (plan: Component Library → "Built-in generic
+    // fallback card"). Topic metadata is preserved via data attributes for staleness
+    // tracking and querying, but visually the card is the fallback presentation.
+    if (latestResult && latestResult.card_fallback) {
+        const fallbackCard = createFallbackCard(latestResult);
+        // Preserve topic metadata for staleness tracking and querying
+        fallbackCard.dataset.topicId = topic.id;
+        fallbackCard.dataset.topicType = topic.type || 'adhoc';
+        fallbackCard.dataset.cardFallback = '1';
+        return fallbackCard;
+    }
 
     const card = document.createElement('div');
     card.className = 'topic-card';
@@ -625,6 +639,7 @@ function createErrorCard(data) {
  * @property {string} latest_result.summary - Result summary
  * @property {string} [latest_result.urgency] - Result urgency (critical, high, normal, low)
  * @property {*} [latest_result.data] - Result data
+ * @property {boolean} [latest_result.card_fallback] - True when no component matched (fallback card rendered)
  */
 
 /**
