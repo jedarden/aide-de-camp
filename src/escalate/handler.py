@@ -23,6 +23,7 @@ import aiosqlite
 import httpx
 
 from ..components.hot_reload import get_reload_manager
+from ..render.hot_path import derive_result_type
 from ..session.store import get_store
 from .llm import get_zai_client, LLMRequest, ModelClass
 from .commands import get_kubectl_executor, CommandExecutionError
@@ -913,31 +914,35 @@ async def handle_terminal_failure(
             logger.warning(f"Failed to update bead_watch for {bead_ref}: {e}")
 
     # Step 3: Create or find topic for failed card
+    # Fetch intent once for both topic creation and result_type derivation
+    intent = None
+    try:
+        intent = await store.get_intent(intent_id)
+    except Exception as e:
+        logger.warning(f"Failed to fetch intent for result_type derivation: {e}")
+
     final_topic_id = topic_id
-    if not final_topic_id:
-        # Get intent details to create a meaningful topic label
-        try:
-            intent = await store.get_intent(intent_id)
-            if intent:
-                utterance_id = intent.get("utterance_id")
-                if utterance_id:
-                    # Get utterance to create label
-                    async with aiosqlite.connect(store.db_path) as db:
-                        db.row_factory = aiosqlite.Row
-                        async with db.execute(
-                            "SELECT raw_text FROM utterances WHERE id = ?",
-                            (utterance_id,)
-                        ) as cursor:
-                            utterance_row = await cursor.fetchone()
-                            if utterance_row:
-                                utterance_text = utterance_row["raw_text"][:80]
-                                final_topic_id, _ = await store.find_or_create_topic(
-                                    label=f"Failed: {utterance_text}",
-                                    session_id=session_id,
-                                    topic_type="exception",
-                                )
-        except Exception as e:
-            logger.warning(f"Failed to create topic for failed card: {e}")
+    if not final_topic_id and intent:
+        utterance_id = intent.get("utterance_id")
+        if utterance_id:
+            # Get utterance to create label
+            try:
+                async with aiosqlite.connect(store.db_path) as db:
+                    db.row_factory = aiosqlite.Row
+                    async with db.execute(
+                        "SELECT raw_text FROM utterances WHERE id = ?",
+                        (utterance_id,)
+                    ) as cursor:
+                        utterance_row = await cursor.fetchone()
+                        if utterance_row:
+                            utterance_text = utterance_row["raw_text"][:80]
+                            final_topic_id, _ = await store.find_or_create_topic(
+                                label=f"Failed: {utterance_text}",
+                                session_id=session_id,
+                                topic_type="exception",
+                            )
+            except Exception as e:
+                logger.warning(f"Failed to create topic for failed card: {e}")
 
     # Step 4: Link intent to topic and create failed card
     if final_topic_id:
@@ -958,6 +963,13 @@ async def handle_terminal_failure(
                 "action_hint": "This task encountered a terminal error and cannot proceed. Review the error details and retry if applicable.",
             }
 
+            # Derive result_type from intent data
+            result_type = derive_result_type(
+                intent_type=intent.get("intent_type") if intent else None,
+                project_slug=intent.get("project_slug") if intent else None,
+                lookup_kind=intent.get("lookup_kind") if intent else None,
+            )
+
             result_id = await store.create_result(
                 intent_id=intent_id,
                 topic_id=final_topic_id,
@@ -965,6 +977,7 @@ async def handle_terminal_failure(
                 summary=summary,
                 data=data,
                 urgency="high",
+                result_type=result_type,
             )
 
             logger.info(f"Created failed card {result_id} for intent {intent_id}")
