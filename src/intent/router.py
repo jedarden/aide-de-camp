@@ -506,6 +506,7 @@ class IntentRouter:
                 result_type=result_type,
                 result_data=synthesize_result.data,
                 summary=synthesize_result.summary,
+                urgency=synthesize_result.urgency.value,
             )
 
             # Update result's card_fallback flag so client knows which path to take
@@ -725,6 +726,7 @@ class IntentRouter:
                 result_type=result_type,
                 result_data=data,
                 summary=summary,
+                urgency="high",
             )
 
             # Update result's card_fallback flag
