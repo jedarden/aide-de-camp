@@ -107,22 +107,22 @@ class DemoSeedVerifier:
     """
 
     # Scripted projects from the demo script
-    SCRIPTED_PROJECTS = ["options-pipeline", "ibkr-mcp"]
+    SCRIPTED_PROJECTS = ["whisper-stt", "pbx-web"]
 
     # Scripted result types that need component coverage
     # (pending/ack and welcome are built-ins, not component-library shapes)
     SCRIPTED_RESULT_TYPES = [
-        "status:options-pipeline",
-        "status:ibkr-mcp",
-        "lookup:logs:ibkr-mcp",
-        "lookup:config:ibkr-mcp",
-        "brainstorm:options-pipeline",
+        "status:whisper-stt",
+        "status:pbx-web",
+        "lookup:logs:whisper-stt",
+        "lookup:config:whisper-stt",
+        "brainstorm:pbx-web",
     ]
 
     # Required intents for each scripted project
     REQUIRED_INTENTS = {
-        "options-pipeline": ["status", "brainstorm", "task-profile"],
-        "ibkr-mcp": ["status", "lookup", "brainstorm", "task-profile"],
+        "whisper-stt": ["status", "lookup", "brainstorm", "task-profile"],
+        "pbx-web": ["status", "lookup", "brainstorm", "task-profile"],
     }
 
     def __init__(self, verbose: bool = False, dry_run: bool = False):
@@ -368,11 +368,11 @@ class DemoSeedVerifier:
 
             # Scripted utterances from the demo (one per distinct shape)
             test_utterances = [
-                ("Has the options pipeline caught up?", "status", "options-pipeline"),
-                ("What's the state of the ibkr mcp?", "status", "ibkr-mcp"),
-                ("Pull up the recent logs for the ibkr mcp.", "lookup:logs", "ibkr-mcp"),
-                ("Find the ibkr mcp's deployment config.", "lookup:config", "ibkr-mcp"),
-                ("Should the options pipeline batch through a queue?", "brainstorm", "options-pipeline"),
+                ("What's the status of whisper stt?", "status", "whisper-stt"),
+                ("How's the pbx web doing?", "status", "pbx-web"),
+                ("Pull up the recent logs for whisper stt.", "lookup:logs", "whisper-stt"),
+                ("Find the whisper stt deployment config.", "lookup:config", "whisper-stt"),
+                ("Should the pbx web use redundant ingress controllers?", "brainstorm", "pbx-web"),
             ]
 
             errors = []

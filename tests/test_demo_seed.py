@@ -115,8 +115,8 @@ class TestDemoSeedVerifier:
         assert verifier.verbose is True
         assert verifier.dry_run is True
         assert len(verifier.SCRIPTED_PROJECTS) == 2
-        assert "options-pipeline" in verifier.SCRIPTED_PROJECTS
-        assert "ibkr-mcp" in verifier.SCRIPTED_PROJECTS
+        assert "whisper-stt" in verifier.SCRIPTED_PROJECTS
+        assert "pbx-web" in verifier.SCRIPTED_PROJECTS
 
     @pytest.mark.asyncio
     async def test_check_registry_missing_entries(self):
@@ -130,7 +130,7 @@ class TestDemoSeedVerifier:
                     "aliases": ["other"],
                     "repo_path": "/home/coding/other-project",
                     "intent_support": ["status", "task-profile"],
-                    "cluster": "ardenone-cluster",
+                    "cluster": "apexalgo-iad",
                 }
             }
         }
@@ -150,19 +150,19 @@ class TestDemoSeedVerifier:
         # Mock registry with entries but missing repo_path
         mock_registry = {
             "projects": {
-                "options-pipeline": {
-                    "aliases": ["the pipeline"],
-                    "repo_path": None,  # Missing!
-                    "intent_support": ["status", "brainstorm", "task-profile"],
-                    "cluster": "apexalgo-iad",
-                    "argocd_app": "options-pipeline",
-                },
-                "ibkr-mcp": {
-                    "aliases": ["ibkr"],
+                "whisper-stt": {
+                    "aliases": ["whisper", "stt"],
                     "repo_path": None,  # Missing!
                     "intent_support": ["status", "lookup", "brainstorm", "task-profile"],
-                    "cluster": "apexalgo-iad",
-                    "argocd_app": "ibkr-mcp",
+                    "cluster": "ardenone-cluster",
+                    "argocd_app": "whisper-stt",
+                },
+                "pbx-web": {
+                    "aliases": ["pbx"],
+                    "repo_path": None,  # Missing!
+                    "intent_support": ["status", "lookup", "brainstorm", "task-profile"],
+                    "cluster": "ardenone-cluster",
+                    "argocd_app": "pbx-web",
                 },
             }
         }
@@ -183,30 +183,30 @@ class TestDemoSeedVerifier:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            opts_dir = tmppath / "options-pipeline"
-            ibkr_dir = tmppath / "ibkr-mcp"
+            whisper_dir = tmppath / "whisper-stt"
+            pbx_dir = tmppath / "pbx-web"
 
-            opts_dir.mkdir()
-            ibkr_dir.mkdir()
-            (opts_dir / ".git").touch()
-            (opts_dir / ".beads").mkdir()
-            (ibkr_dir / ".git").touch()
-            (ibkr_dir / ".beads").mkdir()
+            whisper_dir.mkdir()
+            pbx_dir.mkdir()
+            (whisper_dir / ".git").touch()
+            (whisper_dir / ".beads").mkdir()
+            (pbx_dir / ".git").touch()
+            (pbx_dir / ".beads").mkdir()
 
             # Mock registry missing task-profile intent
             mock_registry = {
                 "projects": {
-                    "options-pipeline": {
-                        "aliases": ["the pipeline"],
-                        "repo_path": str(opts_dir),
-                        "intent_support": ["status", "brainstorm"],  # Missing task-profile
-                        "cluster": "apexalgo-iad",
-                    },
-                    "ibkr-mcp": {
-                        "aliases": ["ibkr"],
-                        "repo_path": str(ibkr_dir),
+                    "whisper-stt": {
+                        "aliases": ["whisper", "stt"],
+                        "repo_path": str(whisper_dir),
                         "intent_support": ["status", "lookup", "brainstorm"],  # Missing task-profile
-                        "cluster": "apexalgo-iad",
+                        "cluster": "ardenone-cluster",
+                    },
+                    "pbx-web": {
+                        "aliases": ["pbx"],
+                        "repo_path": str(pbx_dir),
+                        "intent_support": ["status", "lookup", "brainstorm"],  # Missing task-profile
+                        "cluster": "ardenone-cluster",
                     },
                 }
             }
@@ -225,18 +225,18 @@ class TestDemoSeedVerifier:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
-            opts_dir = tmppath / "options-pipeline"
-            opts_dir.mkdir()
-            (opts_dir / ".git").touch()
-            (opts_dir / ".beads").mkdir()
+            whisper_dir = tmppath / "whisper-stt"
+            whisper_dir.mkdir()
+            (whisper_dir / ".git").touch()
+            (whisper_dir / ".beads").mkdir()
 
             # Mock registry with authenticated ArgoCD (not consumable)
             mock_registry = {
                 "projects": {
-                    "options-pipeline": {
-                        "aliases": ["the pipeline"],
-                        "repo_path": str(opts_dir),
-                        "intent_support": ["status", "brainstorm", "task-profile"],
+                    "whisper-stt": {
+                        "aliases": ["whisper", "stt"],
+                        "repo_path": str(whisper_dir),
+                        "intent_support": ["status", "lookup", "brainstorm", "task-profile"],
                         "cluster": "apexalgo-iad",  # This cluster requires auth
                     },
                 }
@@ -271,28 +271,28 @@ class TestDemoSeedVerifier:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
-            opts_dir = tmppath / "options-pipeline"
-            ibkr_dir = tmppath / "ibkr-mcp"
+            whisper_dir = tmppath / "whisper-stt"
+            pbx_dir = tmppath / "pbx-web"
 
-            opts_dir.mkdir()
-            ibkr_dir.mkdir()
-            (opts_dir / ".git").touch()
-            (opts_dir / ".beads").mkdir()
-            (ibkr_dir / ".git").touch()
-            (ibkr_dir / ".beads").mkdir()
+            whisper_dir.mkdir()
+            pbx_dir.mkdir()
+            (whisper_dir / ".git").touch()
+            (whisper_dir / ".beads").mkdir()
+            (pbx_dir / ".git").touch()
+            (pbx_dir / ".beads").mkdir()
 
             # Mock registry with everything correct
             mock_registry = {
                 "projects": {
-                    "options-pipeline": {
-                        "aliases": ["the pipeline", "options"],
-                        "repo_path": str(opts_dir),
-                        "intent_support": ["status", "brainstorm", "task-profile"],
+                    "whisper-stt": {
+                        "aliases": ["whisper", "stt", "speech-to-text"],
+                        "repo_path": str(whisper_dir),
+                        "intent_support": ["status", "lookup", "brainstorm", "task-profile"],
                         "cluster": "ardenone-cluster",  # Has read-only proxy
                     },
-                    "ibkr-mcp": {
-                        "aliases": ["ibkr", "the mcp"],
-                        "repo_path": str(ibkr_dir),
+                    "pbx-web": {
+                        "aliases": ["pbx", "phone system"],
+                        "repo_path": str(pbx_dir),
                         "intent_support": ["status", "lookup", "brainstorm", "task-profile"],
                         "cluster": "ardenone-cluster",
                     },
@@ -350,7 +350,7 @@ class TestDemoSeedVerifier:
 
         assert result.status == CheckStatus.FAIL
         assert len(result.details["missing_result_types"]) == 5
-        assert "status:options-pipeline" in result.details["missing_result_types"]
+        assert "status:whisper-stt" in result.details["missing_result_types"]
 
     @pytest.mark.asyncio
     async def test_check_component_coverage_complete(self):
