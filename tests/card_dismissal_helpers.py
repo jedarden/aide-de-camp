@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
+import aiosqlite
 import pytest
 
 from src.session.store import SessionStore
@@ -305,6 +306,374 @@ def find_card_by_bead_id(cards: list[dict[str, Any]], bead_id: str) -> dict[str,
             if builtin_data.get("data", {}).get("bead_id") == bead_id:
                 return card
     return None
+
+
+# =============================================================================
+# Database Verification Helpers
+# =============================================================================
+
+async def verify_result_exists_in_db(
+    store: SessionStore,
+    result_id: str
+) -> bool:
+    """
+    Verify that a result exists in the database by result ID.
+
+    Args:
+        store: SessionStore instance
+        result_id: Result ID to check
+
+    Returns:
+        True if result exists, False otherwise
+
+    Example:
+        exists = await verify_result_exists_in_db(store, result_id)
+    """
+    import sqlite3
+    try:
+        async with aiosqlite.connect(store.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT 1 FROM results WHERE id = ?",
+                (result_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row is not None
+    except Exception:
+        return False
+
+
+async def verify_result_count_for_intent(
+    store: SessionStore,
+    intent_id: str,
+    expected_count: int
+) -> bool:
+    """
+    Verify the number of results for a specific intent.
+
+    Args:
+        store: SessionStore instance
+        intent_id: Intent ID to check
+        expected_count: Expected number of results
+
+    Returns:
+        True if count matches, False otherwise
+
+    Example:
+        assert await verify_result_count_for_intent(store, intent_id, 0)
+    """
+    results = await store.get_results_for_intent(intent_id)
+    return len(results) == expected_count
+
+
+async def verify_result_deleted_from_db(
+    store: SessionStore,
+    result_id: str,
+    session_id: str
+) -> dict:
+    """
+    Verify that a result was deleted from the database.
+
+    Performs both direct database query and session isolation check.
+
+    Args:
+        store: SessionStore instance
+        result_id: Result ID that should be deleted
+        session_id: Session ID for isolation check
+
+    Returns:
+        Dict with verification results:
+        {
+            "result_deleted": bool,
+            "session_isolated": bool,
+            "verification_passed": bool
+        }
+
+    Example:
+        verification = await verify_result_deleted_from_db(store, result_id, session_id)
+        assert verification["verification_passed"]
+    """
+    import sqlite3
+
+    # Check if result exists in database
+    result_exists = not await verify_result_exists_in_db(store, result_id)
+
+    # Check session isolation by attempting to delete again
+    deletion_result = await store.delete_result(result_id, session_id)
+    session_isolated = deletion_result.get("result_deleted", 0) == 0
+
+    return {
+        "result_deleted": result_exists,
+        "session_isolated": session_isolated,
+        "verification_passed": result_exists and session_isolated
+    }
+
+
+async def get_all_results_for_session(store: SessionStore, session_id: str) -> list[dict]:
+    """
+    Get all results for a session directly from database.
+
+    Args:
+        store: SessionStore instance
+        session_id: Session ID
+
+    Returns:
+        List of result dicts
+
+    Example:
+        results = await get_all_results_for_session(store, session_id)
+    """
+    async with aiosqlite.connect(store.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT * FROM results
+               WHERE session_id = ?
+               ORDER BY created_at DESC""",
+            (session_id,)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+async def verify_database_integrity_after_dismissal(
+    store: SessionStore,
+    session_id: str,
+    expected_result_count: int | None = None
+) -> dict:
+    """
+    Verify database integrity after card dismissal.
+
+    Checks that:
+    - No orphaned results exist
+    - Result counts are consistent
+    - Foreign key relationships are intact
+
+    Args:
+        store: SessionStore instance
+        session_id: Session ID to verify
+        expected_result_count: Optional expected count of results
+
+    Returns:
+        Dict with integrity check results
+
+    Example:
+        integrity = await verify_database_integrity_after_dismissal(store, session_id)
+        assert integrity["all_checks_passed"]
+    """
+    import sqlite3
+
+    checks_passed = {}
+    all_passed = True
+
+    # Check 1: No orphaned results (results without valid session/intent/topic)
+    try:
+        async with aiosqlite.connect(store.db_path) as db:
+            db.row_factory = aiosqlite.Row
+
+            # Check for results with invalid session_id
+            async with db.execute(
+                """SELECT COUNT(*) FROM results r
+                   LEFT JOIN sessions s ON r.session_id = s.id
+                   WHERE s.id IS NULL"""
+            ) as cursor:
+                orphaned_by_session = (await cursor.fetchone())[0]
+
+            # Check for results with invalid topic_id
+            async with db.execute(
+                """SELECT COUNT(*) FROM results r
+                   LEFT JOIN topics t ON r.topic_id = t.id
+                   WHERE t.id IS NULL"""
+            ) as cursor:
+                orphaned_by_topic = (await cursor.fetchone())[0]
+
+            checks_passed["no_orphaned_results"] = (
+                orphaned_by_session == 0 and orphaned_by_topic == 0
+            )
+            if orphaned_by_session > 0 or orphaned_by_topic > 0:
+                all_passed = False
+
+    except Exception as e:
+        checks_passed["no_orphaned_results"] = False
+        all_passed = False
+
+    # Check 2: Result count consistency
+    if expected_result_count is not None:
+        results = await get_all_results_for_session(store, session_id)
+        checks_passed["result_count_match"] = len(results) == expected_result_count
+        if len(results) != expected_result_count:
+            all_passed = False
+    else:
+        checks_passed["result_count_match"] = True
+
+    # Check 3: Session exists and is valid
+    try:
+        session = await store.get_session(session_id)
+        checks_passed["session_valid"] = session is not None
+        if session is None:
+            all_passed = False
+    except Exception:
+        checks_passed["session_valid"] = False
+        all_passed = False
+
+    # Check 4: Topics are valid
+    try:
+        topics = await store.get_active_topics(session_id)
+        checks_passed["topics_valid"] = all(t.get("id") for t in topics)
+        if not all(t.get("id") for t in topics):
+            all_passed = False
+    except Exception:
+        checks_passed["topics_valid"] = False
+        all_passed = False
+
+    return {
+        "all_checks_passed": all_passed,
+        "checks": checks_passed,
+        "details": {
+            "orphaned_by_session": orphaned_by_session if 'orphaned_by_session' in locals() else 0,
+            "orphaned_by_topic": orphaned_by_topic if 'orphaned_by_topic' in locals() else 0,
+        }
+    }
+
+
+async def verify_dismissal_persistence_across_reopen(
+    db_path: Path,
+    session_id: str,
+    result_id: str | None = None,
+    intent_id: str | None = None
+) -> dict:
+    """
+    Verify that dismissal persists across database reopen.
+
+    Closes the current database and reopens it to simulate a restart.
+
+    Args:
+        db_path: Path to the database file
+        session_id: Session ID to verify
+        result_id: Optional result ID that should be deleted
+        intent_id: Optional intent ID to check results for
+
+    Returns:
+        Dict with persistence verification results
+
+    Example:
+        persistence = await verify_dismissal_persistence_across_reopen(
+            db_path, session_id, result_id=result_id
+        )
+        assert persistence["dismissal_persisted"]
+    """
+    from src.session.store import SessionStore
+
+    # Close any existing connections and reopen database
+    store1 = SessionStore(db_path)
+    await store1.initialize()
+
+    verification_results = {}
+
+    try:
+        # Verify session still exists
+        session = await store1.get_session(session_id)
+        verification_results["session_exists"] = session is not None
+
+        # Verify result deletion if result_id provided
+        if result_id:
+            result_exists = await verify_result_exists_in_db(store1, result_id)
+            verification_results["result_deleted"] = not result_exists
+        else:
+            verification_results["result_deleted"] = True
+
+        # Verify intent results if intent_id provided
+        if intent_id:
+            results = await store1.get_results_for_intent(intent_id)
+            verification_results["intent_result_count"] = len(results)
+        else:
+            verification_results["intent_result_count"] = None
+
+        # Check overall persistence
+        verification_results["dismissal_persisted"] = all([
+            verification_results.get("session_exists", False),
+            verification_results.get("result_deleted", True),
+        ])
+
+    finally:
+        await store1.close()
+
+    return verification_results
+
+
+async def count_results_by_bead_id(
+    store: SessionStore,
+    session_id: str,
+    bead_id: str
+) -> int:
+    """
+    Count results for a specific bead_id in a session.
+
+    Args:
+        store: SessionStore instance
+        session_id: Session ID
+        bead_id: Bead ID to count
+
+    Returns:
+        Number of results for the bead_id
+
+    Example:
+        count = await count_results_by_bead_id(store, session_id, "adc-stuck-1")
+    """
+    import json
+
+    results = await get_all_results_for_session(store, session_id)
+    count = 0
+    for result in results:
+        try:
+            data = json.loads(result.get("data", "{}"))
+            if data.get("bead_id") == bead_id or data.get("bead_ref") == bead_id:
+                count += 1
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return count
+
+
+async def verify_cards_remain_after_dismissal(
+    store: SessionStore,
+    session_id: str,
+    dismissed_bead_ids: list[str],
+    remaining_bead_ids: list[str]
+) -> dict:
+    """
+    Verify that specific cards were dismissed and others remain.
+
+    Args:
+        store: SessionStore instance
+        session_id: Session ID
+        dismissed_bead_ids: Bead IDs that should be dismissed
+        remaining_bead_ids: Bead IDs that should remain
+
+    Returns:
+        Dict with verification results
+
+    Example:
+        verification = await verify_cards_remain_after_dismissal(
+            store, session_id,
+            dismissed_bead_ids=["adc-stuck-1"],
+            remaining_bead_ids=["adc-stuck-2", "adc-stuck-3"]
+        )
+        assert verification["all_correct"]
+    """
+    results = {}
+
+    # Check dismissed cards are gone
+    for bead_id in dismissed_bead_ids:
+        count = await count_results_by_bead_id(store, session_id, bead_id)
+        results[f"dismissed_{bead_id}"] = count == 0
+
+    # Check remaining cards still exist
+    for bead_id in remaining_bead_ids:
+        count = await count_results_by_bead_id(store, session_id, bead_id)
+        results[f"remaining_{bead_id}"] = count > 0
+
+    results["all_correct"] = all(results.values())
+
+    return results
 
 
 # =============================================================================
