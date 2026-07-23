@@ -798,6 +798,175 @@ function createFailedCard(data) {
     return card;
 }
 
+/**
+ * Build an approval card for action beads requiring user approval.
+ *
+ * Displays when an action/self_modification/monitoring_config bead requires
+ * explicit user approval before creation via bf CLI. Shows the bead body preview,
+ * validation result, and approve/reject buttons.
+ *
+ * @param {Object} data - Approval card data structure
+ * @param {string} data.approval_id - Unique approval ID
+ * @param {string} data.intent_id - Intent that triggered this approval
+ * @param {string} data.session_id - Session ID
+ * @param {string} data.bead_type - Type of bead (action, self_modification, etc.)
+ * @param {string} data.utterance - Original user utterance
+ * @param {Object} data.approval_card - Approval card details from escalate handler
+ * @returns {HTMLElement} an .approval-card element (data-builtin="approval")
+ */
+function createApprovalCard(data) {
+    data = data || {};
+    const card = el('div', 'builtin-card approval-card');
+    card.dataset.builtin = 'approval';
+    card.dataset.approvalId = String(data.approval_id || '');
+    card.dataset.intentId = String(data.intent_id || '');
+
+    const approvalCard = data.approval_card || {};
+
+    card.appendChild(el('div', 'builtin-header', [
+        el('span', 'builtin-icon', ['✋']),
+        el('span', 'builtin-title', ['Approval Required'])
+    ]));
+
+    // Summary of what needs approval
+    if (approvalCard.summary) {
+        card.appendChild(el('p', 'approval-summary', [approvalCard.summary]));
+    }
+
+    // Bead type badge
+    if (data.bead_type) {
+        const badge = el('span', 'approval-badge', [
+            'Bead type: ' + data.bead_type.replace('_', ' ')
+        ]);
+        card.appendChild(badge);
+    }
+
+    // Validation result (why approval is needed)
+    if (approvalCard.validation_result) {
+        const vr = approvalCard.validation_result;
+        if (vr.approval_requirement) {
+            const ar = vr.approval_requirement;
+            if (ar.reason) {
+                card.appendChild(el('div', 'approval-reason', [
+                    el('span', 'approval-reason-label', ['Reason: ']),
+                    el('span', 'approval-reason-text', [ar.reason])
+                ]));
+            }
+        }
+    }
+
+    // Show original utterance for context
+    if (data.utterance) {
+        card.appendChild(el('div', 'approval-utterance', [
+            el('span', 'approval-utterance-label', ['Request: ']),
+            el('span', 'approval-utterance-text', [data.utterance])
+        ]));
+    }
+
+    // Bead body preview (truncated)
+    if (data.bead_body) {
+        const preview = el('div', 'approval-preview');
+        preview.appendChild(el('div', 'approval-preview-label', ['Bead body preview:']));
+
+        const bodyText = data.bead_body.length > 300
+            ? data.bead_body.substring(0, 300) + '...'
+            : data.bead_body;
+
+        preview.appendChild(el('pre', 'approval-preview-text', [bodyText]));
+        card.appendChild(preview);
+    }
+
+    // Action buttons
+    const actions = el('div', 'approval-actions');
+
+    const approveBtn = el('button', 'approval-approve', ['✓ Approve']);
+    approveBtn.onclick = function() {
+        handleApproval(data.approval_id, data.session_id, 'approve');
+    };
+
+    const rejectBtn = el('button', 'approval-reject', ['✗ Reject']);
+    rejectBtn.onclick = function() {
+        handleApproval(data.approval_id, data.session_id, 'reject');
+    };
+
+    actions.appendChild(approveBtn);
+    actions.appendChild(rejectBtn);
+    card.appendChild(actions);
+
+    return card;
+}
+
+/**
+ * Handle approve/reject button clicks.
+ *
+ * Calls the backend API to approve or reject the pending bead.
+ */
+async function handleApproval(approvalId, sessionId, action) {
+    const card = document.querySelector('[data-approval-id="' + approvalId + '"]');
+    if (!card) return;
+
+    // Disable buttons
+    const approveBtn = card.querySelector('.approval-approve');
+    const rejectBtn = card.querySelector('.approval-reject');
+    if (approveBtn) approveBtn.disabled = true;
+    if (rejectBtn) rejectBtn.disabled = true;
+
+    try {
+        if (action === 'approve') {
+            const response = await fetch('/api/v1/beads/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    approval_id: approvalId,
+                    session_id: sessionId
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Bead approved:', result);
+
+                // Remove the approval card
+                card.remove();
+
+                // The result_created SSE event will trigger loadTopics() to show the new pending card
+            } else {
+                const error = await response.json();
+                console.error('Approval failed:', error);
+                alert('Failed to approve: ' + (error.error || 'Unknown error'));
+                if (approveBtn) approveBtn.disabled = false;
+                if (rejectBtn) rejectBtn.disabled = false;
+            }
+        } else if (action === 'reject') {
+            const response = await fetch('/api/v1/beads/reject', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    approval_id: approvalId,
+                    session_id: sessionId,
+                    reason: 'User rejected'
+                })
+            });
+
+            if (response.ok) {
+                console.log('Bead rejected');
+                card.remove();
+            } else {
+                const error = await response.json();
+                console.error('Rejection failed:', error);
+                alert('Failed to reject: ' + (error.error || 'Unknown error'));
+                if (approveBtn) approveBtn.disabled = false;
+                if (rejectBtn) rejectBtn.disabled = false;
+            }
+        }
+    } catch (error) {
+        console.error('Approval action failed:', error);
+        alert('Failed to ' + action + ': ' + error.message);
+        if (approveBtn) approveBtn.disabled = false;
+        if (rejectBtn) rejectBtn.disabled = false;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // (1) Generic fallback card — key/value grid over result.data + summary
 // ---------------------------------------------------------------------------
@@ -915,6 +1084,8 @@ if (typeof window !== 'undefined') {
     window.createErrorCard = createErrorCard;  // Error card renderer for SSE error events
     window.createStuckCard = createStuckCard;  // Stuck card renderer for task_stuck events
     window.createFailedCard = createFailedCard;  // Failed card renderer for task_failed events
+    window.createApprovalCard = createApprovalCard;  // Approval card renderer for approval_required events
+    window.handleApproval = handleApproval;  // Approval button click handler
     // Expose type definitions for IDE autocomplete and documentation
     window.CanvasCardTypes = {
         StuckCardData: 'StuckCardData',
