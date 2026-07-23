@@ -14,11 +14,12 @@ projects:
     cluster: apexalgo-iad
     namespace: options
     argocd_app: options-pipeline  # ArgoCD Application name; defaults to the slug when omitted
-    repo_path: null
+    repo_path: /home/coding/options-pipeline  # local checkout: git-log + per-project bead listing
     intent_support:
       - status
       - action
       - brainstorm
+      - task-profile  # Required for demo step 5
     workflows:
       deploy:
         steps:
@@ -41,11 +42,12 @@ projects:
     cluster: apexalgo-iad
     namespace: ibkr-mcp
     argocd_app: ibkr-mcp  # explicit here for clarity; equals the slug default
-    repo_path: null
+    repo_path: /home/coding/ibkr-mcp  # local checkout with its own .beads/ workspace
     intent_support:
       - status
       - lookup
       - brainstorm
+      - task-profile  # Required for demo step 5
     workflows:
       status:
         steps:
