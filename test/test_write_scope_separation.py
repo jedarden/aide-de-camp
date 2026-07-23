@@ -177,9 +177,9 @@ class TestWriteScopeSeparation:
             assert pattern_row is not None
             assert pattern_row["sample_count"] == 2, \
                 "hot-path render must increment sample_count (seeded 1, now 2)"
-            # last_matched should be a recent timestamp (> 0)
-            assert pattern_row["last_matched"] > 0, \
-                "hot-path render must update last_matched"
+            # updated_at should be a recent timestamp (> 0)
+            assert pattern_row["updated_at"] > 0, \
+                "hot-path render must update updated_at"
             # match_score gets updated via running avg, must not be 1.0 (seeded 0.9)
             assert pattern_row["match_score"] != 1.0 or pattern_row["match_score"] >= 0.9
 
