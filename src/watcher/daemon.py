@@ -139,6 +139,8 @@ class BeadWatcher:
         # it is reassigned by the supervisor on each restart. (adc-4afi)
         self._supervisor_task: Optional[asyncio.Task] = None
         self._watch_task: Optional[asyncio.Task] = None
+        # Ambient monitoring task - runs independently from bead watch loop
+        self._ambient_task: Optional[asyncio.Task] = None
         # Consecutive crashes since the last healthy tick; drives the backoff
         # schedule. Reset to 0 whenever a tick completes successfully.
         self._restart_count = 0
@@ -169,18 +171,30 @@ class BeadWatcher:
     async def start(self) -> None:
         """Start the bead watcher daemon.
 
-        Spawns a single lifespan supervisor task that owns the watch-task
-        lifecycle: it runs the poll loop, and if the loop's task itself dies
-        (an exception that escapes its per-iteration catch, or an unexpected
-        return) it restarts the task with exponential backoff. start()/stop()
-        keep their signatures and the lifespan wiring in src/main.py is
-        unchanged — ``_bead_watcher`` stays the module-level instance.
+        Spawns two independent tasks:
+        1. Lifespan supervisor task that owns the bead watch-task lifecycle
+        2. Ambient monitoring task that runs on its own timer (plan §10)
+
+        The bead watch loop polls for closed beads and manages circuit breaker.
+        The ambient monitoring loop runs independently on tick_interval_seconds from
+        monitoring.yaml config (default 300s). start()/stop() keep their signatures
+        and the lifespan wiring in src/main.py is unchanged — ``_bead_watcher``
+        stays the module-level instance.
         """
         self._running = True
+        # Start bead watch supervisor
         self._supervisor_task = asyncio.create_task(
             self._supervise(), name="bead-watcher-supervisor"
         )
-        logger.info("Bead watcher started (interval=%ss)", self.check_interval_seconds)
+        # Start ambient monitoring loop (independent timer)
+        self._ambient_task = asyncio.create_task(
+            self._ambient_monitoring_loop(), name="ambient-monitoring-loop"
+        )
+        logger.info(
+            "Bead watcher started (bead interval=%ss, ambient interval=%ss)",
+            self.check_interval_seconds,
+            self._monitoring_tick_interval,
+        )
 
     async def stop(self) -> None:
         """Stop the bead watcher daemon.
@@ -188,7 +202,8 @@ class BeadWatcher:
         Flags shutdown, then cancels and awaits the supervisor (which in turn
         tears down the watch task it spawned). The watch task is cancelled
         explicitly as well: cancelling a supervisor awaiting another task does
-        not automatically cancel the awaited task.
+        not automatically cancel the awaited task. Also cancels the ambient
+        monitoring task.
         """
         self._running = False
         supervisor = self._supervisor_task
@@ -203,6 +218,13 @@ class BeadWatcher:
             watch.cancel()
             try:
                 await watch
+            except BaseException:  # noqa: BLE001 — tearing down, swallow anything
+                pass
+        ambient = self._ambient_task
+        if ambient and not ambient.done():
+            ambient.cancel()
+            try:
+                await ambient
             except BaseException:  # noqa: BLE001 — tearing down, swallow anything
                 pass
         logger.info("Bead watcher stopped")
@@ -350,6 +372,32 @@ class BeadWatcher:
             except asyncio.CancelledError:
                 raise
 
+    async def _ambient_monitoring_loop(self) -> None:
+        """Ambient monitoring loop - runs on independent timer (plan §10).
+
+        Each iteration:
+        1. Hot-reloads monitoring config (reads tick_interval_seconds)
+        2. Runs ambient monitoring tick (fetch/diff cycle)
+        3. Sleeps for tick_interval_seconds
+
+        This loop is independent from the bead watch loop and uses a separate
+        timer. Per-iteration exceptions are caught and logged so a transient error
+        never ends the task.
+        """
+        while self._running:
+            try:
+                # Run ambient monitoring tick (includes hot-reload)
+                await self._ambient_monitoring_tick()
+            except asyncio.CancelledError:
+                raise  # shutdown signal
+            except Exception as e:
+                logger.error(f"Error in ambient monitoring loop: {e}", exc_info=True)
+            # Sleep for the configured tick interval (hot-reloaded each tick)
+            try:
+                await asyncio.sleep(self._monitoring_tick_interval)
+            except asyncio.CancelledError:
+                raise
+
     async def _check_for_events(self) -> None:
         """Poll for newly-closed bead events and route each to surfaces.
 
@@ -363,8 +411,8 @@ class BeadWatcher:
         polls open tracked beads for REFUSED comments, updates bead_watch state,
         fences beads that meet criteria, and creates stuck cards.
 
-        Also runs ambient monitoring tick (plan §10 Ambient monitoring tick):
-        hot-reloads config and evaluates monitoring rules.
+        Note: Ambient monitoring tick runs in its own separate loop
+        (_ambient_monitoring_loop), not here.
         """
         events = await self._poll_closed_beads()
         for event in events:
@@ -372,9 +420,6 @@ class BeadWatcher:
 
         # Circuit breaker tick (plan §10 The Async Path)
         await self._check_circuit_breaker()
-
-        # Ambient monitoring tick (plan §10 Ambient monitoring tick)
-        await self._ambient_monitoring_tick()
 
     async def _poll_closed_beads(self) -> list[BeadEvent]:
         """Poll closed beads via the CLI and return the newly-closed subset.
