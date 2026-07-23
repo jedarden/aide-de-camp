@@ -340,6 +340,86 @@ class TestArgocdApp:
         params = client.requests[0][1]
         assert params == {"name": "my-proj"}
 
+    @pytest.mark.asyncio
+    async def test_authenticated_cluster_fails_fast_with_caveat(self, mock_httpx):
+        """
+        apexalgo-iad (access: authenticated) raises ArgocdEndpointUnresolvable
+        with a reason mentioning authentication — ZERO HTTP requests issued.
+        This proves a wrong-instance query is impossible.
+        """
+        from src.fetch.clusters import ArgocdEndpointUnresolvable, reset_cache
+
+        reset_cache()  # ensure fresh clusters.yaml read
+        client = mock_httpx(FakeResponse(json_data={"items": []}))
+        strand = FetchStrand()
+
+        # apexalgo-iad is mapped in clusters.yaml with access: authenticated
+        with pytest.raises(ArgocdEndpointUnresolvable) as exc_info:
+            await strand._fetch_argocd_app(
+                _ctx(app_name="test-app", cluster="apexalgo-iad")
+            )
+
+        # The exception carries the cluster and a human-readable reason
+        assert exc_info.value.cluster == "apexalgo-iad"
+        assert "authentication" in exc_info.value.reason.lower()
+        assert "apexalgo-iad" in exc_info.value.reason
+
+        # CRITICAL: no HTTP request was made — proving no wrong-instance query
+        assert client.requests == []
+
+    @pytest.mark.asyncio
+    async def test_unmapped_cluster_fails_fast_with_caveat(self, mock_httpx):
+        """
+        A cluster absent from clusters.yaml (e.g., 'some-unmapped-cluster')
+        raises ArgocdEndpointUnresolvable with a reason mentioning no ArgoCD
+        mapping — ZERO HTTP requests issued. This proves a wrong-instance
+        query is impossible.
+        """
+        from src.fetch.clusters import ArgocdEndpointUnresolvable, reset_cache
+
+        reset_cache()  # ensure fresh clusters.yaml read
+        client = mock_httpx(FakeResponse(json_data={"items": []}))
+        strand = FetchStrand()
+
+        # 'some-unmapped-cluster' does not exist in clusters.yaml
+        with pytest.raises(ArgocdEndpointUnresolvable) as exc_info:
+            await strand._fetch_argocd_app(
+                _ctx(app_name="test-app", cluster="some-unmapped-cluster")
+            )
+
+        # The exception carries the cluster and a human-readable reason
+        assert exc_info.value.cluster == "some-unmapped-cluster"
+        assert "no argocd mapping" in exc_info.value.reason.lower()
+        assert "some-unmapped-cluster" in exc_info.value.reason
+
+        # CRITICAL: no HTTP request was made — proving no wrong-instance query
+        assert client.requests == []
+
+    @pytest.mark.asyncio
+    async def test_none_cluster_fails_fast_with_caveat(self, mock_httpx):
+        """
+        cluster=None (unconfigured) raises ArgocdEndpointUnresolvable with
+        a reason mentioning no cluster configured — ZERO HTTP requests issued.
+        """
+        from src.fetch.clusters import ArgocdEndpointUnresolvable, reset_cache
+
+        reset_cache()
+        client = mock_httpx(FakeResponse(json_data={"items": []}))
+        strand = FetchStrand()
+
+        # cluster=None means no cluster is configured for the project
+        with pytest.raises(ArgocdEndpointUnresolvable) as exc_info:
+            await strand._fetch_argocd_app(
+                _ctx(app_name="test-app", cluster=None)
+            )
+
+        # The exception carries a human-readable reason
+        assert exc_info.value.cluster is None
+        assert "no cluster configured" in exc_info.value.reason.lower()
+
+        # CRITICAL: no HTTP request was made
+        assert client.requests == []
+
 
 class TestLogsAndEvents:
     """_fetch_logs returns raw text; _fetch_events parses an EventList."""
