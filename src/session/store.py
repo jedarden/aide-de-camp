@@ -1002,6 +1002,20 @@ class SessionStore:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
+    async def update_result_card_fallback(self, result_id: str, card_fallback: bool) -> None:
+        """Update a result's card_fallback flag.
+
+        Args:
+            result_id: The result ID to update
+            card_fallback: True if using generic fallback card, False if component rendered
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE results SET card_fallback = ? WHERE id = ?",
+                (1 if card_fallback else 0, result_id)
+            )
+            await db.commit()
+
     async def delete_result(self, result_id: str, session_id: str) -> dict:
         """Delete a result by ID, ensuring it belongs to the specified session.
 
