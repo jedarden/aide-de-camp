@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
 
@@ -985,6 +985,14 @@ class ComponentIterateRequest(BaseModel):
     result_data: Optional[dict] = None
 
 
+class UsagePatternRecord(BaseModel):
+    """Request body for recording component usage patterns."""
+    component_id: str
+    result_type: str
+    match_score: float
+    layout_bucket: str = "normal"
+
+
 # Canvas and Surface endpoints
 @app.post("/api/v1/surfaces/register")
 async def api_v1_register_surface(request: SurfaceRegisterRequest):
@@ -1283,6 +1291,166 @@ async def api_v1_list_components(limit: int = 50):
         ]
     }
 
+
+# =============================================================================
+# Usage patterns routes (must come before /{component_id} routes to avoid conflicts)
+# =============================================================================
+
+@app.post("/api/v1/components/usage-patterns")
+async def api_v1_record_usage_pattern(request: UsagePatternRecord):
+    """Record or update a component usage pattern.
+
+    Called by the UI-regen agent to record pattern mappings discovered during
+    component generation or iteration. This endpoint updates the
+    component_usage_patterns table with the latest match score and usage data.
+
+    Returns:
+        {"status": "ok", "pattern": {...}} on success
+    """
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    try:
+        # Validate inputs
+        if not request.component_id or not request.result_type:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "component_id and result_type are required"}
+            )
+
+        if not 0.0 <= request.match_score <= 1.0:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "match_score must be between 0.0 and 1.0"}
+            )
+
+        if request.layout_bucket not in _component_library.LAYOUT_BUCKETS:
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"layout_bucket must be one of {', '.join(_component_library.LAYOUT_BUCKETS)}"}
+            )
+
+        # Record the pattern
+        _component_library.record_usage_pattern(
+            component_id=request.component_id,
+            result_type=request.result_type,
+            match_score=request.match_score,
+            layout_bucket=request.layout_bucket,
+        )
+
+        logger.info(
+            f"Recorded usage pattern: component={request.component_id}, "
+            f"result_type={request.result_type}, layout_bucket={request.layout_bucket}, "
+            f"match_score={request.match_score}"
+        )
+
+        return {
+            "status": "ok",
+            "pattern": {
+                "component_id": request.component_id,
+                "result_type": request.result_type,
+                "layout_bucket": request.layout_bucket,
+                "match_score": request.match_score,
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to record usage pattern: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to record usage pattern: {str(e)}"}
+        )
+
+
+@app.get("/api/v1/components/usage-patterns")
+async def api_v1_list_usage_patterns(
+    result_type: Optional[str] = Query(None, description="Filter by result type"),
+    component_id: Optional[str] = Query(None, description="Filter by component ID"),
+    limit: int = Query(100, description="Maximum number of patterns to return"),
+):
+    """List component usage patterns, optionally filtered.
+
+    Query params:
+        result_type: Filter by result type (optional)
+        component_id: Filter by component ID (optional)
+        limit: Maximum number of patterns to return (default 100)
+
+    Returns:
+        {"patterns": [...], "count": <total>}
+    """
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    try:
+        import sqlite3
+
+        conn = _component_library._get_conn()
+
+        # Build query with filters
+        where_clauses = []
+        params = []
+
+        if result_type:
+            where_clauses.append("result_type = ?")
+            params.append(result_type)
+
+        if component_id:
+            where_clauses.append("component_id = ?")
+            params.append(component_id)
+
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        query = f"""
+            SELECT result_type, component_id, layout_bucket, match_score, sample_count, updated_at
+            FROM component_usage_patterns
+            WHERE {where_sql}
+            ORDER BY match_score DESC, sample_count DESC
+            LIMIT ?
+        """
+
+        params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+
+        patterns = [
+            {
+                "result_type": row[0],
+                "component_id": row[1],
+                "layout_bucket": row[2],
+                "match_score": row[3],
+                "sample_count": row[4],
+                "updated_at": row[5],
+            }
+            for row in rows
+        ]
+
+        # Get total count
+        count_query = f"SELECT COUNT(*) FROM component_usage_patterns WHERE {where_sql}"
+        count_params = params[:-1]  # Exclude limit
+        total = conn.execute(count_query, count_params).fetchone()[0]
+
+        return {
+            "patterns": patterns,
+            "count": total,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to list usage patterns: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to list usage patterns: {str(e)}"}
+        )
+
+
+# =============================================================================
+# Component-specific routes (/{component_id} routes must come after specific paths)
+# =============================================================================
 
 @app.get("/api/v1/components/{component_id}")
 async def api_v1_get_component(component_id: str):
