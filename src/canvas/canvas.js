@@ -658,6 +658,7 @@ if (typeof module !== 'undefined' && module.exports) {
         deriveExamples: _deriveExamples,
         PENDING_AGE_THRESHOLD_MS: PENDING_AGE_THRESHOLD_MS,
         _setProgress: _setProgress,  // Also export internal helper
+        _normalizeVariant: _normalizeVariant,  // Also export for testing
     };
 }
 
@@ -666,4 +667,5 @@ if (typeof window !== 'undefined') {
     window.buildContainerChildren = buildContainerChildren;
     window._setProgress = _setProgress;
     window.el = el;  // DOM helper for pending cards
+    window.createErrorCard = createErrorCard;  // Error card renderer for SSE error events
 }
