@@ -87,6 +87,33 @@ function createTopicCard(cardData) {
         return fallbackCard;
     }
 
+    // When the result has rendered_html (from hot-path component match), inject it directly.
+    // The HTML is already escaped server-side (hot-path renderer's escaping contract),
+    // so we inject it as-is. Topic metadata is preserved via data attributes.
+    if (latestResult && latestResult.rendered_html) {
+        const card = document.createElement('div');
+        card.className = 'topic-card component-card';
+        card.dataset.topicId = topic.id;
+        card.dataset.componentId = latestResult.component_id || '';
+
+        const stalenessLevel = getStalenessLevel(staleness.seconds);
+        card.classList.add(stalenessLevel);
+
+        const typeClass = topic.type || 'adhoc';
+        card.dataset.topicType = typeClass;
+
+        // Build the full card HTML: component content + staleness indicator
+        const timeAgo = formatStaleness(staleness.seconds);
+        const html = latestResult.rendered_html + `
+            <div class="staleness-indicator ${stalenessLevel}">
+                <span class="staleness-dot ${stalenessLevel}"></span>
+                <span>Updated ${timeAgo}</span>
+            </div>`;
+
+        card.innerHTML = html;
+        return card;
+    }
+
     const card = document.createElement('div');
     card.className = 'topic-card';
     card.dataset.topicId = topic.id;
