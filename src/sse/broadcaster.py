@@ -333,6 +333,11 @@ class EventType:
     TASK_STUCK = "task_stuck"
     TASK_FAILED = "task_failed"
 
+    # Approval events (Generated-Bead Safety)
+    APPROVAL_REQUIRED = "approval_required"
+    APPROVAL_GRANTED = "approval_granted"
+    APPROVAL_DENIED = "approval_denied"
+
     # Degraded-state error events (see docs/plan/plan.md: Degraded-State UX)
     ROUTER_UNAVAILABLE = "router_unavailable"
     ALL_SOURCES_FAILED = "all_sources_failed"

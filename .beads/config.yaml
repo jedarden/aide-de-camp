@@ -2,3 +2,8 @@ issue_prefixes: [adc]
 default_priority: 2
 default_type: task
 claim_ttl_minutes: 30
+secret_protection:
+  allowlist:
+    - "kubectl.*verb"
+    - "cluster.*mutation"
+    - "validate.*bead"
