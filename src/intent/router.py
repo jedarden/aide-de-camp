@@ -449,6 +449,56 @@ class IntentRouter:
         timings = DispatchTimings()
         timings.record("router_ms", routed_intent.router_ms)
 
+        # Honesty guards for unimplemented intents
+        if classification.intent_type == IntentType.ACTION:
+            # Action executor is NOT BUILT — broadcast design-only card
+            handler = get_degraded_state_handler()
+            await handler.broadcast_action_design_only(
+                utterance=routed_intent.utterance,
+                intent_id=routed_intent.intent_id,
+                session_id=routed_intent.session_id,
+                project_slug=classification.project_slug,
+            )
+
+            # Update intent status to reflect the design-only state
+            store = await self._get_store()
+            await store.update_intent_status(
+                routed_intent.intent_id,
+                "resolved",
+                "Action execution is design-only — executor not built",
+            )
+
+            return {
+                "intent_id": routed_intent.intent_id,
+                "intent_type": classification.intent_type.value,
+                "status": "design_only",
+                "message": "Action execution is not yet available",
+            }
+
+        if classification.intent_type == IntentType.REMINDER:
+            # Reminders are NOT YET IMPLEMENTED — broadcast clarification card
+            handler = get_degraded_state_handler()
+            await handler.broadcast_reminder_unavailable(
+                utterance=routed_intent.utterance,
+                intent_id=routed_intent.intent_id,
+                session_id=routed_intent.session_id,
+            )
+
+            # Update intent status to reflect that reminders are unavailable
+            store = await self._get_store()
+            await store.update_intent_status(
+                routed_intent.intent_id,
+                "resolved",
+                "Reminders are not available yet",
+            )
+
+            return {
+                "intent_id": routed_intent.intent_id,
+                "intent_type": classification.intent_type.value,
+                "status": "unavailable",
+                "message": "Reminders are not available yet",
+            }
+
         try:
             # For task-profile intents, escalate to bead
             if classification.intent_type == IntentType.TASK_PROFILE:

@@ -92,6 +92,35 @@ class ClarificationCardEvent:
     raw_output_snippet: str | None = None  # First 200 chars of malformed output for logs
 
 
+@dataclass
+class ActionDesignOnlyEvent:
+    """Payload for action_design_only event.
+
+    Client renders: Design-only card explaining that action execution
+    is not yet built, offering to requeue as a task-profile bead
+    (the reviewed-bead path that exists).
+    """
+    utterance: str
+    intent_id: str
+    session_id: str
+    project_slug: str | None = None
+    timestamp: str = ""
+    requeue_allowed: bool = True
+
+
+@dataclass
+class ReminderUnavailableEvent:
+    """Payload for reminder_unavailable event.
+
+    Client renders: Clarification card with a friendly message that
+    reminders are not available yet.
+    """
+    utterance: str
+    intent_id: str
+    session_id: str
+    timestamp: str
+
+
 class DegradedStateHandler:
     """
     Handles degraded-state error events for the failure-mode matrix.
@@ -359,6 +388,103 @@ class DegradedStateHandler:
 
         return await self._get_broadcaster().broadcast(event)
 
+    async def broadcast_action_design_only(
+        self,
+        utterance: str,
+        intent_id: str,
+        session_id: str,
+        project_slug: str | None = None,
+    ) -> int:
+        """
+        Broadcast action_design_only event.
+
+        Fired when an action intent is detected. The action executor is not
+        built yet, so we render a design-only card offering to requeue as
+        a task-profile bead (the reviewed-bead path).
+
+        Args:
+            utterance: The original utterance
+            intent_id: Intent ID for tracking
+            session_id: Session ID for targeting
+            project_slug: Optional project slug for context
+
+        Returns:
+            Number of connections the event was sent to
+        """
+        event_payload = ActionDesignOnlyEvent(
+            utterance=utterance,
+            intent_id=intent_id,
+            session_id=session_id,
+            project_slug=project_slug,
+            timestamp=datetime.now().isoformat(),
+            requeue_allowed=True,
+        )
+
+        event = SSEEvent(
+            event_type=EventType.ACTION_DESIGN_ONLY,
+            data={
+                "utterance": utterance,
+                "intent_id": intent_id,
+                "project_slug": project_slug,
+                "timestamp": event_payload.timestamp,
+                "requeue_allowed": True,
+                "message": "Action execution is not yet available",
+            },
+            target_session_id=session_id,
+        )
+
+        logger.info(
+            f"Broadcasting action_design_only for intent {intent_id}: "
+            f"project={project_slug or 'none'}"
+        )
+
+        return await self._get_broadcaster().broadcast(event)
+
+    async def broadcast_reminder_unavailable(
+        self,
+        utterance: str,
+        intent_id: str,
+        session_id: str,
+    ) -> int:
+        """
+        Broadcast reminder_unavailable event.
+
+        Fired when a reminder intent is detected. The reminder system is
+        not implemented yet, so we render a clarification card with a
+        friendly message.
+
+        Args:
+            utterance: The original utterance
+            intent_id: Intent ID for tracking
+            session_id: Session ID for targeting
+
+        Returns:
+            Number of connections the event was sent to
+        """
+        event_payload = ReminderUnavailableEvent(
+            utterance=utterance,
+            intent_id=intent_id,
+            session_id=session_id,
+            timestamp=datetime.now().isoformat(),
+        )
+
+        event = SSEEvent(
+            event_type=EventType.REMINDER_UNAVAILABLE,
+            data={
+                "utterance": utterance,
+                "intent_id": intent_id,
+                "timestamp": event_payload.timestamp,
+                "message": "Reminders are not available yet",
+            },
+            target_session_id=session_id,
+        )
+
+        logger.info(
+            f"Broadcasting reminder_unavailable for intent {intent_id}"
+        )
+
+        return await self._get_broadcaster().broadcast(event)
+
 
 # Global degraded state handler instance
 _degraded_state_handler: Optional[DegradedStateHandler] = None
@@ -444,4 +570,34 @@ async def broadcast_clarification_card(
         parse_error=parse_error,
         retry_count=retry_count,
         raw_output_snippet=raw_output_snippet,
+    )
+
+
+async def broadcast_action_design_only(
+    utterance: str,
+    intent_id: str,
+    session_id: str,
+    project_slug: str | None = None,
+) -> int:
+    """Convenience function to broadcast action_design_only event."""
+    handler = get_degraded_state_handler()
+    return await handler.broadcast_action_design_only(
+        utterance=utterance,
+        intent_id=intent_id,
+        session_id=session_id,
+        project_slug=project_slug,
+    )
+
+
+async def broadcast_reminder_unavailable(
+    utterance: str,
+    intent_id: str,
+    session_id: str,
+) -> int:
+    """Convenience function to broadcast reminder_unavailable event."""
+    handler = get_degraded_state_handler()
+    return await handler.broadcast_reminder_unavailable(
+        utterance=utterance,
+        intent_id=intent_id,
+        session_id=session_id,
     )
