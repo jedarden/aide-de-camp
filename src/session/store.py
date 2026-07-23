@@ -221,6 +221,31 @@ CREATE TABLE IF NOT EXISTS bead_watch (
 CREATE INDEX IF NOT EXISTS idx_bead_watch_sla_deadline ON bead_watch(sla_deadline);
 CREATE INDEX IF NOT EXISTS idx_bead_watch_fenced ON bead_watch(fenced_at);
 
+-- Pending bead approvals: beads awaiting user approval before creation
+-- Stores approval card data for action/self_modification/monitoring_config beads
+-- that passed validation but require explicit user approval.
+CREATE TABLE IF NOT EXISTS pending_bead_approvals (
+    id                  TEXT PRIMARY KEY,  -- UUID for this approval request
+    intent_id           TEXT NOT NULL,  -- Reference to the intent that created this request
+    session_id          TEXT NOT NULL,  -- Session for this approval
+    bead_body           TEXT NOT NULL,  -- The bead body awaiting approval
+    bead_type           TEXT NOT NULL,  -- Bead type (action, self_modification, monitoring_config)
+    validation_result   TEXT NOT NULL,  -- JSON: ValidationResult with approval details
+    utterance           TEXT NOT NULL,  -- Original user utterance
+    project_slug        TEXT,  -- Optional project slug
+    topic_id            TEXT,  -- Optional topic ID
+    created_at          INTEGER NOT NULL,  -- When the approval was requested
+    expires_at          INTEGER NOT NULL,  -- When this approval request expires
+    status              TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+    FOREIGN KEY (intent_id) REFERENCES intents(id) ON DELETE CASCADE,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_approvals_session ON pending_bead_approvals(session_id);
+CREATE INDEX IF NOT EXISTS idx_pending_approvals_intent ON pending_bead_approvals(intent_id);
+CREATE INDEX IF NOT EXISTS idx_pending_approvals_status ON pending_bead_approvals(status);
+CREATE INDEX IF NOT EXISTS idx_pending_approvals_expires ON pending_bead_approvals(expires_at);
+
 -- Card cache: pre-rendered HTML for result components
 -- Stores server-side rendered HTML for result/component/layout combinations.
 -- Primary key (result_id, component_id, layout_bucket) allows multiple cached
@@ -1991,6 +2016,135 @@ class SessionStore:
             ) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
+
+    async def create_pending_approval(
+        self,
+        intent_id: str,
+        session_id: str,
+        bead_body: str,
+        bead_type: str,
+        validation_result: dict,
+        utterance: str,
+        project_slug: str | None = None,
+        topic_id: str | None = None,
+        expires_seconds: int = 3600,
+    ) -> str:
+        """Create a pending bead approval request.
+
+        Args:
+            intent_id: The intent that triggered this approval
+            session_id: The session for this approval
+            bead_body: The bead body awaiting approval
+            bead_type: The bead type (action, self_modification, etc.)
+            validation_result: The validation result as a dict
+            utterance: Original user utterance
+            project_slug: Optional project slug
+            topic_id: Optional topic ID
+            expires_seconds: Seconds until approval expires (default 1 hour)
+
+        Returns:
+            The approval ID
+        """
+        approval_id = str(uuid4())
+        now = int(datetime.now().timestamp())
+        expires_at = now + expires_seconds
+
+        import json
+        validation_json = json.dumps(validation_result)
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                """INSERT INTO pending_bead_approvals
+                   (id, intent_id, session_id, bead_body, bead_type, validation_result,
+                    utterance, project_slug, topic_id, created_at, expires_at, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    approval_id,
+                    intent_id,
+                    session_id,
+                    bead_body,
+                    bead_type,
+                    validation_json,
+                    utterance,
+                    project_slug,
+                    topic_id,
+                    now,
+                    expires_at,
+                    "pending",
+                ),
+            )
+            await db.commit()
+
+        return approval_id
+
+    async def get_pending_approval(self, approval_id: str) -> Optional[dict]:
+        """Get a pending approval by ID.
+
+        Args:
+            approval_id: The approval ID
+
+        Returns:
+            The approval data or None if not found
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM pending_bead_approvals WHERE id = ?""",
+                (approval_id,),
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return dict(row)
+                return None
+
+    async def get_pending_approvals_for_session(self, session_id: str) -> list[dict]:
+        """Get all pending approvals for a session.
+
+        Args:
+            session_id: The session ID
+
+        Returns:
+            List of pending approval data
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM pending_bead_approvals
+                   WHERE session_id = ? AND status = 'pending' AND expires_at > ?
+                   ORDER BY created_at DESC""",
+                (session_id, int(datetime.now().timestamp())),
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def update_approval_status(self, approval_id: str, status: str) -> None:
+        """Update the status of a pending approval.
+
+        Args:
+            approval_id: The approval ID
+            status: New status ('approved' or 'rejected')
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE pending_bead_approvals SET status = ? WHERE id = ?",
+                (status, approval_id),
+            )
+            await db.commit()
+
+    async def delete_expired_approvals(self) -> int:
+        """Delete expired pending approvals.
+
+        Returns:
+            Number of approvals deleted
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                """DELETE FROM pending_bead_approvals
+                   WHERE expires_at <= ?""",
+                (int(datetime.now().timestamp()),),
+            )
+            await db.commit()
+            return cursor.rowcount
 
 
 # Global session store instance

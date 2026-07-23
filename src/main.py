@@ -963,6 +963,17 @@ class ApprovalRequest(BaseModel):
     approval_id: str
 
 
+class BeadApproveRequest(BaseModel):
+    approval_id: str
+    session_id: str
+
+
+class BeadRejectRequest(BaseModel):
+    approval_id: str
+    session_id: str
+    reason: Optional[str] = None
+
+
 class RollbackRequest(BaseModel):
     artifact_name: str
     artifact_type: str
@@ -1265,6 +1276,175 @@ async def api_v1_rollback(request: RollbackRequest):
     return {
         "status": response.status,
         "message": response.message,
+    }
+
+
+# Bead approval endpoints
+@app.post("/api/v1/beads/approve")
+async def api_v1_approve_bead(request: BeadApproveRequest):
+    """Approve a pending bead and create it via bf CLI.
+
+    Takes an approval_id from a pending_bead_approvals row, creates the bead,
+    and returns the pending card for the surface.
+    """
+    from .escalate.handler import get_escalate_handler, EscalateRequest
+    import json
+
+    store = session_store_get_store()
+
+    # Get the pending approval
+    approval = await store.get_pending_approval(request.approval_id)
+    if not approval:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Approval not found or expired"}
+        )
+
+    if approval["status"] != "pending":
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Approval already {approval['status']}"}
+        )
+
+    if approval["session_id"] != request.session_id:
+        return JSONResponse(
+            status_code=403,
+            content={"error": "Session mismatch"}
+        )
+
+    logger.info(f"Approving bead {request.approval_id} for intent {approval['intent_id']}")
+
+    try:
+        # Create the bead using the escalate handler
+        escalate_handler = get_escalate_handler(store)
+
+        # Build an escalate request from the approval data
+        escalate_request = EscalateRequest(
+            intent_id=approval["intent_id"],
+            session_id=approval["session_id"],
+            utterance=approval["utterance"],
+            intent_type="action",  # Default to action for approved beads
+            project_slug=approval["project_slug"],
+            topic_id=approval["topic_id"],
+        )
+
+        # Create the bead with the stored body
+        bead_id = await escalate_handler._create_bead_with_type(
+            request=escalate_request,
+            bead_body=approval["bead_body"],
+            bead_type=approval["bead_type"],
+        )
+
+        # Create bead_watch row for circuit breaker tracking
+        await escalate_handler._create_bead_watch(
+            bead_ref=bead_id,
+            project_slug=approval["project_slug"],
+            intent_type="action",
+        )
+
+        # Update approval status
+        await store.update_approval_status(request.approval_id, "approved")
+
+        # Update intent status
+        await store.update_intent_status(
+            intent_id=approval["intent_id"],
+            status="dispatched",
+        )
+
+        # Build pending card
+        pending_card = escalate_handler.build_pending_card(
+            request=escalate_request,
+            bead_id=bead_id,
+            bead_type=approval["bead_type"],
+        )
+
+        # Broadcast result_created event to canvas
+        await _broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.RESULT_CREATED,
+                data={
+                    "intent_id": approval["intent_id"],
+                    "session_id": approval["session_id"],
+                    "result_id": f"result-{bead_id}",  # Use bead_id as result_id
+                    "topic_id": approval["topic_id"],
+                    "summary": pending_card["summary"],
+                    "urgency": pending_card["urgency"],
+                    "bead_id": bead_id,
+                },
+                target_session_id=approval["session_id"],
+            )
+        )
+
+        logger.info(f"Created bead {bead_id} from approval {request.approval_id}")
+
+        return {
+            "status": "approved",
+            "bead_id": bead_id,
+            "pending_card": pending_card,
+            "message": f"Bead {bead_id} created successfully",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to approve bead {request.approval_id}: {e}")
+        # Update approval status to rejected on error
+        await store.update_approval_status(request.approval_id, "rejected")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to create bead: {str(e)}"}
+        )
+
+
+@app.post("/api/v1/beads/reject")
+async def api_v1_reject_bead(request: BeadRejectRequest):
+    """Reject a pending bead approval.
+
+    Marks the approval as rejected and updates the intent status.
+    """
+    store = session_store_get_store()
+
+    # Get the pending approval
+    approval = await store.get_pending_approval(request.approval_id)
+    if not approval:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Approval not found or expired"}
+        )
+
+    if approval["session_id"] != request.session_id:
+        return JSONResponse(
+            status_code=403,
+            content={"error": "Session mismatch"}
+        )
+
+    logger.info(f"Rejecting bead approval {request.approval_id}")
+
+    # Update approval status
+    await store.update_approval_status(request.approval_id, "rejected")
+
+    # Update intent status to cancelled
+    await store.update_intent_status(
+        intent_id=approval["intent_id"],
+        status="cancelled",
+    )
+
+    # Broadcast rejection event to canvas
+    await _broadcaster.broadcast(
+        SSEEvent(
+            event_type=EventType.INTENT_RESOLVED,
+            data={
+                "intent_id": approval["intent_id"],
+                "session_id": approval["session_id"],
+                "status": "cancelled",
+                "message": "Bead approval was rejected",
+                "reason": request.reason,
+            },
+            target_session_id=approval["session_id"],
+        )
+    )
+
+    return {
+        "status": "rejected",
+        "message": "Bead approval rejected",
     }
 
 
