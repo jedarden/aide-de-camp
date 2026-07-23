@@ -483,6 +483,7 @@ class FetchResult:
     coverage: FetchCoverage
     total_duration_ms: int
     caveats: list[str] | None = None
+    terminal_failure: str | None = None  # Set to "all_sources_failed" if all sources fail
 
     def get_source_result(self, source: FetchSource) -> SourceResult | None:
         """Get result for a specific source."""
