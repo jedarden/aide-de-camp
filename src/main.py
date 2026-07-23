@@ -1370,6 +1370,70 @@ async def api_v1_record_pattern(request: UsagePatternRecord):
         )
 
 
+@app.get("/api/v1/patterns")
+async def api_v1_get_patterns(result_type: str = Query(..., description="Result type to filter patterns (required)")):
+    """Get component usage patterns by result_type.
+
+    Query params:
+        result_type: Filter by result type (required)
+
+    Returns:
+        {"patterns": [...]} ordered by match_score DESC
+        404 if no patterns found for the result_type
+    """
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    try:
+        import sqlite3
+
+        conn = _component_library._get_conn()
+
+        # Query patterns for the specified result_type, ordered by match_score DESC
+        query = """
+            SELECT result_type, component_id, layout_bucket, match_score, sample_count, updated_at
+            FROM component_usage_patterns
+            WHERE result_type = ?
+            ORDER BY match_score DESC, sample_count DESC
+        """
+
+        rows = conn.execute(query, (result_type,)).fetchall()
+
+        # Return 404 if no patterns found
+        if not rows:
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"No patterns found for result_type: {result_type}"}
+            )
+
+        patterns = [
+            {
+                "result_type": row[0],
+                "component_id": row[1],
+                "layout_bucket": row[2],
+                "match_score": row[3],
+                "sample_count": row[4],
+                "updated_at": row[5],
+            }
+            for row in rows
+        ]
+
+        return {
+            "patterns": patterns,
+            "count": len(patterns),
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get usage patterns: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to get usage patterns: {str(e)}"}
+        )
+
+
 @app.post("/api/v1/components/usage-patterns")
 async def api_v1_record_usage_pattern(request: UsagePatternRecord):
     """Record or update a component usage pattern.
