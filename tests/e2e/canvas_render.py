@@ -70,6 +70,47 @@ def render_card(card: dict[str, Any]) -> dict[str, Any]:
     return render_cards([card])[0]
 
 
+def render_container(
+    cards: list[dict[str, Any]] | None = None,
+    projects: list[dict[str, Any]] | None = None,
+    description: str | None = None,
+) -> list[dict[str, Any]]:
+    """Render the shared container-decision core ``loadTopics()`` calls (bead adc-4nd25).
+
+    Drives ``canvas_dom_runner.js --container``, which runs
+    ``buildContainerChildren(cards, projects, description)`` — the headlessly-
+    testable core of ``loadTopics()``: a fresh session with ZERO cards yields
+    the first-run welcome card (built from the registry ``projects`` list, never
+    the DB); the moment any real card exists it yields topic cards only,
+    dropping the welcome card. The payload mirrors exactly what
+    ``loadTopics()`` assembles after ``GET /topics`` + ``GET /registry``.
+
+    Returns one ``{outerHTML, className, dataset}`` per rendered container child.
+    Raises ``RuntimeError`` if node is missing or the runner exits non-zero.
+    """
+    if NODE is None:
+        raise RuntimeError("node not found on PATH — cannot drive canvas DOM runner")
+    payload = {
+        "cards": cards if cards is not None else [],
+        "projects": projects if projects is not None else [],
+    }
+    if description is not None:
+        payload["description"] = description
+    proc = subprocess.run(
+        [NODE, str(DOM_RUNNER), "--container"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"canvas_dom_runner --container exited {proc.returncode}: {proc.stderr.strip()}"
+        )
+    return json.loads(proc.stdout)
+
+
 def parse_sse_stream(text: str) -> list[tuple[str, dict]]:
     """Parse raw SSE wire text into ``(event_type, data)`` pairs.
 
