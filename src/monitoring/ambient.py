@@ -20,6 +20,7 @@ from aiosqlite import connect
 from ..session.store import SessionStore, get_store
 from ..fetch.orchestrator import get_fetch_strand, execute_fetch, FetchRequest
 from ..fetch.commands import FetchContext, FetchSource, IntentType
+from ..sse.broadcaster import get_broadcaster, SSEEvent, broadcast_result
 
 
 logger = getLogger(__name__)
@@ -399,6 +400,28 @@ class AmbientMonitor:
         )
 
         logger.info(f"Created monitoring result {result_id} for topic {rule.topic_id} (intent_id=NULL)")
+
+        # Fire SSE event for canvas update
+        # Build result dict for broadcast
+        result_for_broadcast = {
+            "id": result_id,
+            "intent_id": None,
+            "topic_id": topic_id,
+            "session_id": session_id,
+            "summary": self._generate_summary(rule, current_state, previous_state, changes_dict),
+            "data": result_data,
+            "urgency": rule.urgency,
+            "result_type": f"monitoring:{rule.project_slug}",
+            "created_at": int(datetime.now(timezone.utc).timestamp()),
+        }
+
+        # Broadcast to all surfaces in the session
+        await broadcast_result(
+            result=result_for_broadcast,
+            session_id=session_id,
+        )
+
+        logger.info(f"Broadcast SSE event for monitoring result {result_id}")
 
         # Update topic context cache with current state
         await self._update_topic_context_cache(rule.topic_id, current_state)
