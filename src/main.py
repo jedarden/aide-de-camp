@@ -551,16 +551,27 @@ async def dispatch_intent(request: dict):
                     # Broadcast result_created so canvas reloads topics
                     if _broadcaster and surface_id:
                         emit_start = time.monotonic()
+                        # Include rendered card HTML in SSE so canvas injects it directly
+                        # (Component card when matched, fallback when card_fallback=True)
+                        sse_data = {
+                            "intent_id": intent_id,
+                            "topic_id": result.get("topic_id"),
+                            "summary": result.get("summary"),
+                            "urgency": result.get("urgency"),
+                        }
+                        # Add component_id when available (for canvas tracking)
+                        if result.get("component_id") is not None:
+                            sse_data["component_id"] = result["component_id"]
+                        # Add card_fallback flag when available (signals client to use fallback)
+                        if result.get("card_fallback") is not None:
+                            sse_data["card_fallback"] = result["card_fallback"]
+
                         await _broadcaster.broadcast(
                             SSEEvent(
                                 event_type="result_created",
                                 target_surface_id=surface_id,
-                                data={
-                                    "intent_id": intent_id,
-                                    "topic_id": result.get("topic_id"),
-                                    "summary": result.get("summary"),
-                                    "urgency": result.get("urgency"),
-                                }
+                                data=sse_data,
+                                rendered_html=result.get("rendered_html"),
                             )
                         )
                         # Record the SSE emit cost for this intent thread
