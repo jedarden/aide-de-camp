@@ -313,6 +313,191 @@ class TestBeadWatcherFencing:
         assert needs_fencing[0]["refusal_count"] == 3
 
 
+class TestStuckCardPersistence:
+    """Test stuck card persistence to session store (bead adc-4wx6d)."""
+
+    @pytest.mark.asyncio
+    async def test_stuck_card_persists_with_correct_type_and_status(self, store):
+        """Stuck cards persist with intent_type='stuck' and status='stuck'."""
+        # Create test data
+        session_id = "test-session"
+        topic_id, _ = await store.find_or_create_topic(
+            label="Test Topic",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test escalation",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-stuck-persist",
+            lookup_kind=None,
+            topic_id=topic_id,
+        )
+
+        # Update intent to stuck type and status
+        await store.update_intent_type_and_status(
+            intent_id=intent_id,
+            intent_type="stuck",
+            status="stuck",
+        )
+
+        # Create stuck result
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Task stuck — needs your input",
+            data={
+                "bead_id": "adc-stuck-persist",
+                "stuck_reason": "Test refusal reason",
+                "refusal_count": 3,
+                "message": "This task has been blocked after 3 refusals.",
+                "action_hint": "Review the bead and provide missing information.",
+                "fence_detected_during": "intent_routing",
+            },
+            urgency="high",
+        )
+
+        # Verify intent type and status are stuck
+        intent = await store.get_intent(intent_id)
+        assert intent["intent_type"] == "stuck"
+        assert intent["status"] == "stuck"
+        assert intent["bead_ref"] == "adc-stuck-persist"
+
+        # Verify result contains stuck card data
+        result = await store.get_latest_result_for_topic(topic_id)
+        assert result is not None
+        assert result["id"] == result_id
+        assert result["intent_id"] == intent_id
+        assert result["summary"] == "Task stuck — needs your input"
+        assert result["urgency"] == "high"
+
+        import json
+        result_data = json.loads(result["data"])
+        assert result_data["bead_id"] == "adc-stuck-persist"
+        assert result_data["stuck_reason"] == "Test refusal reason"
+        assert result_data["refusal_count"] == 3
+        assert "message" in result_data
+        assert "action_hint" in result_data
+
+    @pytest.mark.asyncio
+    async def test_stuck_card_queryable_via_session_api(self, store):
+        """Stuck cards are queryable via session API (topics endpoint)."""
+        # Create test data
+        session_id = "test-session-query"
+        topic_id, _ = await store.find_or_create_topic(
+            label="Query Test Topic",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test query",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-query-test",
+            lookup_kind=None,
+            topic_id=topic_id,
+        )
+
+        # Update to stuck
+        await store.update_intent_type_and_status(
+            intent_id=intent_id,
+            intent_type="stuck",
+            status="stuck",
+        )
+
+        # Create stuck result
+        await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Query test stuck",
+            data={
+                "bead_id": "adc-query-test",
+                "stuck_reason": "Query test refusal",
+                "refusal_count": 1,
+            },
+            urgency="high",
+        )
+
+        # Query active topics (simulating session API call)
+        topics = await store.get_active_topics(session_id)
+        assert len(topics) >= 1
+
+        # Find our topic
+        topic = next((t for t in topics if t["id"] == topic_id), None)
+        assert topic is not None
+        assert topic["label"] == "Query Test Topic"
+        assert topic["type"] == "project"
+
+        # Verify result is included
+        latest_result = await store.get_latest_result_for_topic(topic_id)
+        assert latest_result is not None
+        assert latest_result["summary"] == "Query test stuck"
+
+    @pytest.mark.asyncio
+    async def test_get_fenced_beads_for_session(self, store):
+        """get_fenced_beads_for_session returns fenced beads with intent context."""
+        # Create test data with fenced bead
+        session_id = "test-fenced-session"
+        topic_id, _ = await store.find_or_create_topic(
+            label="Fenced Test",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test fenced bead",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-fenced-test",
+            lookup_kind=None,
+            topic_id=topic_id,
+        )
+
+        # Create bead watch and fence it
+        await store.create_bead_watch(bead_ref="adc-fenced-test", sla_hours=24)
+        await store.update_bead_watch_refusal(
+            bead_ref="adc-fenced-test",
+            refusal_reason="Test fence",
+            comment_index=0,
+            refusal_count_add=3,
+        )
+        await store.fence_bead(bead_ref="adc-fenced-test")
+
+        # Query fenced beads for session
+        fenced_beads = await store.get_fenced_beads_for_session(session_id)
+        assert len(fenced_beads) == 1
+
+        fenced = fenced_beads[0]
+        assert fenced["bead_ref"] == "adc-fenced-test"
+        assert fenced["fenced_at"] is not None
+        assert fenced["intent_id"] == intent_id
+        assert fenced["topic_id"] == topic_id
+        assert fenced["project_slug"] == "adc"
+
+
 class TestCanvasSSEEventHandling:
     """Test canvas handles stuck/failed SSE events."""
 
