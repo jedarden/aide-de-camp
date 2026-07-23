@@ -494,6 +494,7 @@ global.tickPendingElapsed = canvas.tickPendingElapsed;
 global.applyAgedTreatment = canvas.applyAgedTreatment;
 global.setPendingProgress = canvas._setProgress;  // Alias for consistency
 global.el = canvas.el;  // DOM helper for pending cards
+global.createErrorCard = canvas.createErrorCard;  // Error card renderer for SSE error events
 
 // --- extract + run the REAL inline app script --------------------------------
 
