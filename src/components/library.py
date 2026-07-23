@@ -5,12 +5,15 @@ Manages UI components, their versions, and the card cache.
 Provides component selection and rendering services.
 """
 
+import logging
 import sqlite3
 import json
 import time
 from typing import Optional, Dict, List, Any, Tuple
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -80,7 +83,7 @@ class ComponentLibrary:
         return self._conn
 
     def _ensure_schema(self):
-        """Ensure database schema exists."""
+        """Ensure database schema exists and is up-to-date."""
         schema_path = Path(__file__).parent.parent.parent / 'data' / 'schema.sql'
         if schema_path.exists():
             with open(schema_path) as f:
@@ -88,6 +91,84 @@ class ComponentLibrary:
             conn = self._get_conn()
             conn.executescript(schema)
             conn.commit()
+
+        # Run migrations for component_usage_patterns table
+        self._migrate_component_usage_patterns(conn)
+        conn.commit()
+
+    def _migrate_component_usage_patterns(self, conn: sqlite3.Connection):
+        """
+        Migrate component_usage_patterns table to the new schema.
+
+        Old schema: (component_id, result_type, match_score, sample_count, last_matched)
+        New schema: (result_type, component_id, layout_bucket, match_score, sample_count, updated_at)
+
+        Migration steps:
+        1. Check if layout_bucket column exists
+        2. If not, recreate table with new schema and migrate data
+        """
+        # Check if table exists in old form by checking for layout_bucket column
+        cursor = conn.execute("PRAGMA table_info(component_usage_patterns)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        if 'layout_bucket' in columns and 'updated_at' in columns:
+            # Already migrated
+            return
+
+        logger.info("Migrating component_usage_patterns table to new schema...")
+
+        # Begin transaction for migration
+        conn.execute("BEGIN IMMEDIATE TRANSACTION")
+
+        try:
+            # Check if old table exists
+            old_table_exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='component_usage_patterns'"
+            ).fetchone()
+
+            if old_table_exists:
+                # Create new table with updated schema
+                conn.execute("""
+                    CREATE TABLE component_usage_patterns_new (
+                        result_type TEXT NOT NULL,
+                        component_id TEXT NOT NULL,
+                        layout_bucket TEXT NOT NULL DEFAULT 'normal',
+                        match_score REAL NOT NULL,
+                        sample_count INTEGER NOT NULL DEFAULT 1,
+                        updated_at INTEGER NOT NULL,
+                        PRIMARY KEY (result_type, component_id, layout_bucket)
+                    )
+                """)
+
+                # Migrate data from old table to new table
+                # Use 'normal' as default layout_bucket for existing records
+                conn.execute("""
+                    INSERT INTO component_usage_patterns_new (result_type, component_id, layout_bucket, match_score, sample_count, updated_at)
+                    SELECT result_type, component_id, 'normal' as layout_bucket, match_score, sample_count,
+                           COALESCE(last_matched, ?) as updated_at
+                    FROM component_usage_patterns
+                """, (int(time.time()),))
+
+                # Drop old table and rename new table
+                conn.execute("DROP TABLE component_usage_patterns")
+                conn.execute("ALTER TABLE component_usage_patterns_new RENAME TO component_usage_patterns")
+
+                # Create index on match_score DESC
+                conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_component_usage_patterns_match_score
+                    ON component_usage_patterns(match_score DESC)
+                """)
+
+                conn.commit()
+                logger.info("Migration complete: component_usage_patterns table updated with layout_bucket and updated_at columns")
+            else:
+                # Table doesn't exist yet, will be created by schema.sql
+                conn.rollback()
+
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Failed to migrate component_usage_patterns: {e}")
+            raise
 
     def create_component(
         self,
@@ -170,7 +251,8 @@ class ComponentLibrary:
     def find_best_component(
         self,
         result_type: str,
-        result_data: Dict[str, Any]
+        result_data: Dict[str, Any],
+        layout_bucket: str = 'normal'
     ) -> Optional[Component]:
         """
         Find the best-fit component for a result.
@@ -181,22 +263,23 @@ class ComponentLibrary:
         Args:
             result_type: The type of result (e.g., "pod-status")
             result_data: The structured result data
+            layout_bucket: The layout bucket to use ('compact', 'normal', 'expanded')
 
         Returns:
             The best matching Component, or None if no good match
         """
         conn = self._get_conn()
 
-        # First, check usage patterns for this exact result type
+        # First, check usage patterns for this exact result type and layout
         pattern_row = conn.execute(
             """
             SELECT component_id, match_score
             FROM component_usage_patterns
-            WHERE result_type = ?
+            WHERE result_type = ? AND layout_bucket = ?
             ORDER BY match_score DESC, sample_count DESC
             LIMIT 1
             """,
-            (result_type,)
+            (result_type, layout_bucket)
         ).fetchone()
 
         if pattern_row and pattern_row[1] >= 0.7:  # 70% confidence threshold
@@ -229,6 +312,7 @@ class ComponentLibrary:
         self,
         result_type: str,
         match_threshold: float = 0.7,
+        layout_bucket: str = 'normal',
     ) -> Optional[Component]:
         """Deterministic hot-path selection — the dispatch card selector.
 
@@ -243,17 +327,22 @@ class ComponentLibrary:
         agent uses to steward the library (it may fall back to semantic search
         and ultimately generate a new component). The hot path must never do
         either — it only reads the recorded mappings.
+
+        Args:
+            result_type: The result type to match against
+            match_threshold: Minimum score threshold (default 0.7)
+            layout_bucket: The layout bucket (default 'normal')
         """
         conn = self._get_conn()
         pattern_row = conn.execute(
             """
             SELECT component_id, match_score
             FROM component_usage_patterns
-            WHERE result_type = ? AND match_score >= ?
+            WHERE result_type = ? AND layout_bucket = ? AND match_score >= ?
             ORDER BY match_score DESC, sample_count DESC
             LIMIT 1
             """,
-            (result_type, match_threshold),
+            (result_type, layout_bucket, match_threshold),
         ).fetchone()
 
         if not pattern_row:
@@ -435,7 +524,8 @@ class ComponentLibrary:
         self,
         component_id: str,
         result_type: str,
-        match_score: float
+        match_score: float,
+        layout_bucket: str = 'normal',
     ):
         """
         Record a component usage pattern for future matching.
@@ -444,21 +534,22 @@ class ComponentLibrary:
             component_id: The component that was used
             result_type: The type of result it rendered
             match_score: How well it matched (0-1)
+            layout_bucket: The layout bucket used (default 'normal')
         """
         conn = self._get_conn()
         now = int(time.time())
 
         conn.execute(
             """
-            INSERT INTO component_usage_patterns (component_id, result_type, match_score, sample_count, last_matched)
-            VALUES (?, ?, ?, 1, ?)
-            ON CONFLICT(component_id, result_type)
+            INSERT INTO component_usage_patterns (result_type, component_id, layout_bucket, match_score, sample_count, updated_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+            ON CONFLICT(result_type, component_id, layout_bucket)
             DO UPDATE SET
                 match_score = (match_score * sample_count + ?) / (sample_count + 1),
                 sample_count = sample_count + 1,
-                last_matched = ?
+                updated_at = ?
             """,
-            (component_id, result_type, match_score, now, match_score, now)
+            (result_type, component_id, layout_bucket, match_score, now, match_score, now)
         )
         conn.commit()
 
