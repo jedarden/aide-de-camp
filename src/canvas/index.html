@@ -799,6 +799,146 @@
             color: #cbd5e1;
             word-break: break-all;
         }
+
+        /* Approval card specific */
+        .builtin-card.approval-card {
+            border-left: 4px solid #3b82f6;
+            background: #1a1f2f;
+            border: 1px solid #1e3a5f;
+        }
+
+        .builtin-card.approval-card:hover {
+            border-color: #2563eb;
+            background: #1f2937;
+        }
+
+        .approval-summary {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin: 0 0 12px 0;
+            line-height: 1.5;
+        }
+
+        .approval-badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #1e3a5f;
+            color: #60a5fa;
+            margin-bottom: 12px;
+        }
+
+        .approval-reason {
+            margin: 12px 0;
+            padding: 10px 12px;
+            background: #1e3a5f;
+            border-radius: 6px;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .approval-reason-label {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .approval-reason-text {
+            color: #93c5fd;
+        }
+
+        .approval-utterance {
+            margin: 12px 0;
+            padding: 8px 12px;
+            background: #0f1419;
+            border-radius: 6px;
+            border-left: 3px solid #64748b;
+        }
+
+        .approval-utterance-label {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .approval-utterance-text {
+            color: #f8fafc;
+            font-style: italic;
+        }
+
+        .approval-preview {
+            margin: 12px 0;
+        }
+
+        .approval-preview-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+
+        .approval-preview-text {
+            background: #0f1419;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 12px;
+            color: #94a3b8;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .approval-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .approval-approve,
+        .approval-reject {
+            flex: 1;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .approval-approve {
+            background: #3b82f6;
+            color: #f8fafc;
+        }
+
+        .approval-approve:hover:not(:disabled) {
+            background: #2563eb;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .approval-approve:disabled {
+            background: #1e3a5f;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .approval-reject {
+            background: #ef4444;
+            color: #f8fafc;
+        }
+
+        .approval-reject:hover:not(:disabled) {
+            background: #dc2626;
+            box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .approval-reject:disabled {
+            background: #7f1d1d;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body>
@@ -1228,7 +1368,7 @@
                 container.insertBefore(failedCard, container.firstChild);
             });
 
-            // Approval required event: render approval card for user confirmation
+            // Approval required event: render approval card for action beads
             eventSource.addEventListener('approval_required', (event) => {
                 const data = JSON.parse(event.data);
                 console.log('Approval required:', data);
@@ -1239,7 +1379,7 @@
                     const pendingCard = document.querySelector('[data-pending-id="' + intentId + '"]');
                     if (pendingCard) {
                         pendingCard.remove();
-                        console.log('Removed pending card for approval intent_id:', intentId);
+                        console.log('Removed pending card for approval_required intent_id:', intentId);
                     }
                 }
 
