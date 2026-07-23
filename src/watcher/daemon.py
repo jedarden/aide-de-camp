@@ -499,34 +499,79 @@ class BeadWatcher:
         return metadata
 
     async def _process_bead_event(self, event: BeadEvent) -> None:
-        """Process a bead event and route to surfaces."""
+        """Process a closed bead event: resolve intent, write result, route to surfaces.
+
+        For each closed bead:
+        1. Look up intent via intents.bead_ref (not label parsing)
+        2. If no matching intent, skip (most bf beads are not escalate-tracked)
+        3. Write results row via store.create_result
+        4. Mark intent resolved
+        5. SSE push using existing router (with Telegram fallback)
+        """
+        bead_id = event.bead_id
         bead_data = event.data
 
-        # Extract routing metadata from the bead's labels (escalate encoding).
-        metadata = self._extract_metadata(bead_data)
-        session_id = metadata.get("session_id")
-        surface_id = metadata.get("origin_surface_id")
+        # Step 1: Look up intent by bead_ref (NOT from labels)
+        intent = await self.store.get_intent_by_bead_ref(bead_id)
 
-        if not session_id:
-            # Not an escalate-tracked bead (no session_id label) -- nothing to
-            # route. This is expected for the vast majority of bf beads, so this
-            # is a debug log, not a warning.
-            logger.debug(f"Bead {event.bead_id} has no session_id label; skipping")
+        if not intent:
+            # No matching intent - not an escalate-tracked bead.
+            # This is expected for most bf beads, so debug-log only.
+            logger.debug(f"Closed bead {bead_id} has no matching intent.bead_ref; skipping")
             return
 
-        # Determine target surface
-        decision = await self.router.route_result(
-            session_id=session_id,
-            origin_surface_id=surface_id,
-            urgency=metadata.get("urgency", "normal"),
-        )
+        # Extract intent context
+        intent_id = intent["id"]
+        session_id = intent["session_id"]
+        topic_id = intent.get("topic_id")
 
-        # Extract result from bead
+        if not topic_id:
+            logger.warning(f"Intent {intent_id} for bead {bead_id} has no topic_id; skipping result write")
+            return
+
+        # Step 2: Extract result from bead (reusing existing body logic)
         result = await self._extract_result_from_bead(bead_data, session_id)
 
         if not result:
-            logger.warning(f"Could not extract result from bead {event.bead_id}")
+            logger.warning(f"Could not extract result from bead {bead_id}")
             return
+
+        # Step 3: Write results row via store.create_result
+        # Build result data matching the create_result signature
+        summary = result.get("summary", "Bead resolved")
+        data = result.get("data", {})
+        urgency = result.get("urgency", "normal")
+
+        try:
+            result_id = await self.store.create_result(
+                intent_id=intent_id,
+                topic_id=topic_id,
+                session_id=session_id,
+                summary=summary,
+                data=data,
+                urgency=urgency,
+            )
+            logger.debug(f"Created result {result_id} for bead {bead_id}")
+        except Exception as e:
+            logger.error(f"Failed to create result for bead {bead_id}: {e}", exc_info=True)
+            return
+
+        # Step 4: Mark intent resolved
+        try:
+            await self.store.update_intent_status(intent_id, "resolved")
+            logger.debug(f"Marked intent {intent_id} resolved for bead {bead_id}")
+        except Exception as e:
+            logger.error(f"Failed to mark intent {intent_id} resolved: {e}", exc_info=True)
+            # Continue to routing even if status update fails
+
+        # Step 5: SSE push per Surface Routing Rules
+        # Use existing router + broadcast_result / telegram fallback path
+        # Get routing decision - no origin_surface_id from bead, use None
+        decision = await self.router.route_result(
+            session_id=session_id,
+            origin_surface_id=None,
+            urgency=urgency,
+        )
 
         # Route to target surfaces
         if decision.target_surfaces:
@@ -545,7 +590,7 @@ class BeadWatcher:
             await self._send_to_telegram(result, session_id)
         else:
             # No surface available - result stays in queue
-            logger.info(f"No surface available for bead {event.bead_id}, result queued")
+            logger.info(f"No surface available for bead {bead_id}, result queued")
 
     async def _extract_result_from_bead(self, bead: dict, session_id: str) -> Optional[dict]:
         """Extract result data from a terminal bead (real bf schema)."""

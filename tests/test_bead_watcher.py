@@ -102,8 +102,12 @@ def router():
 
 @pytest.fixture
 def store():
-    """The watcher stores this but never calls into it on the read/process path."""
-    return MagicMock()
+    """Mock session store with get_intent_by_bead_ref support."""
+    s = MagicMock()
+    s.get_intent_by_bead_ref = AsyncMock(return_value=None)
+    s.create_result = AsyncMock(return_value="result-1")
+    s.update_intent_status = AsyncMock()
+    return s
 
 
 # --- CLI invocation config (adc-qw85) ---------------------------------------
@@ -430,30 +434,66 @@ class TestExtractMetadata:
 
 
 class TestRouting:
-    """Only beads the HWM emits are processed; a session_id label reaches routing."""
+    """Only beads the HWM emits are processed; matching intent.bead_ref reaches routing."""
 
-    async def test_emitted_closed_bead_with_session_label_routes(self, store, router):
+    async def test_emitted_closed_bead_with_matching_intent_routes(self, store, router):
+        """A closed bead with a matching intent.bead_ref writes result, marks resolved,
+        and routes to surfaces."""
         bead = _bead(bead_id="adc-c1", closed_at="2026-07-22T12:47:22Z")
         # Seed HWM below the bead's close time so the first tick emits it.
         hw = BeadWatcher._parse_close_epoch("2026-07-22T00:00:00Z")
         w = _watcher_with_records(store, router, [bead], highwater=hw)
+
+        # Mock the intent lookup to return a tracked intent
+        store.get_intent_by_bead_ref = AsyncMock(
+            return_value={
+                "id": "intent-1",
+                "session_id": "test-session-1",
+                "topic_id": "topic-1",
+                "bead_ref": "adc-c1",
+                "status": "pending",
+            }
+        )
+
         await w._check_for_events()
 
-        router.route_result.assert_awaited_once()
-        kwargs = router.route_result.await_args.kwargs
-        assert kwargs["session_id"] == "test-session-1"
-        assert kwargs["origin_surface_id"] == "surf-abc"
-        assert kwargs["urgency"] == "high"
+        # Verify intent was looked up by bead_ref
+        store.get_intent_by_bead_ref.assert_awaited_once_with("adc-c1")
 
-    async def test_emitted_bead_without_session_label_skips_routing(
-        self, store, router
-    ):
+        # Verify result was created
+        store.create_result.assert_awaited_once()
+        kwargs = store.create_result.await_args.kwargs
+        assert kwargs["intent_id"] == "intent-1"
+        assert kwargs["topic_id"] == "topic-1"
+        assert kwargs["session_id"] == "test-session-1"
+
+        # Verify intent was marked resolved
+        store.update_intent_status.assert_awaited_once_with("intent-1", "resolved")
+
+        # Verify routing was called (SSE/Telegram delivery)
+        router.route_result.assert_awaited_once()
+        route_kwargs = router.route_result.await_args.kwargs
+        assert route_kwargs["session_id"] == "test-session-1"
+        assert route_kwargs["urgency"] == "high"
+
+    async def test_emitted_bead_without_matching_intent_skips(self, store, router):
+        """A closed bead with no matching intent.bead_ref is skipped (most beads)."""
         bead = _bead(
             bead_id="adc-nosess", labels=["split-child"], closed_at="2026-07-22T12:47:22Z"
         )
         hw = BeadWatcher._parse_close_epoch("2026-07-22T00:00:00Z")
         w = _watcher_with_records(store, router, [bead], highwater=hw)
+
+        # Mock no matching intent (returns None)
+        store.get_intent_by_bead_ref = AsyncMock(return_value=None)
+
         await w._check_for_events()
+
+        # Verify intent lookup was attempted
+        store.get_intent_by_bead_ref.assert_awaited_once_with("adc-nosess")
+
+        # Verify no result was created and no routing happened
+        store.create_result.assert_not_awaited()
         router.route_result.assert_not_awaited()
 
     async def test_backlog_not_routed_on_first_tick(self, store, router):
@@ -474,6 +514,33 @@ class TestRouting:
         w._run_bf_list_closed = no_records
         await w._check_for_events()
         router.route_result.assert_not_awaited()
+
+    async def test_bead_with_matching_intent_but_no_topic_skips_result_write(
+        self, store, router, caplog
+    ):
+        """An intent with no topic_id cannot write a result; logs warning and skips."""
+        bead = _bead(bead_id="adc-c1", closed_at="2026-07-22T12:47:22Z")
+        hw = BeadWatcher._parse_close_epoch("2026-07-22T00:00:00Z")
+        w = _watcher_with_records(store, router, [bead], highwater=hw)
+
+        # Mock intent without topic_id
+        store.get_intent_by_bead_ref = AsyncMock(
+            return_value={
+                "id": "intent-1",
+                "session_id": "test-session-1",
+                "topic_id": None,  # Missing topic_id
+                "bead_ref": "adc-c1",
+                "status": "pending",
+            }
+        )
+
+        with caplog.at_level(logging.WARNING, logger="src.watcher.daemon"):
+            await w._check_for_events()
+
+        # Result was not created due to missing topic_id
+        store.create_result.assert_not_awaited()
+        # Warning logged about missing topic_id
+        assert any("no topic_id" in r.getMessage() for r in caplog.records)
 
 
 # --- result extraction uses real bf schema (adc-5wtm) -----------------------
