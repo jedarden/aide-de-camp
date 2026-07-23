@@ -507,6 +507,25 @@ class SessionStore:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
+    async def get_intent_by_bead_ref(self, bead_ref: str) -> Optional[dict]:
+        """Get intent by bead reference where status is tracked.
+
+        Returns intent row WHERE bead_ref == <bead_ref> AND status IN
+        ('pending', 'dispatched', 'stuck'), or None if no match.
+        Used by the bead watcher to resolve closed beads to their
+        original intent context.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM intents
+                   WHERE bead_ref = ? AND status IN ('pending', 'dispatched', 'stuck')
+                   LIMIT 1""",
+                (bead_ref,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
     # Result operations
     async def create_result(
         self,
