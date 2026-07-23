@@ -464,6 +464,7 @@ class SessionStore:
         intent_type: str,
         bead_ref: str | None = None,
         lookup_kind: str | None = None,
+        topic_id: str | None = None,
     ) -> str:
         """Create a new intent and return its ID."""
         intent_id = str(uuid4())
@@ -471,9 +472,9 @@ class SessionStore:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """INSERT INTO intents
-                   (id, utterance_id, session_id, project_slug, intent_type, lookup_kind, bead_ref, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (intent_id, utterance_id, session_id, project_slug, intent_type, lookup_kind, bead_ref, now)
+                   (id, utterance_id, session_id, project_slug, intent_type, lookup_kind, bead_ref, topic_id, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (intent_id, utterance_id, session_id, project_slug, intent_type, lookup_kind, bead_ref, topic_id, now)
             )
             await db.commit()
         return intent_id
@@ -522,6 +523,17 @@ class SessionStore:
                    WHERE bead_ref = ? AND status IN ('pending', 'dispatched', 'stuck')
                    LIMIT 1""",
                 (bead_ref,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
+    async def get_intent(self, intent_id: str) -> Optional[dict]:
+        """Get intent by ID."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM intents WHERE id = ? LIMIT 1""",
+                (intent_id,)
             ) as cursor:
                 row = await cursor.fetchone()
                 return dict(row) if row else None
@@ -591,6 +603,29 @@ class SessionStore:
                     (now, result_id, session_id)
                 )
             await db.commit()
+
+    async def get_results_for_intent(self, intent_id: str) -> list[dict]:
+        """Get all results for a specific intent."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM results
+                   WHERE intent_id = ?
+                   ORDER BY created_at DESC""",
+                (intent_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_all_results(self) -> list[dict]:
+        """Get all results in the database."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM results ORDER BY created_at DESC"""
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
 
     # Topic operations
     async def create_topic(

@@ -556,6 +556,19 @@ class BeadWatcher:
             logger.error(f"Failed to create result for bead {bead_id}: {e}", exc_info=True)
             return
 
+        # Construct the result dict for SSE broadcast (must include result_id)
+        result_for_broadcast = {
+            "id": result_id,
+            "result_id": result_id,  # For test compatibility
+            "intent_id": intent_id,
+            "topic_id": topic_id,
+            "session_id": session_id,
+            "summary": summary,
+            "data": data,
+            "urgency": urgency,
+            "created_at": int(datetime.now().timestamp()),
+        }
+
         # Step 4: Mark intent resolved
         try:
             await self.store.update_intent_status(intent_id, "resolved")
@@ -577,17 +590,17 @@ class BeadWatcher:
         if decision.target_surfaces:
             for surface in decision.target_surfaces:
                 if surface.type == "telegram":
-                    await self._send_to_telegram(result, session_id)
+                    await self._send_to_telegram(result_for_broadcast, session_id)
                 else:
                     # SSE broadcast
                     await broadcast_result(
-                        result=result,
+                        result=result_for_broadcast,
                         session_id=session_id,
                         target_surface_id=surface.id,
                     )
         elif decision.fallback_used:
             # Fallback to Telegram
-            await self._send_to_telegram(result, session_id)
+            await self._send_to_telegram(result_for_broadcast, session_id)
         else:
             # No surface available - result stays in queue
             logger.info(f"No surface available for bead {bead_id}, result queued")
