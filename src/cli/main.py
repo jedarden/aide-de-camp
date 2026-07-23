@@ -159,6 +159,19 @@ def create_parser() -> argparse.ArgumentParser:
         help="Show current configuration",
     )
 
+    # rehearsal command
+    rehearsal_parser = subparsers.add_parser(
+        "rehearsal",
+        help="Run Phase 5 demo rehearsal",
+        description="Execute the golden path demo script and validate smooth criteria",
+    )
+    rehearsal_parser.add_argument(
+        "--inject-slow-step",
+        type=int,
+        metavar="STEP",
+        help="Inject a slow step at given step number (for testing violation detection)",
+    )
+
     return parser
 
 
@@ -218,6 +231,12 @@ async def run_command(args: argparse.Namespace) -> int:
                 set_server=args.set_server,
                 set_session=args.set_session,
                 show=args.show,
+            )
+
+        elif args.command == "rehearsal":
+            return await commands.rehearsal(
+                server=server_url,
+                inject_slow_step=args.inject_slow_step,
             )
 
         else:
