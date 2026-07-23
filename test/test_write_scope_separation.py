@@ -227,8 +227,10 @@ class TestWriteScopeSeparation:
             )
 
             # Verify fallback outcome
+            # Note: fallback HTML is now rendered server-side for SSE streaming
             assert outcome.component_id is None
-            assert outcome.rendered_html is None
+            assert outcome.rendered_html is not None  # Server-side fallback HTML
+            assert "fallback-card" in outcome.rendered_html  # Verify it's the fallback template
             assert outcome.card_fallback is True
 
             # Verify nothing was written
