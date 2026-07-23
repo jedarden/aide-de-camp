@@ -909,6 +909,7 @@ class SessionStore:
         data: dict,
         urgency: str = "normal",
         result_type: str | None = None,
+        card_fallback: bool = False,
         previous_result_id: str | None = None,
         diff_summary: str | None = None,
         diff_data: dict | None = None,
@@ -923,6 +924,7 @@ class SessionStore:
             data: Result data (dict)
             urgency: Urgency level
             result_type: Result type for component selection (e.g., 'monitoring:{project_slug}')
+            card_fallback: True when no component matched (client renders built-in fallback card)
             previous_result_id: Previous result ID for diff
             diff_summary: Human-readable diff summary
             diff_data: Detailed diff data
@@ -933,12 +935,13 @@ class SessionStore:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """INSERT INTO results
-                   (id, intent_id, topic_id, session_id, summary, data, urgency, result_type, created_at, surfaced_at,
+                   (id, intent_id, topic_id, session_id, summary, data, urgency, result_type, card_fallback, created_at, surfaced_at,
                     previous_result_id, diff_summary, diff_data)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     result_id, intent_id, topic_id, session_id, summary, json.dumps(data),
-                    urgency, result_type, now, now, previous_result_id, diff_summary,
+                    urgency, result_type, 1 if card_fallback else 0, now, now,
+                    previous_result_id, diff_summary,
                     json.dumps(diff_data) if diff_data else None
                 )
             )
@@ -1432,6 +1435,8 @@ class SessionStore:
         summary: str,
         data: dict,
         urgency: str = "normal",
+        result_type: str | None = None,
+        card_fallback: bool = False,
     ) -> tuple[str, bool]:
         """
         Create a new result with automatic diff computation.
@@ -1440,6 +1445,16 @@ class SessionStore:
 
         Convenience method that automatically computes the diff against
         the previous result for the same topic (if one exists).
+
+        Args:
+            intent_id: Intent thread ID
+            topic_id: Topic ID
+            session_id: Session ID
+            summary: Result summary
+            data: Result data (dict)
+            urgency: Urgency level
+            result_type: Result type for component selection
+            card_fallback: True when no component matched (client renders built-in fallback card)
         """
         from ..diff.engine import get_diff_engine
 
@@ -1483,6 +1498,8 @@ class SessionStore:
             summary=summary,
             data=data,
             urgency=urgency,
+            result_type=result_type,
+            card_fallback=card_fallback,
             previous_result_id=previous_result["id"] if previous_result else None,
             diff_summary=diff_summary,
             diff_data=diff_data,
