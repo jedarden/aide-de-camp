@@ -325,6 +325,88 @@ def render_fallback_card(
         return f'<div class="builtin-card fallback-card" data-builtin="fallback"><p class="fallback-summary">{html.escape(summary or "Result", quote=False)}</p></div>'
 
 
+def select_rendered_card(
+    result_type: str,
+    result_data: dict[str, Any],
+    result_id: str,
+    layout_bucket: str = DEFAULT_LAYOUT_BUCKET,
+    match_threshold: float = DEFAULT_MATCH_THRESHOLD,
+    library: Optional[ComponentLibrary] = None,
+) -> Optional[str]:
+    """Deterministic component selector: (result_type, result.data) → Optional[rendered_html].
+
+    Pure SQL lookup — no LLM call in this path. Queries component_usage_patterns
+    for the highest match_score where result_type matches. If found and score above
+    threshold: fills component template with result.data, writes to card_cache, and
+    returns rendered HTML. If no match or below threshold: returns None (triggers
+    fallback rendering by the caller).
+
+    This is the server-side deterministic component selector specified in the task
+    acceptance criteria. It returns Optional[str] directly, unlike render() which
+    returns a RenderOutcome object with additional metadata.
+
+    Args:
+        result_type: The result type to match against component_usage_patterns
+        result_data: The result data dict to fill into the component template
+        result_id: The result ID for card_cache write
+        layout_bucket: The layout bucket to use (default: 'normal')
+        match_threshold: Minimum match score threshold (default: 0.7)
+        library: Optional ComponentLibrary instance (uses singleton if not provided)
+
+    Returns:
+        Rendered HTML string if a component matched, None if no match or below threshold
+    """
+    lib = library or get_library()
+
+    # Query component_usage_patterns for highest match_score where result_type matches
+    component = lib.select_component_for_result_type(
+        result_type=result_type,
+        match_threshold=match_threshold,
+        layout_bucket=layout_bucket,
+    )
+
+    # If no component matched or below threshold, return None (triggers fallback)
+    if component is None:
+        logger.debug(
+            "select_rendered_card: no component matched result_type=%s "
+            "(threshold %.2f) for result %s",
+            result_type,
+            match_threshold,
+            result_id,
+        )
+        return None
+
+    # On match: fill component template with result.data
+    rendered_html = fill_template(component.html_template, result_data)
+
+    # Write to card_cache
+    lib.cache_card(
+        result_id=result_id,
+        component_id=component.id,
+        component_version=component.version,
+        layout_bucket=layout_bucket,
+        rendered_html=rendered_html,
+    )
+
+    # Record usage pattern (hot-path match is high confidence, so score=1.0)
+    lib.record_usage_pattern(
+        component_id=component.id,
+        result_type=result_type,
+        match_score=1.0,
+        layout_bucket=layout_bucket,
+    )
+
+    logger.info(
+        "select_rendered_card: rendered result %s with component %s v%s (result_type=%s)",
+        result_id,
+        component.id,
+        component.version,
+        result_type,
+    )
+
+    return rendered_html
+
+
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
