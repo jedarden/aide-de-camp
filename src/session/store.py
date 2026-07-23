@@ -1002,6 +1002,21 @@ class SessionStore:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
+    async def delete_result(self, result_id: str, session_id: str) -> dict:
+        """Delete a result by ID, ensuring it belongs to the specified session.
+
+        Returns a dict with 'result_deleted' count (0 or 1).
+        This provides session isolation - a result can only be deleted by its owning session.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            # Use WHERE session_id to ensure session isolation
+            cursor = await db.execute(
+                """DELETE FROM results WHERE id = ? AND session_id = ?""",
+                (result_id, session_id)
+            )
+            await db.commit()
+            return {"result_deleted": cursor.rowcount}
+
     # Topic operations
     async def create_topic(
         self,
