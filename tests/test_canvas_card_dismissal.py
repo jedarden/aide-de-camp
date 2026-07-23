@@ -861,9 +861,9 @@ class TestDismissalPersistence:
 class TestCardDismissalAPI:
     """Test card dismissal via DELETE API endpoint."""
 
-    async def test_dismiss_stuck_card_api(self, store):
+    async def test_dismiss_stuck_card_api(self, store, tmp_path):
         """Test DELETE /api/v1/sessions/{session_id}/results/{result_id} for stuck card."""
-        from src.main import app
+        from unittest.mock import patch
         from fastapi.testclient import TestClient
 
         # Create session and stuck result
@@ -910,17 +910,28 @@ class TestCardDismissalAPI:
         assert len(results) == 1
         assert results[0]["id"] == result_id
 
-        # Test DELETE endpoint (would use TestClient in real scenario)
-        # For this test, we verify the store method works
-        deletion_result = await store.delete_result(result_id, session_id)
-        assert deletion_result["result_deleted"] == 1
+        # Test DELETE endpoint using TestClient
+        from src.main import app
+        from fastapi import status
+
+        # Patch get_store to return our test store
+        with patch("src.main.get_store", return_value=store):
+            with TestClient(app) as client:
+                response = client.delete(f"/api/v1/sessions/{session_id}/results/{result_id}")
+                assert response.status_code == status.HTTP_200_OK
+                deletion_result = response.json()
+                assert deletion_result["result_deleted"] == 1
 
         # Verify result is gone
         results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
-    async def test_dismiss_failed_card_api(self, store):
+    async def test_dismiss_failed_card_api(self, store, tmp_path):
         """Test DELETE API endpoint for failed card."""
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+        from fastapi import status
+
         # Create session and failed result
         session_id = await store.create_session()
 
@@ -963,24 +974,43 @@ class TestCardDismissalAPI:
         results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
 
-        # Delete via API method
-        deletion_result = await store.delete_result(result_id, session_id)
-        assert deletion_result["result_deleted"] == 1
+        # Patch get_store to return our test store
+        from src.main import app
+        with patch("src.main.get_store", return_value=store):
+            with TestClient(app) as client:
+                response = client.delete(f"/api/v1/sessions/{session_id}/results/{result_id}")
+                assert response.status_code == status.HTTP_200_OK
+                deletion_result = response.json()
+                assert deletion_result["result_deleted"] == 1
 
         # Verify result is gone
         results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
-    async def test_dismiss_nonexistent_result(self, store):
+    async def test_dismiss_nonexistent_result(self, store, tmp_path):
         """Test dismissing a result that doesn't exist returns 0 deleted."""
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+        from fastapi import status
+
         session_id = await store.create_session()
         fake_result_id = "fake-result-id"
 
-        deletion_result = await store.delete_result(fake_result_id, session_id)
-        assert deletion_result["result_deleted"] == 0
+        # Patch get_store to return our test store
+        from src.main import app
+        with patch("src.main.get_store", return_value=store):
+            with TestClient(app) as client:
+                response = client.delete(f"/api/v1/sessions/{session_id}/results/{fake_result_id}")
+                assert response.status_code == status.HTTP_200_OK
+                deletion_result = response.json()
+                assert deletion_result["result_deleted"] == 0
 
-    async def test_dismiss_result_wrong_session(self, store):
+    async def test_dismiss_result_wrong_session(self, store, tmp_path):
         """Test that dismissing with wrong session_id doesn't delete the result."""
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+        from fastapi import status
+
         # Create result in session 1
         session_id_1 = await store.create_session()
         utterance_id = await store.create_utterance(
@@ -1008,8 +1038,15 @@ class TestCardDismissalAPI:
 
         # Try to delete from session 2 (different session)
         session_id_2 = await store.create_session()
-        deletion_result = await store.delete_result(result_id, session_id_2)
-        assert deletion_result["result_deleted"] == 0
+
+        # Patch get_store to return our test store
+        from src.main import app
+        with patch("src.main.get_store", return_value=store):
+            with TestClient(app) as client:
+                response = client.delete(f"/api/v1/sessions/{session_id_2}/results/{result_id}")
+                assert response.status_code == status.HTTP_200_OK
+                deletion_result = response.json()
+                assert deletion_result["result_deleted"] == 0
 
         # Verify result still exists
         results = await store.get_results_for_intent(intent_id)
