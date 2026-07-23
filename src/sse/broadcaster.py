@@ -63,9 +63,19 @@ class SSEConnection:
 
 @dataclass
 class SSEEvent:
-    """An SSE event to broadcast."""
+    """An SSE event to broadcast.
+
+    Attributes:
+        event_type: The type of SSE event (e.g., 'result_created', 'topic_updated')
+        data: The event payload data
+        rendered_html: Optional rendered HTML for canvas injection (e.g., pre-rendered card)
+        target_session_id: Optional filter to only send to connections for this session
+        target_surface_id: Optional filter to only send to this specific surface
+        exclude_surface_id: Optional filter to exclude this surface from receiving the event
+    """
     event_type: str
     data: dict
+    rendered_html: str | None = None
     target_session_id: str | None = None
     target_surface_id: str | None = None
     exclude_surface_id: str | None = None
@@ -220,7 +230,10 @@ class SSEBroadcaster:
                 connection.last_heartbeat = datetime.now().timestamp()
 
                 # Format and yield the event
-                yield self._format_sse(event.event_type, event.data)
+                payload = dict(event.data)
+                if event.rendered_html is not None:
+                    payload["rendered_html"] = event.rendered_html
+                yield self._format_sse(event.event_type, payload)
 
                 # Special case: disconnect event ends the stream
                 if event.event_type == "disconnect":
@@ -325,9 +338,16 @@ async def broadcast_result(
     result: dict,
     session_id: str,
     target_surface_id: str | None = None,
+    rendered_html: str | None = None,
 ) -> int:
     """
     Broadcast a result to relevant surfaces.
+
+    Args:
+        result: The result data payload
+        session_id: The session ID to target
+        target_surface_id: Optional specific surface to target
+        rendered_html: Optional pre-rendered HTML for canvas injection
 
     Returns the number of connections the event was sent to.
     """
@@ -335,6 +355,7 @@ async def broadcast_result(
     event = SSEEvent(
         event_type=EventType.RESULT_CREATED,
         data=result,
+        rendered_html=rendered_html,
         target_session_id=session_id,
         target_surface_id=target_surface_id,
     )
