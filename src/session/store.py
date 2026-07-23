@@ -1313,23 +1313,50 @@ class SessionStore:
         session_id: str,
         topic_type: str = "adhoc",
         project_slugs: list[str] | None = None,
+        scope: str = "session",
     ) -> tuple[str, bool]:
-        """Find existing topic by label and session, or create new. Returns (topic_id, created)."""
+        """Find existing topic by label, scope, and session, or create new. Returns (topic_id, created).
+
+        Args:
+            label: Topic label
+            session_id: Current session ID (used for session-scoped topics)
+            topic_type: Topic type ('project', 'research', 'personal', 'exception', 'compound', 'adhoc')
+            project_slugs: List of project slugs for this topic
+            scope: Topic scope ('session', 'cross-session', 'global')
+
+        For cross-session topics (scope='cross-session'), finds by label regardless of session.
+        For session-scoped topics, finds by label within the current session.
+        """
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
-            # Try to find existing topic in session scope
-            async with db.execute(
-                """SELECT id FROM topics
-                   WHERE label = ? AND scope = 'session' AND session_id = ? AND archived_at IS NULL
-                   LIMIT 1""",
-                (label, session_id)
-            ) as cursor:
-                row = await cursor.fetchone()
-                if row:
-                    return row[0], False
 
-        # Create new topic
-        topic_id = await self.create_topic(label, topic_type, project_slugs, "session", session_id)
+            if scope == "cross-session":
+                # For cross-session topics, find by label with cross-session scope
+                async with db.execute(
+                    """SELECT id FROM topics
+                       WHERE label = ? AND scope = 'cross-session' AND session_id IS NULL AND archived_at IS NULL
+                       LIMIT 1""",
+                    (label,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    if row:
+                        return row[0], False
+            else:
+                # For session-scoped topics, find by label within the current session
+                async with db.execute(
+                    """SELECT id FROM topics
+                       WHERE label = ? AND scope = 'session' AND session_id = ? AND archived_at IS NULL
+                       LIMIT 1""",
+                    (label, session_id)
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    if row:
+                        return row[0], False
+
+        # Create new topic with specified scope
+        # Cross-session topics have session_id = NULL
+        topic_session_id = None if scope == "cross-session" else session_id
+        topic_id = await self.create_topic(label, topic_type, project_slugs, scope, topic_session_id)
         return topic_id, True
 
     async def update_topic_activity(self, topic_id: str) -> None:
@@ -1372,6 +1399,39 @@ class SessionStore:
                 row = await cursor.fetchone()
                 return dict(row) if row else None
 
+    async def get_previous_result_for_diff(
+        self,
+        topic_id: str,
+        result_type: str,
+    ) -> Optional[dict]:
+        """
+        Get the previous result for diff computation on a (topic_id, result_type) pair.
+
+        Cross-session search: finds the most recent result for the same topic and result_type,
+        regardless of session. This supports pure lineage tracking for previous_result_id.
+
+        The diff strip rendering is session-scoped (handled by callers) - this method only
+        provides the lineage reference.
+
+        Args:
+            topic_id: The topic ID to search within
+            result_type: The result type to match (e.g., 'status:pbx-web', 'lookup:logs:whisper-stt')
+
+        Returns:
+            The most recent result dict matching the topic and result_type, or None if no match
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM results
+                   WHERE topic_id = ? AND result_type = ?
+                   ORDER BY created_at DESC, id DESC
+                   LIMIT 1""",
+                (topic_id, result_type)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
     async def get_latest_results_by_type(
         self, session_id: str
     ) -> list[dict]:
@@ -1381,6 +1441,11 @@ class SessionStore:
         Returns one result per distinct result_type per topic, enabling
         granular canvas rendering where different result_types on the same
         topic coexist (e.g., status + brainstorm cards).
+
+        Session-scoped display: results are filtered by session_id, so a fresh
+        session shows only its own results, not results from previous sessions
+        even on cross-session topics. The topic itself may be cross-session,
+        but result display is always session-scoped.
         """
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
@@ -1395,12 +1460,13 @@ class SessionStore:
                     JOIN topics t ON r.topic_id = t.id
                     WHERE (t.session_id = ? OR t.scope IN ('cross-session', 'global'))
                       AND t.archived_at IS NULL
+                      AND r.session_id = ?
                 ) ranked
                 WHERE rn = 1
                 ORDER BY
                     ranked.topic_id,
                     ranked.created_at DESC""",
-                (session_id,)
+                (session_id, session_id)
             ) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
@@ -1722,12 +1788,14 @@ class SessionStore:
         card_fallback: bool = False,
     ) -> tuple[str, bool]:
         """
-        Create a new result with automatic diff computation.
+        Create a new result with session-scoped diff computation.
 
         Returns (result_id, has_diff).
 
-        Convenience method that automatically computes the diff against
-        the previous result for the same topic (if one exists).
+        Implements the plan's topic scope vs. session scope requirements:
+        - previous_result_id is pure lineage (set from cross-session result of same type)
+        - Diff strip renders ONLY when previous result is from the current session
+        - A status result never diffs against a brainstorm result (different result_type)
 
         Args:
             intent_id: Intent thread ID
@@ -1736,24 +1804,37 @@ class SessionStore:
             summary: Result summary
             data: Result data (dict)
             urgency: Urgency level
-            result_type: Result type for component selection
+            result_type: Result type for component selection (e.g., 'status:pbx-web')
             card_fallback: True when no component matched (client renders built-in fallback card)
         """
         from ..diff.engine import get_diff_engine
 
-        # Get previous result for this topic
-        previous_result = await self.get_latest_result_for_topic(topic_id)
+        # Get previous result for this (topic_id, result_type) pair
+        # Cross-session search for lineage tracking
+        previous_result = None
+        if result_type:
+            previous_result = await self.get_previous_result_for_diff(topic_id, result_type)
 
-        # Compute diff if we have a previous result
+        # Set previous_result_id for lineage (always set when found, cross-session)
+        # This supports the plan's "pure lineage" requirement
+        previous_result_id = previous_result["id"] if previous_result else None
+
+        # Compute diff ONLY when previous result is from the CURRENT session
+        # This ensures seed-run diffs are suppressed but in-session diffs work
         diff_summary = None
         diff_data = None
         has_diff = False
 
-        if previous_result:
+        if previous_result and previous_result.get("session_id") == session_id:
             diff_engine = get_diff_engine()
+
+            # Parse previous result's data (it's stored as JSON string in DB)
+            import json
+            previous_data = json.loads(previous_result.get("data", "{}"))
+
             diff_result = await diff_engine.compute_diff(
                 topic_id=topic_id,
-                previous_result=previous_result,
+                previous_result={"data": previous_data},
                 current_result={"data": data},
             )
 
@@ -1773,7 +1854,7 @@ class SessionStore:
                     "summary": diff_result.summary,
                 }
 
-        # Create the result with diff data
+        # Create the result with diff data (or without if cross-session)
         result_id = await self.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
@@ -1783,7 +1864,7 @@ class SessionStore:
             urgency=urgency,
             result_type=result_type,
             card_fallback=card_fallback,
-            previous_result_id=previous_result["id"] if previous_result else None,
+            previous_result_id=previous_result_id,
             diff_summary=diff_summary,
             diff_data=diff_data,
         )

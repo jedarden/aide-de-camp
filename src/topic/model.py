@@ -86,17 +86,30 @@ class TopicManager:
         session_id: str,
         topic_type: str = "adhoc",
         project_slugs: list[str] | None = None,
+        scope: str = "session",
     ) -> Topic:
         """
         Find an existing topic or create a new one.
 
-        Topics are matched by label within a session.
+        For cross-session topics (scope='cross-session'), finds by label regardless of session.
+        For session-scoped topics (scope='session'), finds by label within the current session.
+
+        Args:
+            label: Topic label
+            session_id: Current session ID
+            topic_type: Topic type ('project', 'research', 'personal', 'exception', 'compound', 'adhoc')
+            project_slugs: List of project slugs
+            scope: Topic scope ('session', 'cross-session', 'global')
+
+        Returns:
+            Topic object
         """
         topic_id, created = await self.store.find_or_create_topic(
             label=label,
             session_id=session_id,
             topic_type=topic_type,
             project_slugs=project_slugs,
+            scope=scope,
         )
 
         # Fetch full topic data - get from active topics
@@ -117,14 +130,14 @@ class TopicManager:
                 result_count=topic_data.get("result_count", 0),
             )
 
-        # Fallback to basic topic
+        # Fallback to basic topic (shouldn't normally reach here)
         return Topic(
             id=topic_id,
             label=label,
             type=topic_type,
             project_slugs=project_slugs or [],
-            scope="session",
-            session_id=session_id,
+            scope=scope,
+            session_id=None if scope == "cross-session" else session_id,
             created_at=int(datetime.now().timestamp()),
             last_active=int(datetime.now().timestamp()),
         )
@@ -207,6 +220,15 @@ class TopicManager:
         Create or find a topic from an intent.
 
         Infers topic label from project_slug or creates ad hoc topic.
+        Project topics are created as cross-session (scope='cross-session', session_id=NULL).
+        Ad hoc topics are session-scoped (scope='session', session_id set).
+
+        Args:
+            intent: Intent dict with project_slug and intent_type
+            session_id: Current session ID
+
+        Returns:
+            Topic object
         """
         project_slug = intent.get("project_slug")
         intent_type = intent.get("intent_type", "unknown")
@@ -215,17 +237,20 @@ class TopicManager:
             label = project_slug.replace("-", " ").title()
             topic_type = "project"
             project_slugs = [project_slug]
+            scope = "cross-session"  # Project topics are cross-session
         else:
             # Create ad hoc topic from intent type
             label = f"{intent_type.title()} Task"
             topic_type = "adhoc"
             project_slugs = []
+            scope = "session"  # Ad hoc topics are session-scoped
 
         return await self.find_or_create_topic(
             label=label,
             session_id=session_id,
             topic_type=topic_type,
             project_slugs=project_slugs,
+            scope=scope,
         )
 
     async def link_intent_to_topic(
