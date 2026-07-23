@@ -1,0 +1,266 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-23T17:05:02.765541",
+    "runs_per_utterance": 30,
+    "total_runs": 180,
+    "timing_records": 10,
+    "zai_proxy_reachable": true,
+    "demo_projects": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "utterances": [
+    {
+      "name": "step1_multi_status",
+      "utterance": "Has the pbx web caught up, and what's the state of whisper stt?",
+      "description": "Multi-intent status query (pbx-web + whisper-stt)",
+      "expected_intents": 2
+    },
+    {
+      "name": "step2_lookup_logs",
+      "utterance": "Pull up the recent logs for whisper stt.",
+      "description": "Lookup logs (whisper-stt)",
+      "expected_intents": 1
+    },
+    {
+      "name": "step3_brainstorm",
+      "utterance": "Should pbx web keep using the static site generator, or is it time to move to a dynamic frontend? Give me the trade-offs.",
+      "description": "Brainstorm (pbx-web)",
+      "expected_intents": 1
+    },
+    {
+      "name": "step4_lookup_config",
+      "utterance": "Find whisper stt's deployment config \u2014 which cluster and namespace is it on?",
+      "description": "Lookup config (whisper-stt)",
+      "expected_intents": 1
+    },
+    {
+      "name": "step5_task_profile",
+      "utterance": "Queue up a research task: compare the last month of pbx web deployment patterns against whisper stt's and write up common failure patterns \u2014 no rush.",
+      "description": "Task-profile (escalate to bead)",
+      "expected_intents": 1
+    },
+    {
+      "name": "step6_status_with_diff",
+      "utterance": "Anything new on pbx web since we started?",
+      "description": "Status query with diff (pbx-web)",
+      "expected_intents": 1
+    }
+  ],
+  "analysis": {
+    "router_ms": {
+      "count": 10,
+      "p50": 2969,
+      "p95": 3968,
+      "min": 1604,
+      "max": 3968,
+      "mean": 2792.4,
+      "median": 2837.5
+    },
+    "fetch_first_source_ms": {
+      "count": 10,
+      "p50": 16,
+      "p95": 19,
+      "min": 0,
+      "max": 19,
+      "mean": 13.1,
+      "median": 15.5
+    },
+    "fetch_total_ms": {
+      "count": 10,
+      "p50": 162,
+      "p95": 177,
+      "min": 0,
+      "max": 177,
+      "mean": 97.6,
+      "median": 101.5
+    },
+    "synthesize_first_token_ms": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "median": null
+    },
+    "synthesize_total_ms": {
+      "count": 10,
+      "p50": 3916,
+      "p95": 5109,
+      "min": 2707,
+      "max": 5109,
+      "mean": 3772.4,
+      "median": 3655.5
+    },
+    "escalate_ms": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "median": null
+    },
+    "sse_emit_ms": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "median": null
+    },
+    "stt_ms": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "median": null
+    },
+    "first_render_ms": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "median": null
+    }
+  },
+  "raw_timings": [
+    {
+      "intent_id": "cedb6cb1-3346-4ecc-8271-3ea8471be4d0",
+      "router_ms": 1604,
+      "fetch_first_source_ms": 0,
+      "fetch_total_ms": 0,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 5104,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840677
+    },
+    {
+      "intent_id": "076172b5-eb4c-47ee-a29e-2c76835b2ab8",
+      "router_ms": 3968,
+      "fetch_first_source_ms": 19,
+      "fetch_total_ms": 32,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 3395,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840680
+    },
+    {
+      "intent_id": "4befd470-3208-430b-99bd-0f9a0610776c",
+      "router_ms": 3303,
+      "fetch_first_source_ms": 17,
+      "fetch_total_ms": 171,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 5109,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840682
+    },
+    {
+      "intent_id": "8ed458ef-4966-4665-a8bf-21c3d8abc51f",
+      "router_ms": 3968,
+      "fetch_first_source_ms": 8,
+      "fetch_total_ms": 168,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 4596,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840682
+    },
+    {
+      "intent_id": "abb0707d-74ac-4555-83f6-e56d20b32100",
+      "router_ms": 3642,
+      "fetch_first_source_ms": 15,
+      "fetch_total_ms": 41,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 4095,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840685
+    },
+    {
+      "intent_id": "238d0466-9146-4f47-b482-720fc80fbcea",
+      "router_ms": 2706,
+      "fetch_first_source_ms": 18,
+      "fetch_total_ms": 177,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 2732,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840688
+    },
+    {
+      "intent_id": "36f1dfe7-d081-4a5f-b6a3-50d4947d4e0a",
+      "router_ms": 2238,
+      "fetch_first_source_ms": 18,
+      "fetch_total_ms": 31,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 3916,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840692
+    },
+    {
+      "intent_id": "a9268e07-cea8-4772-9838-eebda9103a37",
+      "router_ms": 2969,
+      "fetch_first_source_ms": 16,
+      "fetch_total_ms": 174,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 2707,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840694
+    },
+    {
+      "intent_id": "0e0c9645-3af4-40c7-91d2-78795e531400",
+      "router_ms": 1723,
+      "fetch_first_source_ms": 8,
+      "fetch_total_ms": 20,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 2895,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840697
+    },
+    {
+      "intent_id": "4d0b5014-9f63-498b-b603-80507480a8ab",
+      "router_ms": 1803,
+      "fetch_first_source_ms": 12,
+      "fetch_total_ms": 162,
+      "synthesize_first_token_ms": null,
+      "synthesize_total_ms": 3175,
+      "escalate_ms": null,
+      "sse_emit_ms": null,
+      "stt_ms": null,
+      "first_render_ms": null,
+      "created_at": 1784840700
+    }
+  ]
+}
