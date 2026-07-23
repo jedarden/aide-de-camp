@@ -37,7 +37,7 @@ Return a JSON array of intent objects:
   - `"logs"`: Recent log output, pod logs, error messages
   - `"config"`: Configuration files, deployments, env vars, ArgoCD app state
   - `"docs"`: Documentation, README files, project overview (default when unspecified)
-- **reminder**: Set or query reminders
+- **reminder**: Set or query reminders — **NOT YET IMPLEMENTED** (no reminders table, scheduler, or module exists; reminder-shaped utterances are handled as clarification with a "reminders aren't available yet" card)
 - **self-modification**: Instructions to improve the interface itself
 - **monitoring-config**: Configure ambient monitoring rules
 - **task-profile**: Durable async work items that escalate to NEEDLE beads

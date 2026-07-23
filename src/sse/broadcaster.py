@@ -345,6 +345,10 @@ class EventType:
     CLARIFICATION_CARD = "clarification_card"
     MALFORMED_RESPONSE = "malformed_response"
 
+    # Unimplemented intent events (honesty guards)
+    ACTION_DESIGN_ONLY = "action_design_only"
+    REMINDER_UNAVAILABLE = "reminder_unavailable"
+
 
 async def broadcast_result(
     result: dict,
