@@ -23,7 +23,12 @@ from ..session.store import (
     CIRCUIT_BREAKER_REFUSAL_THRESHOLD,
     CIRCUIT_BREAKER_AGE_THRESHOLD_HOURS,
 )
-from ..sse.broadcaster import broadcast_result
+from ..sse.broadcaster import (
+    broadcast_result,
+    get_broadcaster,
+    SSEEvent,
+    EventType,
+)
 from ..surface.router import SurfaceRouter
 from ..telegram.fallback import TelegramFallback, get_telegram_fallback
 
@@ -573,7 +578,25 @@ class BeadWatcher:
         await self.store.update_intent_status(intent_id, "stuck")
         logger.info(f"Set intent {intent_id} to stuck status")
 
-        # Step 5: Create stuck result card
+        # Step 5: Broadcast task_stuck event via SSE
+        broadcaster = get_broadcaster()
+        await broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.TASK_STUCK,
+                data={
+                    "bead_id": bead_ref,
+                    "stuck_reason": refusal_reason,
+                    "refusal_count": refusal_count,
+                    "intent_id": intent_id,
+                    "session_id": session_id,
+                    "topic_id": topic_id,
+                    "timestamp": int(datetime.now().timestamp()),
+                },
+                target_session_id=session_id,
+            )
+        )
+
+        # Step 6: Create stuck result card
         await self._create_stuck_card(
             bead_ref=bead_ref,
             intent_id=intent_id,
