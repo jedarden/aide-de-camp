@@ -13,7 +13,7 @@ DOM runner in tests/e2e/canvas_builtin_runner.js. This file focuses on backend
 SSE broadcasting and circuit breaker logic.
 """
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
 
 from src.sse.broadcaster import (
@@ -190,6 +190,231 @@ class TestTaskFailedSSEEvent:
         assert event.event_type == "task_failed"
         assert event.data["failure_reason"] == "Worker process crashed"
         assert event.data["error_type"] == "worker_crash"
+
+
+class TestFailedCardPersistence:
+    """Test failed card persistence to session store (bead adc-5fpkh)."""
+
+    @pytest.mark.asyncio
+    async def test_failed_card_persists_with_correct_status(self, store):
+        """Failed cards persist with status='failed' and failure details."""
+        session_id = "test-session-failed"
+        topic_id, _ = await store.find_or_create_topic(
+            label="Test Topic",
+            session_id=session_id,
+            topic_type="exception",
+        )
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test task that will fail",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="action",
+            lookup_kind=None,
+            topic_id=topic_id,
+        )
+
+        # Import and call handle_terminal_failure
+        from src.escalate.handler import handle_terminal_failure
+        import src.session.store
+
+        # Patch get_store to return our test store
+        with patch.object(src.session.store, 'get_store', return_value=store):
+            await handle_terminal_failure(
+                intent_id=intent_id,
+                session_id=session_id,
+                topic_id=topic_id,
+                failure_reason="Required data sources failed",
+                error_type="required_source_failure",
+                bead_ref=None,
+            )
+
+        # Verify intent status is failed
+        intent = await store.get_intent(intent_id)
+        assert intent["status"] == "failed"
+
+        # Verify result contains failed card data
+        result = await store.get_latest_result_for_topic(topic_id)
+        assert result is not None
+        assert result["intent_id"] == intent_id
+        assert result["summary"] == "Task Failed: Required Source Failure"
+        assert result["urgency"] == "high"
+
+        import json
+        result_data = json.loads(result["data"])
+        assert result_data["failure_reason"] == "Required data sources failed"
+        assert result_data["error_type"] == "required_source_failure"
+        assert "message" in result_data
+        assert "action_hint" in result_data
+
+    @pytest.mark.asyncio
+    async def test_failed_card_queryable_via_session_api(self, store):
+        """Failed cards are queryable via session API (topics endpoint)."""
+        session_id = "test-session-query-failed"
+        topic_id, _ = await store.find_or_create_topic(
+            label="Query Failed Test",
+            session_id=session_id,
+            topic_type="exception",
+        )
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test query failed",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            lookup_kind=None,
+            topic_id=topic_id,
+        )
+
+        # Import and call handle_terminal_failure
+        from src.escalate.handler import handle_terminal_failure
+        import src.session.store
+
+        with patch.object(src.session.store, 'get_store', return_value=store):
+            await handle_terminal_failure(
+                intent_id=intent_id,
+                session_id=session_id,
+                topic_id=topic_id,
+                failure_reason="Worker process crashed",
+                error_type="worker_crash",
+                bead_ref="adc-test123",
+            )
+
+        # Query active topics (simulating session API call)
+        topics = await store.get_active_topics(session_id)
+        assert len(topics) >= 1
+
+        # Find our topic
+        topic = next((t for t in topics if t["id"] == topic_id), None)
+        assert topic is not None
+        assert topic["label"] == "Query Failed Test"
+        assert topic["type"] == "exception"
+
+        # Verify failed result is included
+        latest_result = await store.get_latest_result_for_topic(topic_id)
+        assert latest_result is not None
+        assert latest_result["summary"] == "Task Failed: Worker Crash"
+
+        import json
+        result_data = json.loads(latest_result["data"])
+        assert result_data["bead_ref"] == "adc-test123"
+        assert result_data["failure_reason"] == "Worker process crashed"
+
+    @pytest.mark.asyncio
+    async def test_failed_card_without_topic_creates_topic(self, store):
+        """handle_terminal_failure creates topic when topic_id is None."""
+        session_id = "test-session-no-topic"
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test without topic",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="status",
+            lookup_kind=None,
+            topic_id=None,
+        )
+
+        # Import and call handle_terminal_failure without topic_id
+        from src.escalate.handler import handle_terminal_failure
+        import src.session.store
+
+        with patch.object(src.session.store, 'get_store', return_value=store):
+            await handle_terminal_failure(
+                intent_id=intent_id,
+                session_id=session_id,
+                topic_id=None,  # No topic provided
+                failure_reason="Invalid input detected",
+                error_type="invalid_input",
+                bead_ref=None,
+            )
+
+        # Verify intent status is failed
+        intent = await store.get_intent(intent_id)
+        assert intent["status"] == "failed"
+
+        # Verify a topic was created and linked
+        # Query the intent to see its topic
+        intent = await store.get_intent(intent_id)
+        created_topic_id = intent.get("topic_id")
+        assert created_topic_id is not None
+
+        # Verify the topic exists and has the failed result
+        topic_topics = await store.get_active_topics(session_id)
+        created_topic = next((t for t in topic_topics if t["id"] == created_topic_id), None)
+        assert created_topic is not None
+        assert "Failed:" in created_topic["label"]
+
+        # Verify failed result exists for the created topic
+        latest_result = await store.get_latest_result_for_topic(created_topic_id)
+        assert latest_result is not None
+        assert latest_result["intent_id"] == intent_id
+
+    @pytest.mark.asyncio
+    async def test_failed_card_stores_in_bead_watch(self, store):
+        """handle_terminal_failure stores failure reason in bead_watch when bead_ref provided."""
+        session_id = "test-session-bead-watch"
+        topic_id, _ = await store.find_or_create_topic(
+            label="Bead Watch Test",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test bead watch failure",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-fail123",
+            lookup_kind=None,
+            topic_id=topic_id,
+        )
+
+        # Create bead_watch row
+        await store.create_bead_watch(
+            bead_ref="adc-fail123",
+            sla_hours=6,
+            intent_type="task-profile",
+        )
+
+        # Import and call handle_terminal_failure
+        from src.escalate.handler import handle_terminal_failure
+        import src.session.store
+
+        with patch.object(src.session.store, 'get_store', return_value=store):
+            await handle_terminal_failure(
+                intent_id=intent_id,
+                session_id=session_id,
+                topic_id=topic_id,
+                failure_reason="Bead execution failed",
+                error_type="worker_crash",
+                bead_ref="adc-fail123",
+            )
+
+        # Verify failure reason stored in bead_watch
+        bead_watch = await store.get_bead_watch("adc-fail123")
+        assert bead_watch is not None
+        assert bead_watch["last_refusal_reason"] == "Bead execution failed"
+        assert bead_watch["refusal_count"] == 1  # Should be incremented
 
 
 class TestBeadWatcherFencing:
