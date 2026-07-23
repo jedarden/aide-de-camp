@@ -37,6 +37,7 @@ set_migration_version(db_path, 1)
 | Version | Migration | Description |
 |---------|-----------|-------------|
 | 001 | add_result_type | Add result_type TEXT column to results table for component card selection |
+| 002 | add_component_usage_patterns | Create component_usage_patterns table for component selection tracking |
 
 ## Notes
 
