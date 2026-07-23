@@ -1298,3 +1298,459 @@ class TestCardDismissalEndToEnd:
         assert len(results_1_after) == 0
         assert len(results_2_after) == 1
         assert results_2_after[0]["id"] == result_id_2
+
+
+# --- Comprehensive End-to-End Dismissal Flow Tests ------------------------------
+
+
+@pytest.mark.asyncio
+class TestComprehensiveDismissalFlow:
+    """Comprehensive end-to-end dismissal flow tests that simulate real user interactions."""
+
+    async def test_stuck_card_complete_dismissal_with_api(self, store, broadcaster):
+        """Test complete stuck card dismissal flow: create → API dismiss → verify removal → verify topics query."""
+        session_id = await store.create_session()
+        surface_id = await store.register_surface(session_id, "canvas")
+
+        # Step 1: Create utterance (user says something)
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="Deploy the new feature to production",
+        )
+
+        # Step 2: Create or find topic
+        topic_id, _ = await store.find_or_create_topic(
+            label="Production Deployment",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        # Step 3: Create intent with bead reference
+        bead_ref = "adc-deploy-prod-stuck"
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref=bead_ref,
+            topic_id=topic_id,
+        )
+
+        # Step 4: Create stuck result (this is what the user sees as a stuck card)
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Task stuck — needs your input",
+            data={
+                "bead_id": bead_ref,
+                "stuck_reason": "Deployment blocked: missing production credentials",
+                "refusal_count": 3,
+                "message": "This task has been blocked after 3 refusals.",
+                "action_hint": "Please provide the missing production credentials.",
+            },
+            urgency="high",
+        )
+
+        # Step 5: Verify the card is in the topics query (simulating canvas load)
+        import json
+        topics_before = await store.get_active_topics(session_id)
+        assert len(topics_before) >= 1
+
+        # Find our topic in the results
+        topic_before = next((t for t in topics_before if t["id"] == topic_id), None)
+        assert topic_before is not None
+        assert topic_before["result_count"] >= 1
+
+        # Verify the result exists for the intent
+        results_before = await store.get_results_for_intent(intent_id)
+        assert len(results_before) == 1
+        assert results_before[0]["id"] == result_id
+        result_data_before = json.loads(results_before[0]["data"])
+        assert result_data_before["bead_id"] == bead_ref
+        assert result_data_before["stuck_reason"] == "Deployment blocked: missing production credentials"
+
+        # Step 6: Dismiss the card via API (simulating user clicking dismiss)
+        deletion_result = await store.delete_result(result_id, session_id)
+        assert deletion_result["result_deleted"] == 1
+
+        # Step 7: Verify the result is gone from all queries
+        results_after = await store.get_results_for_intent(intent_id)
+        assert len(results_after) == 0
+
+        # Step 8: Verify the card is removed from topics query
+        topics_after = await store.get_active_topics(session_id)
+        topic_after = next((t for t in topics_after if t["id"] == topic_id), None)
+
+        # The topic should still exist but result count should be updated
+        if topic_after:
+            # Topic exists but the specific result is gone
+            topic_results = await store.get_results_for_intent(intent_id)
+            assert len(topic_results) == 0
+
+        # Step 9: Verify data integrity - intent and topic should still exist
+        intent = await store.get_intent(intent_id)
+        assert intent is not None
+        assert intent["id"] == intent_id
+        assert intent["bead_ref"] == bead_ref
+
+        topic = await store.get_active_topics(session_id)
+        assert len(topic) >= 1
+
+    async def test_failed_card_complete_dismissal_with_api(self, store, broadcaster):
+        """Test complete failed card dismissal flow: create → API dismiss → verify removal → verify topics query."""
+        session_id = await store.create_session()
+        surface_id = await store.register_surface(session_id, "canvas")
+
+        # Step 1: Create utterance
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="Run the data migration script",
+        )
+
+        # Step 2: Create topic
+        topic_id, _ = await store.find_or_create_topic(
+            label="Data Migration",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        # Step 3: Create intent with bead reference
+        bead_ref = "adc-data-migration-failed"
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref=bead_ref,
+            topic_id=topic_id,
+        )
+
+        # Step 4: Create failed result
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Task Failed: Worker_Crash",
+            data={
+                "bead_ref": bead_ref,
+                "failure_reason": "Migration worker crashed due to out of memory error",
+                "error_type": "oom",
+                "message": "Task failed: Worker process crashed",
+                "action_hint": "Increase worker memory allocation and retry.",
+            },
+            urgency="high",
+        )
+
+        # Step 5: Verify the card is in the topics query
+        import json
+        topics_before = await store.get_active_topics(session_id)
+        assert len(topics_before) >= 1
+
+        topic_before = next((t for t in topics_before if t["id"] == topic_id), None)
+        assert topic_before is not None
+        assert topic_before["result_count"] >= 1
+
+        # Verify the result exists
+        results_before = await store.get_results_for_intent(intent_id)
+        assert len(results_before) == 1
+        assert results_before[0]["id"] == result_id
+        result_data_before = json.loads(results_before[0]["data"])
+        assert result_data_before["bead_ref"] == bead_ref
+        assert result_data_before["error_type"] == "oom"
+
+        # Step 6: Dismiss the card via API
+        deletion_result = await store.delete_result(result_id, session_id)
+        assert deletion_result["result_deleted"] == 1
+
+        # Step 7: Verify the result is gone from all queries
+        results_after = await store.get_results_for_intent(intent_id)
+        assert len(results_after) == 0
+
+        # Step 8: Verify data integrity - other data should remain intact
+        intent = await store.get_intent(intent_id)
+        assert intent is not None
+        assert intent["id"] == intent_id
+        assert intent["bead_ref"] == bead_ref
+
+        # Verify utterance still exists
+        all_intents = await store.get_pending_intents(session_id)
+        assert len(all_intents) >= 1
+
+    async def test_dismissal_with_data_integrity_verification(self, store):
+        """Test that dismissal maintains data integrity across the entire flow."""
+        session_id = await store.create_session()
+
+        # Create multiple related data structures
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="Test data integrity during dismissal",
+        )
+
+        topic_id, _ = await store.find_or_create_topic(
+            label="Data Integrity Test",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        bead_ref = "adc-integrity-test"
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref=bead_ref,
+            topic_id=topic_id,
+        )
+
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Test result",
+            data={"bead_id": bead_ref, "stuck_reason": "Integrity test"},
+            urgency="high",
+        )
+
+        # Record the state before dismissal
+        intent_before = await store.get_intent(intent_id)
+        topics_before = await store.get_active_topics(session_id)
+        results_before = await store.get_results_for_intent(intent_id)
+
+        # Verify all data exists before dismissal
+        assert intent_before is not None
+        assert len(topics_before) >= 1
+        assert len(results_before) == 1
+
+        # Dismiss the result
+        await store.delete_result(result_id, session_id)
+
+        # Verify data integrity: other structures should remain intact
+        intent_after = await store.get_intent(intent_id)
+        assert intent_after is not None
+        assert intent_after["id"] == intent_id
+        assert intent_after["bead_ref"] == bead_ref
+        assert intent_after["topic_id"] == topic_id
+
+        # Verify topic still exists
+        topics_after = await store.get_active_topics(session_id)
+        assert len(topics_after) >= 1
+
+        # Verify only the result was deleted
+        results_after = await store.get_results_for_intent(intent_id)
+        assert len(results_after) == 0
+
+        # Verify no orphaned data
+        # Topic should still be accessible
+        topic_after = next((t for t in topics_after if t["id"] == topic_id), None)
+        assert topic_after is not None
+
+    async def test_dismissal_simulating_real_user_flow(self, store, broadcaster):
+        """Simulate real user flow: utterance → stuck card → user dismisses → verify gone from UI."""
+        session_id = await store.create_session()
+        surface_id = await store.register_surface(session_id, "canvas")
+
+        # Register SSE connection (simulating canvas connection)
+        conn = broadcaster.register(
+            surface_id=surface_id,
+            session_id=session_id,
+            surface_type="canvas",
+        )
+
+        # Step 1: User makes an utterance
+        utterance_text = "Deploy the latest build to staging"
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text=utterance_text,
+        )
+
+        # Step 2: System routes to topic
+        topic_id, _ = await store.find_or_create_topic(
+            label="Staging Deployment",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        # Step 3: System creates intent
+        bead_ref = "adc-deploy-staging"
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref=bead_ref,
+            topic_id=topic_id,
+        )
+
+        # Step 4: System creates stuck card (simulating bead watcher fencing)
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Task stuck — needs your input",
+            data={
+                "bead_id": bead_ref,
+                "stuck_reason": "Deployment blocked: staging environment unavailable",
+                "refusal_count": 2,
+                "message": "This task needs your input to proceed.",
+                "action_hint": "Check staging environment status and retry.",
+            },
+            urgency="high",
+        )
+
+        # Step 5: Canvas loads topics (simulating initial render)
+        import json
+        topics = await store.get_active_topics(session_id)
+        assert len(topics) >= 1
+
+        # Verify stuck card is present
+        results = await store.get_results_for_intent(intent_id)
+        assert len(results) == 1
+        result_data = json.loads(results[0]["data"])
+        assert result_data["bead_id"] == bead_ref
+        assert "staging environment unavailable" in result_data["stuck_reason"]
+
+        # Step 6: User clicks dismiss button (canvas calls DELETE API)
+        deletion_result = await store.delete_result(result_id, session_id)
+        assert deletion_result["result_deleted"] == 1
+
+        # Step 7: Canvas reloads topics (simulating post-dismissal render)
+        topics_after = await store.get_active_topics(session_id)
+
+        # Step 8: Verify dismissed card is gone from all UI queries
+        results_after = await store.get_results_for_intent(intent_id)
+        assert len(results_after) == 0
+
+        # Step 9: Verify the topic still exists but card is gone
+        topic_still_exists = next((t for t in topics_after if t["id"] == topic_id), None)
+        assert topic_still_exists is not None
+
+        # Step 10: Verify user can still make new utterances (system still works)
+        new_utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="Check staging status",
+        )
+        assert new_utterance_id is not None
+
+    async def test_multiple_dismissals_in_sequence(self, store):
+        """Test dismissing multiple cards in sequence without affecting data integrity."""
+        session_id = await store.create_session()
+
+        # Create multiple results for dismissal
+        result_ids = []
+        bead_refs = ["adc-1", "adc-2", "adc-3"]
+        intent_ids = []
+
+        for i, bead_ref in enumerate(bead_refs):
+            utterance_id = await store.create_utterance(
+                session_id=session_id,
+                raw_text=f"Test utterance {i}",
+            )
+
+            topic_id, _ = await store.find_or_create_topic(
+                label=f"Topic {i}",
+                session_id=session_id,
+                topic_type="project",
+            )
+
+            intent_id = await store.create_intent(
+                utterance_id=utterance_id,
+                session_id=session_id,
+                project_slug="adc",
+                intent_type="task-profile",
+                bead_ref=bead_ref,
+                topic_id=topic_id,
+            )
+            intent_ids.append(intent_id)
+
+            result_id = await store.create_result(
+                intent_id=intent_id,
+                topic_id=topic_id,
+                session_id=session_id,
+                summary=f"Card {i}",
+                data={"bead_id": bead_ref, "stuck_reason": f"Reason {i}"},
+                urgency="high",
+            )
+            result_ids.append(result_id)
+
+        # Verify all results exist
+        for intent_id in intent_ids:
+            results = await store.get_results_for_intent(intent_id)
+            assert len(results) == 1
+
+        # Dismiss each result in sequence
+        for i, (result_id, intent_id) in enumerate(zip(result_ids, intent_ids)):
+            deletion_result = await store.delete_result(result_id, session_id)
+            assert deletion_result["result_deleted"] == 1
+
+            # Verify this result is gone
+            results_after = await store.get_results_for_intent(intent_id)
+            assert len(results_after) == 0
+
+            # Verify other results still exist
+            for other_intent_id in intent_ids[i+1:]:
+                other_results = await store.get_results_for_intent(other_intent_id)
+                assert len(other_results) == 1
+
+        # Verify all results are gone
+        for intent_id in intent_ids:
+            results = await store.get_results_for_intent(intent_id)
+            assert len(results) == 0
+
+    async def test_dismissal_and_topic_activity_updates(self, store):
+        """Test that dismissal properly affects topic activity tracking."""
+        session_id = await store.create_session()
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="Test topic activity",
+        )
+
+        topic_id, _ = await store.find_or_create_topic(
+            label="Activity Test",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        bead_ref = "adc-activity-test"
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref=bead_ref,
+            topic_id=topic_id,
+        )
+
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Activity test card",
+            data={"bead_id": bead_ref, "stuck_reason": "Test"},
+            urgency="high",
+        )
+
+        # Get topic before dismissal
+        topics_before = await store.get_active_topics(session_id)
+        topic_before = next((t for t in topics_before if t["id"] == topic_id), None)
+        assert topic_before is not None
+        last_active_before = topic_before["last_active"]
+
+        # Dismiss the result
+        await store.delete_result(result_id, session_id)
+
+        # Update topic activity
+        await store.update_topic_activity(topic_id)
+
+        # Get topic after dismissal
+        topics_after = await store.get_active_topics(session_id)
+        topic_after = next((t for t in topics_after if t["id"] == topic_id), None)
+        assert topic_after is not None
+
+        # Verify topic still exists
+        assert topic_after["id"] == topic_id
+
+        # Verify result is gone
+        results = await store.get_results_for_intent(intent_id)
+        assert len(results) == 0

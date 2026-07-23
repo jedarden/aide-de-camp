@@ -1023,6 +1023,21 @@ async def api_v1_get_session_topics(session_id: str):
     }
 
 
+@app.delete("/api/v1/sessions/{session_id}/results/{result_id}")
+async def api_v1_delete_result(session_id: str, result_id: str):
+    """Delete a result card by ID, ensuring it belongs to the specified session.
+
+    Used by the canvas to dismiss stuck/failed cards.
+    Returns the number of results deleted (0 or 1).
+    """
+    store = await get_store()
+
+    # Delete the result with session isolation
+    deletion_result = await store.delete_result(result_id, session_id)
+
+    return deletion_result
+
+
 @app.get("/api/v1/sse")
 async def api_v1_sse(
     session_id: str,
