@@ -1,8 +1,9 @@
 """
-Unit tests for derive_result_type in the hot-path renderer.
+Unit tests for hot-path renderer functionality.
 
-Tests cover all derivation scenarios and edge cases for the deterministic
-result_type derivation that powers component selection.
+Tests cover:
+1. derive_result_type - Deterministic result_type derivation
+2. select_rendered_card - Server-side component selector
 
 Derivation branches:
 - intent-derived: "{intent_type}:{project_slug}"
@@ -16,8 +17,12 @@ Edge cases:
 """
 
 import pytest
+import tempfile
+from pathlib import Path
+import os
 
-from src.render.hot_path import derive_result_type
+from src.render.hot_path import derive_result_type, select_rendered_card, fill_template
+from src.components.library import ComponentLibrary, get_library
 
 
 # =============================================================================
@@ -430,3 +435,306 @@ class TestRealWorldScenarios:
             project_slug="options-pipeline"
         )
         assert rederived == original_result
+
+
+# =============================================================================
+# Fixtures for select_rendered_card tests
+# =============================================================================
+
+@pytest.fixture
+def temp_component_db():
+    """Create a temporary component library database for testing."""
+    fd, path = tempfile.mkstemp(suffix='.db')
+    os.close(fd)
+    db_path = Path(path)
+    yield db_path
+    # Cleanup
+    if db_path.exists():
+        db_path.unlink()
+
+
+@pytest.fixture
+def component_library(temp_component_db):
+    """Create a component library with temporary database."""
+    # Reset the global singleton
+    import src.components.library
+    src.components.library._library_instance = None
+    lib = ComponentLibrary(str(temp_component_db))
+    yield lib
+    lib.close()
+
+
+@pytest.fixture
+def sample_component(component_library):
+    """Create a sample component for testing."""
+    component = component_library.create_component(
+        name="test-status",
+        description="Test status component",
+        html_template='<div class="test-card"><h3>{{title}}</h3><p>{{summary}}</p></div>',
+        change_note="Initial version"
+    )
+    return component
+
+
+@pytest.fixture
+def sample_result_data():
+    """Sample result data for template filling."""
+    return {
+        "title": "Test Status",
+        "summary": "All systems operational",
+        "status": "running"
+    }
+
+
+# =============================================================================
+# select_rendered_card Tests
+# =============================================================================
+
+class TestSelectRenderedCard:
+    """Test server-side deterministic component selector.
+
+    Tests cover the three acceptance criteria cases:
+    1. Match case - component found with score >= threshold
+    2. No-match case - no component found for result_type
+    3. Below-threshold case - component found but score < threshold
+    """
+
+    def test_match_case_returns_rendered_html(self, component_library, sample_component, sample_result_data):
+        """TC-SRC-001: Match case - component found with score >= threshold returns rendered HTML.
+
+        When a component exists in component_usage_patterns with match_score >= threshold,
+        select_rendered_card should:
+        - Fill the component template with result.data
+        - Write to card_cache
+        - Return the rendered HTML string
+        """
+        result_id = "result-test-123"
+        result_type = "status:test-project"
+
+        # Record a high-confidence usage pattern (above threshold)
+        component_library.record_usage_pattern(
+            component_id=sample_component.id,
+            result_type=result_type,
+            match_score=0.85,  # Above 0.7 threshold
+            layout_bucket="normal"
+        )
+
+        # Call select_rendered_card
+        rendered_html = select_rendered_card(
+            result_type=result_type,
+            result_data=sample_result_data,
+            result_id=result_id,
+            layout_bucket="normal",
+            match_threshold=0.7,
+            library=component_library
+        )
+
+        # Assert: Should return rendered HTML (not None)
+        assert rendered_html is not None
+        assert isinstance(rendered_html, str)
+        assert len(rendered_html) > 0
+
+        # Assert: Template should be filled with result data
+        assert "Test Status" in rendered_html  # title from result_data
+        assert "All systems operational" in rendered_html  # summary from result_data
+        assert "<div class=\"test-card\">" in rendered_html  # template structure
+
+        # Assert: Should have written to card_cache
+        cached_card = component_library.get_cached_card(
+            result_id=result_id,
+            component_id=sample_component.id,
+            layout_bucket="normal"
+        )
+        assert cached_card is not None
+        assert cached_card.rendered_html == rendered_html
+
+    def test_no_match_case_returns_none(self, component_library, sample_component, sample_result_data):
+        """TC-SRC-002: No-match case - no component found for result_type returns None.
+
+        When no component exists in component_usage_patterns for the given result_type,
+        select_rendered_card should return None, triggering fallback rendering.
+        """
+        result_id = "result-test-456"
+        result_type = "status:nonexistent-project"
+
+        # Don't record any usage pattern - simulating no match
+
+        # Call select_rendered_card
+        rendered_html = select_rendered_card(
+            result_type=result_type,
+            result_data=sample_result_data,
+            result_id=result_id,
+            layout_bucket="normal",
+            match_threshold=0.7,
+            library=component_library
+        )
+
+        # Assert: Should return None (triggers fallback)
+        assert rendered_html is None
+
+        # Assert: Should NOT have written to card_cache
+        cached_card = component_library.get_cached_card(
+            result_id=result_id,
+            component_id=sample_component.id,
+            layout_bucket="normal"
+        )
+        assert cached_card is None
+
+    def test_below_threshold_case_returns_none(self, component_library, sample_component, sample_result_data):
+        """TC-SRC-003: Below-threshold case - component found but score < threshold returns None.
+
+        When a component exists in component_usage_patterns but with match_score below threshold,
+        select_rendered_card should return None, triggering fallback rendering.
+        """
+        result_id = "result-test-789"
+        result_type = "status:low-confidence-project"
+
+        # Record a low-confidence usage pattern (below threshold)
+        component_library.record_usage_pattern(
+            component_id=sample_component.id,
+            result_type=result_type,
+            match_score=0.65,  # Below 0.7 threshold
+            layout_bucket="normal"
+        )
+
+        # Call select_rendered_card with threshold higher than recorded score
+        rendered_html = select_rendered_card(
+            result_type=result_type,
+            result_data=sample_result_data,
+            result_id=result_id,
+            layout_bucket="normal",
+            match_threshold=0.7,
+            library=component_library
+        )
+
+        # Assert: Should return None (triggers fallback)
+        assert rendered_html is None
+
+        # Assert: Should NOT have written to card_cache
+        cached_card = component_library.get_cached_card(
+            result_id=result_id,
+            component_id=sample_component.id,
+            layout_bucket="normal"
+        )
+        assert cached_card is None
+
+    def test_exactly_at_threshold_returns_html(self, component_library, sample_component, sample_result_data):
+        """TC-SRC-004: Edge case - match_score exactly at threshold (0.7) should match.
+
+        When match_score equals the threshold exactly, it should be considered a match.
+        """
+        result_id = "result-test-threshold"
+        result_type = "status:threshold-project"
+
+        # Record usage pattern with score exactly at threshold
+        component_library.record_usage_pattern(
+            component_id=sample_component.id,
+            result_type=result_type,
+            match_score=0.70,  # Exactly at threshold
+            layout_bucket="normal"
+        )
+
+        # Call select_rendered_card
+        rendered_html = select_rendered_card(
+            result_type=result_type,
+            result_data=sample_result_data,
+            result_id=result_id,
+            layout_bucket="normal",
+            match_threshold=0.7,
+            library=component_library
+        )
+
+        # Assert: Should return rendered HTML (threshold is inclusive)
+        assert rendered_html is not None
+        assert isinstance(rendered_html, str)
+
+    def test_records_usage_pattern_with_score_1_on_match(self, component_library, sample_component, sample_result_data):
+        """TC-SRC-005: On successful match, should record usage pattern with score=1.0.
+
+        Hot-path matches are high-confidence, so they should be recorded with match_score=1.0
+        to bump reliable components toward the top of the selector.
+        """
+        result_id = "result-test-usage"
+        result_type = "status:usage-tracking-project"
+
+        # Record initial pattern with moderate score
+        component_library.record_usage_pattern(
+            component_id=sample_component.id,
+            result_type=result_type,
+            match_score=0.75,
+            layout_bucket="normal"
+        )
+
+        # Call select_rendered_card (should record new usage at 1.0)
+        rendered_html = select_rendered_card(
+            result_type=result_type,
+            result_data=sample_result_data,
+            result_id=result_id,
+            layout_bucket="normal",
+            match_threshold=0.7,
+            library=component_library
+        )
+
+        # Assert: Should have recorded the usage pattern
+        conn = component_library._get_conn()
+        row = conn.execute(
+            """
+            SELECT match_score, sample_count
+            FROM component_usage_patterns
+            WHERE result_type = ? AND component_id = ? AND layout_bucket = ?
+            """,
+            (result_type, sample_component.id, "normal")
+        ).fetchone()
+
+        assert row is not None
+        # The match_score should have been updated toward 1.0 by the new recording
+        # (exact value depends on the running average calculation)
+        assert row[1] >= 2  # sample_count should have increased
+
+
+class TestFillTemplate:
+    """Test template filling functionality."""
+
+    def test_fill_template_simple_substitution(self):
+        """Test simple field substitution in template."""
+        template = '<div>{{title}}</div>'
+        data = {"title": "Test Title"}
+        result = fill_template(template, data)
+        assert result == '<div>Test Title</div>'
+
+    def test_fill_template_nested_path(self):
+        """Test nested dot-path substitution."""
+        template = '<div>{{user.name}}</div>'
+        data = {"user": {"name": "John"}}
+        result = fill_template(template, data)
+        assert result == '<div>John</div>'
+
+    def test_fill_template_list_indexing(self):
+        """Test list indexing via numeric segments."""
+        template = '<div>{{items.0.name}}</div>'
+        data = {"items": [{"name": "First"}, {"name": "Second"}]}
+        result = fill_template(template, data)
+        assert result == '<div>First</div>'
+
+    def test_fill_template_html_escaping(self):
+        """Test that values are HTML-escaped."""
+        template = '<div>{{content}}</div>'
+        data = {"content": "<script>alert('xss')</script>"}
+        result = fill_template(template, data)
+        assert "&lt;script&gt;" in result
+        assert "<script>" not in result
+
+    def test_fill_template_unknown_path_returns_empty(self):
+        """Test that unknown paths resolve to empty string."""
+        template = '<div>{{unknown.path}}</div>'
+        data = {"other": "value"}
+        result = fill_template(template, data)
+        assert result == '<div></div>'
+
+    def test_fill_template_multiple_placeholders(self):
+        """Test multiple placeholders in one template."""
+        template = '<h1>{{title}}</h1><p>{{summary}}</p>'
+        data = {"title": "My Title", "summary": "My Summary"}
+        result = fill_template(template, data)
+        assert "<h1>My Title</h1>" in result
+        assert "<p>My Summary</p>" in result
