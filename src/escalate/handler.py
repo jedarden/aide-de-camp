@@ -977,7 +977,7 @@ async def handle_terminal_failure(
         SSEEvent(
             event_type=EventType.TASK_FAILED,
             data={
-                "bead_ref": bead_ref,
+                "bead_id": bead_ref,
                 "intent_id": intent_id,
                 "session_id": session_id,
                 "topic_id": final_topic_id,
