@@ -20,7 +20,7 @@ from ..escalate.handler import EscalateRequest, escalate_intent
 from ..escalate.llm import get_zai_client, ModelClass
 from ..instrument.timings import DispatchTimings
 from ..session.store import get_store
-from ..fetch.commands import FetchRequest, FetchContext, IntentType as FetchIntentType
+from ..fetch.commands import FetchRequest, FetchContext, IntentType as FetchIntentType, get_fetch_commands
 from ..fetch.orchestrator import execute_fetch
 from ..synthesize.strand import SynthesizeRequest, synthesize_intent
 from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
@@ -423,6 +423,32 @@ class IntentRouter:
                     timings.elapsed_ms(fetch_start, first_source_at[0]),
                 )
 
+            # Check for required source failures (terminal condition)
+            required_sources_failed = [
+                s for s in fetch_result.coverage.failed
+                if any(cmd.source == s and cmd.required
+                       for cmd in get_fetch_commands(fetch_result.intent_type))
+            ]
+
+            if required_sources_failed:
+                failure_reason = f"Required data sources failed: {', '.join(s.value for s in required_sources_failed)}"
+                logger.error(f"Required sources failed for intent {routed_intent.intent_id}: {failure_reason}")
+
+                # Handle terminal failure
+                await self._handle_terminal_failure_for_intent(
+                    routed_intent=routed_intent,
+                    failure_reason=failure_reason,
+                    error_type="required_source_failure",
+                )
+
+                return {
+                    "intent_id": routed_intent.intent_id,
+                    "intent_type": classification.intent_type.value,
+                    "status": "failed",
+                    "error": failure_reason,
+                    "message": "Required sources failed - cannot proceed",
+                }
+
             # Step 2: Synthesize result
             synthesize_request = SynthesizeRequest(
                 intent_id=routed_intent.intent_id,
@@ -479,13 +505,61 @@ class IntentRouter:
 
         except Exception as e:
             logger.error(f"Fetch/synthesize failed for intent {routed_intent.intent_id}: {e}")
+
+            # Detect terminal failure and handle appropriately
+            await self._handle_terminal_failure_for_intent(
+                routed_intent=routed_intent,
+                failure_reason=str(e),
+                error_type="worker_crash",
+            )
+
             return {
                 "intent_id": routed_intent.intent_id,
                 "intent_type": classification.intent_type.value,
-                "status": "error",
+                "status": "failed",
                 "error": str(e),
-                "message": "Failed to fetch or synthesize intent",
+                "message": "Fetch/synthesize failed - terminal error",
             }
+
+    async def _handle_terminal_failure_for_intent(
+        self,
+        routed_intent: RoutedIntent,
+        failure_reason: str,
+        error_type: str,
+        bead_ref: str | None = None,
+    ) -> None:
+        """
+        Handle terminal failure for a routed intent.
+
+        Args:
+            routed_intent: The intent that failed
+            failure_reason: Human-readable failure reason
+            error_type: Type of error (worker_crash, invalid_input, required_source_failure)
+            bead_ref: Associated bead reference (if applicable)
+        """
+        from ..escalate.handler import handle_terminal_failure
+
+        # Get or create topic for failed card
+        try:
+            store = await self._get_store()
+            topic_id, _ = await store.find_or_create_topic(
+                label=f"Failed: {routed_intent.utterance[:80]}",
+                session_id=routed_intent.session_id,
+                topic_type="exception",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create topic for failed card: {e}")
+            topic_id = None
+
+        # Handle terminal failure (updates intent status, stores in bead_watch, broadcasts SSE)
+        await handle_terminal_failure(
+            intent_id=routed_intent.intent_id,
+            session_id=routed_intent.session_id,
+            topic_id=topic_id,
+            failure_reason=failure_reason,
+            error_type=error_type,
+            bead_ref=bead_ref,
+        )
 
     def _map_intent_type(self, intent_type: IntentType) -> FetchIntentType:
         """Map router IntentType to fetch IntentType."""
