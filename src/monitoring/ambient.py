@@ -393,6 +393,7 @@ class AmbientMonitor:
             "is_first_check": changes_dict.get("is_first", False),
             "rule_filters": rule.filters,
             "notification_threshold": rule.notification_threshold,
+            "triggered_rules": changes_dict.get("triggered_rules", []),
         }
 
         # Derive result_type from monitoring intent type per plan §10
