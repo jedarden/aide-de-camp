@@ -1,15 +1,15 @@
 # Demo Seeding Verification Report
 
-**Generated:** 2026-07-23T16:04:32.094219
+**Generated:** 2026-07-23T16:08:59.660738
 
 ## Summary
 
 - **Overall Status:** FAIL
 - **Total Checks:** 4
-  - Passed: 1
-  - Failed: 1
+  - Passed: 2
+  - Failed: 2
   - Warnings: 0
-  - Skipped: 2
+  - Skipped: 0
 
 ## Check Details
 
@@ -30,17 +30,39 @@
 }
 ```
 
-### ⏭️  Context Warmer
+### ❌ Context Warmer
 
-**Status:** SKIP
+**Status:** FAIL
 
-**Message:** Skipped (dry-run mode)
+**Message:** Exception during check: 'SessionStore' object has no attribute 'get_topic'
 
-### ⏭️  Dispatch Execution
+**Details:**
 
-**Status:** SKIP
+```json
+{
+  "error": "'SessionStore' object has no attribute 'get_topic'"
+}
+```
 
-**Message:** Skipped (dry-run mode)
+### ✅ Dispatch Execution
+
+**Status:** PASS
+
+**Message:** All dispatches succeeded
+
+**Details:**
+
+```json
+{
+  "successful_dispatches": [
+    "What's the status of whisper stt?...",
+    "How's the pbx web doing?...",
+    "Pull up the recent logs for whisper stt....",
+    "Find the whisper stt deployment config....",
+    "Should the pbx web use redundant ingress controlle..."
+  ]
+}
+```
 
 ### ❌ Component Coverage
 
