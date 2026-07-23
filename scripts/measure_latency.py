@@ -4,6 +4,9 @@ Latency Baseline Measurement Script
 
 Runs the Phase 5 demo script utterances repeatedly to collect timing data.
 Each utterance shape is run >=30 times to establish reliable p50/p95 metrics.
+
+Demo script uses pbx-web and whisper-stt projects (both on ardenone-cluster).
+Based on Phase 5 Demo Readiness plan.md.
 """
 
 import asyncio
@@ -18,42 +21,43 @@ from typing import Any, Dict, List
 import httpx
 import aiosqlite
 
-# Demo script utterances from Phase 5
+# Demo script utterances from Phase 5 plan.md (golden path)
+# Uses pbx-web and whisper-stt projects (ardenone-cluster, ArgoCD on ardenone-manager)
 DEMO_UTTERANCES = [
     {
         "name": "step1_multi_status",
-        "utterance": "Has the options pipeline caught up, and what's the state of the ibkr mcp?",
-        "description": "Multi-intent status query (options-pipeline + ibkr-mcp)",
+        "utterance": "Has the pbx web caught up, and what's the state of whisper stt?",
+        "description": "Multi-intent status query (pbx-web + whisper-stt)",
         "expected_intents": 2
     },
     {
         "name": "step2_lookup_logs",
-        "utterance": "Pull up the recent logs for the ibkr mcp.",
-        "description": "Lookup logs (ibkr-mcp)",
+        "utterance": "Pull up the recent logs for whisper stt.",
+        "description": "Lookup logs (whisper-stt)",
         "expected_intents": 1
     },
     {
         "name": "step3_brainstorm",
-        "utterance": "Should the options pipeline keep writing straight to SQLite, or is it time to batch through a queue? Give me the trade-offs.",
-        "description": "Brainstorm (options-pipeline)",
+        "utterance": "Should pbx web keep using the static site generator, or is it time to move to a dynamic frontend? Give me the trade-offs.",
+        "description": "Brainstorm (pbx-web)",
         "expected_intents": 1
     },
     {
         "name": "step4_lookup_config",
-        "utterance": "Find the ibkr mcp's deployment config — which cluster and namespace is it on?",
-        "description": "Lookup config (ibkr-mcp)",
+        "utterance": "Find whisper stt's deployment config — which cluster and namespace is it on?",
+        "description": "Lookup config (whisper-stt)",
         "expected_intents": 1
     },
     {
         "name": "step5_task_profile",
-        "utterance": "Queue up a research task: compare the last month of options pipeline errors against the ibkr mcp's and write up common failure patterns — no rush.",
+        "utterance": "Queue up a research task: compare the last month of pbx web deployment patterns against whisper stt's and write up common failure patterns — no rush.",
         "description": "Task-profile (escalate to bead)",
         "expected_intents": 1
     },
     {
         "name": "step6_status_with_diff",
-        "utterance": "Anything new on the options pipeline since we started?",
-        "description": "Status query with diff (options-pipeline)",
+        "utterance": "Anything new on pbx web since we started?",
+        "description": "Status query with diff (pbx-web)",
         "expected_intents": 1
     }
 ]
@@ -61,6 +65,36 @@ DEMO_UTTERANCES = [
 RUNS_PER_UTTERANCE = 30  # Minimum runs per utterance shape
 SERVER_URL = "http://localhost:8000"
 DB_PATH = "data/session.db"
+ZAI_PROXY_URL = "https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages"
+
+
+async def check_zai_proxy_health() -> bool:
+    """Check if ZAI proxy is reachable."""
+    print(f"\nChecking ZAI proxy health: {ZAI_PROXY_URL}")
+    try:
+        async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
+            # Try a minimal API request to check connectivity
+            response = await client.post(
+                ZAI_PROXY_URL,
+                json={
+                    "model": "claude-haiku-4-20250514",
+                    "max_tokens": 10,
+                    "messages": [{"role": "user", "content": "test"}]
+                },
+                headers={"x-api-key": "test"}  # May fail auth but proves connectivity
+            )
+            # Any response (even 401/403) means proxy is reachable
+            print(f"  ✓ Proxy reachable (status: {response.status_code})")
+            return True
+    except httpx.ConnectError as e:
+        print(f"  ✗ Proxy connection failed: {e}")
+        return False
+    except httpx.TimeoutException:
+        print(f"  ✗ Proxy timeout")
+        return False
+    except Exception as e:
+        print(f"  ✗ Proxy check failed: {e}")
+        return False
 
 
 async def dispatch_utterance(client: httpx.AsyncClient, utterance: str, wait: bool = True) -> Dict[str, Any]:
@@ -226,14 +260,25 @@ async def main():
     print(f"Runs per utterance: {RUNS_PER_UTTERANCE}")
     print(f"Server: {SERVER_URL}")
 
+    # Check ZAI proxy health first
+    zai_ok = await check_zai_proxy_health()
+    if not zai_ok:
+        print("\n⚠ WARNING: ZAI proxy is not reachable. Latency tests may fail or show unrealistic values.")
+        print("Continuing anyway...")
+
     # Check server is healthy
+    print(f"\nChecking ADC server health: {SERVER_URL}/health")
     try:
         async with httpx.AsyncClient() as client:
             health = await client.get(f"{SERVER_URL}/health", timeout=5.0)
             health.raise_for_status()
-            print(f"Server health: {health.json()}")
+            health_data = health.json()
+            print(f"  ✓ Server healthy: {health_data.get('status')}")
+            if health_data.get('watcher'):
+                watcher_alive = health_data['watcher'].get('alive')
+                print(f"  Watcher alive: {watcher_alive}")
     except Exception as e:
-        print(f"ERROR: Server not healthy: {e}")
+        print(f"  ✗ ERROR: Server not healthy: {e}")
         sys.exit(1)
 
     # Clear old timing data (optional - comment out if you want to keep history)
@@ -246,7 +291,7 @@ async def main():
         await db.execute("DELETE FROM topics")
         await db.execute("DELETE FROM sessions")
         await db.commit()
-        print("Cleared old data")
+        print("  ✓ Cleared old data")
 
     # Run each demo utterance
     all_results = []
@@ -263,6 +308,10 @@ async def main():
     # Collect timing data from database
     timings = await collect_timing_data()
     print(f"Collected {len(timings)} timing records")
+
+    if not timings:
+        print("\n✗ ERROR: No timing data collected. Check server logs.")
+        sys.exit(1)
 
     # Analyze timings
     analysis = analyze_timings(timings)
@@ -298,7 +347,8 @@ async def main():
                   f"{format_duration(data['max']):>10}")
 
     # Save results to file
-    results_file = Path("docs/notes/latency-baseline-2026-07.json")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    results_file = Path(f"docs/notes/latency-baseline-{timestamp}.json")
     results_file.parent.mkdir(parents=True, exist_ok=True)
 
     output = {
@@ -306,7 +356,9 @@ async def main():
             "timestamp": datetime.now().isoformat(),
             "runs_per_utterance": RUNS_PER_UTTERANCE,
             "total_runs": len(all_results),
-            "timing_records": len(timings)
+            "timing_records": len(timings),
+            "zai_proxy_reachable": zai_ok,
+            "demo_projects": ["pbx-web", "whisper-stt"]
         },
         "utterances": DEMO_UTTERANCES,
         "analysis": analysis,
@@ -349,6 +401,10 @@ async def main():
     print(f"{'='*60}")
 
     print(f"\nCompleted: {datetime.now().isoformat()}")
+
+    # Exit with error code if budget failed
+    if not budget_passed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
