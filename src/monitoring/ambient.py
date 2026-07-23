@@ -504,6 +504,93 @@ class AmbientMonitor:
 
         return f"{rule.topic_id} state updated"
 
+    def evaluate_exception_rules(
+        self,
+        changes_dict: dict,
+        project_slug: str,
+        rules: list[ExceptionRule],
+    ) -> list[dict]:
+        """
+        Evaluate exception rules against state changes.
+
+        Returns list of triggered rule outputs with project_slug, urgency, and exception type.
+        Rules fire only when matching state changes occur in the diff.
+        No firing when no relevant state changes.
+        """
+        if not changes_dict.get("changed_fields"):
+            return []
+
+        diff = changes_dict.get("diff", {})
+        triggered_rules = []
+
+        for rule in rules:
+            # Check if rule applies to this project
+            if rule.project_slug and rule.project_slug != project_slug:
+                continue
+
+            # Evaluate rule condition against diff
+            if self._rule_condition_matches(rule.condition, diff):
+                triggered_rules.append({
+                    "project_slug": project_slug,
+                    "urgency": rule.urgency,
+                    "exception_type": rule.name,
+                    "condition": rule.condition,
+                    "message": rule.message,
+                })
+                logger.info(f"Exception rule '{rule.name}' fired for {project_slug}: {rule.condition}")
+
+        return triggered_rules
+
+    def _rule_condition_matches(self, condition: str, diff: dict) -> bool:
+        """
+        Check if a rule condition matches the diff.
+
+        Conditions are simple field comparisons against the diff.
+        Examples:
+        - "phase==Failed" -> true if phase changed to Failed
+        - "restarts>5" -> true if restarts changed to value > 5
+        - "sync_status==OutOfSync" -> true if sync_status changed to OutOfSync
+        """
+        import re
+
+        # Parse condition
+        match = re.match(r'(\w+)(==|!=|>=|<=|>|<)(.+)', condition)
+        if not match:
+            logger.warning(f"Invalid rule condition: {condition}")
+            return False
+
+        field, op, expected_value = match.groups()
+
+        # Check if this field changed
+        if field not in diff:
+            return False
+
+        # Get the new value (what it changed "to")
+        new_value = diff[field].get("to")
+
+        if new_value is None:
+            return False
+
+        # Evaluate condition
+        try:
+            if op == "==":
+                return str(new_value) == expected_value
+            elif op == "!=":
+                return str(new_value) != expected_value
+            elif op == ">":
+                return float(new_value) > float(expected_value)
+            elif op == "<":
+                return float(new_value) < float(expected_value)
+            elif op == ">=":
+                return float(new_value) >= float(expected_value)
+            elif op == "<=":
+                return float(new_value) <= float(expected_value)
+        except (ValueError, TypeError):
+            logger.warning(f"Rule condition evaluation failed: {condition} with value {new_value}")
+            return False
+
+        return False
+
     async def monitor_topic(self, rule: MonitoringRule) -> None:
         """
         Monitor a single topic on its check interval.
@@ -527,6 +614,19 @@ class AmbientMonitor:
 
                     if has_change:
                         logger.info(f"State change detected for {rule.topic_id}: {changes_dict.get('changed_fields', [])}")
+
+                        # Evaluate exception rules if configured
+                        if self.config and self.config.exceptions:
+                            triggered_rules = self.evaluate_exception_rules(
+                                changes_dict=changes_dict,
+                                project_slug=rule.project_slug,
+                                rules=self.config.exceptions,
+                            )
+                            if triggered_rules:
+                                logger.info(f"Triggered {len(triggered_rules)} exception rules for {rule.topic_id}")
+                                # Add triggered rules to result data
+                                changes_dict["triggered_rules"] = triggered_rules
+
                         await self.push_monitoring_result(rule, current_state, changes_dict, session_id)
                     else:
                         # Update cache even if no change (keeps it fresh)
