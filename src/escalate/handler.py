@@ -984,6 +984,7 @@ async def handle_terminal_failure(
                 "failure_reason": failure_reason,
                 "error_type": error_type,
                 "message": f"Task failed: {failure_reason}",
+                "timestamp": int(datetime.now(timezone.utc).timestamp()),
             },
             target_session_id=session_id,
         )
