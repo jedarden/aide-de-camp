@@ -774,7 +774,25 @@ class EscalateHandler:
             )
             raise BeadApprovalRequired(approval_card, bead_body, bead_type)
 
-        # Validation failed - try re-formulation once
+        # Validation failed - check re-formulation count before attempting
+        store = await self._get_store()
+        reformulation_count = await store.get_reformulation_count(request.session_id)
+        MAX_REFORMULATION_ATTEMPTS = 3  # Maximum 3 attempts per session
+
+        if reformulation_count >= MAX_REFORMULATION_ATTEMPTS:
+            logger.error(
+                f"Session {request.session_id} has exceeded re-formulation attempt limit "
+                f"({reformulation_count}/{MAX_REFORMULATION_ATTEMPTS})"
+            )
+            raise ValidationRetryExhaustedError(
+                result.violations,
+                f"Re-formulation attempt limit exceeded ({MAX_REFORMULATION_ATTEMPTS} attempts per session). "
+                "Please clarify your request or provide more specific details.",
+            )
+
+        # Increment re-formulation count
+        new_count = await store.increment_reformulation_count(request.session_id)
+        logger.info(f"Attempt re-formulation for intent {request.intent_id} (session attempt {new_count}/{MAX_REFORMULATION_ATTEMPTS})")
         logger.warning(f"Validation failed for intent {request.intent_id}, attempting re-formulation")
         logger.info(f"Reformulation hint: {result.reformulation_hint}")
 
@@ -934,6 +952,44 @@ Output ONLY the revised bead body as markdown.
             },
         }
 
+    def build_clarification_card(
+        self,
+        request: EscalateRequest,
+        original_bead_body: str,
+        violations: list,
+    ) -> dict:
+        """
+        Build a clarification card for the surface.
+
+        The clarification card shows the user that the intent needs
+        clarification due to validation failures after re-formulation.
+        """
+        title = self._generate_bead_title(request)
+
+        # Format violations for display
+        violation_messages = []
+        for v in violations:
+            violation_messages.append(f"- {v.message}")
+
+        return {
+            "type": "clarification",
+            "id": f"clarification-{request.intent_id}",
+            "intent_id": request.intent_id,
+            "title": title,
+            "summary": f"Needs clarification: {request.utterance[:100]}",
+            "status": "needs_clarification",
+            "urgency": request.metadata.get("urgency", "normal"),
+            "created_at": int(datetime.now(timezone.utc).timestamp()),
+            "original_utterance": request.utterance,
+            "original_bead_body": original_bead_body,
+            "violations": violation_messages,
+            "metadata": {
+                "project_slug": request.project_slug,
+                "topic_id": request.topic_id,
+                "session_id": request.session_id,
+            },
+        }
+
     async def escalate_intent(self, request: EscalateRequest) -> EscalateResult:
         """
         Escalate an intent to a bead.
@@ -1011,11 +1067,15 @@ Output ONLY the revised bead body as markdown.
                 intent_type=request.intent_type,
             )
 
+            # Reset re-formulation count on successful bead creation
+            store = await self._get_store()
+            await store.reset_reformulation_count(request.session_id)
+            logger.info(f"Reset reformulation_count for session {request.session_id} after successful bead creation")
+
             # Step 6: Build pending card
             pending_card = self.build_pending_card(request, bead_id, bead_type)
 
             # Update intent in store with bead reference
-            store = await self._get_store()
             await store.update_intent_status(
                 intent_id=request.intent_id,
                 status="dispatched",
@@ -1031,7 +1091,7 @@ Output ONLY the revised bead body as markdown.
             )
 
         except BeadApprovalRequired as e:
-            # Approval required - return approval card
+            # Approval required - broadcast approval event and return approval card
             logger.info(f"Approval required for intent {request.intent_id}")
 
             # Update intent status
@@ -1041,11 +1101,72 @@ Output ONLY the revised bead body as markdown.
                 status="awaiting_approval",
             )
 
+            # Broadcast approval_required event to canvas
+            broadcaster = get_broadcaster()
+            await broadcaster.broadcast(
+                SSEEvent(
+                    event_type=EventType.APPROVAL_REQUIRED,
+                    data={
+                        "intent_id": request.intent_id,
+                        "session_id": request.session_id,
+                        "approval_card": e.approval_card,
+                        "bead_body": e.bead_body,
+                        "bead_type": e.bead_type,
+                        "utterance": request.utterance,
+                    },
+                    target_session_id=request.session_id,
+                )
+            )
+            logger.info(f"Broadcast approval_required event for intent {request.intent_id}")
+
             return EscalateResult(
                 bead_id="",  # No bead created yet
                 intent_id=request.intent_id,
                 pending_card=e.approval_card,
                 status="awaiting_approval",
+            )
+        except ValidationRetryExhaustedError as e:
+            # Re-formulation failed - return clarification card
+            logger.warning(f"Re-formulation exhausted for intent {request.intent_id}: {e}")
+
+            # Update intent status
+            store = await self._get_store()
+            await store.update_intent_status(
+                intent_id=request.intent_id,
+                status="needs_clarification",
+            )
+
+            # Build clarification card
+            # We need to get the original bead body that was formulated before validation
+            # Since we don't have the original bead body at this point, we use the utterance
+            clarification_card = self.build_clarification_card(
+                request=request,
+                original_bead_body=request.utterance,  # Fallback to utterance
+                violations=e.original_violations,
+            )
+
+            # Broadcast clarification_card event to canvas
+            broadcaster = get_broadcaster()
+            await broadcaster.broadcast(
+                SSEEvent(
+                    event_type=EventType.CLARIFICATION_CARD,
+                    data={
+                        "intent_id": request.intent_id,
+                        "session_id": request.session_id,
+                        "clarification_card": clarification_card,
+                        "violations": [v.to_dict() if hasattr(v, 'to_dict') else {"message": str(v)} for v in e.original_violations],
+                        "utterance": request.utterance,
+                    },
+                    target_session_id=request.session_id,
+                )
+            )
+            logger.info(f"Broadcast clarification_card event for intent {request.intent_id}")
+
+            return EscalateResult(
+                bead_id="",  # No bead created
+                intent_id=request.intent_id,
+                pending_card=clarification_card,
+                status="needs_clarification",
             )
         except EscalateError:
             raise

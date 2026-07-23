@@ -1228,6 +1228,34 @@
                 container.insertBefore(failedCard, container.firstChild);
             });
 
+            // Approval required event: render approval card for user confirmation
+            eventSource.addEventListener('approval_required', (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Approval required:', data);
+
+                // Find and remove any pending card for this intent
+                const intentId = data.intent_id;
+                if (intentId) {
+                    const pendingCard = document.querySelector('[data-pending-id="' + intentId + '"]');
+                    if (pendingCard) {
+                        pendingCard.remove();
+                        console.log('Removed pending card for approval intent_id:', intentId);
+                    }
+                }
+
+                // Create and prepend the approval card
+                const approvalCard = createApprovalCard(data);
+                const container = document.getElementById('topicsContainer');
+
+                // Clear loading/empty state if present
+                if (container.querySelector('.loading') || container.querySelector('.empty-state')) {
+                    container.innerHTML = '';
+                }
+
+                // Prepend approval card (newest first)
+                container.insertBefore(approvalCard, container.firstChild);
+            });
+
             // Error event: render error card from degraded-state SSE error events
             eventSource.addEventListener('error', (event) => {
                 const data = JSON.parse(event.data);
