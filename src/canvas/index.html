@@ -879,8 +879,25 @@
                     return;
                 }
 
-                console.log('Thread progress:', { thread_id: threadId, data: data });
-                // Card updates will be handled in the next child (Child 2 of 5)
+                // Find the pending thread card by thread_id
+                const threadCard = document.querySelector('[data-pending-id="' + threadId + '"]');
+                if (!threadCard) {
+                    console.warn('thread_progress: threadCard not found for thread_id=' + threadId);
+                    return;
+                }
+                if (!threadCard.classList.contains('pending-card')) {
+                    console.warn('thread_progress: threadCard does not have pending-card class for thread_id=' + threadId);
+                    return;
+                }
+                if (typeof _setProgress !== 'function') {
+                    console.warn('thread_progress: _setProgress is not a function');
+                    return;
+                }
+
+                // Pass progress message (e.g., '3/5 sources in') to _setProgress()
+                const completed = data.completed;
+                const total = data.total;
+                _setProgress(threadCard, { completed: completed, total: total });
             });
 
             // Per-source progress update for a thread
