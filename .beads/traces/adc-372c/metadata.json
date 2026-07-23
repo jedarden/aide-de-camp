@@ -1,16 +1,16 @@
 {
   "bead_id": "adc-372c",
-  "agent": "timeout-agent",
-  "provider": null,
-  "model": null,
+  "agent": "claude-code-glm-5",
+  "provider": "zai",
+  "model": "glm-5",
   "exit_code": 124,
   "outcome": "timeout",
-  "duration_ms": 1001,
+  "duration_ms": 600000,
   "input_tokens": null,
   "output_tokens": null,
   "cost_usd": null,
-  "captured_at": "2026-07-16T01:57:58.458231604Z",
-  "trace_format": "raw_text",
+  "captured_at": "2026-07-20T01:59:06.446211556Z",
+  "trace_format": "claude_json",
   "pruned": false,
   "template_version": null
 }

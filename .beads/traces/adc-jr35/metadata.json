@@ -1,0 +1,16 @@
+{
+  "bead_id": "adc-jr35",
+  "agent": "claude-code-glm-5",
+  "provider": "zai",
+  "model": "glm-5",
+  "exit_code": 0,
+  "outcome": "success",
+  "duration_ms": 196569,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_usd": null,
+  "captured_at": "2026-07-22T05:13:00.650453637Z",
+  "trace_format": "claude_json",
+  "pruned": false,
+  "template_version": null
+}

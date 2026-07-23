@@ -261,6 +261,33 @@ class BeadWatcher:
         self.last_tick_at = time.time()
         self.tick_count += 1
 
+    def health_snapshot(self) -> dict:
+        """Return watcher liveness snapshot for GET /health.
+
+        Computes ``alive`` as: the watch task is running AND the last tick
+        occurred within 2x the poll interval. Returns a dict with ``alive``,
+        ``last_tick_at`` (epoch seconds or None if never ticked), ``tick_count``,
+        and ``interval`` (seconds). If ``last_tick_at`` is 0.0 (never ticked),
+        ``last_tick_at`` is None and ``alive`` is False.
+        """
+        now = time.time()
+        # Task is running if the supervisor task exists and is not done/cancelled
+        task_running = (
+            self._watch_task is not None
+            and not self._watch_task.done()
+        )
+        # Last tick is fresh if within 2x the interval (0.0 means never ticked)
+        tick_fresh = (
+            self.last_tick_at > 0.0
+            and (now - self.last_tick_at) <= (2 * self.check_interval_seconds)
+        )
+        return {
+            "alive": task_running and tick_fresh,
+            "last_tick_at": int(self.last_tick_at) if self.last_tick_at > 0.0 else None,
+            "tick_count": self.tick_count,
+            "interval": int(self.check_interval_seconds),
+        }
+
     async def _watch_loop(self) -> None:
         """Main watch loop - checks for new bead events each interval.
 

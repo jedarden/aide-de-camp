@@ -1,0 +1,5 @@
+# Node Playwright install for the canvas browser runner.
+# The browser binaries themselves live in ~/.cache/ms-playwright (shared, not per-repo).
+# Only the JS package tarballs land here — all regenerable via `npm install`.
+node_modules/
+package-lock.json

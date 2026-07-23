@@ -13,6 +13,7 @@ projects:
       - "options data"
     cluster: apexalgo-iad
     namespace: options
+    argocd_app: options-pipeline  # ArgoCD Application name; defaults to the slug when omitted
     repo_path: null
     intent_support:
       - status
@@ -39,6 +40,7 @@ projects:
       - "ibkr mcp"
     cluster: apexalgo-iad
     namespace: ibkr-mcp
+    argocd_app: ibkr-mcp  # explicit here for clarity; equals the slug default
     repo_path: null
     intent_support:
       - status

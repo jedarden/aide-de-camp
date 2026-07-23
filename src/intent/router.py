@@ -7,6 +7,7 @@ Uses LLM to classify intents by type and project, then routes:
 """
 import asyncio
 import json
+import time
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -17,6 +18,7 @@ from typing import Any, Optional
 from ..components.hot_reload import get_reload_manager
 from ..escalate.handler import EscalateRequest, escalate_intent
 from ..escalate.llm import get_zai_client, ModelClass
+from ..instrument.timings import DispatchTimings
 from ..session.store import get_store
 from ..fetch.commands import FetchRequest, FetchContext, IntentType as FetchIntentType
 from ..fetch.orchestrator import execute_fetch
@@ -57,6 +59,10 @@ class RoutedIntent:
     classification: IntentClassification
     session_id: str
     utterance: str
+    # router_ms is measured once around classify_utterance() in route_utterance
+    # (one LLM call per utterance) and shared across every intent thread from
+    # that utterance — see Latency Budget & Instrumentation in docs/plan/plan.md.
+    router_ms: int | None = None
 
 
 # Path to the router segmentation prompt. Read from disk on each classify_utterance()
@@ -254,8 +260,12 @@ class IntentRouter:
         Returns:
             List of RoutedIntent objects
         """
-        # Classify the utterance
+        # Classify the utterance (one LLM call per utterance — the router stage
+        # is shared across every intent thread it produces, so its duration is
+        # measured once here and stamped onto each RoutedIntent).
+        classify_start = time.monotonic()
         classifications = await self.classify_utterance(utterance, session_id)
+        router_ms = int((time.monotonic() - classify_start) * 1000)
 
         routed_intents = []
         for classification in classifications:
@@ -267,6 +277,7 @@ class IntentRouter:
                 classification=classification,
                 session_id=session_id,
                 utterance=classification.utterance_fragment,
+                router_ms=router_ms,
             )
             routed_intents.append(routed_intent)
 
@@ -287,22 +298,54 @@ class IntentRouter:
         """
         classification = routed_intent.classification
 
-        # For task-profile intents, escalate to bead
-        if classification.intent_type == IntentType.TASK_PROFILE:
-            return await self._escalate_to_bead(routed_intent)
+        # Capture per-stage timings for this dispatch and persist one
+        # dispatch_timings row (see Latency Budget & Instrumentation). Each
+        # branch records the stages it measures; router_ms is shared across
+        # the utterance's threads and was stamped on the RoutedIntent. Capture
+        # is non-fatal: a persistence failure logs and moves on, never breaking
+        # the dispatch itself.
+        timings = DispatchTimings()
+        timings.record("router_ms", routed_intent.router_ms)
 
-        # For other intents, fetch then synthesize
-        return await self._fetch_and_synthesize(routed_intent)
+        try:
+            # For task-profile intents, escalate to bead
+            if classification.intent_type == IntentType.TASK_PROFILE:
+                result = await self._escalate_to_bead(routed_intent, timings)
+            else:
+                # For other intents, fetch then synthesize
+                result = await self._fetch_and_synthesize(routed_intent, timings)
+        except Exception:
+            # Persist whatever was captured before the failure, then re-raise.
+            await self._persist_timings(routed_intent.intent_id, timings)
+            raise
+
+        await self._persist_timings(routed_intent.intent_id, timings)
+        return result
+
+    async def _persist_timings(
+        self,
+        intent_id: str,
+        timings: DispatchTimings,
+    ) -> None:
+        """Persist the captured dispatch timings. Non-fatal on error."""
+        try:
+            store = await self._get_store()
+            await store.record_dispatch_timings(intent_id, **timings.to_fields())
+        except Exception as e:
+            logger.warning(f"dispatch timings not recorded for {intent_id}: {e}")
 
     async def _fetch_and_synthesize(
         self,
         routed_intent: RoutedIntent,
+        timings: DispatchTimings,
     ) -> dict:
         """
         Fetch context then synthesize into structured result.
 
         Args:
             routed_intent: The routed intent to process
+            timings: Per-stage timing collector; records fetch_first_source_ms,
+                fetch_total_ms, and synthesize_total_ms.
 
         Returns:
             Result dictionary with synthesized data
@@ -319,6 +362,7 @@ class IntentRouter:
             fetch_intent_type = self._map_intent_type(classification.intent_type)
 
             from ..environment.discovery import get_registry
+            from ..registry import get_project
             repo_path = None
             ssh_target = None
             host_alias = None
@@ -334,6 +378,15 @@ class IntentRouter:
                 else:
                     logger.info(f"No repo found for slug '{classification.project_slug}'")
 
+            # YAML registry entry carries cluster/namespace/argocd_app — cluster
+            # drives ArgoCD endpoint resolution (bead adc-1ejh: the fetch strand
+            # resolves {argocd_api} from `cluster` via config/clusters.yaml).
+            # argocd_app defaults to the slug when omitted (see _fetch_argocd_app).
+            project_cfg = (
+                get_project(classification.project_slug)
+                if classification.project_slug else None
+            )
+
             fetch_request = FetchRequest(
                 intent_id=routed_intent.intent_id,
                 intent_type=fetch_intent_type,
@@ -344,10 +397,29 @@ class IntentRouter:
                     repo_path=repo_path,
                     ssh_target=ssh_target,
                     host_alias=host_alias,
+                    cluster=project_cfg.get("cluster") if project_cfg else None,
+                    namespace=project_cfg.get("namespace") if project_cfg else None,
+                    app_name=project_cfg.get("argocd_app") if project_cfg else None,
                 ),
             )
 
-            fetch_result = await execute_fetch(fetch_request)
+            # fetch_first_source_ms = time from fetch start to the first source
+            # resolving (success/fail/timeout — the first progress state on the
+            # pending card). fetch_total_ms = the fetch window close.
+            fetch_start = timings.clock()
+            first_source_at: list[float | None] = [None]
+
+            def _on_first_source(_source, _result) -> None:
+                if first_source_at[0] is None:
+                    first_source_at[0] = timings.clock()
+
+            fetch_result = await execute_fetch(fetch_request, _on_first_source)
+            timings.record("fetch_total_ms", fetch_result.total_duration_ms)
+            if first_source_at[0] is not None:
+                timings.record(
+                    "fetch_first_source_ms",
+                    timings.elapsed_ms(fetch_start, first_source_at[0]),
+                )
 
             # Step 2: Synthesize result
             synthesize_request = SynthesizeRequest(
@@ -359,7 +431,12 @@ class IntentRouter:
                 urgency=classification.urgency,
             )
 
+            synth_start = timings.clock()
             synthesize_result = await synthesize_intent(synthesize_request)
+            timings.record("synthesize_total_ms", timings.elapsed_ms(synth_start))
+            # synthesize_first_token_ms is not measurable on the current
+            # call_simple path (no token stream) and is left NULL until the
+            # synthesize strand streams — see src/instrument/timings.py.
 
             # Persist result to session store so loadTopics() can display it
             store = get_store()
@@ -425,12 +502,14 @@ class IntentRouter:
     async def _escalate_to_bead(
         self,
         routed_intent: RoutedIntent,
+        timings: DispatchTimings,
     ) -> dict:
         """
         Escalate a task-profile intent to a NEEDLE bead.
 
         Args:
             routed_intent: The routed intent to escalate
+            timings: Per-stage timing collector; records escalate_ms.
 
         Returns:
             Result dictionary with pending card
@@ -455,8 +534,11 @@ class IntentRouter:
         )
 
         try:
-            # Escalate to bead
+            # Escalate to bead — escalate_ms budgets formulation + validation +
+            # bf create (task-profile dispatches only; NULL for hot-path rows).
+            esc_start = timings.clock()
             result = await escalate_intent(escalate_request)
+            timings.record("escalate_ms", timings.elapsed_ms(esc_start))
 
             return {
                 "intent_id": routed_intent.intent_id,

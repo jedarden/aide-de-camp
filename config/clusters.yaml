@@ -1,0 +1,55 @@
+# config/clusters.yaml — cluster → ArgoCD API mapping
+#
+# There is no single ArgoCD API. Applications on ardenone-cluster live on
+# ardenone-manager's ArgoCD, which exposes a no-auth read-only proxy the fetch
+# strand can consume directly. apexalgo-iad and the iad-* Spot clusters are
+# managed by the ArgoCD instance on rs-manager, which today has NO equivalent
+# no-auth read-only proxy — only the authenticated, Tailscale-only API.
+#
+# Querying the wrong instance returns not-found (indistinguishable from "app
+# doesn't exist"). The fetch strand therefore resolves the ArgoCD endpoint from
+# a registry entry's `cluster` through THIS file — and any cluster absent from
+# here, or mapped to an `access` mode the fetch strand cannot satisfy (it holds
+# no ArgoCD credentials, so only `read-only-proxy` is consumable), resolves the
+# ArgoCD source as FAILED with a fetch_coverage caveat. Never a silent
+# wrong-instance query.
+#
+# See docs/plan/plan.md → Fetch Strand → Cluster→ArgoCD Endpoint Resolution.
+# Hot-reloaded via an mtime-checked cache (src/fetch/clusters.py) like every
+# config artifact — edit takes effect on the next fetch, no restart.
+#
+# `access` modes:
+#   read-only-proxy  → no auth; a proxy injects a read-only token. CONSUMABLE.
+#   authenticated    → requires credentials the fetch strand does not hold.
+#                      Resolves as failed with an honest caveat.
+clusters:
+  # --- ardenone-manager ArgoCD (no-auth read-only proxy) ---
+  ardenone-cluster:
+    argocd_api: https://argocd-ro-ardenone-manager-ts.ardenone.com:8444
+    access: read-only-proxy   # ArgoCD on ardenone-manager; proxy injects a RO token
+  ardenone-manager:
+    argocd_api: https://argocd-ro-ardenone-manager-ts.ardenone.com:8444
+    access: read-only-proxy   # ArgoCD runs on ardenone-manager itself
+
+  # --- rs-manager ArgoCD (authenticated only — no no-auth RO proxy today) ---
+  apexalgo-iad:
+    argocd_api: https://argocd-rs-manager.tail1b1987.ts.net:8080
+    access: authenticated      # ⚠ no no-auth RO proxy for rs-manager — known issue
+  iad-options:
+    argocd_api: https://argocd-rs-manager.tail1b1987.ts.net:8080
+    access: authenticated
+  iad-kalshi:
+    argocd_api: https://argocd-rs-manager.tail1b1987.ts.net:8080
+    access: authenticated
+  iad-ci:
+    argocd_api: https://argocd-rs-manager.tail1b1987.ts.net:8080
+    access: authenticated
+  iad-native-ads:
+    argocd_api: https://argocd-rs-manager.tail1b1987.ts.net:8080
+    access: authenticated
+  rs-manager:
+    argocd_api: https://argocd-rs-manager.tail1b1987.ts.net:8080
+    access: authenticated
+
+  # Clusters intentionally NOT mapped here (e.g. ardenone-hub, ord-devimprint)
+  # resolve the ArgoCD source as failed with a caveat — preferred over a guess.

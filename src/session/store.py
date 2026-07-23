@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS intents (
     topic_id     TEXT,
     project_slug TEXT,
     intent_type  TEXT NOT NULL,
+    lookup_kind  TEXT,  -- lookup intents only: 'logs' | 'config' | 'docs' (router-emitted; see Intent Router). NULL otherwise
     status       TEXT NOT NULL CHECK(status IN ('pending', 'dispatched', 'resolved', 'cancelled')) DEFAULT 'pending',
     bead_ref     TEXT,
     created_at   INTEGER NOT NULL,
@@ -85,6 +86,14 @@ CREATE TABLE IF NOT EXISTS results (
     summary     TEXT NOT NULL,
     data        TEXT NOT NULL,  -- JSON
     urgency     TEXT NOT NULL CHECK(urgency IN ('critical', 'high', 'normal', 'low')) DEFAULT 'normal',
+    result_type TEXT,  -- deterministic card-selector key, set at result-write time:
+                       -- "{intent_type}:{project_slug}" for intent-derived results — one per
+                       -- intent thread (the aggregated thread card); lookup threads insert the
+                       -- intent's lookup_kind: "lookup:{lookup_kind}:{project_slug}";
+                       -- "monitoring:{project_slug}" for monitoring-originated rows. The hot-path
+                       -- component lookup keys on this column, no LLM (see UI-Regen Agent /
+                       -- component_usage_patterns).
+    card_fallback INTEGER NOT NULL DEFAULT 0 CHECK(card_fallback IN (0, 1)),  -- 1 when no component matched this result_type (or below threshold): the client renders the built-in generic fallback card (see Component Library → Built-in generic fallback card). 0 when a real component rendered it (card_cache holds the rendered HTML).
     created_at  INTEGER NOT NULL,
     surfaced_at INTEGER,
     acked_at    INTEGER,
@@ -161,7 +170,46 @@ CREATE INDEX IF NOT EXISTS idx_signals_session ON feedback_signals(session_id);
 CREATE INDEX IF NOT EXISTS idx_signals_type ON feedback_signals(signal_type);
 CREATE INDEX IF NOT EXISTS idx_signals_processed ON feedback_signals(processed);
 CREATE INDEX IF NOT EXISTS idx_signals_result ON feedback_signals(result_id);
+
+-- Per-stage latency capture for every dispatch (Latency Budget & Instrumentation).
+-- Keyed by the intent *thread* id (routed_intent.intent_id — the same id the
+-- fetch/synthesize/escalate strands and the results row use), NOT the
+-- intents.id the caller mints in create_intent(). router_ms is shared across
+-- every intent thread from the same utterance; escalate_ms is NULL for hot-path
+-- dispatches; stt_ms/first_render_ms are client-reported and NULL when the
+-- client never reports them. synthesize_first_token_ms is NULL until the
+-- synthesize strand streams (the non-streaming call_simple path can't measure
+-- first token separately) — see src/instrument/timings.py.
+CREATE TABLE IF NOT EXISTS dispatch_timings (
+    intent_id                 TEXT PRIMARY KEY,
+    router_ms                 INTEGER,
+    fetch_first_source_ms     INTEGER,
+    fetch_total_ms            INTEGER,
+    synthesize_first_token_ms INTEGER,
+    synthesize_total_ms       INTEGER,
+    escalate_ms               INTEGER,
+    sse_emit_ms               INTEGER,
+    stt_ms                    INTEGER,
+    first_render_ms           INTEGER,
+    created_at                INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_dispatch_timings_created ON dispatch_timings(created_at);
 """
+
+# The set of dispatch_timings timing columns record_dispatch_timings() may set.
+# intent_id/created_at are handled explicitly (PK / insert-only timestamp).
+DISPATCH_TIMING_COLUMNS = (
+    "router_ms",
+    "fetch_first_source_ms",
+    "fetch_total_ms",
+    "synthesize_first_token_ms",
+    "synthesize_total_ms",
+    "escalate_ms",
+    "sse_emit_ms",
+    "stt_ms",
+    "first_render_ms",
+)
 
 
 class SessionStore:
@@ -180,6 +228,32 @@ class SessionStore:
             # Create schema
             await db.executescript(SCHEMA_SQL)
             await db.commit()
+
+            # Additive migrations: CREATE TABLE IF NOT EXISTS above creates new
+            # columns only for freshly-made DBs; an existing data/session.db
+            # (e.g. the live Hetzner box) keeps its old column set and must be
+            # ALTERed. Each statement is guarded by a PRAGMA table_info probe so
+            # it is idempotent and never re-runs once the column exists.
+            await self._migrate_additive_columns(db)
+
+    @staticmethod
+    async def _migrate_additive_columns(db: aiosqlite.Connection) -> None:
+        """Idempotently add columns introduced after the initial schema."""
+        async with db.execute("PRAGMA table_info(results)") as cur:
+            result_cols = {row[1] for row in await cur.fetchall()}
+        if "result_type" not in result_cols:
+            await db.execute("ALTER TABLE results ADD COLUMN result_type TEXT")
+        if "card_fallback" not in result_cols:
+            await db.execute(
+                "ALTER TABLE results ADD COLUMN card_fallback INTEGER NOT NULL DEFAULT 0"
+            )
+
+        async with db.execute("PRAGMA table_info(intents)") as cur:
+            intent_cols = {row[1] for row in await cur.fetchall()}
+        if "lookup_kind" not in intent_cols:
+            await db.execute("ALTER TABLE intents ADD COLUMN lookup_kind TEXT")
+
+        await db.commit()
 
     async def close(self) -> None:
         """Close database connection pool."""
@@ -267,6 +341,16 @@ class SessionStore:
             )
             await db.execute(
                 "DELETE FROM intent_topics WHERE intent_id IN "
+                "(SELECT id FROM intents WHERE session_id = ?)",
+                (session_id,),
+            )
+            # dispatch_timings is keyed by the intent *thread* id
+            # (routed_intent.intent_id), which differs from intents.id for the
+            # current router path (see the table comment in SCHEMA_SQL), so this
+            # is best-effort: it catches rows keyed by the store intent id, while
+            # thread-keyd rows survive until the thread id is known to the caller.
+            await db.execute(
+                "DELETE FROM dispatch_timings WHERE intent_id IN "
                 "(SELECT id FROM intents WHERE session_id = ?)",
                 (session_id,),
             )
@@ -379,6 +463,7 @@ class SessionStore:
         project_slug: str | None,
         intent_type: str,
         bead_ref: str | None = None,
+        lookup_kind: str | None = None,
     ) -> str:
         """Create a new intent and return its ID."""
         intent_id = str(uuid4())
@@ -386,9 +471,9 @@ class SessionStore:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """INSERT INTO intents
-                   (id, utterance_id, session_id, project_slug, intent_type, bead_ref, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (intent_id, utterance_id, session_id, project_slug, intent_type, bead_ref, now)
+                   (id, utterance_id, session_id, project_slug, intent_type, lookup_kind, bead_ref, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (intent_id, utterance_id, session_id, project_slug, intent_type, lookup_kind, bead_ref, now)
             )
             await db.commit()
         return intent_id
@@ -753,6 +838,96 @@ class SessionStore:
                     (now, signal_id)
                 )
             await db.commit()
+
+    # Dispatch timing operations (Latency Budget & Instrumentation)
+    async def record_dispatch_timings(
+        self,
+        intent_id: str,
+        **fields: int | None,
+    ) -> None:
+        """Persist per-stage timings for one dispatch intent thread.
+
+        Upserts the row so the same intent_id can be written incrementally:
+        process_intent() records the server-side stages it measures, the
+        dispatch caller records sse_emit_ms after the SSE broadcast, and the
+        /api/v1/timings endpoint records client-reported stt_ms/first_render_ms.
+        Only columns passed with a non-NULL value are touched, so a later
+        partial write never clobbers a stage an earlier write already set.
+        ``created_at`` is stamped once on insert and never overwritten.
+        """
+        cols = {
+            k: v for k, v in fields.items()
+            if k in DISPATCH_TIMING_COLUMNS and v is not None
+        }
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            # Ensure the row exists (created_at set once, on first write).
+            await db.execute(
+                "INSERT OR IGNORE INTO dispatch_timings (intent_id, created_at) VALUES (?, ?)",
+                (intent_id, now),
+            )
+            if cols:
+                set_clause = ", ".join(f"{c} = ?" for c in cols)
+                params = [*cols.values(), intent_id]
+                await db.execute(
+                    f"UPDATE dispatch_timings SET {set_clause} WHERE intent_id = ?",
+                    params,
+                )
+            await db.commit()
+
+    async def get_dispatch_timings(self, intent_id: str) -> Optional[dict]:
+        """Get the dispatch_timings row for one intent thread, or None."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM dispatch_timings WHERE intent_id = ?",
+                (intent_id,),
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
+    async def get_latency_percentiles(self, since: int | None = None) -> dict:
+        """Aggregate p50/p95 per stage across dispatch_timings rows.
+
+        Returns ``{stage: {"p50": ms, "p95": ms, "count": n}}`` for every stage
+        that has at least one non-NULL value. NULLs are skipped per stage (so a
+        stage not yet captured for any dispatch simply doesn't appear). Pass
+        ``since`` (a unix timestamp) to window to recent dispatches only — the
+        latency-baseline bead consumes the un-windowed call to fill the plan's
+        global Measured p50/p95 columns.
+
+        Percentiles are nearest-rank (ceil(q/100 * n)), computed in Python
+        because SQLite has no built-in percentile.
+        """
+        from ..instrument.timings import percentiles
+
+        result: dict[str, dict] = {}
+        async with aiosqlite.connect(self.db_path) as db:
+            for stage in DISPATCH_TIMING_COLUMNS:
+                if since is not None:
+                    query = (
+                        f"SELECT {stage} FROM dispatch_timings "
+                        f"WHERE {stage} IS NOT NULL AND created_at >= ? "
+                        f"ORDER BY {stage}"
+                    )
+                    params: tuple = (since,)
+                else:
+                    query = (
+                        f"SELECT {stage} FROM dispatch_timings "
+                        f"WHERE {stage} IS NOT NULL ORDER BY {stage}"
+                    )
+                    params = ()
+                async with db.execute(query, params) as cursor:
+                    values = [row[0] for row in await cursor.fetchall()]
+                if not values:
+                    continue
+                pct = percentiles(values, qs=(50, 95))
+                result[stage] = {
+                    "p50": pct[50],
+                    "p95": pct[95],
+                    "count": len(values),
+                }
+        return result
 
     async def get_session_feedback_summary(
         self,
