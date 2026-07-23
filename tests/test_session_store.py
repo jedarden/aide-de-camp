@@ -1,5 +1,5 @@
 """
-Session store unit tests (bead adc-3ttx0).
+Session store unit tests (bead adc-3ttx0, bead adc-cmzj5).
 
 Tests core CRUD operations for SQLite session store:
 - Topic creation and retrieval
@@ -7,6 +7,7 @@ Tests core CRUD operations for SQLite session store:
 - Utterance persistence
 - Topic type mapping
 - Independent session.store operations
+- Card dismissal (delete_result) operations
 
 These tests are hermetic and use temporary databases to avoid touching
 production data/session.db.
@@ -504,3 +505,492 @@ async def test_delete_session_does_not_affect_other_sessions(store: SessionStore
 # --- datetime import fix -----------------------------------------------------
 
 from datetime import datetime  # noqa: E402 (needed for archived test)
+
+
+# --- card dismissal tests (bead adc-cmzj5) --------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_delete_result_basic(store: SessionStore, session_id: str) -> None:
+    """Test basic result deletion by ID."""
+    # Create a topic and result
+    topic_id = await store.create_topic(
+        label="Dismiss Test Topic",
+        topic_type="project",
+        scope="session",
+        session_id=session_id
+    )
+
+    result_id = await store.create_result(
+        intent_id=None,
+        topic_id=topic_id,
+        session_id=session_id,
+        summary="Test result to dismiss",
+        data={"message": "This will be deleted"},
+        urgency="normal"
+    )
+
+    # Verify result exists
+    result_before = await store.get_latest_result_for_topic(topic_id)
+    assert result_before is not None
+    assert result_before["id"] == result_id
+
+    # Delete the result
+    delete_response = await store.delete_result(result_id, session_id)
+    assert delete_response["result_deleted"] == 1
+
+    # Verify result is gone
+    result_after = await store.get_latest_result_for_topic(topic_id)
+    assert result_after is None
+
+
+@pytest.mark.asyncio
+async def test_delete_stuck_card_from_results(store: SessionStore, session_id: str) -> None:
+    """Test stuck card removal from results (bead adc-cmzj5)."""
+    # Create topic, utterance, and intent for stuck card
+    topic_id = await store.create_topic(
+        label="Stuck Card Test",
+        topic_type="exception",
+        scope="session",
+        session_id=session_id
+    )
+
+    utterance_id = await store.create_utterance(
+        session_id=session_id,
+        raw_text="test stuck task"
+    )
+
+    intent_id = await store.create_intent(
+        utterance_id=utterance_id,
+        session_id=session_id,
+        project_slug="adc",
+        intent_type="task-profile",
+        bead_ref="adc-stuck-test",
+        lookup_kind=None,
+        topic_id=topic_id
+    )
+
+    # Update intent to stuck status
+    await store.update_intent_type_and_status(
+        intent_id=intent_id,
+        intent_type="stuck",
+        status="stuck"
+    )
+
+    # Create stuck card result
+    stuck_result_id = await store.create_result(
+        intent_id=intent_id,
+        topic_id=topic_id,
+        session_id=session_id,
+        summary="Task stuck — needs your input",
+        data={
+            "bead_id": "adc-stuck-test",
+            "stuck_reason": "Missing required information",
+            "refusal_count": 3,
+            "message": "This task has been blocked after 3 refusals.",
+            "action_hint": "Review the bead and provide missing information."
+        },
+        urgency="high"
+    )
+
+    # Verify stuck card exists
+    stuck_result_before = await store.get_latest_result_for_topic(topic_id)
+    assert stuck_result_before is not None
+    assert stuck_result_before["id"] == stuck_result_id
+    assert stuck_result_before["summary"] == "Task stuck — needs your input"
+    result_data = json.loads(stuck_result_before["data"])
+    assert result_data["bead_id"] == "adc-stuck-test"
+    assert result_data["refusal_count"] == 3
+
+    # Delete stuck card
+    delete_response = await store.delete_result(stuck_result_id, session_id)
+    assert delete_response["result_deleted"] == 1
+
+    # Verify stuck card is removed
+    stuck_result_after = await store.get_latest_result_for_topic(topic_id)
+    assert stuck_result_after is None
+
+    # Verify intent still exists (deleting result doesn't delete intent)
+    intent = await store.get_intent(intent_id)
+    assert intent is not None
+    assert intent["status"] == "stuck"
+
+
+@pytest.mark.asyncio
+async def test_delete_failed_card_from_results(store: SessionStore, session_id: str) -> None:
+    """Test failed card removal from results (bead adc-cmzj5)."""
+    # Create topic, utterance, and intent for failed card
+    topic_id = await store.create_topic(
+        label="Failed Card Test",
+        topic_type="exception",
+        scope="session",
+        session_id=session_id
+    )
+
+    utterance_id = await store.create_utterance(
+        session_id=session_id,
+        raw_text="test failed task"
+    )
+
+    intent_id = await store.create_intent(
+        utterance_id=utterance_id,
+        session_id=session_id,
+        project_slug="adc",
+        intent_type="action",
+        bead_ref="adc-failed-test",
+        lookup_kind=None,
+        topic_id=topic_id
+    )
+
+    # Update intent to failed status
+    await store.update_intent_status(intent_id=intent_id, status="failed")
+
+    # Create failed card result
+    failed_result_id = await store.create_result(
+        intent_id=intent_id,
+        topic_id=topic_id,
+        session_id=session_id,
+        summary="Task Failed: Worker Crash",
+        data={
+            "bead_ref": "adc-failed-test",
+            "failure_reason": "Worker process crashed",
+            "error_type": "worker_crash",
+            "message": "Task failed due to worker crash.",
+            "action_hint": "Check system logs and retry."
+        },
+        urgency="high"
+    )
+
+    # Verify failed card exists
+    failed_result_before = await store.get_latest_result_for_topic(topic_id)
+    assert failed_result_before is not None
+    assert failed_result_before["id"] == failed_result_id
+    assert failed_result_before["summary"] == "Task Failed: Worker Crash"
+    result_data = json.loads(failed_result_before["data"])
+    assert result_data["bead_ref"] == "adc-failed-test"
+    assert result_data["error_type"] == "worker_crash"
+
+    # Delete failed card
+    delete_response = await store.delete_result(failed_result_id, session_id)
+    assert delete_response["result_deleted"] == 1
+
+    # Verify failed card is removed
+    failed_result_after = await store.get_latest_result_for_topic(topic_id)
+    assert failed_result_after is None
+
+    # Verify intent still exists
+    intent = await store.get_intent(intent_id)
+    assert intent is not None
+    assert intent["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_delete_result_data_integrity_before_after(store: SessionStore, session_id: str) -> None:
+    """Test result data integrity before and after dismissal (bead adc-cmzj5)."""
+    # Create multiple results for a topic
+    topic_id = await store.create_topic(
+        label="Integrity Test Topic",
+        topic_type="project",
+        scope="session",
+        session_id=session_id
+    )
+
+    utterance_id = await store.create_utterance(
+        session_id=session_id,
+        raw_text="integrity test"
+    )
+
+    intent_id = await store.create_intent(
+        utterance_id=utterance_id,
+        session_id=session_id,
+        project_slug="test",
+        intent_type="status",
+        lookup_kind=None,
+        topic_id=topic_id
+    )
+
+    # Create first result
+    result1_id = await store.create_result(
+        intent_id=intent_id,
+        topic_id=topic_id,
+        session_id=session_id,
+        summary="First result",
+        data={"count": 1, "status": "active"},
+        urgency="normal"
+    )
+
+    # Create second result
+    result2_id = await store.create_result(
+        intent_id=intent_id,
+        topic_id=topic_id,
+        session_id=session_id,
+        summary="Second result",
+        data={"count": 2, "status": "pending"},
+        urgency="normal"
+    )
+
+    # Verify both results exist via intent query
+    results_for_intent = await store.get_results_for_intent(intent_id)
+    assert len(results_for_intent) == 2
+
+    # Get the latest result (whichever one it is)
+    latest_result = await store.get_latest_result_for_topic(topic_id)
+    assert latest_result is not None
+    latest_result_id_before = latest_result["id"]
+
+    # Determine which result to delete (the one that's currently latest)
+    result_to_delete = latest_result_id_before
+    remaining_result_id = result1_id if result_to_delete == result2_id else result2_id
+    remaining_summary = "First result" if result_to_delete == result2_id else "Second result"
+    remaining_count = 1 if result_to_delete == result2_id else 2
+    remaining_status = "active" if result_to_delete == result2_id else "pending"
+
+    # Delete the latest result
+    delete_response = await store.delete_result(result_to_delete, session_id)
+    assert delete_response["result_deleted"] == 1
+
+    # Verify data integrity: only one result remains
+    results_after = await store.get_results_for_intent(intent_id)
+    assert len(results_after) == 1
+    assert results_after[0]["id"] == remaining_result_id
+    assert results_after[0]["summary"] == remaining_summary
+
+    # Verify latest result is now the remaining one
+    latest_after = await store.get_latest_result_for_topic(topic_id)
+    assert latest_after is not None
+    assert latest_after["id"] == remaining_result_id
+    assert latest_after["summary"] == remaining_summary
+
+    # Verify remaining result data is intact
+    remaining_data = json.loads(latest_after["data"])
+    assert remaining_data["count"] == remaining_count
+    assert remaining_data["status"] == remaining_status
+
+
+@pytest.mark.asyncio
+async def test_delete_result_session_scoping(store: SessionStore) -> None:
+    """Test delete_result is scoped to session (security check, bead adc-cmzj5)."""
+    # Create two sessions
+    session1 = await store.create_session()
+    session2 = await store.create_session()
+
+    # Create topics in both sessions
+    topic1_id = await store.create_topic(
+        label="Session1 Topic",
+        topic_type="project",
+        scope="session",
+        session_id=session1
+    )
+
+    topic2_id = await store.create_topic(
+        label="Session2 Topic",
+        topic_type="project",
+        scope="session",
+        session_id=session2
+    )
+
+    # Create results in both sessions
+    result1_id = await store.create_result(
+        intent_id=None,
+        topic_id=topic1_id,
+        session_id=session1,
+        summary="Session1 result",
+        data={"session": "1"},
+        urgency="normal"
+    )
+
+    result2_id = await store.create_result(
+        intent_id=None,
+        topic_id=topic2_id,
+        session_id=session2,
+        summary="Session2 result",
+        data={"session": "2"},
+        urgency="normal"
+    )
+
+    # Verify both results exist
+    result1 = await store.get_latest_result_for_topic(topic1_id)
+    result2 = await store.get_latest_result_for_topic(topic2_id)
+    assert result1 is not None
+    assert result2 is not None
+
+    # Try to delete session2's result using session1 credentials (should fail)
+    delete_response = await store.delete_result(result2_id, session1)
+    assert delete_response["result_deleted"] == 0  # Not deleted, wrong session
+
+    # Verify session2's result still exists
+    result2_after = await store.get_latest_result_for_topic(topic2_id)
+    assert result2_after is not None
+    assert result2_after["id"] == result2_id
+
+    # Delete session1's result using session1 credentials (should succeed)
+    delete_response = await store.delete_result(result1_id, session1)
+    assert delete_response["result_deleted"] == 1
+
+    # Verify session1's result is gone
+    result1_after = await store.get_latest_result_for_topic(topic1_id)
+    assert result1_after is None
+
+
+@pytest.mark.asyncio
+async def test_delete_result_returns_zero_for_nonexistent(store: SessionStore, session_id: str) -> None:
+    """Test delete_result returns 0 for nonexistent result (bead adc-cmzj5)."""
+    # Try to delete a result that doesn't exist
+    fake_result_id = "nonexistent-result-id"
+    delete_response = await store.delete_result(fake_result_id, session_id)
+    assert delete_response["result_deleted"] == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_multiple_results_from_topic(store: SessionStore, session_id: str) -> None:
+    """Test deleting multiple results from a topic (bead adc-cmzj5)."""
+    topic_id = await store.create_topic(
+        label="Multi-dismiss Topic",
+        topic_type="project",
+        scope="session",
+        session_id=session_id
+    )
+
+    utterance_id = await store.create_utterance(
+        session_id=session_id,
+        raw_text="multiple results test"
+    )
+
+    intent_id = await store.create_intent(
+        utterance_id=utterance_id,
+        session_id=session_id,
+        project_slug="test",
+        intent_type="status",
+        lookup_kind=None,
+        topic_id=topic_id
+    )
+
+    # Create multiple results
+    result_ids = []
+    for i in range(3):
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary=f"Result {i}",
+            data={"index": i},
+            urgency="normal"
+        )
+        result_ids.append(result_id)
+
+    # Verify all 3 results exist
+    results = await store.get_results_for_intent(intent_id)
+    assert len(results) == 3
+
+    # Delete results one by one
+    for result_id in result_ids:
+        delete_response = await store.delete_result(result_id, session_id)
+        assert delete_response["result_deleted"] == 1
+
+    # Verify all results are gone
+    results_final = await store.get_results_for_intent(intent_id)
+    assert len(results_final) == 0
+
+    # Verify topic still exists
+    topics = await store.get_active_topics(session_id)
+    topic = next((t for t in topics if t["id"] == topic_id), None)
+    assert topic is not None
+
+
+@pytest.mark.asyncio
+async def test_get_all_results_includes_dismissable_cards(store: SessionStore, session_id: str) -> None:
+    """Test get_all_results includes stuck and failed cards (bead adc-cmzj5)."""
+    # Create stuck card
+    stuck_topic = await store.create_topic(
+        label="Stuck Topic",
+        topic_type="exception",
+        scope="session",
+        session_id=session_id
+    )
+
+    stuck_utterance = await store.create_utterance(
+        session_id=session_id,
+        raw_text="stuck test"
+    )
+
+    stuck_intent = await store.create_intent(
+        utterance_id=stuck_utterance,
+        session_id=session_id,
+        project_slug="adc",
+        intent_type="task-profile",
+        bead_ref="adc-stuck-all",
+        lookup_kind=None,
+        topic_id=stuck_topic
+    )
+
+    await store.update_intent_type_and_status(
+        intent_id=stuck_intent,
+        intent_type="stuck",
+        status="stuck"
+    )
+
+    stuck_result_id = await store.create_result(
+        intent_id=stuck_intent,
+        topic_id=stuck_topic,
+        session_id=session_id,
+        summary="Stuck card",
+        data={"bead_id": "adc-stuck-all", "stuck_reason": "Test"},
+        urgency="high"
+    )
+
+    # Create failed card
+    failed_topic = await store.create_topic(
+        label="Failed Topic",
+        topic_type="exception",
+        scope="session",
+        session_id=session_id
+    )
+
+    failed_utterance = await store.create_utterance(
+        session_id=session_id,
+        raw_text="failed test"
+    )
+
+    failed_intent = await store.create_intent(
+        utterance_id=failed_utterance,
+        session_id=session_id,
+        project_slug="adc",
+        intent_type="action",
+        bead_ref="adc-failed-all",
+        lookup_kind=None,
+        topic_id=failed_topic
+    )
+
+    await store.update_intent_status(intent_id=failed_intent, status="failed")
+
+    failed_result_id = await store.create_result(
+        intent_id=failed_intent,
+        topic_id=failed_topic,
+        session_id=session_id,
+        summary="Failed card",
+        data={"bead_ref": "adc-failed-all", "error_type": "test"},
+        urgency="high"
+    )
+
+    # Verify get_all_results includes both cards
+    all_results = await store.get_all_results()
+    result_ids = [r["id"] for r in all_results]
+    assert stuck_result_id in result_ids
+    assert failed_result_id in result_ids
+
+    # Delete stuck card
+    await store.delete_result(stuck_result_id, session_id)
+
+    # Verify stuck card is removed from all_results
+    all_results_after = await store.get_all_results()
+    result_ids_after = [r["id"] for r in all_results_after]
+    assert stuck_result_id not in result_ids_after
+    assert failed_result_id in result_ids_after
+
+    # Delete failed card
+    await store.delete_result(failed_result_id, session_id)
+
+    # Verify failed card is also removed
+    all_results_final = await store.get_all_results()
+    result_ids_final = [r["id"] for r in all_results_final]
+    assert failed_result_id not in result_ids_final
