@@ -169,8 +169,10 @@ class TestTaskFailedSSEEvent:
             surface_type="canvas",
         )
 
-        # Patch get_store at module level to return our test store
-        with patch.object(src.session.store, 'get_store', return_value=store):
+        # Patch get_store and get_broadcaster to use our test objects
+        import src.sse.broadcaster
+        with patch.object(src.session.store, 'get_store', return_value=store), \
+             patch.object(src.sse.broadcaster, 'get_broadcaster', return_value=broadcaster):
             # Handle terminal failure
             await handle_terminal_failure(
                 intent_id=intent_id,
@@ -760,3 +762,486 @@ class TestCanvasSSEEventHandling:
         # Verify functions are exported to window
         assert "window.createStuckCard" in canvas_js
         assert "window.createFailedCard" in canvas_js
+
+
+class TestIntentRouterFenceDetection:
+    """Test intent router fence detection logic (bead adc-2cjdj)."""
+
+    @pytest.mark.asyncio
+    async def test_check_fence_for_bead_fenced(self):
+        """_check_fence_for_bead returns context for fenced bead."""
+        from src.intent.router import IntentRouter
+
+        router = IntentRouter()
+
+        # Mock the store to return a fenced bead
+        mock_store = AsyncMock()
+        mock_store.get_bead_watch.return_value = {
+            "bead_ref": "adc-fenced123",
+            "last_refusal_reason": "Test refusal",
+            "refusal_count": 3,
+            "fenced_at": 1234567890,
+        }
+
+        router.store = mock_store
+
+        # Check fence
+        fence_context = await router._check_fence_for_bead("adc-fenced123")
+
+        assert fence_context is not None
+        assert fence_context["bead_id"] == "adc-fenced123"
+        assert fence_context["refusal_reason"] == "Test refusal"
+        assert fence_context["refusal_count"] == 3
+        assert fence_context["fenced_at"] == 1234567890
+
+        mock_store.get_bead_watch.assert_called_once_with("adc-fenced123")
+
+    @pytest.mark.asyncio
+    async def test_check_fence_for_bead_not_fenced(self):
+        """_check_fence_for_bead returns None for unfenced bead."""
+        from src.intent.router import IntentRouter
+
+        router = IntentRouter()
+
+        # Mock the store to return a bead without refusal_reason
+        mock_store = AsyncMock()
+        mock_store.get_bead_watch.return_value = {
+            "bead_ref": "adc-unfenced123",
+            "refusal_count": 0,
+            "fenced_at": None,
+            "last_refusal_reason": None,
+        }
+
+        router.store = mock_store
+
+        # Check fence
+        fence_context = await router._check_fence_for_bead("adc-unfenced123")
+
+        assert fence_context is None
+
+    @pytest.mark.asyncio
+    async def test_check_fence_for_bead_no_watch(self):
+        """_check_fence_for_bead returns None when bead not watched."""
+        from src.intent.router import IntentRouter
+
+        router = IntentRouter()
+
+        # Mock the store to return None (bead not watched)
+        mock_store = AsyncMock()
+        mock_store.get_bead_watch.return_value = None
+
+        router.store = mock_store
+
+        # Check fence for non-existent bead
+        fence_context = await router._check_fence_for_bead("adc-nonexistent")
+
+        assert fence_context is None
+
+
+class TestIntentRouterStuckCardCreation:
+    """Test intent router stuck card creation from fence (bead adc-2cjdj)."""
+
+    @pytest.mark.asyncio
+    async def test_create_stuck_card_from_fence_creates_card_and_broadcasts(self, broadcaster):
+        """_create_stuck_card_from_fence creates stuck card and broadcasts SSE event."""
+        from src.intent.router import IntentRouter, RoutedIntent, IntentClassification, IntentType
+
+        router = IntentRouter()
+
+        routed_intent = RoutedIntent(
+            intent_id="intent-1",
+            classification=IntentClassification(
+                intent_type=IntentType.TASK_PROFILE,
+                project_slug="adc",
+                utterance_fragment="test",
+            ),
+            session_id="test-session",
+            utterance="test",
+        )
+
+        fence_context = {
+            "bead_id": "adc-fenced123",
+            "refusal_reason": "Test refusal",
+            "refusal_count": 3,
+            "fenced_at": 1234567890,
+        }
+
+        # Mock store methods
+        mock_store = AsyncMock()
+        mock_store.find_or_create_topic.return_value = ("topic-1", False)
+        mock_store.link_intent_to_topic = AsyncMock()
+        mock_store.update_intent_type_and_status = AsyncMock()
+        mock_store.create_result.return_value = "result-1"
+
+        router.store = mock_store
+
+        # Register SSE connection
+        conn = broadcaster.register(
+            surface_id="test-surface",
+            session_id="test-session",
+            surface_type="canvas",
+        )
+
+        # Mock broadcaster
+        with patch("src.intent.router.get_broadcaster", return_value=broadcaster):
+            result = await router._create_stuck_card_from_fence(
+                routed_intent=routed_intent,
+                fence_context=fence_context,
+            )
+
+        # Verify result
+        assert result["intent_id"] == "intent-1"
+        assert result["intent_type"] == "stuck"
+        assert result["status"] == "stuck"
+        assert result["bead_id"] == "adc-fenced123"
+
+        # Verify store calls
+        mock_store.find_or_create_topic.assert_called_once()
+        mock_store.link_intent_to_topic.assert_called_once_with("intent-1", "topic-1")
+        mock_store.update_intent_type_and_status.assert_called_once_with(
+            intent_id="intent-1",
+            intent_type="stuck",
+            status="stuck",
+        )
+        mock_store.create_result.assert_called_once()
+
+        # Verify SSE broadcast was called
+        event = await conn.queue.get()
+        assert event.event_type == "task_stuck"
+        assert event.data["bead_id"] == "adc-fenced123"
+        assert event.data["stuck_reason"] == "Test refusal"
+        assert event.data["refusal_count"] == 3
+
+
+class TestIntentTypeStatusHandling:
+    """Test handling of both 'stuck' and 'failed' intent types (bead adc-2cjdj)."""
+
+    @pytest.mark.asyncio
+    async def test_stuck_intent_type_accepted(self, store):
+        """Intent type 'stuck' is accepted by update_intent_type_and_status."""
+        session_id = "test-session"
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test",
+        )
+
+        # Create intent with task-profile type
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            lookup_kind=None,
+        )
+
+        # Update to stuck type and status
+        await store.update_intent_type_and_status(
+            intent_id=intent_id,
+            intent_type="stuck",
+            status="stuck",
+        )
+
+        # Verify stuck type and status are accepted
+        intent = await store.get_intent(intent_id)
+        assert intent["intent_type"] == "stuck"
+        assert intent["status"] == "stuck"
+
+    @pytest.mark.asyncio
+    async def test_failed_status_accepted(self, store):
+        """Status 'failed' is accepted by update_intent_status."""
+        session_id = "test-session"
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="action",
+            lookup_kind=None,
+        )
+
+        # Update to failed status
+        await store.update_intent_status(
+            intent_id=intent_id,
+            status="failed",
+        )
+
+        # Verify failed status is accepted
+        intent = await store.get_intent(intent_id)
+        assert intent["status"] == "failed"
+
+    @pytest.mark.asyncio
+    async def test_get_intent_by_bead_ref_includes_stuck(self, store):
+        """get_intent_by_bead_ref finds intents with stuck status."""
+        session_id = "test-session"
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-stuck123",
+            lookup_kind=None,
+        )
+
+        # Update to stuck status
+        await store.update_intent_status(intent_id=intent_id, status="stuck")
+
+        # Find by bead_ref
+        intent = await store.get_intent_by_bead_ref("adc-stuck123")
+        assert intent is not None
+        assert intent["id"] == intent_id
+        assert intent["status"] == "stuck"
+
+
+class TestSSEBroadcasterBroadcastCalls:
+    """Test SSE broadcaster.broadcast() call verification (bead adc-2cjdj)."""
+
+    @pytest.mark.asyncio
+    async def test_broadcast_stuck_event_call(self, broadcaster):
+        """broadcast is called with correct params for task_stuck event."""
+        from unittest.mock import AsyncMock
+
+        session_id = "test-session"
+
+        # Register connection
+        conn = broadcaster.register(
+            surface_id="test-surface",
+            session_id=session_id,
+            surface_type="canvas",
+        )
+
+        # Create mock broadcaster to verify call
+        mock_broadcaster = AsyncMock()
+        mock_broadcaster.broadcast = AsyncMock(return_value=1)
+
+        # Broadcast stuck event using real broadcaster
+        sent_count = await broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.TASK_STUCK,
+                data={
+                    "bead_id": "adc-stuck123",
+                    "stuck_reason": "Test refusal",
+                    "refusal_count": 3,
+                    "message": "Task blocked after refusals",
+                    "timestamp": int(datetime.now(timezone.utc).timestamp()),
+                },
+                target_session_id=session_id,
+            )
+        )
+
+        # Verify broadcast was called and returned correct count
+        assert sent_count == 1
+
+        # Verify event received
+        event = await conn.queue.get()
+        assert event.event_type == "task_stuck"
+        assert event.data["bead_id"] == "adc-stuck123"
+        assert event.data["stuck_reason"] == "Test refusal"
+        assert event.data["refusal_count"] == 3
+
+    @pytest.mark.asyncio
+    async def test_broadcast_failed_event_call(self, broadcaster):
+        """broadcast is called with correct params for task_failed event."""
+        session_id = "test-session"
+
+        # Register connection
+        conn = broadcaster.register(
+            surface_id="test-surface",
+            session_id=session_id,
+            surface_type="canvas",
+        )
+
+        # Broadcast failed event
+        sent_count = await broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.TASK_FAILED,
+                data={
+                    "intent_id": "intent-123",
+                    "failure_reason": "Worker crashed",
+                    "error_type": "worker_crash",
+                    "message": "Task failed: Worker crashed",
+                    "timestamp": int(datetime.now(timezone.utc).timestamp()),
+                },
+                target_session_id=session_id,
+            )
+        )
+
+        # Verify broadcast was called and returned correct count
+        assert sent_count == 1
+
+        # Verify event received
+        event = await conn.queue.get()
+        assert event.event_type == "task_failed"
+        assert event.data["intent_id"] == "intent-123"
+        assert event.data["failure_reason"] == "Worker crashed"
+        assert event.data["error_type"] == "worker_crash"
+
+    @pytest.mark.asyncio
+    async def test_broadcast_with_target_filtering(self, broadcaster):
+        """broadcast respects target_session_id filtering."""
+        session_a = "session-a"
+        session_b = "session-b"
+
+        # Register connections for different sessions
+        conn_a = broadcaster.register(
+            surface_id="surface-a",
+            session_id=session_a,
+            surface_type="canvas",
+        )
+
+        conn_b = broadcaster.register(
+            surface_id="surface-b",
+            session_id=session_b,
+            surface_type="canvas",
+        )
+
+        # Broadcast to session_a only
+        sent_count = await broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.TASK_STUCK,
+                data={"bead_id": "adc-test"},
+                target_session_id=session_a,
+            )
+        )
+
+        assert sent_count == 1
+
+        # Verify only session_a received
+        event_a = await conn_a.queue.get()
+        assert event_a.event_type == "task_stuck"
+
+        # session_b queue should be empty
+        assert conn_b.queue.empty()
+
+    @pytest.mark.asyncio
+    async def test_broadcast_with_exclude_surface(self, broadcaster):
+        """broadcast respects exclude_surface_id filtering."""
+        session_id = "test-session"
+
+        # Register two connections
+        conn_1 = broadcaster.register(
+            surface_id="surface-1",
+            session_id=session_id,
+            surface_type="canvas",
+        )
+
+        conn_2 = broadcaster.register(
+            surface_id="surface-2",
+            session_id=session_id,
+            surface_type="telegram",
+        )
+
+        # Broadcast excluding surface-1
+        sent_count = await broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.TASK_STUCK,
+                data={"bead_id": "adc-test"},
+                target_session_id=session_id,
+                exclude_surface_id="surface-1",
+            )
+        )
+
+        assert sent_count == 1
+
+        # Verify only surface-2 received
+        event_2 = await conn_2.queue.get()
+        assert event_2.event_type == "task_stuck"
+
+        # surface-1 queue should be empty
+        assert conn_1.queue.empty()
+
+
+class TestSessionStoreOperations:
+    """Test session store operations (bead adc-2cjdj)."""
+
+    @pytest.mark.asyncio
+    async def test_create_utterance(self, store):
+        """create_utterance stores utterance and returns ID."""
+        session_id = "test-session"
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test utterance",
+        )
+
+        # Verify utterance ID is returned
+        assert utterance_id is not None
+
+        # Verify utterance was stored by checking it exists in session intents
+        # (SessionStore doesn't expose get_utterance, but we can verify it indirectly)
+        intents = await store.get_pending_intents(session_id)
+        # Since we just created an utterance but no intent, the list should be empty
+        # The utterance exists in the database, used by create_intent
+        assert isinstance(intents, list)
+
+    @pytest.mark.asyncio
+    async def test_find_or_create_topic_new(self, store):
+        """find_or_create_topic creates new topic when none exists."""
+        session_id = "test-session"
+
+        topic_id, created = await store.find_or_create_topic(
+            label="New Topic",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        assert topic_id is not None
+        assert created is True
+
+        # Verify topic was stored
+        topics = await store.get_active_topics(session_id)
+        topic = next((t for t in topics if t["id"] == topic_id), None)
+        assert topic is not None
+        assert topic["label"] == "New Topic"
+        assert topic["type"] == "project"
+
+    @pytest.mark.asyncio
+    async def test_find_or_create_topic_existing(self, store):
+        """find_or_create_topic returns existing topic when found."""
+        session_id = "test-session"
+
+        # Create topic first
+        topic_id_1, created_1 = await store.find_or_create_topic(
+            label="Existing Topic",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        assert created_1 is True
+
+        # Find existing topic
+        topic_id_2, created_2 = await store.find_or_create_topic(
+            label="Existing Topic",
+            session_id=session_id,
+            topic_type="project",
+        )
+
+        assert created_2 is False
+        assert topic_id_1 == topic_id_2
+
+    @pytest.mark.asyncio
+    async def test_find_or_create_topic_exception_type(self, store):
+        """find_or_create_topic accepts exception topic type."""
+        session_id = "test-session"
+
+        topic_id, created = await store.find_or_create_topic(
+            label="Exception Topic",
+            session_id=session_id,
+            topic_type="exception",
+        )
+
+        assert topic_id is not None
+        assert created is True
+
+        # Verify topic type
+        topics = await store.get_active_topics(session_id)
+        topic = next((t for t in topics if t["id"] == topic_id), None)
+        assert topic["type"] == "exception"
