@@ -23,52 +23,53 @@ REPO_DIR = Path(__file__).parent.parent
 REHEARSALS_DIR = REPO_DIR / "docs" / "notes" / "rehearsals"
 
 # Golden path demo script from plan.md Phase 5
+# Uses pbx-web and whisper-stt projects (both on ardenone-cluster)
 DEMO_SCRIPT = [
     {
         "step": 1,
-        "utterance": "Has the options pipeline caught up, and what's the state of the ibkr mcp?",
+        "utterance": "Has the pbx web caught up, and what's the state of whisper stt?",
         "expected_intent_types": ["status", "status"],
-        "expected_projects": ["options-pipeline", "ibkr-mcp"],
+        "expected_projects": ["pbx-web", "whisper-stt"],
         "expected_outcomes": ["component_render", "component_render"],
         "description": "Multi-intent status query with parallel card render",
     },
     {
         "step": 2,
-        "utterance": "Pull up the recent logs for the ibkr mcp.",
+        "utterance": "Pull up the recent logs for whisper stt.",
         "expected_intent_types": ["lookup"],
-        "expected_projects": ["ibkr-mcp"],
+        "expected_projects": ["whisper-stt"],
         "expected_outcomes": ["component_render"],
-        "description": "Log lookup with lookup:logs:ibkr-mcp result_type",
+        "description": "Log lookup with lookup:logs:whisper-stt result_type",
     },
     {
         "step": 3,
-        "utterance": "Should the options pipeline keep writing straight to SQLite, or is it time to batch through a queue? Give me the trade-offs.",
+        "utterance": "Should pbx web keep using the static site generator, or is it time to move to a dynamic frontend? Give me the trade-offs.",
         "expected_intent_types": ["brainstorm"],
-        "expected_projects": ["options-pipeline"],
+        "expected_projects": ["pbx-web"],
         "expected_outcomes": ["component_render"],
         "description": "Brainstorm with structured trade-off summary",
     },
     {
         "step": 4,
-        "utterance": "Find the ibkr mcp's deployment config — which cluster and namespace is it on?",
+        "utterance": "Find whisper stt's deployment config — which cluster and namespace is it on?",
         "expected_intent_types": ["lookup"],
-        "expected_projects": ["ibkr-mcp"],
+        "expected_projects": ["whisper-stt"],
         "expected_outcomes": ["component_render"],
-        "description": "Config lookup with lookup:config:ibkr-mcp result_type",
+        "description": "Config lookup with lookup:config:whisper-stt result_type",
     },
     {
         "step": 5,
-        "utterance": "Queue up a research task: compare the last month of options pipeline errors against the ibkr mcp's and write up common failure patterns — no rush.",
+        "utterance": "Queue up a research task: compare the last month of pbx web deployment patterns against whisper stt's and write up common failure patterns — no rush.",
         "expected_intent_types": ["task-profile"],
-        "expected_projects": ["options-pipeline"],
+        "expected_projects": ["pbx-web"],
         "expected_outcomes": ["pending_ack"],  # Ack/pending card, not resolved
         "description": "Task-profile escalation with pending/ack card",
     },
     {
         "step": 6,
-        "utterance": "Anything new on the options pipeline since we started?",
+        "utterance": "Anything new on pbx web since we started?",
         "expected_intent_types": ["status"],
-        "expected_projects": ["options-pipeline"],
+        "expected_projects": ["pbx-web"],
         "expected_outcomes": ["in_place_diff"],  # In-place update with diff strip
         "description": "Status with in-place diff since step 1",
     },
