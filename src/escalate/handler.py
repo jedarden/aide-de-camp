@@ -27,6 +27,8 @@ from ..render.hot_path import derive_result_type
 from ..session.store import get_store
 from .llm import get_zai_client, LLMRequest, ModelClass
 from .commands import get_kubectl_executor, CommandExecutionError
+from ..bead_validation import get_validator, ValidationResult, ValidationError, ValidationRetryExhaustedError
+from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
 
 
 logger = getLogger(__name__)
@@ -121,6 +123,20 @@ class EscalateError(Exception):
 class BeadCreationError(EscalateError):
     """Bead creation failed."""
     pass
+
+
+class BeadApprovalRequired(EscalateError):
+    """Bead requires user approval before creation.
+
+    Raised when validation passes but requires user approval.
+    The approval card details are carried in the exception.
+    """
+
+    def __init__(self, approval_card: dict, bead_body: str, bead_type: str):
+        self.approval_card = approval_card
+        self.bead_body = bead_body
+        self.bead_type = bead_type
+        super().__init__("Bead requires user approval")
 
 
 class EscalateHandler:
@@ -717,6 +733,178 @@ class EscalateHandler:
         logger.warning(f"Unexpected bf create output format: {output}")
         return output
 
+    async def _validate_and_prepare_approval(
+        self,
+        request: EscalateRequest,
+        bead_body: str,
+        bead_type: str,
+    ) -> tuple[ValidationResult, str | None]:
+        """
+        Validate bead body and prepare for approval if needed.
+
+        Args:
+            request: The escalate request
+            bead_body: The formulated bead body
+            bead_type: The bead type
+
+        Returns:
+            (validation_result, reformulated_bead_body_or_None)
+
+        Raises:
+            BeadApprovalRequired: When bead requires approval (carries approval card)
+            ValidationRetryExhaustedError: When validation fails after re-formulation
+        """
+        validator = get_validator()
+
+        # Initial validation
+        result = validator.validate_bead_body(bead_body, bead_type)
+
+        if result.is_valid and not result.requires_approval:
+            logger.info(f"Validation passed for intent {request.intent_id} (no approval required)")
+            return result, None
+
+        if result.requires_approval:
+            logger.info(f"Validation passed but approval required for intent {request.intent_id}: {result.approval_requirement.reason}")
+            # Build approval card
+            approval_card = self._build_approval_card(
+                request=request,
+                bead_body=bead_body,
+                bead_type=bead_type,
+                validation_result=result,
+            )
+            raise BeadApprovalRequired(approval_card, bead_body, bead_type)
+
+        # Validation failed - try re-formulation once
+        logger.warning(f"Validation failed for intent {request.intent_id}, attempting re-formulation")
+        logger.info(f"Reformulation hint: {result.reformulation_hint}")
+
+        try:
+            # Re-formulate with failure reason
+            reformulated_body = await self._reformulate_with_failure_reason(
+                request=request,
+                original_body=bead_body,
+                validation_result=result,
+            )
+
+            # Validate the reformulated body
+            new_result = validator.validate_bead_body(reformulated_body, bead_type)
+
+            if not new_result.is_valid:
+                # Re-formulation still failed
+                logger.error(f"Re-formulation still failed for intent {request.intent_id}")
+                raise ValidationRetryExhaustedError(
+                    new_result.violations,
+                    f"Validation failed after re-formulation: {len(new_result.violations)} violations remain",
+                )
+
+            if new_result.requires_approval:
+                logger.info(f"Re-formulated body requires approval")
+                approval_card = self._build_approval_card(
+                    request=request,
+                    bead_body=reformulated_body,
+                    bead_type=bead_type,
+                    validation_result=new_result,
+                )
+                raise BeadApprovalRequired(approval_card, reformulated_body, bead_type)
+
+            logger.info(f"Re-formulated body passed validation")
+            return new_result, reformulated_body
+
+        except Exception as e:
+            logger.error(f"Re-formulation failed for intent {request.intent_id}: {e}")
+            raise ValidationRetryExhaustedError(
+                result.violations,
+                f"Re-formulation failed: {str(e)}",
+            )
+
+    async def _reformulate_with_failure_reason(
+        self,
+        request: EscalateRequest,
+        original_body: str,
+        validation_result: ValidationResult,
+    ) -> str:
+        """
+        Re-formulate bead body with validation failure reason.
+
+        Args:
+            request: The escalate request
+            original_body: The original bead body
+            validation_result: The validation result with violations
+
+        Returns:
+            Reformulated bead body
+        """
+        client = await self._get_zai_client()
+        system_prompt = load_escalate_prompt()
+
+        # Build failure message
+        failure_message = "The previous bead body failed validation:\n\n"
+        for violation in validation_result.violations:
+            failure_message += f"- {violation.message}\n"
+        if validation_result.reformulation_hint:
+            failure_message += f"\nHint: {validation_result.reformulation_hint}"
+
+        # Build user message
+        user_message = f"""Original intent: {request.utterance}
+
+{failure_message}
+
+Please re-formulate the bead body to address these validation errors.
+Output ONLY the revised bead body as markdown.
+"""
+
+        logger.info(f"Requesting re-formulation for intent {request.intent_id}")
+
+        try:
+            reformulated = await client.call_simple(
+                system_prompt=system_prompt,
+                user_message=user_message,
+                model=ModelClass.SONNET.value,
+                max_tokens=4096,
+                temperature=0.7,
+            )
+
+            logger.info(f"Re-formulated bead body for intent {request.intent_id}: {len(reformulated)} chars")
+            return reformulated
+
+        except Exception as e:
+            logger.error(f"Failed to re-formulate bead body: {e}")
+            raise
+
+    def _build_approval_card(
+        self,
+        request: EscalateRequest,
+        bead_body: str,
+        bead_type: str,
+        validation_result: ValidationResult,
+    ) -> dict:
+        """
+        Build an approval card for the surface.
+
+        The approval card shows the bead body and asks for user approval.
+        """
+        title = self._generate_bead_title(request)
+
+        return {
+            "type": "approval",
+            "id": f"approval-{request.intent_id}",
+            "intent_id": request.intent_id,
+            "title": title,
+            "summary": f"Review before creating: {request.utterance[:100]}",
+            "status": "awaiting_approval",
+            "urgency": request.metadata.get("urgency", "normal"),
+            "created_at": int(datetime.now(timezone.utc).timestamp()),
+            "bead_body": bead_body,
+            "bead_type": bead_type,
+            "validation_result": validation_result.to_dict(),
+            "metadata": {
+                "project_slug": request.project_slug,
+                "topic_id": request.topic_id,
+                "session_id": request.session_id,
+                "utterance": request.utterance,
+            },
+        }
+
     def build_pending_card(
         self,
         request: EscalateRequest,
@@ -754,13 +942,14 @@ class EscalateHandler:
         1. Load exceptions.yaml to determine bead type from escalation_targets
         2. Evaluate auto-approve rules from exceptions.yaml
         3. If auto-approved: execute directly and return result
-        4. Otherwise: formulate bead body via LLM, create bead, return pending-card spec
+        4. Otherwise: formulate bead body via LLM, validate, create bead (or approval card), return result
 
         Args:
             request: The escalate request
 
         Returns:
             EscalateResult with bead ID and pending card (if bead created)
+            or approval card (if approval required)
             or execution result (if auto-approved)
         """
         logger.info(f"Escalating intent {request.intent_id}")
@@ -801,8 +990,18 @@ class EscalateHandler:
             # Step 4: Formulate bead body
             bead_body = await self.formulate_bead_body(request)
 
+            # Step 4.5: Validate and prepare for approval (NEW)
+            validation_result, reformulated_body = await self._validate_and_prepare_approval(
+                request=request,
+                bead_body=bead_body,
+                bead_type=bead_type,
+            )
+
+            # Use reformulated body if provided, otherwise original
+            final_body = reformulated_body or bead_body
+
             # Step 5: Create bead with determined type
-            bead_id = await self._create_bead_with_type(request, bead_body, bead_type)
+            bead_id = await self._create_bead_with_type(request, final_body, bead_type)
 
             # Step 5.5: Create bead_watch row for circuit breaker tracking
             # (plan §10 The Async Path: watcher tracks open beads for refusals/SLA)
@@ -831,6 +1030,23 @@ class EscalateHandler:
                 status="created",
             )
 
+        except BeadApprovalRequired as e:
+            # Approval required - return approval card
+            logger.info(f"Approval required for intent {request.intent_id}")
+
+            # Update intent status
+            store = await self._get_store()
+            await store.update_intent_status(
+                intent_id=request.intent_id,
+                status="awaiting_approval",
+            )
+
+            return EscalateResult(
+                bead_id="",  # No bead created yet
+                intent_id=request.intent_id,
+                pending_card=e.approval_card,
+                status="awaiting_approval",
+            )
         except EscalateError:
             raise
         except Exception as e:
