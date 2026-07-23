@@ -40,6 +40,7 @@ class IntentType(Enum):
     MONITORING_CONFIG = "monitoring-config"
     TASK_PROFILE = "task-profile"  # Escalate to NEEDLE bead
     CLARIFICATION = "clarification"  # Needs user input
+    STUCK = "stuck"  # Stuck intent - task blocked by circuit breaker
 
 
 @dataclass
@@ -497,6 +498,7 @@ class IntentRouter:
             IntentType.REMINDER: FetchIntentType.REMINDER,
             IntentType.SELF_MODIFICATION: FetchIntentType.SELF_MODIFICATION,
             IntentType.MONITORING_CONFIG: FetchIntentType.MONITORING_CONFIG,
+            IntentType.STUCK: FetchIntentType.STUCK,
         }
         return type_map.get(intent_type, FetchIntentType.STATUS)
 
@@ -570,6 +572,13 @@ class IntentRouter:
         try:
             store = await self._get_store()
 
+            # Update intent type to 'stuck' and status to 'stuck'
+            await store.update_intent_type_and_status(
+                intent_id=routed_intent.intent_id,
+                intent_type="stuck",
+                status="stuck",
+            )
+
             # Get or create topic for this stuck card
             topic_type = "project" if routed_intent.classification.project_slug else "research"
             topic_id, _ = await store.find_or_create_topic(
@@ -624,7 +633,7 @@ class IntentRouter:
 
             return {
                 "intent_id": routed_intent.intent_id,
-                "intent_type": routed_intent.classification.intent_type.value,
+                "intent_type": "stuck",
                 "status": "stuck",
                 "bead_id": bead_id,
                 "topic_id": topic_id,
@@ -638,7 +647,7 @@ class IntentRouter:
             logger.error(f"Failed to create stuck card from fence: {e}")
             return {
                 "intent_id": routed_intent.intent_id,
-                "intent_type": routed_intent.classification.intent_type.value,
+                "intent_type": "stuck",
                 "status": "error",
                 "error": str(e),
                 "message": "Failed to create stuck card from fence context",

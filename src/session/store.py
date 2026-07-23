@@ -786,6 +786,23 @@ class SessionStore:
             )
             await db.commit()
 
+    async def update_intent_type_and_status(
+        self,
+        intent_id: str,
+        intent_type: str,
+        status: str,
+        resolved_at: int | None = None,
+    ) -> None:
+        """Update both intent type and status."""
+        async with aiosqlite.connect(self.db_path) as db:
+            if resolved_at is None and status == "resolved":
+                resolved_at = int(datetime.now().timestamp())
+            await db.execute(
+                "UPDATE intents SET intent_type = ?, status = ?, resolved_at = ? WHERE id = ?",
+                (intent_type, status, resolved_at, intent_id)
+            )
+            await db.commit()
+
     async def get_pending_intents(self, session_id: str) -> list[dict]:
         """Get all pending intents for a session."""
         async with aiosqlite.connect(self.db_path) as db:

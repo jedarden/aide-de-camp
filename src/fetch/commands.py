@@ -20,6 +20,7 @@ class IntentType(Enum):
     SELF_MODIFICATION = "self-modification"
     MONITORING_CONFIG = "monitoring-config"
     TASK_PROFILE = "task-profile"  # Escalate to NEEDLE bead for durable async handling
+    STUCK = "stuck"  # Stuck intent - task blocked by circuit breaker
 
 
 class FetchSource(Enum):
