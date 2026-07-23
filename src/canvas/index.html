@@ -974,10 +974,55 @@
                 // returns topic cards only (clearing the welcome card).
                 const projects = cards.length ? [] : await loadWelcomeProjects();
 
-                container.innerHTML = '';
-                buildContainerChildren(cards, projects).forEach(node => {
-                    container.appendChild(node);
+                // Build map of existing cards by card_id for in-place updates
+                const existingCards = new Map();
+                container.querySelectorAll('[data-card-id]').forEach(card => {
+                    const cardId = card.dataset.cardId;
+                    if (cardId) existingCards.set(cardId, card);
                 });
+
+                // Track which card_ids from the new set we've seen
+                const seenCardIds = new Set();
+
+                // Update or create cards
+                cards.forEach(cardData => {
+                    const cardId = cardData.card_id;
+                    seenCardIds.add(cardId);
+
+                    const existingCard = existingCards.get(cardId);
+                    if (existingCard) {
+                        // In-place update: replace the existing card with new content
+                        const newCard = createTopicCard(cardData);
+                        existingCard.replaceWith(newCard);
+                    } else {
+                        // Create new card
+                        const newCard = createTopicCard(cardData);
+                        container.appendChild(newCard);
+                    }
+                });
+
+                // Remove cards that are no longer in the new set (excluding welcome/error/stuck/failed cards)
+                existingCards.forEach((card, cardId) => {
+                    if (!seenCardIds.has(cardId) && !card.dataset.builtin) {
+                        card.remove();
+                    }
+                });
+
+                // Handle welcome card for empty state
+                if (cards.length === 0) {
+                    // Remove any existing welcome card
+                    const existingWelcome = container.querySelector('[data-builtin="welcome"]');
+                    if (existingWelcome) existingWelcome.remove();
+
+                    // Add welcome card
+                    const welcomeCard = createWelcomeCard(projects);
+                    container.appendChild(welcomeCard);
+                } else {
+                    // Remove welcome card if we have real cards
+                    const welcomeCard = container.querySelector('[data-builtin="welcome"]');
+                    if (welcomeCard) welcomeCard.remove();
+                }
+
             } catch (error) {
                 console.error('Error loading topics:', error);
             }

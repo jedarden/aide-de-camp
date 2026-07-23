@@ -72,6 +72,7 @@ function createTopicCard(cardData) {
     const topic = cardData.topic;
     const staleness = cardData.staleness;
     const latestResult = cardData.latest_result;
+    const cardId = cardData.card_id;  // Unique (topic, result_type) identifier
 
     // When the result has card_fallback=True, render the built-in generic fallback card
     // instead of the standard topic card. The fallback card is a complete card showing
@@ -82,6 +83,7 @@ function createTopicCard(cardData) {
         const fallbackCard = createFallbackCard(latestResult);
         // Preserve topic metadata for staleness tracking and querying
         fallbackCard.dataset.topicId = topic.id;
+        fallbackCard.dataset.cardId = cardId;
         fallbackCard.dataset.topicType = topic.type || 'adhoc';
         fallbackCard.dataset.cardFallback = '1';
         return fallbackCard;
@@ -94,6 +96,7 @@ function createTopicCard(cardData) {
         const card = document.createElement('div');
         card.className = 'topic-card component-card';
         card.dataset.topicId = topic.id;
+        card.dataset.cardId = cardId;
         card.dataset.componentId = latestResult.component_id || '';
 
         const stalenessLevel = getStalenessLevel(staleness.seconds);
@@ -117,6 +120,7 @@ function createTopicCard(cardData) {
     const card = document.createElement('div');
     card.className = 'topic-card';
     card.dataset.topicId = topic.id;
+    card.dataset.cardId = cardId;  // Store card_id for in-place updates
 
     const stalenessLevel = getStalenessLevel(staleness.seconds);
     card.classList.add(stalenessLevel);
