@@ -386,3 +386,46 @@ def config_cmd(
         print(f"  Session ID: {f'{session_id[:8]}...' if session_id else 'Not set'}\n")
 
     return 0
+
+
+async def rehearsal(
+    server: str,
+    inject_slow_step: Optional[int],
+) -> int:
+    """
+    Run Phase 5 demo rehearsal.
+
+    Executes the golden path demo script, validates smooth criteria,
+    and files defect beads on violations.
+
+    Args:
+        server: ADC server URL
+        inject_slow_step: Inject a slow step at given step number (for testing)
+
+    Returns:
+        Exit code (0 for success, non-zero for error)
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    # Path to rehearsal script
+    repo_dir = Path(__file__).parent.parent.parent
+    rehearsal_script = repo_dir / "scripts" / "rehearsal.py"
+
+    if not rehearsal_script.exists():
+        print(f"❌ Rehearsal script not found: {rehearsal_script}", file=sys.stderr)
+        return 1
+
+    # Build command
+    cmd = [sys.executable, str(rehearsal_script), "--server", server]
+    if inject_slow_step:
+        cmd.extend(["--inject-slow-step", str(inject_slow_step)])
+
+    print(f"🎬 Running rehearsal: {rehearsal_script}")
+    print(f"📋 Server: {server}\n")
+
+    # Run rehearsal script
+    result = subprocess.run(cmd, cwd=repo_dir)
+
+    return result.returncode
