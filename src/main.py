@@ -458,6 +458,7 @@ async def route_intent(request: dict):
                 session_id=session_id,
                 project_slug=classification.project_slug,
                 intent_type=classification.intent_type.value,
+                lookup_kind=classification.lookup_kind,
             )
 
             # Process the intent (escalate or fetch+synthesize)
@@ -528,6 +529,7 @@ async def dispatch_intent(request: dict):
                 session_id=session_id,
                 project_slug=classification.project_slug,
                 intent_type=classification.intent_type.value,
+                lookup_kind=classification.lookup_kind,
             )
             intent_ids.append(routed_intent.intent_id)
 
