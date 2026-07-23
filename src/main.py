@@ -1296,6 +1296,80 @@ async def api_v1_list_components(limit: int = 50):
 # Usage patterns routes (must come before /{component_id} routes to avoid conflicts)
 # =============================================================================
 
+@app.post("/api/v1/patterns")
+async def api_v1_record_pattern(request: UsagePatternRecord):
+    """Record or update a component usage pattern.
+
+    Simple endpoint for recording component usage patterns.
+    Upserts pattern (update if exists, insert if new) and sets updated_at to current timestamp.
+
+    Request body:
+        - result_type: str - The type of result
+        - component_id: str - The component that was used
+        - layout_bucket: str - The layout bucket used (default 'normal')
+        - match_score: float - How well the component matched (0.0-1.0)
+
+    Returns:
+        {"status": "ok", "pattern": {...}} on success
+    """
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    try:
+        # Validate inputs
+        if not request.component_id or not request.result_type:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "component_id and result_type are required"}
+            )
+
+        if not 0.0 <= request.match_score <= 1.0:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "match_score must be between 0.0 and 1.0"}
+            )
+
+        if request.layout_bucket not in _component_library.LAYOUT_BUCKETS:
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"layout_bucket must be one of {', '.join(_component_library.LAYOUT_BUCKETS)}"}
+            )
+
+        # Record the pattern (upsert: update if exists, insert if new)
+        _component_library.record_usage_pattern(
+            component_id=request.component_id,
+            result_type=request.result_type,
+            match_score=request.match_score,
+            layout_bucket=request.layout_bucket,
+        )
+
+        logger.info(
+            f"Recorded usage pattern: component={request.component_id}, "
+            f"result_type={request.result_type}, layout_bucket={request.layout_bucket}, "
+            f"match_score={request.match_score}"
+        )
+
+        return {
+            "status": "ok",
+            "pattern": {
+                "component_id": request.component_id,
+                "result_type": request.result_type,
+                "layout_bucket": request.layout_bucket,
+                "match_score": request.match_score,
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to record usage pattern: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to record usage pattern: {str(e)}"}
+        )
+
+
 @app.post("/api/v1/components/usage-patterns")
 async def api_v1_record_usage_pattern(request: UsagePatternRecord):
     """Record or update a component usage pattern.
