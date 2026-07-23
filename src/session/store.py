@@ -448,10 +448,15 @@ class SessionStore:
                 )
             """)
 
-            # Copy data from old table to new table
+            # Copy data from old table to new table - explicit column mapping
+            # to handle different column orders between old and new schemas
             await db.execute("""
-                INSERT INTO results_new
-                SELECT * FROM results
+                INSERT INTO results_new (id, intent_id, topic_id, session_id, summary, data, urgency, result_type, card_fallback, created_at, surfaced_at, acked_at, previous_result_id, diff_summary, diff_data)
+                SELECT id, intent_id, topic_id, session_id, summary, data, urgency,
+                       COALESCE(result_type, 'default') AS result_type,
+                       COALESCE(card_fallback, 0) AS card_fallback,
+                       created_at, surfaced_at, acked_at, previous_result_id, diff_summary, diff_data
+                FROM results
             """)
 
             # Recreate indexes
