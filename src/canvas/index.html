@@ -929,6 +929,18 @@
             eventSource.addEventListener('result_created', (event) => {
                 const result = JSON.parse(event.data);
                 console.log('New result:', result);
+
+                // Find and remove the pending card for this intent before reloading
+                const intentId = result.intent_id;
+                if (intentId) {
+                    const pendingCard = document.querySelector('[data-pending-id="' + intentId + '"]');
+                    if (pendingCard) {
+                        // Remove the pending card so it doesn't flicker when loadTopics() renders the real result
+                        pendingCard.remove();
+                        console.log('Removed pending card for intent_id:', intentId);
+                    }
+                }
+
                 loadTopics(); // Reload topics to show new result
             });
 

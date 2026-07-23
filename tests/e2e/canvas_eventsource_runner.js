@@ -158,7 +158,8 @@ class El {
     }
     appendChild(c) {
         // Handle DocumentFragment: spill its children into this element
-        if (c && c._children && Array.isArray(c._children)) {
+        // Fragments have _children array but no _tag property (elements always have _tag)
+        if (c && c._children && Array.isArray(c._children) && !c._tag) {
             // Append all children from the fragment
             c._children.forEach((child) => {
                 // For elements, add them to _children
@@ -171,8 +172,7 @@ class El {
             });
             return c;
         }
-        // Skip text nodes in _children tracking (they don't have nested structure)
-        // but still append them so innerHTML can render them
+        // Regular element or text node - append directly
         if (c && c._tag !== "#text") {
             this._children.push(c);
         } else if (c) {
@@ -242,15 +242,23 @@ class El {
         if (this._tag === "#text") {
             return this._textContent || "";
         }
-        // Render element with its children
+        // Render element with its children, innerHTML, or textContent
         let childrenHTML = "";
         if (this._children && this._children.length) {
+            // Render from children (e.g., after appendChild)
             childrenHTML = this._children.map((c) => {
                 if (c._tag === "#text") {
                     return c._textContent ? escapeText(c._textContent) : "";
                 }
                 return c.outerHTML || "";
             }).join("");
+        } else if (this._innerHTML) {
+            // Use innerHTML string (set via innerHTML setter) - takes precedence over textContent
+            childrenHTML = this._innerHTML;
+        } else if (this._textContent) {
+            // Element has direct textContent (set via textContent setter) but no children/innerHTML
+            // This is the case when _setProgress sets node.textContent = "X/Y sources in"
+            childrenHTML = escapeText(this._textContent);
         }
         return `<${this._tag}${cls}${attrStr}>${childrenHTML}</${this._tag}>`;
     }
@@ -269,14 +277,49 @@ class El {
         this._children.splice(refIndex, 0, newNode);
         return newNode;
     }
+    remove() {
+        // Remove this element from its parent's children
+        // In the mock, we need to find the parent and remove this element
+        // Since elementsById tracks top-level elements, we search for a parent
+        for (const id in elementsById) {
+            const parent = elementsById[id];
+            if (parent._children && parent._children.includes(this)) {
+                parent._children = parent._children.filter((c) => c !== this);
+                return;
+            }
+        }
+        // Also search recursively through all children
+        function removeFromParent(children) {
+            for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                if (child && child._children && child._children.includes(this)) {
+                    child._children = child._children.filter((c) => c !== this);
+                    return true;
+                }
+                if (child && child._children && child._children.length) {
+                    if (removeFromParent(child._children)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        for (const id in elementsById) {
+            const parent = elementsById[id];
+            if (parent._children && removeFromParent(parent._children)) {
+                return;
+            }
+        }
+    }
 }
 
 global.document = {
     querySelector(selector) {
         // Search through all registered elements for a matching selector
         // Only supports attribute selectors like [data-pending-id="..."]
+        // Fixed regex to support hyphens in attribute names (was [^-]+ which failed on data-pending-id)
         if (selector.startsWith('[') && selector.endsWith(']')) {
-            const attrMatch = selector.match(/\[data-([^-]+)="([^"]+)"\]/);
+            const attrMatch = selector.match(/\[data-([^\]]+)="([^"]+)"\]/);
             if (attrMatch) {
                 const attrName = attrMatch[1];
                 const attrValue = attrMatch[2];
@@ -398,6 +441,19 @@ global.window = {
     // navigator.mediaDevices — the inline script's mic block only touches those
     // inside click handlers, which this harness never fires.
 };
+
+// After canvas.js exports to window, also export those to global scope so
+// bare names like _setProgress work in the inline script (they do in browsers
+// because window is the global scope, but not in Node's vm context).
+function syncWindowToGlobal() {
+    if (global.window && typeof global.window === 'object') {
+        for (const key of Object.keys(global.window)) {
+            if (key !== 'location' && key !== 'history') {  // Keep these as objects
+                global[key] = global.window[key];
+            }
+        }
+    }
+}
 // Node 21+ exposes a read-only `navigator` getter on the global object, so a
 // plain `global.navigator = {}` throws "which has only a getter". defineProperty
 // replaces it regardless (Node's getter is configurable). The inline mic block
