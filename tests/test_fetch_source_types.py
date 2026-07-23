@@ -281,9 +281,9 @@ class TestArgocdApp:
                 }
             ]
         }
-        mock_httpx(FakeResponse(json_data=apps))
+        client = mock_httpx(FakeResponse(json_data=apps))
         strand = FetchStrand()
-        data = await strand._fetch_argocd_app(_ctx(app_name="my-app"))
+        data = await strand._fetch_argocd_app(_ctx(app_name="my-app", cluster="ardenone-cluster"))
 
         assert data["name"] == "my-app"
         assert data["sync_status"] == "Synced"
@@ -294,16 +294,51 @@ class TestArgocdApp:
     async def test_empty_items_returns_not_found(self, mock_httpx):
         mock_httpx(FakeResponse(json_data={"items": []}))
         strand = FetchStrand()
-        data = await strand._fetch_argocd_app(_ctx(app_name="ghost"))
+        data = await strand._fetch_argocd_app(_ctx(app_name="ghost", cluster="ardenone-cluster"))
         assert "not found" in data["error"].lower()
 
     @pytest.mark.asyncio
     async def test_no_app_name_returns_error(self, mock_httpx):
         client = mock_httpx(FakeResponse(json_data={"items": []}))
         strand = FetchStrand()
-        data = await strand._fetch_argocd_app(_ctx(app_name=None, project_slug=None))
+        data = await strand._fetch_argocd_app(_ctx(app_name=None, project_slug=None, cluster="ardenone-cluster"))
         assert data["error"] == "No application name specified"
         assert client.requests == []
+
+    @pytest.mark.asyncio
+    async def test_queries_correct_argocd_base_url(self, mock_httpx):
+        """Mapped read-only cluster queries the correct ArgoCD API base URL."""
+        apps = {"items": []}
+        client = mock_httpx(FakeResponse(json_data=apps))
+        strand = FetchStrand()
+        await strand._fetch_argocd_app(_ctx(app_name="test-app", cluster="ardenone-cluster"))
+
+        # Assert the requested URL contains the ardenone-cluster ArgoCD API base
+        assert client.requests
+        url = client.requests[0][0]
+        assert "argocd-ro-ardenone-manager-ts.ardenone.com:8444" in url
+
+    @pytest.mark.asyncio
+    async def test_app_name_falls_back_to_project_slug(self, mock_httpx):
+        """Omitting app_name falls back to project_slug for the ArgoCD application name."""
+        apps = {
+            "items": [
+                {
+                    "status": {
+                        "sync": {"status": "Synced"},
+                        "health": {"status": "Healthy"},
+                    },
+                }
+            ]
+        }
+        client = mock_httpx(FakeResponse(json_data=apps))
+        strand = FetchStrand()
+        await strand._fetch_argocd_app(_ctx(app_name=None, project_slug="my-proj", cluster="ardenone-cluster"))
+
+        # The app name should be passed as a query parameter
+        assert client.requests
+        params = client.requests[0][1]
+        assert params == {"name": "my-proj"}
 
 
 class TestLogsAndEvents:
@@ -462,7 +497,7 @@ class TestStrandWiring:
 
         request = FetchRequest(
             intent_type=IntentType.STATUS,
-            context=_ctx(app_name="my-app"),
+            context=_ctx(app_name="my-app", cluster="ardenone-cluster"),
             intent_id="intent-status-utterance",
             session_id="session-test",
         )
