@@ -1027,12 +1027,24 @@ class BeadWatcher:
             "created_at": int(datetime.now().timestamp()),
         }
 
-        # Step 4: Mark intent resolved
+        # Step 4: Mark intent resolved or failed based on bead status
+        # Plan §10 The Async Path: Terminal failures -> intent 'failed' with reason surfaced
+        bead_status = bead_data.get("status", "closed")
+        intent_status = "resolved"
+
+        # If bead is failed/refused, mark intent as 'failed'
+        if bead_status in ("failed", "refused"):
+            intent_status = "failed"
+            logger.info(f"Bead {bead_id} closed as {bead_status}; marking intent {intent_id} as failed")
+        elif bead_status == "cancelled":
+            intent_status = "cancelled"
+            logger.info(f"Bead {bead_id} was cancelled; marking intent {intent_id} as cancelled")
+
         try:
-            await self.store.update_intent_status(intent_id, "resolved")
-            logger.debug(f"Marked intent {intent_id} resolved for bead {bead_id}")
+            await self.store.update_intent_status(intent_id, intent_status)
+            logger.debug(f"Marked intent {intent_id} as {intent_status} for bead {bead_id}")
         except Exception as e:
-            logger.error(f"Failed to mark intent {intent_id} resolved: {e}", exc_info=True)
+            logger.error(f"Failed to mark intent {intent_id} as {intent_status}: {e}", exc_info=True)
             # Continue to routing even if status update fails
 
         # Step 5: SSE push per Surface Routing Rules
@@ -1077,18 +1089,40 @@ class BeadWatcher:
         # bf stores the bead body in `description` (NOT `body`); fall back to
         # notes then title so the summary is never empty.
         body = bead.get("description") or bead.get("notes") or bead.get("title") or ""
+        bead_status = bead.get("status", "closed")
+
+        # Plan §10 The Async Path: Terminal failures -> reason surfaced
+        # For failed/refused beads, extract the most recent REFUSED comment reason
+        failure_reason = None
+        if bead_status in ("failed", "refused"):
+            comments = bead.get("comments", [])
+            refusals = self._parse_refusals_from_comments(comments, since_index=-1)
+            if refusals:
+                # Get the most recent refusal (last in list)
+                failure_reason = refusals[-1]["reason"]
+
+        # Build summary - prepend failure reason for failed beads
+        summary = body[:200] if len(body) > 200 else body
+        if bead_status in ("failed", "refused") and failure_reason:
+            summary = f"Task {bead_status}: {failure_reason}"
+
+        result_data = {
+            "bead_id": bead.get("id"),
+            "title": bead.get("title"),
+            "issue_type": bead.get("issue_type"),
+            "description": body,
+            "status": bead_status,
+        }
+
+        # Add failure reason if present
+        if failure_reason:
+            result_data["failure_reason"] = failure_reason
 
         return {
             "id": bead.get("id"),
             "type": "bead_result",
-            "summary": body[:200] if len(body) > 200 else body,  # Truncate for summary
-            "data": {
-                "bead_id": bead.get("id"),
-                "title": bead.get("title"),
-                "issue_type": bead.get("issue_type"),
-                "description": body,
-                "status": bead.get("status"),
-            },
+            "summary": summary,
+            "data": result_data,
             "urgency": metadata.get("urgency", "normal"),
             "created_at": int(datetime.now().timestamp()),
             "surfaced_at": int(datetime.now().timestamp()),
