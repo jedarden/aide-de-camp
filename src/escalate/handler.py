@@ -19,6 +19,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Optional
 
+import aiosqlite
 import httpx
 
 from ..components.hot_reload import get_reload_manager
@@ -876,6 +877,7 @@ async def handle_terminal_failure(
     Plan §10 The Async Path: terminal failure handling.
     - Sets intents.status = 'failed'
     - Stores failure reason in bead_watch.last_refusal_reason (if bead exists)
+    - Creates failed card in session store
     - Broadcasts task_failed SSE event
 
     Args:
@@ -910,7 +912,66 @@ async def handle_terminal_failure(
         except Exception as e:
             logger.warning(f"Failed to update bead_watch for {bead_ref}: {e}")
 
-    # Step 3: Broadcast task_failed event via SSE
+    # Step 3: Create or find topic for failed card
+    final_topic_id = topic_id
+    if not final_topic_id:
+        # Get intent details to create a meaningful topic label
+        try:
+            intent = await store.get_intent(intent_id)
+            if intent:
+                utterance_id = intent.get("utterance_id")
+                if utterance_id:
+                    # Get utterance to create label
+                    async with aiosqlite.connect(store.db_path) as db:
+                        db.row_factory = aiosqlite.Row
+                        async with db.execute(
+                            "SELECT raw_text FROM utterances WHERE id = ?",
+                            (utterance_id,)
+                        ) as cursor:
+                            utterance_row = await cursor.fetchone()
+                            if utterance_row:
+                                utterance_text = utterance_row["raw_text"][:80]
+                                final_topic_id, _ = await store.find_or_create_topic(
+                                    label=f"Failed: {utterance_text}",
+                                    session_id=session_id,
+                                    topic_type="exception",
+                                )
+        except Exception as e:
+            logger.warning(f"Failed to create topic for failed card: {e}")
+
+    # Step 4: Link intent to topic and create failed card
+    if final_topic_id:
+        try:
+            # Link intent to topic (many-to-many)
+            await store.link_intent_to_topic(intent_id, final_topic_id)
+
+            # Update intent's primary topic_id field
+            await store.update_intent_topic(intent_id, final_topic_id)
+
+            # Create failed result card
+            summary = f"Task Failed: {error_type.replace('_', ' ').title()}"
+            data = {
+                "bead_ref": bead_ref,
+                "failure_reason": failure_reason,
+                "error_type": error_type,
+                "message": f"Task failed: {failure_reason}",
+                "action_hint": "This task encountered a terminal error and cannot proceed. Review the error details and retry if applicable.",
+            }
+
+            result_id = await store.create_result(
+                intent_id=intent_id,
+                topic_id=final_topic_id,
+                session_id=session_id,
+                summary=summary,
+                data=data,
+                urgency="high",
+            )
+
+            logger.info(f"Created failed card {result_id} for intent {intent_id}")
+        except Exception as e:
+            logger.warning(f"Failed to create failed card for intent {intent_id}: {e}")
+
+    # Step 5: Broadcast task_failed event via SSE
     broadcaster = get_broadcaster()
     await broadcaster.broadcast(
         SSEEvent(
@@ -919,7 +980,7 @@ async def handle_terminal_failure(
                 "bead_ref": bead_ref,
                 "intent_id": intent_id,
                 "session_id": session_id,
-                "topic_id": topic_id,
+                "topic_id": final_topic_id,
                 "failure_reason": failure_reason,
                 "error_type": error_type,
                 "message": f"Task failed: {failure_reason}",

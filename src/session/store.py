@@ -789,17 +789,65 @@ class SessionStore:
     async def update_intent_type_and_status(
         self,
         intent_id: str,
-        intent_type: str,
-        status: str,
+        intent_type: str | None,
+        status: str | None,
         resolved_at: int | None = None,
     ) -> None:
-        """Update both intent type and status."""
+        """Update both intent type and status.
+
+        Args:
+            intent_id: The intent ID to update
+            intent_type: New intent type (None = don't update)
+            status: New status (None = don't update)
+            resolved_at: Resolved timestamp (None = don't update unless status is resolved)
+        """
         async with aiosqlite.connect(self.db_path) as db:
-            if resolved_at is None and status == "resolved":
-                resolved_at = int(datetime.now().timestamp())
+            # Build update dynamically based on which values are provided
+            updates = []
+            params = []
+
+            if intent_type is not None:
+                updates.append("intent_type = ?")
+                params.append(intent_type)
+
+            if status is not None:
+                updates.append("status = ?")
+                params.append(status)
+                # Auto-set resolved_at when status is resolved and resolved_at is None
+                if resolved_at is None and status == "resolved":
+                    resolved_at = int(datetime.now().timestamp())
+
+            if resolved_at is not None:
+                updates.append("resolved_at = ?")
+                params.append(resolved_at)
+
+            if not updates:
+                # Nothing to update
+                return
+
+            params.append(intent_id)
+            query = f"UPDATE intents SET {', '.join(updates)} WHERE id = ?"
+            await db.execute(query, params)
+            await db.commit()
+
+    async def update_intent_topic(
+        self,
+        intent_id: str,
+        topic_id: str | None,
+    ) -> None:
+        """Update intent's primary topic.
+
+        Args:
+            intent_id: The intent ID to update
+            topic_id: New topic ID (None = don't update)
+        """
+        if topic_id is None:
+            return
+
+        async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
-                "UPDATE intents SET intent_type = ?, status = ?, resolved_at = ? WHERE id = ?",
-                (intent_type, status, resolved_at, intent_id)
+                "UPDATE intents SET topic_id = ? WHERE id = ?",
+                (topic_id, intent_id)
             )
             await db.commit()
 
