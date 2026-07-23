@@ -198,6 +198,70 @@ async def result_listener(
 
     while True:
         try:
+            # Check for pending approvals awaiting narration (voice mode support)
+            pending_approvals = await store.get_pending_approvals_for_session(session_id)
+            for approval in pending_approvals:
+                approval_id = approval["approval_id"]
+                intent_id = approval["intent_id"]
+
+                # Skip if already narrated (check against pushed_ids)
+                if f"approval-{approval_id}" in pushed_ids:
+                    continue
+
+                try:
+                    # Build narration from approval data
+                    approval_narration = f"I need your approval before creating this {approval.get('bead_type', 'bead')}. "
+
+                    # Add reason if available
+                    if approval.get("validation_result"):
+                        vr = approval["validation_result"]
+                        if vr.get("approval_requirement", {}).get("reason"):
+                            approval_narration += f"Reason: {vr['approval_requirement']['reason']}. "
+
+                    # Add utterance preview
+                    utterance = approval.get("utterance", "")
+                    if utterance:
+                        utterance_preview = utterance[:100]
+                        if len(utterance) > 100:
+                            utterance_preview += "..."
+                        approval_narration += f"Request: {utterance_preview}. "
+
+                    approval_narration += "Please approve or reject this request on the canvas."
+
+                    # Push approval as a result for narration
+                    approval_result = {
+                        "intent_id": intent_id,
+                        "summary": approval_narration,
+                        "urgency": "high",  # Approvals are high priority
+                        "data": {
+                            "type": "approval_required",
+                            "approval_id": approval_id,
+                            "bead_type": approval.get("bead_type", "bead"),
+                            "utterance": utterance,
+                        },
+                        "surfaced_at": time.time(),
+                    }
+
+                    if use_batching and batcher:
+                        # Queue with batcher for immediate narration (high urgency)
+                        await batcher.queue_result(
+                            result_id=f"approval-{approval_id}",
+                            intent_id=intent_id,
+                            topic_id=approval.get("topic_id"),
+                            summary=approval_narration,
+                            data=approval_result["data"],
+                            urgency="high",
+                        )
+                    else:
+                        # Push directly to voice session
+                        await voice_session.push_result(approval_result)
+
+                    logger.info(f"Narrated approval requirement {approval_id} for intent {intent_id}")
+                    pushed_ids.add(f"approval-{approval_id}")
+
+                except Exception as e:
+                    logger.warning(f"Failed to narrate approval {approval_id}: {e}")
+
             # Check for new results
             unsurfed = await store.get_unsurfaced_results(session_id)
 
