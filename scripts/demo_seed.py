@@ -134,7 +134,12 @@ class DemoSeedVerifier:
 
         # Add src to path for imports
         src_path = Path(__file__).parent.parent / "src"
-        sys.path.insert(0, str(src_path))
+        if str(src_path) not in sys.path:
+            sys.path.insert(0, str(src_path))
+        # Also add parent directory so 'src' can be imported as a package
+        parent_path = src_path.parent
+        if str(parent_path) not in sys.path:
+            sys.path.insert(0, str(parent_path))
 
     def _print(self, message: str, color: str = Colors.WHITE) -> None:
         """Print a colored message."""
@@ -169,7 +174,7 @@ class DemoSeedVerifier:
             return self.registry
 
         try:
-            from registry import get_registry
+            from src.registry import get_registry
             self.registry = get_registry(force=True)
             return self.registry
         except Exception as e:
@@ -234,7 +239,7 @@ class DemoSeedVerifier:
                 argocd_app = project.get("argocd_app") or project_slug
 
                 # Check ArgoCD endpoint resolution (via config/clusters.yaml)
-                from fetch.clusters import resolve_argocd_endpoint
+                from src.fetch.clusters import resolve_argocd_endpoint
                 try:
                     resolution = resolve_argocd_endpoint(cluster)
                     if not resolution.satisfiable:
@@ -289,8 +294,8 @@ class DemoSeedVerifier:
             )
 
         try:
-            from context.warmer import get_context_warmer
-            from session.store import get_store
+            from src.context.warmer import get_context_warmer
+            from src.session.store import get_store
 
             store = get_store()
             warmer = get_context_warmer()
@@ -364,7 +369,7 @@ class DemoSeedVerifier:
 
         try:
             import httpx
-            from test.dispatch import TestDispatchRequest, dispatch_test_utterance
+            from src.test.dispatch import TestDispatchRequest, dispatch_test_utterance
 
             # Scripted utterances from the demo (one per distinct shape)
             test_utterances = [
@@ -474,7 +479,7 @@ class DemoSeedVerifier:
         Built-in cards (pending/ack, welcome, generic fallback) are exempt by design.
         """
         try:
-            from components.library import get_library
+            from src.components.library import get_library
 
             library = get_library()
 
