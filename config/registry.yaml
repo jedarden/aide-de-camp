@@ -5,20 +5,21 @@
 # Updated by the self-modification agent.
 
 projects:
-  options-pipeline:
-    description: "Options data pipeline on apexalgo-iad"
+  whisper-stt:
+    description: "Whisper STT service on ardenone-cluster"
     aliases:
-      - "the pipeline"
-      - "options"
-      - "options data"
-    cluster: apexalgo-iad
-    namespace: options
-    argocd_app: options-pipeline  # ArgoCD Application name; defaults to the slug when omitted
-    repo_path: /home/coding/options-pipeline  # local checkout: git-log + per-project bead listing
+      - "whisper"
+      - "stt"
+      - "speech-to-text"
+      - "whisper stt"
+    cluster: ardenone-cluster
+    namespace: whisper-stt
+    argocd_app: whisper-stt  # ArgoCD Application name; defaults to the slug when omitted
+    repo_path: /home/coding/declarative-config  # local checkout: git-log + per-project bead listing (whisper-stt manifests live in k8s/ardenone-cluster/whisper-stt/)
     intent_support:
       - status
-      - action
       - brainstorm
+      - lookup
       - task-profile  # Required for demo step 5
     workflows:
       deploy:
@@ -33,16 +34,17 @@ projects:
           - pod_logs
           - argocd_events
 
-  ibkr-mcp:
-    description: "IBKR MCP server on apexalgo-iad"
+  pbx-web:
+    description: "PBX web interface on ardenone-cluster"
     aliases:
-      - "ibkr"
-      - "the mcp"
-      - "ibkr mcp"
-    cluster: apexalgo-iad
-    namespace: ibkr-mcp
-    argocd_app: ibkr-mcp  # explicit here for clarity; equals the slug default
-    repo_path: /home/coding/ibkr-mcp  # local checkout with its own .beads/ workspace
+      - "pbx"
+      - "pbx web"
+      - "phone system"
+      - "telephony"
+    cluster: ardenone-cluster
+    namespace: pbx-web
+    argocd_app: pbx-web  # explicit here for clarity; equals the slug default
+    repo_path: /home/coding/declarative-config  # local checkout: git-log + per-project bead listing (pbx-web manifests live in k8s/ardenone-cluster/pbx-web/)
     intent_support:
       - status
       - lookup
