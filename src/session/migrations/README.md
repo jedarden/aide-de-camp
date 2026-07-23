@@ -38,6 +38,7 @@ set_migration_version(db_path, 1)
 |---------|-----------|-------------|
 | 001 | add_result_type | Add result_type TEXT column to results table for component card selection |
 | 002 | add_component_usage_patterns | Create component_usage_patterns table for component selection tracking |
+| 003 | seed_component_patterns | Populate component_usage_patterns with initial seed data mapping result types to UI components |
 
 ## Notes
 
