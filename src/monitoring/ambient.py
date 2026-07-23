@@ -21,7 +21,7 @@ from ..session.store import SessionStore, get_store
 from ..fetch.orchestrator import get_fetch_strand, execute_fetch, FetchRequest
 from ..fetch.commands import FetchContext, FetchSource, IntentType
 from ..sse.broadcaster import get_broadcaster, SSEEvent, broadcast_result
-from ..render.hot_path import derive_result_type
+from ..render.hot_path import derive_result_type, get_renderer
 
 
 logger = getLogger(__name__)
@@ -402,6 +402,19 @@ class AmbientMonitor:
             result_type=result_type,
         )
 
+        # Render monitoring card via hot-path selector (deterministic, no LLM)
+        renderer = get_renderer()
+        summary_text = self._generate_summary(rule, current_state, previous_state, changes_dict)
+        render_outcome = renderer.render(
+            result_id=result_id,
+            result_type=result_type,
+            result_data=result_data,
+            summary=summary_text,
+        )
+
+        # Update result's card_fallback flag
+        await self._store.update_result_card_fallback(result_id, render_outcome.card_fallback)
+
         logger.info(f"Created monitoring result {result_id} for topic {rule.topic_id} (intent_id=NULL)")
 
         # Fire SSE event for canvas update
@@ -411,10 +424,13 @@ class AmbientMonitor:
             "intent_id": None,
             "topic_id": topic_id,
             "session_id": session_id,
-            "summary": self._generate_summary(rule, current_state, previous_state, changes_dict),
+            "summary": summary_text,
             "data": result_data,
             "urgency": rule.urgency,
             "result_type": result_type,
+            "card_fallback": render_outcome.card_fallback,
+            "rendered_html": render_outcome.rendered_html,
+            "component_id": render_outcome.component_id,
             "created_at": int(datetime.now(timezone.utc).timestamp()),
         }
 
