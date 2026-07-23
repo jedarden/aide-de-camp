@@ -29,12 +29,10 @@ from .commands import (
     get_required_sources,
     SourceResult,
 )
+from .clusters import ArgocdEndpointUnresolvable, resolve_argocd_endpoint
 
 
 logger = getLogger(__name__)
-
-# ArgoCD read-only proxy endpoint
-ARGOCD_RO_PROXY = "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444"
 
 # Type alias for the streaming callback
 # Called when a source completes: (source, result) -> None
@@ -366,13 +364,33 @@ class FetchStrand:
             return {"error": str(e), "workflows": []}
 
     async def _fetch_argocd_app(self, context: FetchContext) -> dict:
-        """Fetch ArgoCD application status."""
-        proxy = ARGOCD_RO_PROXY
-        app_name = context.app_name or context.project_slug
+        """Fetch ArgoCD application status.
 
+        The ArgoCD endpoint is resolved from the project's ``cluster`` via
+        config/clusters.yaml (see src/fetch/clusters.py): there is no single
+        ArgoCD API, and querying the wrong instance returns not-found —
+        indistinguishable from "app doesn't exist". An unmapped cluster, or one
+        mapped to an ``access`` mode the strand cannot satisfy (it holds no
+        ArgoCD credentials, so only ``read-only-proxy`` is consumable), raises
+        ``ArgocdEndpointUnresolvable`` *before* any HTTP call.
+
+        The exception is raised outside the httpx try/except so the resolution
+        ``reason`` propagates cleanly: ``_execute_source`` buckets it as a
+        failed source and the fetch loop emits a ``fetch_coverage`` caveat
+        carrying the reason. Never a silent wrong-instance query.
+        """
+        app_name = context.app_name or context.project_slug
         if not app_name:
             return {"error": "No application name specified"}
 
+        resolution = resolve_argocd_endpoint(context.cluster)
+        if not resolution.satisfiable:
+            raise ArgocdEndpointUnresolvable(
+                resolution.reason or "ArgoCD endpoint unresolvable",
+                cluster=context.cluster,
+            )
+
+        proxy = resolution.argocd_api
         try:
             async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
                 resp = await client.get(

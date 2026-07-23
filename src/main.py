@@ -7,6 +7,7 @@ Replaces text input with voice session.
 import asyncio
 import logging
 import os
+import time
 import uuid
 from logging import getLogger
 from pathlib import Path
@@ -56,6 +57,7 @@ from .environment.discovery import (
     refresh_registry, start_background_refresh, stop_background_refresh,
     get_last_scan_at,
 )
+from .registry import get_registry as get_yaml_registry
 
 
 logger = getLogger(__name__)
@@ -214,8 +216,28 @@ async def get_store():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "ok", "service": "adc-voice"}
+    """Health check endpoint.
+
+    Returns overall service status and watcher liveness block (alive, last_tick_at,
+    tick_count, interval). Watcher alive is true only while the task is running
+    AND last_tick_at is within 2x the poll interval. If _bead_watcher is None
+    (failed start), watcher.alive is false.
+    """
+    response = {
+        "status": "ok",
+        "service": "adc-voice",
+    }
+    if _bead_watcher is not None:
+        response["watcher"] = _bead_watcher.health_snapshot()
+    else:
+        # Watcher failed to start or not initialized
+        response["watcher"] = {
+            "alive": False,
+            "last_tick_at": None,
+            "tick_count": 0,
+            "interval": 0,
+        }
+    return response
 
 
 @app.get("/")
@@ -528,6 +550,7 @@ async def dispatch_intent(request: dict):
 
                     # Broadcast result_created so canvas reloads topics
                     if _broadcaster and surface_id:
+                        emit_start = time.monotonic()
                         await _broadcaster.broadcast(
                             SSEEvent(
                                 event_type="result_created",
@@ -540,6 +563,15 @@ async def dispatch_intent(request: dict):
                                 }
                             )
                         )
+                        # Record the SSE emit cost for this intent thread
+                        # (Latency Budget & Instrumentation). Non-fatal.
+                        try:
+                            await store.record_dispatch_timings(
+                                intent_id,
+                                sse_emit_ms=int((time.monotonic() - emit_start) * 1000),
+                            )
+                        except Exception as te:
+                            logger.warning(f"sse_emit timing not recorded for {intent_id}: {te}")
 
                 except Exception as e:
                     logger.error(f"Intent processing failed: {e}")
@@ -570,6 +602,66 @@ async def dispatch_intent(request: dict):
             status_code=500,
             content={"error": f"Dispatch error: {str(e)}"}
         )
+
+
+@app.post("/api/v1/timings")
+async def report_client_timings(request: dict):
+    """Record client-reported dispatch timings for an intent thread.
+
+    The server-side stages (router/fetch/synthesize/escalate/sse_emit_ms) are
+    recorded by the router and the /dispatch endpoint; this endpoint is the wire
+    for the two client-reported stages in the latency budget — STT final
+    transcript (stt_ms) and first card render (first_render_ms) — which only the
+    client can measure (see Latency Budget & Instrumentation in docs/plan/plan.md).
+    Both are nullable: a dispatch with no client reporter (the text box, the
+    /api/v1/test/dispatch harness) simply never calls this and those columns
+    stay NULL.
+
+    Body: {"intent_id": "...", "stt_ms": 312, "first_render_ms": 90}
+    Either timing field is optional; intent_id is required.
+    """
+    intent_id = request.get("intent_id")
+    if not intent_id:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "intent_id is required"},
+        )
+
+    fields: dict[str, int] = {}
+    for name in ("stt_ms", "first_render_ms"):
+        value = request.get(name)
+        if value is not None:
+            fields[name] = int(value)
+
+    store = await get_store()
+    try:
+        # Upserts into the existing server-written row (created_at unchanged);
+        # if no server row exists yet this still creates one keyed by the
+        # client-reported intent_id so the timing is never lost.
+        await store.record_dispatch_timings(intent_id, **fields)
+    except Exception as e:
+        logger.warning(f"client timings not recorded for {intent_id}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to record timings: {e}"},
+        )
+
+    return {"ok": True, "intent_id": intent_id, "recorded": list(fields.keys())}
+
+
+@app.get("/api/v1/timings/percentiles")
+async def get_latency_percentiles_endpoint(since: int | None = None):
+    """Aggregate p50/p95 per dispatch stage (Latency Budget & Instrumentation).
+
+    Returns ``{stage: {"p50": ms, "p95": ms, "count": n}}`` for every stage
+    that has at least one captured sample. The latency-baseline bead consumes
+    the un-windowed store helper directly; this endpoint exposes the same
+    numbers over HTTP for the Phase 5 rehearsal checklist and on-demand
+    inspection. Optional ``since`` (unix timestamp) windows to recent
+    dispatches only.
+    """
+    store = await get_store()
+    return await store.get_latency_percentiles(since=since)
 
 
 @app.post("/escalate")
@@ -668,6 +760,31 @@ async def get_environment():
         "last_scan_at": get_last_scan_at(),
         "repos": entries,
     }
+
+
+@app.get("/api/v1/registry")
+async def get_registry_endpoint():
+    """Return the merged project registry (config/registry.yaml + discovery).
+
+    This is the DB-independent data source for the first-run welcome card (the
+    built-in family #2 — see plan, Component Library → Built-in cards, and Cold
+    start & demo seed). The welcome card renders even against an empty
+    components.db because the project list comes from this YAML-backed registry,
+    not the component DB. Returns only the welcome-relevant fields per project
+    (slug, name, description, intent_support, aliases) so no internal paths leak
+    to the served frontend.
+    """
+    reg = get_yaml_registry()
+    projects = []
+    for slug, entry in (reg.get("projects") or {}).items():
+        projects.append({
+            "slug": slug,
+            "name": slug,
+            "description": entry.get("description") or "",
+            "intent_support": entry.get("intent_support") or [],
+            "aliases": entry.get("aliases") or [],
+        })
+    return {"projects": projects}
 
 
 @app.post("/api/v1/environment/refresh")

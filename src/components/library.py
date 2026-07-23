@@ -225,6 +225,42 @@ class ComponentLibrary:
 
         return None
 
+    def select_component_for_result_type(
+        self,
+        result_type: str,
+        match_threshold: float = 0.7,
+    ) -> Optional[Component]:
+        """Deterministic hot-path selection — the dispatch card selector.
+
+        Returns the highest-``match_score`` component mapped to ``result_type``
+        in ``component_usage_patterns`` whose score clears ``match_threshold``,
+        or None. No LLM, no semantic fallback, no generation (plan: The Hot Path
+        / UI-Regen Agent — "highest match_score in component_usage_patterns for
+        the result_type, no LLM call"). A None return is the signal that the
+        result must fall to the built-in generic fallback card.
+
+        Distinct from :meth:`find_best_component`, which the *async* UI-regen
+        agent uses to steward the library (it may fall back to semantic search
+        and ultimately generate a new component). The hot path must never do
+        either — it only reads the recorded mappings.
+        """
+        conn = self._get_conn()
+        pattern_row = conn.execute(
+            """
+            SELECT component_id, match_score
+            FROM component_usage_patterns
+            WHERE result_type = ? AND match_score >= ?
+            ORDER BY match_score DESC, sample_count DESC
+            LIMIT 1
+            """,
+            (result_type, match_threshold),
+        ).fetchone()
+
+        if not pattern_row:
+            return None
+
+        return self.get_component(pattern_row[0])
+
     def _semantic_score(self, result_type: str, comp_name: str, comp_description: str) -> float:
         """
         Calculate semantic match score.
