@@ -869,6 +869,20 @@
                 delete pendingPlaceholders[utteranceId];
             });
 
+            // Thread-level progress event
+            eventSource.addEventListener('thread_progress', (event) => {
+                const data = JSON.parse(event.data);
+                const threadId = data.thread_id;
+
+                if (!threadId) {
+                    console.warn('thread_progress: missing thread_id in event data');
+                    return;
+                }
+
+                console.log('Thread progress:', { thread_id: threadId, data: data });
+                // Card updates will be handled in the next child (Child 2 of 5)
+            });
+
             // Per-source progress update for a thread
             eventSource.addEventListener('progress_update', (event) => {
                 const data = JSON.parse(event.data);
@@ -880,13 +894,19 @@
 
                 // Find the pending thread card by intent_id
                 const threadCard = document.querySelector('[data-pending-id="' + intentId + '"]');
-                if (threadCard && threadCard.classList.contains('pending-card')) {
-                    // Use the internal _setProgress function from canvas.js
-                    // (it's exported as setPendingProgress in Node for tests)
-                    if (typeof _setProgress === 'function') {
-                        _setProgress(threadCard, { completed: completed, total: total });
-                    }
+                if (!threadCard) {
+                    console.warn('progress_update: threadCard is null for intent_id=' + intentId);
+                    return;
                 }
+                if (!threadCard.classList.contains('pending-card')) {
+                    console.warn('progress_update: threadCard does not have pending-card class for intent_id=' + intentId);
+                    return;
+                }
+                if (typeof _setProgress !== 'function') {
+                    console.warn('progress_update: _setProgress is not a function');
+                    return;
+                }
+                _setProgress(threadCard, { completed: completed, total: total });
             });
 
             eventSource.addEventListener('result_created', (event) => {
