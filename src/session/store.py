@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS bead_watch (
     refusal_count      INTEGER NOT NULL DEFAULT 0,  -- Number of REFUSED: comments seen
     last_refusal_reason TEXT,  -- Most recent refusal reason
     last_refusal_at    INTEGER,  -- Timestamp of most recent refusal
-    comment_high_water INTEGER NOT NULL DEFAULT 0,  -- Latest comment index processed
+    comment_high_water INTEGER NOT NULL DEFAULT -1,  -- Latest comment index processed (-1 = none)
     sla_deadline       INTEGER NOT NULL,  -- Unix timestamp when SLA expires
     sla_flagged_at     INTEGER,  -- Timestamp when SLA was flagged (NULL if not flagged)
     fenced_at          INTEGER,  -- Timestamp when bead was fenced to status=blocked (NULL if not fenced)
@@ -303,6 +303,9 @@ class SessionStore:
 
         # Migrate results.intent_id to allow NULL for monitoring-originated results
         await SessionStore._migrate_results_intent_id_nullable(db)
+
+        # Migrate bead_watch.comment_high_water default from 0 to -1
+        await SessionStore._migrate_bead_watch_comment_high_water(db)
 
         await db.commit()
 
@@ -471,6 +474,76 @@ class SessionStore:
         except Exception as e:
             await db.rollback()
             logger.error(f"Failed to migrate results.intent_id: {e}")
+            raise
+
+    @staticmethod
+    async def _migrate_bead_watch_comment_high_water(db: aiosqlite.Connection) -> None:
+        """Migrate bead_watch.comment_high_water default from 0 to -1.
+
+        The initial schema had DEFAULT 0, which meant the first comment (index 0)
+        was skipped on the first check. With DEFAULT -1, no comments are skipped
+        initially, and only comments with index > comment_high_water are processed.
+        SQLite doesn't support ALTER COLUMN DEFAULT, so we recreate the table.
+        """
+        # Check if migration is needed by inspecting the bead_watch table schema
+        async with db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='bead_watch'"
+        ) as cur:
+            table_sql = await cur.fetchone()
+            if not table_sql:
+                return  # Table doesn't exist yet
+
+            # If comment_high_water already has DEFAULT -1, skip migration
+            if "DEFAULT -1" in table_sql[0]:
+                # Already migrated
+                return
+
+        # Migration needed: recreate table with new default
+        logger.info("Migrating bead_watch.comment_high_water default from 0 to -1")
+
+        # Begin transaction for data migration
+        await db.execute("BEGIN IMMEDIATE TRANSACTION")
+
+        try:
+            # Create new table with DEFAULT -1
+            await db.execute("""
+                CREATE TABLE bead_watch_new (
+                    bead_ref           TEXT PRIMARY KEY,
+                    refusal_count      INTEGER NOT NULL DEFAULT 0,
+                    last_refusal_reason TEXT,
+                    last_refusal_at    INTEGER,
+                    comment_high_water INTEGER NOT NULL DEFAULT -1,
+                    sla_deadline       INTEGER NOT NULL,
+                    sla_flagged_at     INTEGER,
+                    fenced_at          INTEGER,
+                    created_at         INTEGER NOT NULL
+                )
+            """)
+
+            # Copy data from old table to new table
+            # Existing rows with comment_high_water=0 are migrated as-is
+            # (they represent "comment 0 has been processed", which is valid)
+            await db.execute("""
+                INSERT INTO bead_watch_new
+                SELECT * FROM bead_watch
+            """)
+
+            # Recreate indexes
+            await db.execute("DROP INDEX IF EXISTS idx_bead_watch_sla_deadline")
+            await db.execute("DROP INDEX IF EXISTS idx_bead_watch_fenced")
+
+            await db.execute("CREATE INDEX idx_bead_watch_sla_deadline ON bead_watch_new(sla_deadline)")
+            await db.execute("CREATE INDEX idx_bead_watch_fenced ON bead_watch_new(fenced_at)")
+
+            # Drop old table and rename new table
+            await db.execute("DROP TABLE bead_watch")
+            await db.execute("ALTER TABLE bead_watch_new RENAME TO bead_watch")
+
+            await db.commit()
+            logger.info("Migration complete: bead_watch.comment_high_water default is now -1")
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Failed to migrate bead_watch.comment_high_water: {e}")
             raise
 
     async def close(self) -> None:
@@ -1346,7 +1419,7 @@ class SessionStore:
             await db.execute(
                 """INSERT OR REPLACE INTO bead_watch
                    (bead_ref, refusal_count, comment_high_water, sla_deadline, created_at)
-                   VALUES (?, 0, 0, ?, ?)""",
+                   VALUES (?, 0, -1, ?, ?)""",
                 (bead_ref, sla_deadline, now),
             )
             await db.commit()
