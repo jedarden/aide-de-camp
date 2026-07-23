@@ -219,6 +219,22 @@ CREATE TABLE IF NOT EXISTS bead_watch (
 
 CREATE INDEX IF NOT EXISTS idx_bead_watch_sla_deadline ON bead_watch(sla_deadline);
 CREATE INDEX IF NOT EXISTS idx_bead_watch_fenced ON bead_watch(fenced_at);
+
+-- Card cache: pre-rendered HTML for result components
+-- Stores server-side rendered HTML for result/component/layout combinations.
+-- Primary key (result_id, component_id, layout_bucket) allows multiple cached
+-- variations per result (e.g., different layouts). Populated after component
+-- selection to avoid repeated rendering for the same result.
+CREATE TABLE IF NOT EXISTS card_cache (
+    result_id      TEXT NOT NULL,
+    component_id   TEXT NOT NULL,
+    layout_bucket  TEXT NOT NULL,
+    rendered_html  TEXT NOT NULL,
+    created_at     INTEGER NOT NULL,
+    PRIMARY KEY (result_id, component_id, layout_bucket)
+);
+
+CREATE INDEX IF NOT EXISTS idx_card_cache_result_id ON card_cache(result_id);
 """
 
 # The set of dispatch_timings timing columns record_dispatch_timings() may set.
@@ -1033,6 +1049,138 @@ class SessionStore:
             )
             await db.commit()
             return {"result_deleted": cursor.rowcount}
+
+    # Card cache operations
+    async def write_card_cache(
+        self,
+        result_id: str,
+        component_id: str,
+        layout_bucket: str,
+        rendered_html: str,
+    ) -> None:
+        """Write rendered HTML to card cache.
+
+        Stores pre-rendered HTML for a specific result/component/layout combination.
+        Uses INSERT OR REPLACE to update existing cache entries.
+
+        Args:
+            result_id: The result ID
+            component_id: The component ID that rendered this HTML
+            layout_bucket: The layout bucket used for rendering
+            rendered_html: The pre-rendered HTML content
+        """
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                """INSERT OR REPLACE INTO card_cache
+                   (result_id, component_id, layout_bucket, rendered_html, created_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (result_id, component_id, layout_bucket, rendered_html, now)
+            )
+            await db.commit()
+
+    async def get_card_cache(self, result_id: str) -> list[dict]:
+        """Get all cached HTML entries for a result.
+
+        Returns a list of cached entries, each containing:
+        - result_id
+        - component_id
+        - layout_bucket
+        - rendered_html
+        - created_at
+
+        Args:
+            result_id: The result ID to fetch cache for
+
+        Returns:
+            List of cache entries (empty list if none found)
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT result_id, component_id, layout_bucket, rendered_html, created_at
+                   FROM card_cache
+                   WHERE result_id = ?
+                   ORDER BY created_at DESC""",
+                (result_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_card_cache_entry(
+        self,
+        result_id: str,
+        component_id: str,
+        layout_bucket: str,
+    ) -> Optional[dict]:
+        """Get a specific cached HTML entry.
+
+        Returns the cache entry matching all three keys, or None if not found.
+
+        Args:
+            result_id: The result ID
+            component_id: The component ID
+            layout_bucket: The layout bucket
+
+        Returns:
+            Cache entry dict or None
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT result_id, component_id, layout_bucket, rendered_html, created_at
+                   FROM card_cache
+                   WHERE result_id = ? AND component_id = ? AND layout_bucket = ?""",
+                (result_id, component_id, layout_bucket)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
+    async def invalidate_card_cache(self, result_id: str) -> int:
+        """Invalidate all cache entries for a result.
+
+        Deletes all cached HTML for the given result_id.
+
+        Args:
+            result_id: The result ID to invalidate cache for
+
+        Returns:
+            Number of entries deleted
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "DELETE FROM card_cache WHERE result_id = ?",
+                (result_id,)
+            )
+            await db.commit()
+            return cursor.rowcount
+
+    async def invalidate_card_cache_entry(
+        self,
+        result_id: str,
+        component_id: str,
+        layout_bucket: str,
+    ) -> int:
+        """Invalidate a specific cache entry.
+
+        Deletes the cache entry matching all three keys.
+
+        Args:
+            result_id: The result ID
+            component_id: The component ID
+            layout_bucket: The layout bucket
+
+        Returns:
+            Number of entries deleted (0 or 1)
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                """DELETE FROM card_cache
+                   WHERE result_id = ? AND component_id = ? AND layout_bucket = ?""",
+                (result_id, component_id, layout_bucket)
+            )
+            await db.commit()
+            return cursor.rowcount
 
     # Topic operations
     async def create_topic(
