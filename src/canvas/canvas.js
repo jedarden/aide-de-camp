@@ -86,7 +86,7 @@ function createTopicCard(cardData) {
         <div class="topic-header">
             <div class="topic-label">${escapeHtml(topic.label)}</div>
             <div>
-                <span class="topic-type ${typeClass}">${topic.type || 'adhoc'}</span>
+                <span class="topic-type ${typeClass}">${escapeHtml(topic.type || 'adhoc')}</span>
                 ${stalenessLevel !== 'fresh' ? `<span class="stale-badge ${stalenessLevel}">STALE</span>` : ''}
             </div>
         </div>
@@ -99,7 +99,7 @@ function createTopicCard(cardData) {
             <div class="result-content">
                 <div class="result-summary">
                     ${escapeHtml(latestResult.summary)}
-                    <span class="urgency-badge ${urgencyClass}">${urgencyClass}</span>
+                    <span class="urgency-badge ${urgencyClass}">${escapeHtml(urgencyClass)}</span>
                 </div>
         `;
 
