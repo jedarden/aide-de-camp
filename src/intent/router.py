@@ -53,6 +53,7 @@ class IntentClassification:
     utterance_fragment: str = ""
     reasoning: str = ""
     urgency: str = "normal"  # critical, high, normal, low
+    lookup_kind: str | None = None  # lookup intents only: 'logs' | 'config' | 'docs'
 
 
 @dataclass
@@ -223,6 +224,7 @@ class IntentRouter:
                     utterance_fragment=intent_data.get("utterance_fragment", utterance),
                     reasoning=intent_data.get("reasoning", ""),
                     urgency=intent_data.get("urgency", "normal"),
+                    lookup_kind=intent_data.get("lookup_kind") if intent_type == IntentType.LOOKUP else None,
                 )
                 classifications.append(classification)
 
@@ -362,7 +364,10 @@ class IntentRouter:
 
         try:
             # Step 1: Fetch context — resolve project slug to local repo path
-            fetch_intent_type = self._map_intent_type(classification.intent_type)
+            fetch_intent_type = self._map_intent_type(
+                classification.intent_type,
+                classification.lookup_kind
+            )
 
             from ..environment.discovery import get_registry
             from ..registry import get_project
@@ -482,11 +487,11 @@ class IntentRouter:
             )
             await store.link_intent_to_topic(routed_intent.intent_id, topic_id)
 
-            # Derive result_type from intent classification
+            # Derive result_type from intent classification (includes lookup_kind for lookups)
             result_type = derive_result_type(
                 intent_type=classification.intent_type.value,
                 project_slug=classification.project_slug,
-                lookup_kind=None,  # Not populated in current classification
+                lookup_kind=classification.lookup_kind,
             )
 
             result_id = await store.create_result(
@@ -587,8 +592,11 @@ class IntentRouter:
             bead_ref=bead_ref,
         )
 
-    def _map_intent_type(self, intent_type: IntentType) -> FetchIntentType:
-        """Map router IntentType to fetch IntentType."""
+    def _map_intent_type(self, intent_type: IntentType, lookup_kind: str | None = None) -> FetchIntentType:
+        """Map router IntentType to fetch IntentType.
+
+        For lookup intents, route to the subtype-specific fetch matrix based on lookup_kind.
+        """
         # Map enum values by string
         type_map = {
             IntentType.STATUS: FetchIntentType.STATUS,
@@ -600,6 +608,16 @@ class IntentRouter:
             IntentType.MONITORING_CONFIG: FetchIntentType.MONITORING_CONFIG,
             IntentType.STUCK: FetchIntentType.STUCK,
         }
+
+        # For lookup intents with lookup_kind, route to the subtype-specific matrix
+        if intent_type == IntentType.LOOKUP and lookup_kind:
+            if lookup_kind == "logs":
+                return FetchIntentType.LOOKUP_LOGS
+            elif lookup_kind == "config":
+                return FetchIntentType.LOOKUP_CONFIG
+            elif lookup_kind == "docs":
+                return FetchIntentType.LOOKUP_DOCS
+
         return type_map.get(intent_type, FetchIntentType.STATUS)
 
     async def _check_fence_for_bead(
@@ -702,11 +720,11 @@ class IntentRouter:
                 "fence_detected_during": "intent_routing",
             }
 
-            # Derive result_type from original intent classification (not "stuck" state)
+            # Derive result_type from original intent classification (not "stuck" state, includes lookup_kind)
             result_type = derive_result_type(
                 intent_type=routed_intent.classification.intent_type.value,
                 project_slug=routed_intent.classification.project_slug,
-                lookup_kind=None,  # Not populated in current classification
+                lookup_kind=routed_intent.classification.lookup_kind,
             )
 
             result_id = await store.create_result(
