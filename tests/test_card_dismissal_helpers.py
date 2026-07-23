@@ -16,6 +16,14 @@ from tests.card_dismissal_helpers import (
     find_card_by_bead_id,
     get_dismissal_selector,
     create_mock_router,
+    verify_result_exists_in_db,
+    verify_result_count_for_intent,
+    verify_result_deleted_from_db,
+    get_all_results_for_session,
+    verify_database_integrity_after_dismissal,
+    verify_dismissal_persistence_across_reopen,
+    count_results_by_bead_id,
+    verify_cards_remain_after_dismissal,
 )
 
 
@@ -457,3 +465,425 @@ class TestIntegrationHelpers:
         assert failed_card["builtin_data"]["type"] == "failed"
 
         await store.close()
+
+
+class TestDatabaseVerificationHelpers:
+    """Test database verification helper functions."""
+
+    @pytest.mark.asyncio
+    async def test_verify_result_exists_in_db(self, tmp_path):
+        """Test verifying a result exists in the database."""
+        store, session_id, topic_id = await create_test_session_with_topic(tmp_path=tmp_path)
+
+        # Create a stuck card result
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test result exists",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-result-exists-test",
+            topic_id=topic_id,
+        )
+
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Test result",
+            data={"bead_id": "adc-result-exists-test", "stuck_reason": "Test"},
+            urgency="high",
+        )
+
+        # Verify result exists
+        exists = await verify_result_exists_in_db(store, result_id)
+        assert exists is True
+
+        # Delete result
+        await store.delete_result(result_id, session_id)
+
+        # Verify result no longer exists
+        exists_after = await verify_result_exists_in_db(store, result_id)
+        assert exists_after is False
+
+        await store.close()
+
+    @pytest.mark.asyncio
+    async def test_verify_result_count_for_intent(self, tmp_path):
+        """Test verifying result count for an intent."""
+        store, session_id, topic_id = await create_test_session_with_topic(tmp_path=tmp_path)
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test count",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-count-test",
+            topic_id=topic_id,
+        )
+
+        # Initially 0 results
+        assert await verify_result_count_for_intent(store, intent_id, 0) is True
+
+        # Create first result
+        await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Result 1",
+            data={"bead_id": "adc-count-test"},
+            urgency="normal",
+        )
+
+        # Now 1 result
+        assert await verify_result_count_for_intent(store, intent_id, 1) is True
+
+        # Create second result
+        await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Result 2",
+            data={"bead_id": "adc-count-test"},
+            urgency="normal",
+        )
+
+        # Now 2 results
+        assert await verify_result_count_for_intent(store, intent_id, 2) is True
+        assert await verify_result_count_for_intent(store, intent_id, 1) is False
+
+        await store.close()
+
+    @pytest.mark.asyncio
+    async def test_verify_result_deleted_from_db(self, tmp_path):
+        """Test verifying a result was properly deleted from database."""
+        store, session_id, topic_id = await create_test_session_with_topic(tmp_path=tmp_path)
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test deletion",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-delete-test",
+            topic_id=topic_id,
+        )
+
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Test deletion",
+            data={"bead_id": "adc-delete-test"},
+            urgency="high",
+        )
+
+        # Delete the result
+        await store.delete_result(result_id, session_id)
+
+        # Verify deletion
+        verification = await verify_result_deleted_from_db(store, result_id, session_id)
+        assert verification["result_deleted"] is True
+        assert verification["session_isolated"] is True
+        assert verification["verification_passed"] is True
+
+        await store.close()
+
+    @pytest.mark.asyncio
+    async def test_get_all_results_for_session(self, tmp_path):
+        """Test getting all results for a session."""
+        store, session_id, topic_id = await create_test_session_with_topic(tmp_path=tmp_path)
+
+        # Create multiple intents and results
+        for i in range(3):
+            utterance_id = await store.create_utterance(
+                session_id=session_id,
+                raw_text=f"test result {i}",
+            )
+
+            intent_id = await store.create_intent(
+                utterance_id=utterance_id,
+                session_id=session_id,
+                project_slug="adc",
+                intent_type="task-profile",
+                bead_ref=f"adc-results-{i}",
+                topic_id=topic_id,
+            )
+
+            await store.create_result(
+                intent_id=intent_id,
+                topic_id=topic_id,
+                session_id=session_id,
+                summary=f"Result {i}",
+                data={"bead_id": f"adc-results-{i}"},
+                urgency="normal",
+            )
+
+        # Get all results
+        results = await get_all_results_for_session(store, session_id)
+        assert len(results) == 3
+        assert all(r.get("session_id") == session_id for r in results)
+
+        await store.close()
+
+    @pytest.mark.asyncio
+    async def test_verify_database_integrity_after_dismissal(self, tmp_path):
+        """Test database integrity verification after dismissal."""
+        store, session_id, topic_id = await create_test_session_with_topic(tmp_path=tmp_path)
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test integrity",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-integrity-test",
+            topic_id=topic_id,
+        )
+
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Test integrity",
+            data={"bead_id": "adc-integrity-test"},
+            urgency="high",
+        )
+
+        # Delete the result
+        await store.delete_result(result_id, session_id)
+
+        # Verify integrity
+        integrity = await verify_database_integrity_after_dismissal(
+            store, session_id, expected_result_count=0
+        )
+        assert integrity["all_checks_passed"] is True
+        assert integrity["checks"]["no_orphaned_results"] is True
+        assert integrity["checks"]["result_count_match"] is True
+        assert integrity["checks"]["session_valid"] is True
+        assert integrity["checks"]["topics_valid"] is True
+
+        await store.close()
+
+    @pytest.mark.asyncio
+    async def test_verify_dismissal_persistence_across_reopen(self, tmp_path):
+        """Test that dismissal persists across database reopen."""
+        db_path = tmp_path / "test_session.db"
+        store, session_id, topic_id = await create_test_session_with_topic(tmp_path=tmp_path)
+
+        utterance_id = await store.create_utterance(
+            session_id=session_id,
+            raw_text="test reopen persistence",
+        )
+
+        intent_id = await store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug="adc",
+            intent_type="task-profile",
+            bead_ref="adc-reopen-test",
+            topic_id=topic_id,
+        )
+
+        result_id = await store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="Test reopen persistence",
+            data={"bead_id": "adc-reopen-test"},
+            urgency="high",
+        )
+
+        # Delete the result
+        await store.delete_result(result_id, session_id)
+        await store.close()
+
+        # Verify persistence across reopen
+        persistence = await verify_dismissal_persistence_across_reopen(
+            db_path, session_id, result_id=result_id, intent_id=intent_id
+        )
+        assert persistence["session_exists"] is True
+        assert persistence["result_deleted"] is True
+        assert persistence["dismissal_persisted"] is True
+        assert persistence["intent_result_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_count_results_by_bead_id(self, tmp_path):
+        """Test counting results by bead_id."""
+        store, session_id, topic_id = await create_test_session_with_topic(tmp_path=tmp_path)
+
+        # Create results with different bead_ids
+        for i in range(3):
+            utterance_id = await store.create_utterance(
+                session_id=session_id,
+                raw_text=f"test bead {i}",
+            )
+
+            intent_id = await store.create_intent(
+                utterance_id=utterance_id,
+                session_id=session_id,
+                project_slug="adc",
+                intent_type="task-profile",
+                bead_ref="adc-bead-count-test",
+                topic_id=topic_id,
+            )
+
+            await store.create_result(
+                intent_id=intent_id,
+                topic_id=topic_id,
+                session_id=session_id,
+                summary=f"Bead count test {i}",
+                data={"bead_id": "adc-bead-count-test"},
+                urgency="normal",
+            )
+
+        count = await count_results_by_bead_id(store, session_id, "adc-bead-count-test")
+        assert count == 3
+
+        await store.close()
+
+    @pytest.mark.asyncio
+    async def test_verify_cards_remain_after_dismissal(self, tmp_path):
+        """Test verifying selective dismissal - some cards gone, others remain."""
+        store, session_id, topic_id = await create_test_session_with_topic(tmp_path=tmp_path)
+
+        cards_to_dismiss = ["adc-dismiss-1", "adc-dismiss-2"]
+        cards_to_remain = ["adc-remain-1", "adc-remain-2"]
+
+        # Create all cards
+        for bead_id in cards_to_dismiss + cards_to_remain:
+            utterance_id = await store.create_utterance(
+                session_id=session_id,
+                raw_text=f"test {bead_id}",
+            )
+
+            intent_id = await store.create_intent(
+                utterance_id=utterance_id,
+                session_id=session_id,
+                project_slug="adc",
+                intent_type="task-profile",
+                bead_ref=bead_id,
+                topic_id=topic_id,
+            )
+
+            result_id = await store.create_result(
+                intent_id=intent_id,
+                topic_id=topic_id,
+                session_id=session_id,
+                summary=f"Card {bead_id}",
+                data={"bead_id": bead_id},
+                urgency="high",
+            )
+
+            # Dismiss the cards that should be dismissed
+            if bead_id in cards_to_dismiss:
+                await store.delete_result(result_id, session_id)
+
+        # Verify selective dismissal
+        verification = await verify_cards_remain_after_dismissal(
+            store, session_id, cards_to_dismiss, cards_to_remain
+        )
+        assert verification["all_correct"] is True
+        assert verification["dismissed_adc-dismiss-1"] is True
+        assert verification["dismissed_adc-dismiss-2"] is True
+        assert verification["remaining_adc-remain-1"] is True
+        assert verification["remaining_adc-remain-2"] is True
+
+        await store.close()
+
+
+class TestDatabaseVerificationIntegration:
+    """Integration tests for database verification helpers working together."""
+
+    @pytest.mark.asyncio
+    async def test_complete_persistence_verification_workflow(self, tmp_path):
+        """Test complete workflow: create, dismiss, verify persistence, reopen, verify again."""
+        from src.session.store import SessionStore
+
+        db_path = tmp_path / "test_persistence_workflow.db"
+
+        # First session: create and dismiss
+        store1 = SessionStore(db_path)
+        await store1.initialize()
+
+        session_id = await store1.create_session()
+        topic_id, _ = await store1.find_or_create_topic(
+            label="Persistence Workflow Test",
+            session_id=session_id,
+            topic_type="project"
+        )
+
+        # Create multiple cards
+        card_ids = []
+        for i in range(1, 4):
+            utterance_id = await store1.create_utterance(
+                session_id=session_id,
+                raw_text=f"card {i}",
+            )
+
+            intent_id = await store1.create_intent(
+                utterance_id=utterance_id,
+                session_id=session_id,
+                project_slug="adc",
+                intent_type="task-profile",
+                bead_ref=f"adc-workflow-{i}",
+                topic_id=topic_id,
+            )
+
+            result_id = await store1.create_result(
+                intent_id=intent_id,
+                topic_id=topic_id,
+                session_id=session_id,
+                summary=f"Card {i}",
+                data={"bead_id": f"adc-workflow-{i}"},
+                urgency="high",
+            )
+            card_ids.append((f"adc-workflow-{i}", result_id, intent_id))
+
+        # Verify all cards exist
+        all_results = await get_all_results_for_session(store1, session_id)
+        assert len(all_results) == 3
+
+        # Dismiss card 2
+        await store1.delete_result(card_ids[1][1], session_id)
+
+        # Verify card 2 is gone, others remain
+        verification = await verify_cards_remain_after_dismissal(
+            store1, session_id,
+            dismissed_bead_ids=[card_ids[1][0]],
+            remaining_bead_ids=[card_ids[0][0], card_ids[2][0]]
+        )
+        assert verification["all_correct"]
+
+        # Verify database integrity
+        integrity = await verify_database_integrity_after_dismissal(store1, session_id)
+        assert integrity["all_checks_passed"]
+
+        await store1.close()
+
+        # Second session: verify persistence
+        persistence = await verify_dismissal_persistence_across_reopen(
+            db_path, session_id,
+            result_id=card_ids[1][1],
+            intent_id=card_ids[1][2]
+        )
+        assert persistence["dismissal_persisted"], f"Persistence check failed: {persistence}"
+
+        await store1.close()
