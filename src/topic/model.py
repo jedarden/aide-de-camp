@@ -47,13 +47,21 @@ class Topic:
 class TopicCard:
     """A topic card for the canvas - includes staleness info."""
     topic: Topic
+    result_type: str  # Distinct card type within topic (e.g., 'status:ibkr-mcp', 'lookup:logs:options-pipeline')
     latest_result: Optional[dict] = None
     staleness_seconds: int = 0
     staleness_level: str = "fresh"  # 'fresh', 'stale', 'very_stale'
 
+    @property
+    def card_id(self) -> str:
+        """Unique identifier for this card (topic_id + result_type)."""
+        return f"{self.topic.id}::{self.result_type}"
+
     def to_dict(self) -> dict:
         return {
+            "card_id": self.card_id,
             "topic": self.topic.to_dict(),
+            "result_type": self.result_type,
             "latest_result": self.latest_result,
             "staleness": {
                 "seconds": self.staleness_seconds,
@@ -124,13 +132,29 @@ class TopicManager:
     async def get_active_topic_cards(self, session_id: str) -> list[TopicCard]:
         """
         Get all active topic cards for a session, with staleness info.
+
+        Returns one card per (topic, result_type) pair, enabling granular
+        canvas rendering where different result_types on the same topic
+        coexist (e.g., status + brainstorm cards).
         """
-        topics = await self.store.get_active_topics(session_id)
-        cards = []
+        # Get latest result for each (topic_id, result_type) pair
+        results_by_type = await self.store.get_latest_results_by_type(session_id)
+
+        # Fetch topics for context
+        topics_data = {t["id"]: t for t in await self.store.get_active_topics(session_id)}
 
         now = int(datetime.now().timestamp())
+        cards = []
 
-        for topic_data in topics:
+        for result in results_by_type:
+            topic_id = result["topic_id"]
+            result_type = result["result_type"]
+
+            # Skip if topic not found (shouldn't happen with FK constraints)
+            if topic_id not in topics_data:
+                continue
+
+            topic_data = topics_data[topic_id]
             topic = Topic(
                 id=topic_data["id"],
                 label=topic_data["label"],
@@ -144,10 +168,8 @@ class TopicManager:
                 result_count=topic_data.get("result_count", 0),
             )
 
-            # Get latest result
-            latest_result = await self.store.get_latest_result_for_topic(topic.id)
-            if latest_result:
-                latest_result["data"] = json.loads(latest_result["data"])
+            # Parse result data
+            result["data"] = json.loads(result["data"])
 
             # Calculate staleness
             staleness_seconds = now - topic.last_active
@@ -155,7 +177,8 @@ class TopicManager:
 
             cards.append(TopicCard(
                 topic=topic,
-                latest_result=latest_result,
+                result_type=result_type,
+                latest_result=result,
                 staleness_seconds=staleness_seconds,
                 staleness_level=staleness_level,
             ))
