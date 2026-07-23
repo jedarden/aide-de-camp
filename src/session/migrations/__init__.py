@@ -10,5 +10,6 @@ Each migration file should implement:
 from . import add_result_type
 from . import add_component_usage_patterns
 from . import seed_component_patterns
+from . import add_card_cache
 
-__all__ = ["add_result_type", "add_component_usage_patterns", "seed_component_patterns"]
+__all__ = ["add_result_type", "add_component_usage_patterns", "seed_component_patterns", "add_card_cache"]
