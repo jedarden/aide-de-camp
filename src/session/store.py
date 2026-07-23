@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     id              TEXT PRIMARY KEY,
     created_at      INTEGER NOT NULL,
     last_active     INTEGER NOT NULL,
-    primary_surface_id TEXT
+    primary_surface_id TEXT,
+    reformulation_count INTEGER DEFAULT 0
 );
 
 -- Surfaces: transient windows into sessions
@@ -323,6 +324,9 @@ class SessionStore:
         # Migrate bead_watch.comment_high_water default from 0 to -1
         await SessionStore._migrate_bead_watch_comment_high_water(db)
 
+        # Migrate sessions table to add reformulation_count column
+        await SessionStore._migrate_sessions_reformulation_count(db)
+
         await db.commit()
 
     @staticmethod
@@ -567,6 +571,32 @@ class SessionStore:
             logger.error(f"Failed to migrate bead_watch.comment_high_water: {e}")
             raise
 
+    @staticmethod
+    async def _migrate_sessions_reformulation_count(db: aiosqlite.Connection) -> None:
+        """Migrate sessions table to add reformulation_count column.
+
+        Tracks re-formulation attempts per session to prevent infinite loops.
+        """
+        # Check if migration is needed by inspecting the sessions table schema
+        async with db.execute("PRAGMA table_info(sessions)") as cur:
+            session_cols = {row[1] for row in await cur.fetchall()}
+
+        if "reformulation_count" in session_cols:
+            # Already migrated
+            return
+
+        # Migration needed: add reformulation_count column
+        logger.info("Migrating sessions table to add reformulation_count column")
+
+        try:
+            await db.execute(
+                "ALTER TABLE sessions ADD COLUMN reformulation_count INTEGER DEFAULT 0"
+            )
+            logger.info("Migration complete: sessions.reformulation_count column added")
+        except Exception as e:
+            logger.error(f"Failed to migrate sessions.reformulation_count: {e}")
+            raise
+
     async def close(self) -> None:
         """Close database connection pool."""
         # aiosqlite uses connection-per-context, so just ensure checkpoint
@@ -615,6 +645,53 @@ class SessionStore:
                 (surface_id, session_id)
             )
             await db.commit()
+
+    async def get_reformulation_count(self, session_id: str) -> int:
+        """Get the re-formulation attempt count for a session."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT reformulation_count FROM sessions WHERE id = ?",
+                (session_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return row["reformulation_count"] if row["reformulation_count"] else 0
+                return 0
+
+    async def increment_reformulation_count(self, session_id: str) -> int:
+        """Increment the re-formulation attempt count for a session.
+
+        Returns the new count.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            # First get current count
+            current_count = await self.get_reformulation_count(session_id)
+            new_count = current_count + 1
+
+            # Update the count
+            await db.execute(
+                "UPDATE sessions SET reformulation_count = ? WHERE id = ?",
+                (new_count, session_id)
+            )
+            await db.commit()
+
+            logger.info(f"Incremented reformulation_count for session {session_id} to {new_count}")
+            return new_count
+
+    async def reset_reformulation_count(self, session_id: str) -> None:
+        """Reset the re-formulation attempt count for a session.
+
+        Called when a valid bead is successfully created, allowing the session
+        to attempt re-formulation again for future intents.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE sessions SET reformulation_count = 0 WHERE id = ?",
+                (session_id,)
+            )
+            await db.commit()
+            logger.info(f"Reset reformulation_count for session {session_id}")
 
     async def delete_session(self, session_id: str) -> dict:
         """Delete a session and every row tied to it. Returns a removal summary.
