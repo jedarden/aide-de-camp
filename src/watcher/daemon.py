@@ -18,6 +18,7 @@ from typing import Optional
 
 import aiosqlite
 
+from ..render.hot_path import derive_result_type
 from ..session.store import (
     SessionStore,
     CIRCUIT_BREAKER_REFUSAL_THRESHOLD,
@@ -683,6 +684,16 @@ class BeadWatcher:
             "action_hint": "Review the bead and provide the missing information or context needed to proceed.",
         }
 
+        # Fetch intent for result_type derivation
+        intent = await self.store.get_intent(intent_id)
+
+        # Derive result_type from intent data
+        result_type = derive_result_type(
+            intent_type=intent.get("intent_type") if intent else None,
+            project_slug=intent.get("project_slug") if intent else None,
+            lookup_kind=intent.get("lookup_kind") if intent else None,
+        )
+
         # Create result
         result_id = await self.store.create_result(
             intent_id=intent_id,
@@ -691,6 +702,7 @@ class BeadWatcher:
             summary=summary,
             data=data,
             urgency="high",  # Stuck tasks are high urgency
+            result_type=result_type,
         )
 
         logger.info(f"Created stuck card {result_id} for bead {bead_ref}")
@@ -1000,6 +1012,13 @@ class BeadWatcher:
         data = result.get("data", {})
         urgency = result.get("urgency", "normal")
 
+        # Derive result_type from intent data
+        result_type = derive_result_type(
+            intent_type=intent.get("intent_type"),
+            project_slug=intent.get("project_slug"),
+            lookup_kind=intent.get("lookup_kind"),
+        )
+
         try:
             result_id = await self.store.create_result(
                 intent_id=intent_id,
@@ -1008,6 +1027,7 @@ class BeadWatcher:
                 summary=summary,
                 data=data,
                 urgency=urgency,
+                result_type=result_type,
             )
             logger.debug(f"Created result {result_id} for bead {bead_id}")
         except Exception as e:
@@ -1443,6 +1463,9 @@ class BeadWatcher:
                 previous_state=cached_context,
             )
 
+            # Derive result_type from monitoring intent type per plan §10
+            result_type = derive_result_type(intent_type="monitoring", project_slug=project_slug)
+
             # Write result with intent_id=NULL (plan §10: monitoring-originated results)
             result_id = await self.store.create_result(
                 intent_id=None,  # NULL for monitoring-originated results
@@ -1451,7 +1474,7 @@ class BeadWatcher:
                 summary=summary,
                 data=result_data,
                 urgency=urgency,
-                result_type=f"monitoring:{project_slug}",  # Monitoring result type
+                result_type=result_type,
             )
 
             logger.info(f"Created monitoring result {result_id} for topic {topic_id} (intent_id=NULL)")

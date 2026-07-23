@@ -19,6 +19,7 @@ from ..components.hot_reload import get_reload_manager
 from ..escalate.handler import EscalateRequest, escalate_intent
 from ..escalate.llm import get_zai_client, ModelClass
 from ..instrument.timings import DispatchTimings
+from ..render.hot_path import derive_result_type
 from ..session.store import get_store
 from ..fetch.commands import FetchRequest, FetchContext, IntentType as FetchIntentType, get_fetch_commands
 from ..fetch.orchestrator import execute_fetch
@@ -480,6 +481,14 @@ class IntentRouter:
                 session_id=routed_intent.session_id,
             )
             await store.link_intent_to_topic(routed_intent.intent_id, topic_id)
+
+            # Derive result_type from intent classification
+            result_type = derive_result_type(
+                intent_type=classification.intent_type.value,
+                project_slug=classification.project_slug,
+                lookup_kind=None,  # Not populated in current classification
+            )
+
             result_id = await store.create_result(
                 intent_id=routed_intent.intent_id,
                 topic_id=topic_id,
@@ -487,6 +496,7 @@ class IntentRouter:
                 summary=synthesize_result.summary,
                 data=synthesize_result.data,
                 urgency=synthesize_result.urgency.value,
+                result_type=result_type,
             )
 
             return {
@@ -676,6 +686,13 @@ class IntentRouter:
                 "fence_detected_during": "intent_routing",
             }
 
+            # Derive result_type from original intent classification (not "stuck" state)
+            result_type = derive_result_type(
+                intent_type=routed_intent.classification.intent_type.value,
+                project_slug=routed_intent.classification.project_slug,
+                lookup_kind=None,  # Not populated in current classification
+            )
+
             result_id = await store.create_result(
                 intent_id=routed_intent.intent_id,
                 topic_id=topic_id,
@@ -683,6 +700,7 @@ class IntentRouter:
                 summary=summary,
                 data=data,
                 urgency="high",
+                result_type=result_type,
             )
 
             logger.info(f"Created stuck card {result_id} for fenced bead {bead_id}")

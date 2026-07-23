@@ -21,6 +21,7 @@ from ..session.store import SessionStore, get_store
 from ..fetch.orchestrator import get_fetch_strand, execute_fetch, FetchRequest
 from ..fetch.commands import FetchContext, FetchSource, IntentType
 from ..sse.broadcaster import get_broadcaster, SSEEvent, broadcast_result
+from ..render.hot_path import derive_result_type
 
 
 logger = getLogger(__name__)
@@ -387,8 +388,10 @@ class AmbientMonitor:
             "notification_threshold": rule.notification_threshold,
         }
 
+        # Derive result_type from monitoring intent type per plan §10
+        result_type = derive_result_type(intent_type="monitoring", project_slug=rule.project_slug)
+
         # Write result with intent_id=NULL (system-originated, no utterance behind it)
-        # result_type is 'monitoring:{project_slug}' per plan §10
         result_id = await self._store.create_result(
             intent_id=None,  # NULL for monitoring-originated results
             topic_id=topic_id,
@@ -396,7 +399,7 @@ class AmbientMonitor:
             summary=self._generate_summary(rule, current_state, previous_state, changes_dict),
             data=result_data,
             urgency=rule.urgency,
-            result_type=f"monitoring:{rule.project_slug}",  # Monitoring result type
+            result_type=result_type,
         )
 
         logger.info(f"Created monitoring result {result_id} for topic {rule.topic_id} (intent_id=NULL)")
@@ -411,7 +414,7 @@ class AmbientMonitor:
             "summary": self._generate_summary(rule, current_state, previous_state, changes_dict),
             "data": result_data,
             "urgency": rule.urgency,
-            "result_type": f"monitoring:{rule.project_slug}",
+            "result_type": result_type,
             "created_at": int(datetime.now(timezone.utc).timestamp()),
         }
 
