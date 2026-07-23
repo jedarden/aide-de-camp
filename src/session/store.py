@@ -1270,6 +1270,39 @@ class SessionStore:
                 row = await cursor.fetchone()
                 return dict(row) if row else None
 
+    async def get_latest_results_by_type(
+        self, session_id: str
+    ) -> list[dict]:
+        """
+        Get the latest result for each (topic_id, result_type) pair in a session.
+
+        Returns one result per distinct result_type per topic, enabling
+        granular canvas rendering where different result_types on the same
+        topic coexist (e.g., status + brainstorm cards).
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT ranked.* FROM (
+                    SELECT r.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY r.topic_id, r.result_type
+                            ORDER BY r.created_at DESC
+                        ) as rn
+                    FROM results r
+                    JOIN topics t ON r.topic_id = t.id
+                    WHERE (t.session_id = ? OR t.scope IN ('cross-session', 'global'))
+                      AND t.archived_at IS NULL
+                ) ranked
+                WHERE rn = 1
+                ORDER BY
+                    ranked.topic_id,
+                    ranked.created_at DESC""",
+                (session_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
     async def link_intent_to_topic(self, intent_id: str, topic_id: str) -> None:
         """Link an intent to a topic (many-to-many)."""
         async with aiosqlite.connect(self.db_path) as db:
