@@ -62,6 +62,12 @@ function getStalenessLevel(seconds) {
     return 'very-stale';
 }
 
+/**
+ * Build a topic card from topic data.
+ *
+ * @param {TopicCardData} cardData - Topic card data structure
+ * @returns {HTMLElement} a .topic-card element
+ */
 function createTopicCard(cardData) {
     const topic = cardData.topic;
     const staleness = cardData.staleness;
@@ -487,7 +493,7 @@ function _normalizeVariant(errorType) {
 /**
  * Build an error/clarification card from an SSE error event payload.
  *
- * @param {object} data  {error_type, utterance, detail, sources, data, intent_id, pending_id}
+ * @param {ErrorCardData} data - Error card data structure
  * @returns {HTMLElement} a .error-card element (data-builtin="error")
  *
  * Per-source failure lists, the echoed utterance, raw degraded data, and any
@@ -566,6 +572,74 @@ function createErrorCard(data) {
 }
 
 // ---------------------------------------------------------------------------
+// Canvas Card Type Definitions
+// ---------------------------------------------------------------------------
+
+/**
+ * @typedef {Object} StuckCardData
+ * @property {string} bead_id - The bead reference ID that is stuck
+ * @property {string} stuck_reason - The reason why the bead is stuck (refusal reason)
+ * @property {number} [refusal_count] - Number of refusals that caused the stuck state
+ * @property {string} [message] - Optional message describing the stuck state
+ * @property {string} [action_hint] - Optional hint for user action to resolve
+ */
+
+/**
+ * @typedef {Object} FailedCardData
+ * @property {string} bead_id - The bead reference ID that failed
+ * @property {string} failure_reason - The reason why the task failed
+ * @property {string} [error_type] - Optional error type/category
+ * @property {string} [message] - Optional message describing the failure
+ */
+
+/**
+ * @typedef {Object} ErrorCardData
+ * @property {string} error_type - The error variant type
+ * @property {string} [utterance] - The original user utterance
+ * @property {string} [detail] - Error detail message
+ * @property {Array<{name?: string, source?: string, reason?: string, error?: string}>} [sources] - Failed sources list
+ * @property {*} [data] - Raw degraded data
+ * @property {string} [intent_id] - Associated intent ID
+ * @property {string} [pending_id] - Associated pending ID
+ * @property {Array<string|{slug?: string, name?: string}>} [registered_projects] - Projects for no-match variant
+ */
+
+/**
+ * @typedef {Object} PendingCardData
+ * @property {string} utterance - The utterance being processed
+ * @property {number} createdAt - Creation timestamp (ms epoch)
+ * @property {string} [pendingId] - Stable ID for this placeholder
+ * @property {number} [completed] - Number of completed sources (for progress)
+ * @property {number} [total] - Total number of sources (for progress)
+ */
+
+/**
+ * @typedef {Object} TopicCardData
+ * @property {Object} topic - The topic object
+ * @property {string} topic.id - Topic ID
+ * @property {string} topic.label - Topic label
+ * @property {string} [topic.type] - Topic type (project, research, personal, exception, compound)
+ * @property {Object} staleness - Staleness info
+ * @property {number} staleness.seconds - Seconds since last update
+ * @property {Object} [latest_result] - Optional latest result
+ * @property {string} latest_result.summary - Result summary
+ * @property {string} [latest_result.urgency] - Result urgency (critical, high, normal, low)
+ * @property {*} [latest_result.data] - Result data
+ */
+
+/**
+ * @typedef {Object} FallbackCardData
+ * @property {string} [summary] - Result summary
+ * @property {*} [data] - Result data
+ * @property {string} [urgency] - Result urgency
+ */
+
+/**
+ * @typedef {StuckCardData | FailedCardData | ErrorCardData | PendingCardData | TopicCardData | FallbackCardData} CardData
+ * Union type for all card data structures
+ */
+
+// ---------------------------------------------------------------------------
 // (5) Stuck/Failed cards — circuit breaker and terminal failure cards
 // ---------------------------------------------------------------------------
 
@@ -575,7 +649,7 @@ function createErrorCard(data) {
  * Plan §10 The Async Path: displayed when a bead is fenced due to repeated
  * refusals or timeout. Shows the bead reference, refusal count, and latest reason.
  *
- * @param {object} data  {bead_id, stuck_reason, refusal_count, message, action_hint}
+ * @param {StuckCardData} data - Stuck card data structure
  * @returns {HTMLElement} a .stuck-card element (data-builtin="stuck")
  */
 function createStuckCard(data) {
@@ -633,7 +707,7 @@ function createStuckCard(data) {
  * Plan §10 The Async Path: displayed when an intent fails non-recoverably
  * (worker crash, invalid input, etc.). Shows failure reason and context.
  *
- * @param {object} data  {bead_id, failure_reason, error_type, message}
+ * @param {FailedCardData} data - Failed card data structure
  * @returns {HTMLElement} a .failed-card element (data-builtin="failed")
  */
 function createFailedCard(data) {
@@ -685,7 +759,7 @@ function createFailedCard(data) {
  * over result.data plus the summary line — every value escaped per the
  * rendering escaping contract.
  *
- * @param {object} result  {summary, data, urgency}
+ * @param {FallbackCardData} result - Fallback card data structure
  * @returns {HTMLElement} a .fallback-card element (data-builtin="fallback")
  */
 function createFallbackCard(result) {
@@ -771,6 +845,16 @@ if (typeof module !== 'undefined' && module.exports) {
         PENDING_AGE_THRESHOLD_MS: PENDING_AGE_THRESHOLD_MS,
         _setProgress: _setProgress,  // Also export internal helper
         _normalizeVariant: _normalizeVariant,  // Also export for testing
+        // Type definitions (for documentation and IDE autocomplete)
+        types: {
+            StuckCardData: 'StuckCardData',
+            FailedCardData: 'FailedCardData',
+            ErrorCardData: 'ErrorCardData',
+            PendingCardData: 'PendingCardData',
+            TopicCardData: 'TopicCardData',
+            FallbackCardData: 'FallbackCardData',
+            CardData: 'CardData'  // Union type
+        }
     };
 }
 
@@ -782,4 +866,14 @@ if (typeof window !== 'undefined') {
     window.createErrorCard = createErrorCard;  // Error card renderer for SSE error events
     window.createStuckCard = createStuckCard;  // Stuck card renderer for task_stuck events
     window.createFailedCard = createFailedCard;  // Failed card renderer for task_failed events
+    // Expose type definitions for IDE autocomplete and documentation
+    window.CanvasCardTypes = {
+        StuckCardData: 'StuckCardData',
+        FailedCardData: 'FailedCardData',
+        ErrorCardData: 'ErrorCardData',
+        PendingCardData: 'PendingCardData',
+        TopicCardData: 'TopicCardData',
+        FallbackCardData: 'FallbackCardData',
+        CardData: 'CardData'  // Union type
+    };
 }
