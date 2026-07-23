@@ -16,6 +16,9 @@ class IntentType(Enum):
     ACTION = "action"
     BRAINSTORM = "brainstorm"
     LOOKUP = "lookup"
+    LOOKUP_LOGS = "lookup:logs"  # Lookup intent with lookup_kind=logs
+    LOOKUP_CONFIG = "lookup:config"  # Lookup intent with lookup_kind=config
+    LOOKUP_DOCS = "lookup:docs"  # Lookup intent with lookup_kind=docs
     REMINDER = "reminder"
     SELF_MODIFICATION = "self-modification"
     MONITORING_CONFIG = "monitoring-config"
@@ -239,6 +242,95 @@ FETCH_COMMAND_MATRIX: dict[IntentType, list[FetchCommandSpec]] = {
             source=FetchSource.KUBECTL_PODS,
             command_template="kubectl --server={proxy} get pods -n {namespace} -o json",
             timeout_seconds=5,
+            required=False,
+            cacheable=True,
+        ),
+    ],
+
+    # LOOKUP_LOGS: Recent log output and related diagnostics
+    IntentType.LOOKUP_LOGS: [
+        FetchCommandSpec(
+            source=FetchSource.LOGS,
+            command_template="kubectl --server={proxy} logs -n {namespace} {pod_name} --tail=100",
+            timeout_seconds=10,
+            required=False,
+            cacheable=False,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.EVENTS,
+            command_template="kubectl --server={proxy} get events -n {namespace} --sort-by='.lastTimestamp'",
+            timeout_seconds=5,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.KUBECTL_PODS,
+            command_template="kubectl --server={proxy} get pods -n {namespace} -o json",
+            timeout_seconds=5,
+            required=False,
+            cacheable=True,
+        ),
+    ],
+
+    # LOOKUP_CONFIG: Configuration and deployment state
+    IntentType.LOOKUP_CONFIG: [
+        FetchCommandSpec(
+            source=FetchSource.ARGOCD_APP,
+            command_template="curl -s {argocd_proxy}/api/v1/applications/{app_name}",
+            timeout_seconds=5,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.KUBECTL_DEPLOYMENTS,
+            command_template="kubectl --server={proxy} get deployment -n {namespace} -o json",
+            timeout_seconds=5,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.KUBECTL_PODS,
+            command_template="kubectl --server={proxy} get pods -n {namespace} -o json",
+            timeout_seconds=5,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.GIT_LOG,
+            command_template="git -C {repo_path} log -10 --oneline --pretty=format:'%h|%s|%an|%ar'",
+            timeout_seconds=3,
+            required=False,
+            cacheable=True,
+        ),
+    ],
+
+    # LOOKUP_DOCS: Documentation and project overview
+    IntentType.LOOKUP_DOCS: [
+        FetchCommandSpec(
+            source=FetchSource.FS_HOME,
+            command_template="ls /home/coding",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.FS_EXPLORE,
+            command_template="ls {repo_path}",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.FS_README,
+            command_template="cat {repo_path}/README.md",
+            timeout_seconds=2,
+            required=False,
+            cacheable=True,
+        ),
+        FetchCommandSpec(
+            source=FetchSource.GIT_LOG,
+            command_template="git -C {repo_path} log -5 --oneline --pretty=format:'%h|%s|%an|%ar'",
+            timeout_seconds=3,
             required=False,
             cacheable=True,
         ),

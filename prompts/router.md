@@ -21,6 +21,7 @@ Return a JSON array of intent objects:
     "project_slug": "project-id or null",
     "urgency": "critical|high|normal|low",
     "utterance_fragment": "the specific fragment this intent covers",
+    "lookup_kind": "logs|config|docs",  // lookup intents only: which information to fetch. defaults to "docs" when not specified
     "confidence": 0.0-1.0,
     "reasoning": "brief explanation of classification"
   }
@@ -32,7 +33,10 @@ Return a JSON array of intent objects:
 - **status**: Query current state (pods, pipelines, deployments, beads)
 - **action**: Execute a command (deploy, restart, create)
 - **brainstorm**: Explore options, design, architecture discussion
-- **lookup**: Find specific information (logs, configs, docs)
+- **lookup**: Find specific information. Every lookup thread MUST include a `lookup_kind` field:
+  - `"logs"`: Recent log output, pod logs, error messages
+  - `"config"`: Configuration files, deployments, env vars, ArgoCD app state
+  - `"docs"`: Documentation, README files, project overview (default when unspecified)
 - **reminder**: Set or query reminders
 - **self-modification**: Instructions to improve the interface itself
 - **monitoring-config**: Configure ambient monitoring rules
