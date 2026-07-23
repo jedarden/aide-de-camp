@@ -1593,6 +1593,31 @@ class SessionStore:
             )
             await db.commit()
 
+    async def get_fenced_beads_for_session(self, session_id: str) -> list[dict]:
+        """Get all fenced beads for a session.
+
+        Returns bead_watch rows where fenced_at IS NOT NULL and the bead
+        is associated with an intent from the given session.
+
+        Args:
+            session_id: The session ID to filter by
+
+        Returns:
+            List of fenced bead_watch rows with intent context
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT bw.*, i.id as intent_id, i.topic_id, i.project_slug
+                   FROM bead_watch bw
+                   INNER JOIN intents i ON i.bead_ref = bw.bead_ref
+                   WHERE i.session_id = ? AND bw.fenced_at IS NOT NULL
+                   ORDER BY bw.fenced_at DESC""",
+                (session_id,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
 
 # Global session store instance
 _store: SessionStore | None = None
