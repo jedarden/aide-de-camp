@@ -502,3 +502,102 @@ class TestCircuitBreakerIntegration:
         stuck_card = results[-1]
         assert "stuck" in stuck_card["summary"].lower()
         assert stuck_card["urgency"] == "high"
+
+    async def test_sse_fence_event_broadcast(self, store, router, watcher, monkeypatch):
+        """Verify SSE event broadcast when bead is fenced.
+
+        Acceptance criteria:
+        - SSE event broadcast on fence (event_type: 'task_stuck')
+        - Event includes: bead_id, refusal_reason, timestamp
+        - Broadcast triggered when bead_watch.last_refusal_reason is set
+        - Target surface_id for the originating session
+        """
+        from src.sse.broadcaster import get_broadcaster, SSEEvent, EventType
+
+        bead_ref = "adc-sse-test"
+        session_id = "session-sse"
+        topic_id = "topic-sse"
+        origin_surface_id = "surface-origin"
+
+        # Create a real intent in the store
+        intent_id = await store.create_intent(
+            utterance_id="utterance-sse",
+            session_id=session_id,
+            project_slug="test-project",
+            intent_type="task-profile",
+            bead_ref=bead_ref,
+            topic_id=topic_id,
+        )
+
+        # Create bead_watch row
+        await store.create_bead_watch(bead_ref=bead_ref)
+
+        # Mock get_open_watched_beads to return only our test bead
+        async def fake_get_open_watched():
+            row = await store.get_bead_watch(bead_ref)
+            if row:
+                return [row]
+            return []
+
+        store.get_open_watched_beads = fake_get_open_watched
+
+        # Mock bf show to return 3 refusals AND origin_surface_id in labels
+        async def fake_show(bref):
+            if bref == bead_ref:
+                return {
+                    "id": bref,
+                    "labels": [f"origin_surface_id={origin_surface_id}"],
+                    "comments": [
+                        {"body": "REFUSED: Reason 1", "created_at": "2026-07-22T10:00:00Z"},
+                        {"body": "REFUSED: Reason 2", "created_at": "2026-07-22T11:00:00Z"},
+                        {"body": "REFUSED: Reason 3", "created_at": "2026-07-22T12:00:00Z"},
+                    ],
+                }
+            return None
+
+        watcher._run_bf_show = fake_show
+
+        # Mock bf update --status blocked
+        async def fake_update(bref, status):
+            pass
+
+        watcher._run_bf_update_status = fake_update
+
+        # Mock broadcaster to capture the event
+        broadcast_events = []
+        broadcaster = get_broadcaster()
+
+        original_broadcast = broadcaster.broadcast
+
+        async def mock_broadcast(event):
+            broadcast_events.append(event)
+            return await original_broadcast(event)
+
+        broadcaster.broadcast = mock_broadcast
+
+        # Run circuit breaker check
+        await watcher._check_circuit_breaker()
+
+        # Verify SSE event was broadcast
+        assert len(broadcast_events) >= 1, "Expected at least one SSE event broadcast"
+
+        # Find the TASK_STUCK event
+        task_stuck_events = [e for e in broadcast_events if e.event_type == EventType.TASK_STUCK]
+        assert len(task_stuck_events) == 1, "Expected exactly one TASK_STUCK event"
+
+        event = task_stuck_events[0]
+
+        # Verify event data includes required fields
+        assert event.data["bead_id"] == bead_ref
+        assert "stuck_reason" in event.data
+        assert event.data["stuck_reason"] == "Reason 3"  # Most recent refusal
+        assert "timestamp" in event.data
+        assert event.data["timestamp"] > 0
+
+        # Verify event targets correct session and surface
+        assert event.target_session_id == session_id
+        assert event.target_surface_id == origin_surface_id
+
+        # Verify bead was fenced
+        row = await store.get_bead_watch(bead_ref)
+        assert row["fenced_at"] is not None

@@ -548,7 +548,14 @@ class BeadWatcher:
         """
         logger.info(f"Fencing bead {bead_ref} (refusals: {refusal_count})")
 
-        # Step 1: Run bf update --status blocked
+        # Step 1: Fetch bead details to get origin_surface_id
+        bead_details = await self._run_bf_show(bead_ref)
+        origin_surface_id = None
+        if bead_details:
+            metadata = self._extract_metadata(bead_details)
+            origin_surface_id = metadata.get("origin_surface_id")
+
+        # Step 2: Run bf update --status blocked
         try:
             await self._run_bf_update_status(bead_ref, "blocked")
             logger.info(f"Set bead {bead_ref} to blocked status")
@@ -556,10 +563,10 @@ class BeadWatcher:
             logger.error(f"Failed to block bead {bead_ref}: {e}")
             # Continue to intent update even if bf fails
 
-        # Step 2: Mark fenced in bead_watch
+        # Step 3: Mark fenced in bead_watch
         await self.store.fence_bead(bead_ref)
 
-        # Step 3: Find intent and set status to 'stuck'
+        # Step 4: Find intent and set status to 'stuck'
         intent = await self.store.get_intent_by_bead_ref(bead_ref)
 
         if not intent:
@@ -574,11 +581,11 @@ class BeadWatcher:
             logger.warning(f"Intent {intent_id} has no topic_id; cannot create stuck card")
             return
 
-        # Step 4: Update intent status to 'stuck'
+        # Step 5: Update intent status to 'stuck'
         await self.store.update_intent_status(intent_id, "stuck")
         logger.info(f"Set intent {intent_id} to stuck status")
 
-        # Step 5: Broadcast task_stuck event via SSE
+        # Step 6: Broadcast task_stuck event via SSE
         broadcaster = get_broadcaster()
         await broadcaster.broadcast(
             SSEEvent(
@@ -593,6 +600,7 @@ class BeadWatcher:
                     "timestamp": int(datetime.now().timestamp()),
                 },
                 target_session_id=session_id,
+                target_surface_id=origin_surface_id,
             )
         )
 

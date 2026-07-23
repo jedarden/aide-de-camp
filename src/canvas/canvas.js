@@ -566,6 +566,116 @@ function createErrorCard(data) {
 }
 
 // ---------------------------------------------------------------------------
+// (5) Stuck/Failed cards — circuit breaker and terminal failure cards
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a stuck card for a fenced bead.
+ *
+ * Plan §10 The Async Path: displayed when a bead is fenced due to repeated
+ * refusals or timeout. Shows the bead reference, refusal count, and latest reason.
+ *
+ * @param {object} data  {bead_id, stuck_reason, refusal_count, message, action_hint}
+ * @returns {HTMLElement} a .stuck-card element (data-builtin="stuck")
+ */
+function createStuckCard(data) {
+    data = data || {};
+    const card = el('div', 'builtin-card stuck-card');
+    card.dataset.builtin = 'stuck';
+    if (data.bead_id) card.dataset.beadId = String(data.bead_id);
+
+    card.appendChild(el('div', 'builtin-header', [
+        el('span', 'builtin-icon', ['🚧']),
+        el('span', 'builtin-title', ['Task stuck — needs your input'])
+    ]));
+
+    if (data.message) {
+        card.appendChild(el('p', 'stuck-message', [data.message]));
+    }
+
+    if (data.stuck_reason) {
+        card.appendChild(el('div', 'stuck-reason-wrap', [
+            el('span', 'stuck-reason-label', ['Reason: ']),
+            el('span', 'stuck-reason', [data.stuck_reason])
+        ]));
+    }
+
+    const meta = el('div', 'stuck-meta');
+    if (data.refusal_count != null) {
+        meta.appendChild(el('span', 'stuck-refusal-count', [
+            'Refusals: ' + String(data.refusal_count)
+        ]));
+    }
+    if (data.bead_id) {
+        if (meta.children.length > 0) {
+            meta.appendChild(document.createTextNode(' • '));
+        }
+        meta.appendChild(el('span', 'stuck-bead-id', ['Bead: ' + data.bead_id]));
+    }
+    if (meta.children.length > 0) {
+        card.appendChild(meta);
+    }
+
+    if (data.action_hint) {
+        card.appendChild(el('p', 'stuck-action-hint', [data.action_hint]));
+    }
+
+    // View bead button
+    const viewBtn = el('button', 'stuck-view-bead', ['View bead']);
+    card.appendChild(viewBtn);
+
+    return card;
+}
+
+/**
+ * Build a failed card for a terminal failure.
+ *
+ * Plan §10 The Async Path: displayed when an intent fails non-recoverably
+ * (worker crash, invalid input, etc.). Shows failure reason and context.
+ *
+ * @param {object} data  {bead_id, failure_reason, error_type, message}
+ * @returns {HTMLElement} a .failed-card element (data-builtin="failed")
+ */
+function createFailedCard(data) {
+    data = data || {};
+    const card = el('div', 'builtin-card failed-card');
+    card.dataset.builtin = 'failed';
+    if (data.bead_id) card.dataset.beadId = String(data.bead_id);
+
+    card.appendChild(el('div', 'builtin-header', [
+        el('span', 'builtin-icon', ['❌']),
+        el('span', 'builtin-title', ['Task failed'])
+    ]));
+
+    if (data.message) {
+        card.appendChild(el('p', 'failed-message', [data.message]));
+    }
+
+    if (data.failure_reason) {
+        card.appendChild(el('div', 'failed-reason-wrap', [
+            el('span', 'failed-reason-label', ['Reason: ']),
+            el('span', 'failed-reason', [data.failure_reason])
+        ]));
+    }
+
+    if (data.error_type) {
+        card.appendChild(el('div', 'failed-error-type', [
+            'Error type: ' + data.error_type
+        ]));
+    }
+
+    if (data.bead_id) {
+        card.appendChild(el('div', 'failed-bead-id', ['Bead: ' + data.bead_id]));
+    }
+
+    // Retry button
+    const retryBtn = el('button', 'failed-retry', ['Retry']);
+    card.appendChild(retryBtn);
+
+    return card;
+}
+
+// ---------------------------------------------------------------------------
 // (1) Generic fallback card — key/value grid over result.data + summary
 // ---------------------------------------------------------------------------
 
@@ -654,6 +764,8 @@ if (typeof module !== 'undefined' && module.exports) {
         setPendingProgress: _setProgress,
         createErrorCard: createErrorCard,
         createFallbackCard: createFallbackCard,
+        createStuckCard: createStuckCard,
+        createFailedCard: createFailedCard,
         normalizeErrorVariant: _normalizeVariant,
         deriveExamples: _deriveExamples,
         PENDING_AGE_THRESHOLD_MS: PENDING_AGE_THRESHOLD_MS,
@@ -668,4 +780,6 @@ if (typeof window !== 'undefined') {
     window._setProgress = _setProgress;
     window.el = el;  // DOM helper for pending cards
     window.createErrorCard = createErrorCard;  // Error card renderer for SSE error events
+    window.createStuckCard = createStuckCard;  // Stuck card renderer for task_stuck events
+    window.createFailedCard = createFailedCard;  // Failed card renderer for task_failed events
 }

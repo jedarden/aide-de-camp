@@ -316,6 +316,10 @@ class EventType:
     BEAD_CLOSED = "bead_closed"
     BEAD_FAILED = "bead_failed"
 
+    # Circuit breaker events
+    TASK_STUCK = "task_stuck"
+    TASK_FAILED = "task_failed"
+
 
 async def broadcast_result(
     result: dict,
