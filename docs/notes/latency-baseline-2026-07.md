@@ -22,10 +22,10 @@
 
 | Metric | Budget | Measured | Status | Over Budget |
 |--------|--------|----------|--------|-------------|
-| p50 | 500ms | **2,651ms** | ❌ FAIL | 5.3× |
-| p95 | 1,500ms | **6,441ms** | ❌ FAIL | 4.3× |
+| p50 | 500ms | **2,642ms** | ❌ FAIL | 5.3× |
+| p95 | 1,500ms | **6,437ms** | ❌ FAIL | 4.3× |
 
-**Data Source:** Live server `/api/v1/timings/percentiles` endpoint (611 samples)
+**Data Source:** Live server `/api/v1/timings/percentiles` endpoint (649 samples)
 
 ---
 
