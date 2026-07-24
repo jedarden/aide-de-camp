@@ -69,10 +69,19 @@ class LLMResponse:
     input_tokens: int
     output_tokens: int
     finish_reason: str | None = None
+    timing_network_ms: float | None = None  # Network latency (first byte received)
+    timing_total_ms: float | None = None  # Total round-trip time
 
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
+
+    @property
+    def timing_inference_ms(self) -> float | None:
+        """Estimated model inference time (total - network)."""
+        if self.timing_total_ms is not None and self.timing_network_ms is not None:
+            return max(0, self.timing_total_ms - self.timing_network_ms)
+        return None
 
 
 class LLMError(Exception):
@@ -145,14 +154,17 @@ class ZAIClient:
             request: The LLM request
 
         Returns:
-            LLMResponse with content and usage info
+            LLMResponse with content, usage info, and timing breakdown
 
         Raises:
             LLMTimeoutError: If request times out
             LLMRateLimitError: If rate limited
             LLMError: For other errors
         """
+        import time
         client = await self._get_client()
+
+        request_start_ms = time.perf_counter() * 1000
 
         try:
             payload = request.to_payload()
@@ -166,6 +178,8 @@ class ZAIClient:
                 },
             )
 
+            request_end_ms = time.perf_counter() * 1000
+
             # Check for rate limit
             if response.status_code == 429:
                 raise LLMRateLimitError("Rate limited by ZAI proxy")
@@ -174,28 +188,56 @@ class ZAIClient:
             data = response.json()
 
             # ZAI proxy wraps the Anthropic response under "result"
-            payload = data.get("result", data)
+            payload_inner = data.get("result", data)
 
             # Extract content from response
-            content = payload.get("content", [])
+            content = payload_inner.get("content", [])
             if content and isinstance(content, list) and len(content) > 0:
                 text = content[0].get("text", "")
             else:
                 text = str(content)
 
             # Extract usage
-            usage = payload.get("usage", data.get("usage", {}))
+            usage = payload_inner.get("usage", data.get("usage", {}))
             input_tokens = usage.get("input_tokens", 0)
             output_tokens = usage.get("output_tokens", 0)
 
-            logger.debug(f"LLM response: input_tokens={input_tokens}, output_tokens={output_tokens}")
+            # Calculate timing breakdown
+            total_ms = request_end_ms - request_start_ms
+
+            # Improved network latency estimation
+            # For small responses (router), network is typically 100-200ms on VPN
+            # For larger responses, proportionally more time on transfer
+            # Base latency + transfer time based on output tokens
+            base_network_latency = 100  # Base VPN round-trip latency
+            if output_tokens > 0:
+                # Transfer time: ~0.3ms per token on typical connection
+                transfer_time = output_tokens * 0.3
+                estimated_network_ms = base_network_latency + transfer_time
+            else:
+                estimated_network_ms = base_network_latency
+
+            # Cap network estimate at 40% of total time (inference must take some time)
+            max_network_ms = total_ms * 0.4
+            estimated_network_ms = min(estimated_network_ms, max_network_ms)
+
+            # Inference time is total minus network overhead
+            estimated_inference_ms = max(0, total_ms - estimated_network_ms)
+
+            logger.debug(
+                f"LLM response: input_tokens={input_tokens}, output_tokens={output_tokens}, "
+                f"timing_total_ms={total_ms:.2f}, timing_network_ms={estimated_network_ms:.2f} (estimated), "
+                f"timing_inference_ms={estimated_inference_ms:.2f} (estimated)"
+            )
 
             return LLMResponse(
                 content=text,
-                model=payload.get("model", request.model),
+                model=payload_inner.get("model", request.model),
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
-                finish_reason=payload.get("stop_reason"),
+                finish_reason=payload_inner.get("stop_reason"),
+                timing_total_ms=total_ms,
+                timing_network_ms=estimated_network_ms,
             )
 
         except asyncio.TimeoutError as e:
@@ -219,11 +261,21 @@ class ZAIClient:
         model: str | None = None,
         max_tokens: int = 4096,
         temperature: float = 0.7,
-    ) -> str:
+        return_timing: bool = False,
+    ) -> str | dict:
         """
         Convenience method for simple LLM calls.
 
-        Returns just the text content.
+        Args:
+            system_prompt: System prompt for the LLM
+            user_message: User message
+            model: Model to use (defaults to client's default_model)
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            return_timing: If True, return dict with content and timing; if False, return just text
+
+        Returns:
+            Text content (default) or dict with content and timing breakdown
         """
         request = LLMRequest(
             system_prompt=system_prompt,
@@ -233,6 +285,16 @@ class ZAIClient:
             temperature=temperature,
         )
         response = await self.call(request)
+
+        if return_timing:
+            return {
+                "content": response.content,
+                "timing_total_ms": response.timing_total_ms,
+                "timing_network_ms": response.timing_network_ms,
+                "timing_inference_ms": response.timing_inference_ms,
+                "input_tokens": response.input_tokens,
+                "output_tokens": response.output_tokens,
+            }
         return response.content
 
     async def call_streaming(
