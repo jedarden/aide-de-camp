@@ -50,7 +50,7 @@ The <3s promise is the product's central claim, so it gets a budget, instrumenta
 | Stage | Target (ESTIMATE) | Measured p50 | Measured p95 |
 |-------|-------------------|--------------|--------------|
 | STT final transcript (Web Speech API) | ~300ms | *Not measured* (client-side) | *Not measured* (client-side) |
-| Intent Router (haiku-class via ZAI proxy) | ~500ms | **1,587-2,074ms** ❌ | **2,527-4,301ms** ❌ |
+| Intent Router (haiku-class via ZAI proxy) | ~500ms | **2,808ms** ❌ (Jul 24) | **5,558ms** ❌ (Jul 24) |
 | Fetch — first source returns (surfaces as a per-source progress state on the pending card) | ~500ms | **0-16ms** ✅ | **0-21ms** ✅ |
 | Fetch — window closes (all sources resolved or timed out; gates synthesize start — see Fetch Strand) | ~1s | **0-51ms** ✅ | **0-191ms** ✅ |
 | Synthesize — first token (sonnet-class via ZAI proxy; starts at fetch-window close) | ~1s (cap set by the e2e gate — see internal-consistency note) | *Not measured* (instrumentation gap) | *Not measured* (instrumentation gap) |
@@ -65,7 +65,9 @@ The <3s promise is the product's central claim, so it gets a budget, instrumenta
 
 **Instrumentation requirement.** The server records per-stage timings for every dispatch — `router_ms`, `fetch_first_source_ms`, `fetch_total_ms` (fetch-window close), `synthesize_first_token_ms`, `synthesize_total_ms`, `escalate_ms` (task-profile dispatches: formulation + validation + `bf create`), `sse_emit_ms`, plus client-reported STT and first-render timestamps when available — and persists them to the session store's `dispatch_timings` table (schema in Data Model). This is not optional telemetry: it is the only way the Measured columns get filled, and it doubles as the per-step timing log the Phase 5 rehearsal checklist requires.
 
-**Gate.** The demo cannot be scheduled until the Measured p50/p95 columns are filled from real runs (rehearsal timing logs count). If measured p95 blows a stage's budget, either the stage gets fixed or the on-screen promise changes — the recording must not showcase a number the system doesn't hit.
+**Gate.** ❌ **DEMO BLOCKED** — The demo cannot be scheduled until the Measured p50/p95 columns are filled from real runs (rehearsal timing logs count). If measured p95 blows a stage's budget, either the stage gets fixed or the on-screen promise changes — the recording must not showcase a number the system doesn't hit.
+
+**Gate Status (2026-07-24):** Post-optimization verification (adc-1jrkq) shows intent router latency still 5.6× over budget at p50 (2,808ms vs 500ms target). Optimization attempts (adc-1kp7n) resulted in performance degradation rather than improvement. See `docs/notes/latency-baseline-2026-07.md` for detailed analysis.
 
 ### The Async Path
 

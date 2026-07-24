@@ -338,3 +338,80 @@ From the plan:
 
 **Total Runs:** 206 timing records across all shapes  
 **Success Rate:** 100% (all runs completed successfully)
+
+---
+
+## Post-Optimization Verification — 2026-07-24
+
+**Verification Date:** 2026-07-24  
+**Analysis Bead:** adc-1jrkq  
+**Optimization Bead:** adc-1kp7n  
+**Server Version:** 0.22.0 (post-optimization commits 828d3fb, 4dca81f)
+
+### Executive Summary
+
+**❌ DEMO GATE REMAINS BLOCKED** — The intent router optimizations implemented in adc-1kp7n did not achieve the latency budget targets. Performance has actually **degraded** compared to the July 2026 baseline, with p50 latencies 39-84% worse across all test shapes.
+
+### Critical Findings
+
+1. **Performance Degradation:** All three test shapes show worse latencies after optimization
+2. **Budget Target Miss:** Router latency still 5-6× over the 500ms budget (measured p50: 2,808ms)
+3. **Synthesis Failures:** HTTP 500 errors (8 failures in multi-intent, 1 in brainstorm) due to missing import
+4. **Cache Working:** Intent cache functional (100% hit rate on repeated utterances), but not enough to compensate for slow base latency
+
+### Detailed Comparison
+
+| Shape | Metric | Baseline (Jul 2026) | Post-Opt (Jul 24) | Change | Status |
+|-------|--------|-------------------|------------------|---------|---------|
+| Multi-intent | p50 | 2,074ms | 2,887ms | +39% worse | ❌ Degraded |
+| Multi-intent | p95 | 4,301ms | 8,025ms | +87% worse | ❌ Degraded |
+| Lookup | p50 | 1,640ms | 3,022ms | +84% worse | ❌ Degraded |
+| Lookup | p95 | 3,298ms | 4,293ms | +30% worse | ❌ Degraded |
+| Brainstorm | p50 | 1,587ms | 2,478ms | +56% worse | ❌ Degraded |
+| Brainstorm | p95 | 2,527ms | 4,284ms | +70% worse | ❌ Degraded |
+
+### Test Methodology
+
+**Data Collection Period:** 2026-07-24 03:43-03:49 UTC  
+**Total Runs:** 90 (30 runs × 3 shapes)  
+**Success Rate:** 90% (81/90 successful, 9 failures due to synthesis errors)
+
+**Instrumentation:** Automated test script `test_e2e_latency.py` measuring:
+- Full dispatch latency (HTTP POST /dispatch → response)
+- Router timing via `/api/v1/timings/percentiles` endpoint
+
+### Root Cause Analysis
+
+1. **Missing Import Bug:** `src/synthesize/strand.py` missing `ParseLLMError` import from `..llm.response_parser`, causing synthesis failures and HTTP 500 errors
+
+2. **Insufficient Optimization:** The prompt simplification and max_tokens reduction (96→80) in adc-1kp7n did not significantly reduce inference time
+
+3. **ZAI Proxy Latency:** Router timing breakdown shows:
+   - `proxy_inference_ms`: 1,449-1,875ms (dominant contributor)
+   - `proxy_network_ms`: ~116ms (consistent overhead)
+   - Total router time: 1,566-1,992ms per call
+
+### Compliance with Budget Targets
+
+| Stage | Budget | Measured p50 | Measured p95 | Status |
+|-------|--------|--------------|--------------|---------|
+| Intent Router | ~500ms | **2,808ms** ❌ | **5,558ms** ❌ | FAIL (5.6× over) |
+| End-to-end | <3s | **2.5-8+ seconds** ❌ | **4.3-8+ seconds** ❌ | FAIL |
+
+**Gate Status:** ❌ **DEMO REMAINS BLOCKED**
+
+Per the plan's explicit gate: "The demo cannot be scheduled until the Measured p50/p95 columns are filled from real runs... If measured p95 blows a stage's budget, either the stage gets fixed or the on-screen promise changes."
+
+### Recommended Actions
+
+1. **Fix Critical Bug:** Add missing `ParseLLMError` import to `src/synthesize/strand.py` (adc-1jrkq-5)
+2. **Re-evaluate Approach:** Current optimization strategies insufficient for 500ms target
+3. **Consider Alternatives:**
+   - Switch to faster model (current GLM-4.7 inference 1.4-1.9s)
+   - Implement request batching/streaming
+   - Cache more aggressively (currently 5min TTL)
+   - Architectural changes (local inference, different LLM provider)
+
+---
+
+**Raw Test Data:** `/tmp/e2e-latency-test-results.json` (2026-07-24 03:49:02 UTC)
