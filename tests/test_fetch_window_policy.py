@@ -154,7 +154,10 @@ class TestFetchWindowPolicy:
             else:
                 modified_commands.append(spec)
 
-        with patch('src.fetch.orchestrator.get_fetch_commands') as mock_commands:
+        # Mock both get_fetch_commands and get_source_timeout_ms to ensure the short timeout is used
+        # (config/fetch.yaml may have a longer timeout that would override the spec)
+        with patch('src.fetch.orchestrator.get_fetch_commands') as mock_commands, \
+             patch('src.fetch.commands.get_source_timeout_ms', return_value=None):
             mock_commands.return_value = modified_commands
 
             start = time.monotonic()
@@ -259,7 +262,10 @@ class TestFetchWindowPolicy:
             else:
                 modified_commands.append(spec)
 
-        with patch('src.fetch.orchestrator.get_fetch_commands') as mock_commands:
+        # Mock both get_fetch_commands and get_source_timeout_ms to ensure the short timeout is used
+        # (config/fetch.yaml may have a longer timeout that would override the spec)
+        with patch('src.fetch.orchestrator.get_fetch_commands') as mock_commands, \
+             patch('src.fetch.commands.get_source_timeout_ms', return_value=None):
             mock_commands.return_value = modified_commands
 
             result = await strand.fetch(request)
