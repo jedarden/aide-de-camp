@@ -43,8 +43,7 @@ See: docs/error-handling-standardization.md for complete pattern comparison and 
 
 import json
 from logging import getLogger
-from typing import Any, Dict, Optional
-
+from typing import Any, Dict, Optional, Union, cast
 
 logger = getLogger(__name__)
 
@@ -156,12 +155,12 @@ def extract_text_from_response(payload: Dict[str, Any]) -> str:
     content = payload.get("content", [])
 
     if content and isinstance(content, list) and len(content) > 0:
-        text = content[0].get("text", "")
+        text = cast(str, content[0].get("text", ""))
         if text:
             return text
 
     # Fallback: try to stringify the content
-    logger.warning(f"Could not extract text from content array, using fallback")
+    logger.warning("Could not extract text from content array, using fallback")
     return str(content)
 
 
@@ -170,7 +169,7 @@ def parse_llm_response(
     *,
     strip_fences: bool = True,
     expect_json: bool = True,
-) -> Any:
+) -> Union[str, Dict[str, Any]]:
     """
     Parse an LLM text response, optionally stripping fences and parsing JSON.
 
@@ -241,12 +240,12 @@ def parse_llm_response(
 
 
 def parse_zai_proxy_response(
-    response_dict: dict,
+    response_dict: Dict[str, Any],
     *,
     extract_text: bool = True,
     strip_fences: bool = True,
     expect_json: bool = True,
-) -> Any:
+) -> Union[str, Dict[str, Any]]:
     """
     Parse a complete ZAI proxy response from HTTP.
 

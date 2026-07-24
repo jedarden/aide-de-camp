@@ -11,10 +11,9 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from logging import getLogger
-from typing import Any, Optional
+from typing import Any, AsyncGenerator, Dict, Optional, Union
 
 import httpx
-
 
 logger = getLogger(__name__)
 
@@ -44,7 +43,7 @@ class LLMRequest:
     max_tokens: int = 4096
     temperature: float = 0.7
 
-    def to_payload(self) -> dict:
+    def to_payload(self) -> Dict[str, Any]:
         """Convert to API payload."""
         return {
             "model": self.model,
@@ -100,7 +99,7 @@ class ZAIClient:
         proxy_url: str = ZAI_PROXY_URL,
         default_model: str = DEFAULT_MODEL,
         timeout: float = 30.0,
-    ):
+    ) -> None:
         self.proxy_url = proxy_url
         self.default_model = default_model
         self.timeout = timeout
@@ -223,7 +222,7 @@ class ZAIClient:
         model: str | None = None,
         max_tokens: int = 4096,
         temperature: float = 0.7,
-    ):
+    ) -> AsyncGenerator[Union[str, Dict[str, Any]], None]:
         """
         Stream LLM response for progressive card fill.
 
