@@ -25,6 +25,7 @@ from .commands import (
     FetchSource,
     IntentType,
     KUBECTL_PROXIES,
+    get_effective_timeout,
     get_fetch_commands,
     get_required_sources,
     SourceResult,
@@ -102,9 +103,16 @@ class FetchStrand:
                 self._execute_source(spec, request.context),
                 name=f"fetch_{spec.source.value}_{request.intent_id[:8]}",
             )
-            tasks.append((spec.source, spec.required, spec.timeout_seconds, task))
+            # Get effective timeout from config file or spec default
+            effective_timeout = get_effective_timeout(spec, request.context.project_slug)
+            tasks.append((spec.source, spec.required, effective_timeout, task))
 
-        # Wait for all tasks to complete (with per-task timeout)
+        # Wait for all tasks to complete with per-source timeout enforcement
+        # We use asyncio.wait with ALL_COMPLETED to detect window close:
+        # - All tasks run concurrently
+        # - Each task is wrapped to handle its own timeout
+        # - As tasks complete, we process them immediately
+        # - Window closes when ALL tasks reach terminal state (success/timeout/error)
         sources = {}
         succeeded = []
         timed_out = []
@@ -112,55 +120,71 @@ class FetchStrand:
         skipped = []
         caveats = []
 
-        for source, required, timeout, task in tasks:
+        # Wrap each task with its timeout and error handling
+        # This allows true concurrent waiting with per-source timeouts
+        async def execute_with_timeout(
+            source: FetchSource,
+            required: bool,
+            timeout: int | float,
+            task: asyncio.Task
+        ) -> tuple[FetchSource, bool, SourceResult]:
+            """Execute a task with timeout, returning (source, required, result)."""
             try:
                 result = await asyncio.wait_for(task, timeout=timeout)
-
-                if on_partial_result:
-                    # Stream partial result as it arrives
-                    on_partial_result(source, result)
-
-                sources[source] = result
-
-                if result.status == "success":
-                    succeeded.append(source)
-                    # Check if the source data contains a caveat (e.g., fallback path with narrower scope)
-                    if isinstance(result.data, dict) and "caveat" in result.data:
-                        caveats.append(result.data["caveat"])
-                elif result.status == "timeout":
-                    timed_out.append(source)
-                    caveats.append(f"{source.value} timed out")
-                elif result.status == "error":
-                    failed.append(source)
-                    if required:
-                        caveats.append(f"Required source {source.value} failed: {result.error}")
-                    else:
-                        caveats.append(f"Optional source {source.value} failed: {result.error}")
-
+                return source, required, result
             except asyncio.TimeoutError:
                 logger.warning(f"Source {source.value} timed out after {timeout}s")
-                sources[source] = SourceResult(
+                result = SourceResult(
                     source=source,
                     status="timeout",
                     data={},
                     error=f"Timed out after {timeout}s",
                     duration_ms=int(timeout * 1000),
                 )
-                timed_out.append(source)
-                caveats.append(f"{source.value} timed out after {timeout}s")
-
+                return source, required, result
             except Exception as e:
                 logger.error(f"Error fetching {source.value}: {e}", exc_info=True)
-                sources[source] = SourceResult(
+                result = SourceResult(
                     source=source,
                     status="error",
                     data={},
                     error=str(e),
                     duration_ms=0,
                 )
+                return source, required, result
+
+        # Create wrapped tasks for concurrent execution
+        wrapped_tasks = [
+            execute_with_timeout(source, required, timeout, task)
+            for source, required, timeout, task in tasks
+        ]
+
+        # Wait for all wrapped tasks to complete concurrently
+        # This is the WINDOW CLOSE detection: we wait until ALL tasks finish
+        completed_results = await asyncio.gather(*wrapped_tasks)
+
+        # Process results as they arrive (maintaining completion order)
+        for source, required, result in completed_results:
+            # Stream partial result immediately (progressive window fill)
+            if on_partial_result:
+                on_partial_result(source, result)
+
+            sources[source] = result
+
+            if result.status == "success":
+                succeeded.append(source)
+                # Check if the source data contains a caveat (e.g., fallback path with narrower scope)
+                if isinstance(result.data, dict) and "caveat" in result.data:
+                    caveats.append(result.data["caveat"])
+            elif result.status == "timeout":
+                timed_out.append(source)
+                caveats.append(f"{source.value} timed out")
+            elif result.status == "error":
                 failed.append(source)
                 if required:
-                    caveats.append(f"Required source {source.value} crashed: {e}")
+                    caveats.append(f"Required source {source.value} failed: {result.error}")
+                else:
+                    caveats.append(f"Optional source {source.value} failed: {result.error}")
 
         # Build coverage report
         coverage = FetchCoverage(

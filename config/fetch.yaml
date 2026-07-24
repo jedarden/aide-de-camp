@@ -1,0 +1,80 @@
+# aide-de-camp Fetch Source Timeouts
+#
+# This config defines per-source timeout values for fetch operations.
+# All timeouts are optional - if not specified, the source uses its default timeout
+# from the command matrix (or no timeout for certain sources).
+#
+# Timeouts are specified in milliseconds (timeout_ms).
+# Set to null or omit to use the source's default timeout.
+#
+# Updated by the self-modification agent.
+# Hot-reloaded on every fetch call.
+
+sources:
+  # Kubernetes sources - may need longer timeouts for large clusters
+  kubectl_pods:
+    timeout_ms: 5000  # 5 seconds default
+  kubectl_deployments:
+    timeout_ms: 5000  # 5 seconds default
+  kubectl_workflows:
+    timeout_ms: 5000  # 5 seconds default
+
+  # ArgoCD API calls
+  argocd_app:
+    timeout_ms: 5000  # 5 seconds default
+
+  # Git operations - local filesystem, usually fast
+  git_log:
+    timeout_ms: 3000  # 3 seconds default
+  git_status:
+    timeout_ms: 3000  # 3 seconds default
+
+  # Bead operations - can be slow for large workspaces
+  bead_list:
+    timeout_ms: 5000  # 5 seconds default
+  bead_details:
+    timeout_ms: 3000  # 3 seconds default
+
+  # CI status - querying workflows
+  ci_status:
+    timeout_ms: 5000  # 5 seconds default
+
+  # Component library operations
+  components:
+    timeout_ms: 3000  # 3 seconds default
+
+  # Logs - can be large, may need longer timeout
+  logs:
+    timeout_ms: 10000  # 10 seconds default
+
+  # Events - kubernetes event stream
+  events:
+    timeout_ms: 5000  # 5 seconds default
+
+  # Session operations
+  session_state:
+    timeout_ms: 3000  # 3 seconds default
+  topic_context:
+    timeout_ms: 3000  # 3 seconds default
+
+  # Reminders
+  reminders:
+    timeout_ms: 3000  # 3 seconds default
+
+  # Filesystem operations - local, usually fast
+  fs_explore:
+    timeout_ms: 2000  # 2 seconds default
+  fs_readme:
+    timeout_ms: 2000  # 2 seconds default
+  fs_home:
+    timeout_ms: 2000  # 2 seconds default
+
+# Per-project overrides (optional)
+# Allows project-specific timeout adjustments
+# project_timeouts:
+#   options-pipeline:
+#     kubectl_pods:
+#       timeout_ms: 10000  # Longer timeout for this project's cluster
+#   kalshi-tape:
+#     logs:
+#       timeout_ms: 15000  # Longer timeout for log fetching
