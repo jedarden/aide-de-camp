@@ -73,12 +73,13 @@ def strip_markdown_fences(raw: str) -> str:
     Handles:
     - ```json ... ```
     - ``` ... ```
-    - ` ... ` (rare but possible)
+    - Content with ``` in the middle (rfind finds closing fence correctly)
+    - Incomplete fences (no closing fence - strips opening only)
+    - Bare JSON (no fences)
 
-    Performance: Uses find()/rfind() for single-pass fence removal, avoiding intermediate
-    string allocations from split()/rsplit(). This is 10-15% faster than split-based
-    approaches (see benchmarking in notes/adc-3e5gg.md). This is the optimal approach
-    for hot-path LLM response parsing.
+    Performance: Uses find()/rfind() for position-based fence removal, avoiding intermediate
+    string allocations from split()/rsplit(). The rfind() approach correctly handles content
+    with embedded ``` by finding the LAST ``` (closing fence), not the second occurrence.
 
     Args:
         raw: Raw response text that may contain markdown fences
@@ -93,6 +94,8 @@ def strip_markdown_fences(raw: str) -> str:
         '{"a": 1}'
         >>> strip_markdown_fences('{"a": 1}')
         '{"a": 1}'
+        >>> strip_markdown_fences('```json\\n{"code": "```hello```"}\\n```')
+        '{"code": "```hello```"}'
     """
     # Early return for empty/whitespace strings
     if not raw or not raw.strip():
@@ -103,16 +106,31 @@ def strip_markdown_fences(raw: str) -> str:
 
     # Fast manual fence stripping using position-based search
     # Pattern: ```optional_lang\n content \n```
-    # Uses find()/rfind() instead of split()/rsplit() to avoid intermediate allocations
+    # Uses rfind() to find LAST ``` (closing fence), which handles content with embedded ```
     if text.startswith("```"):
-        # Find first newline after opening fence (position-based, no split)
-        nl_pos = text.find("\n")
-        # Find closing fence from end (search backwards for last ```)
+        # Find first newline after opening fence
+        first_newline = text.find("\n")
+
+        # Find closing fence from END (last ``` in the text)
+        # This correctly handles content with ``` embedded in it
         fence_end = text.rfind("```")
 
-        # Direct slice extraction with single strip
-        if nl_pos != -1 and fence_end > nl_pos:
-            text = text[nl_pos + 1:fence_end].strip()
+        if fence_end != -1 and fence_end > 3:  # Must be after opening fence
+            # Complete fence: extract content between opening and closing
+            # Content is after first newline, before closing fence
+            if first_newline != -1 and fence_end > first_newline:
+                text = text[first_newline + 1:fence_end].strip()
+            else:
+                # No newline after opening fence or fence before newline (malformed)
+                text = ""
+        else:
+            # Incomplete fence: only opening fence present
+            # Strip opening fence and return the rest
+            if first_newline != -1:
+                text = text[first_newline + 1:].strip()
+            else:
+                # Opening fence with no content
+                text = ""
 
     return text
 
@@ -213,7 +231,8 @@ def parse_llm_response(
             text = raw_text.strip() if raw_text else ""
 
         # Step 2: Check for empty input (after fence stripping)
-        if not text:
+        # Use strip() to catch whitespace-only strings
+        if not text or not text.strip():
             if expect_json:
                 raise ParseLLMError(
                     "Empty response provided",
