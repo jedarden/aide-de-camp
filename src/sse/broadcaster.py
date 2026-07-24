@@ -316,6 +316,12 @@ class EventType:
     INTENT_DISPATCHED = "intent_dispatched"
     INTENT_RESOLVED = "intent_resolved"
 
+    # Fetch progress events (fetch-window policy: per-source progress states)
+    FETCH_PROGRESS = "fetch_progress"
+
+    # Synthesis progress events (streaming synthesis for progressive card fill)
+    SYNTHESIS_PROGRESS = "synthesis_progress"
+
     # Topic events
     TOPIC_CREATED = "topic_created"
     TOPIC_UPDATED = "topic_updated"
@@ -405,5 +411,80 @@ async def broadcast_workload_summary(
         data=summary,
         target_session_id=session_id,
         target_surface_id=surface_id,
+    )
+    return await broadcaster.broadcast(event)
+
+
+async def broadcast_fetch_progress(
+    intent_id: str,
+    session_id: str,
+    completed: int,
+    total: int,
+    source_name: str | None = None,
+    source_status: str | None = None,
+    target_surface_id: str | None = None,
+) -> int:
+    """
+    Broadcast fetch progress state for per-source progress streaming to pending card.
+
+    Emits '3/5 sources in' style updates as each source resolves.
+
+    Args:
+        intent_id: The intent being fetched
+        session_id: The session ID
+        completed: Number of sources completed so far
+        total: Total number of sources
+        source_name: Name of the most recently completed source (optional)
+        source_status: Status of the most recently completed source (optional)
+        target_surface_id: Optional specific surface to target
+
+    Returns:
+        Number of connections the event was sent to
+    """
+    broadcaster = get_broadcaster()
+    event = SSEEvent(
+        event_type=EventType.FETCH_PROGRESS,
+        data={
+            "intent_id": intent_id,
+            "completed": completed,
+            "total": total,
+            "source_name": source_name,
+            "source_status": source_status,
+        },
+        target_session_id=session_id,
+        target_surface_id=target_surface_id,
+    )
+    return await broadcaster.broadcast(event)
+
+
+async def broadcast_synthesis_progress(
+    intent_id: str,
+    session_id: str,
+    text_chunk: str,
+    target_surface_id: str | None = None,
+) -> int:
+    """
+    Broadcast synthesis progress for streaming synthesis (progressive card fill).
+
+    Emits text chunks as they arrive from the LLM for progressive rendering.
+
+    Args:
+        intent_id: The intent being synthesized
+        session_id: The session ID
+        text_chunk: The text chunk received from the LLM
+        target_surface_id: Optional specific surface to target
+
+    Returns:
+        Number of connections the event was sent to
+    """
+    broadcaster = get_broadcaster()
+    event = SSEEvent(
+        event_type=EventType.SYNTHESIS_PROGRESS,
+        data={
+            "intent_id": intent_id,
+            "text_chunk": text_chunk,
+        },
+        target_session_id=session_id,
+        target_surface_id=target_surface_id,
     )
     return await broadcaster.broadcast(event)
