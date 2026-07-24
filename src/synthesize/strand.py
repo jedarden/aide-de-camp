@@ -117,7 +117,12 @@ class SynthesizeStrand:
         Returns:
             SynthesizeResult with data, summary, and urgency
         """
+        synthesize_start = time.perf_counter()
+
         client = await self._get_zai_client()
+
+        # Measure prompt construction time
+        prompt_start = time.perf_counter()
         prompt = self._load_prompt()
 
         # Splice urgency.md rules into the system prompt (hot-reloadable).
@@ -129,10 +134,18 @@ class SynthesizeStrand:
 
         # Build user message with intent spec and fetched context
         user_message = self._build_user_message(request)
+        prompt_ms = (time.perf_counter() - prompt_start) * 1000
+
+        logger.debug(
+            f"synthesize_timing phase=prompt_construction duration_ms={prompt_ms:.2f} "
+            f"intent_id={request.intent_id[:8]}"
+        )
 
         logger.info(f"Synthesizing intent {request.intent_id}")
 
         try:
+            # Measure LLM call time
+            llm_start = time.perf_counter()
             response = await client.call_simple(
                 system_prompt=system_prompt,
                 user_message=user_message,
@@ -140,7 +153,15 @@ class SynthesizeStrand:
                 max_tokens=1024,  # Reduced from 4096 - most outputs are smaller
                 temperature=0.3,  # Lower temperature for more deterministic, faster outputs
             )
+            llm_ms = (time.perf_counter() - llm_start) * 1000
 
+            logger.debug(
+                f"synthesize_timing phase=llm_call duration_ms={llm_ms:.2f} "
+                f"intent_id={request.intent_id[:8]}"
+            )
+
+            # Measure JSON parsing time
+            parse_start = time.perf_counter()
             # Parse JSON response using centralized parser
             # Note: Synthesize uses fallback result pattern (not corrective retry)
             # because fetch operations are expensive and should not be discarded.
@@ -151,6 +172,15 @@ class SynthesizeStrand:
                 logger.error(f"Failed to parse synthesize response: {e}")
                 # Fall through to fallback result below
                 raise json.JSONDecodeError(str(e), doc="", pos=0) from e
+            parse_ms = (time.perf_counter() - parse_start) * 1000
+
+            logger.debug(
+                f"synthesize_timing phase=json_parse duration_ms={parse_ms:.2f} "
+                f"intent_id={request.intent_id[:8]}"
+            )
+
+            # Measure result processing time
+            process_start = time.perf_counter()
 
             # Extract fields
             data = result_data.get("data", {})
@@ -184,9 +214,20 @@ class SynthesizeStrand:
                 caveats=caveats,
             )
 
+            process_ms = (time.perf_counter() - process_start) * 1000
+            total_ms = (time.perf_counter() - synthesize_start) * 1000
+
+            logger.debug(
+                f"synthesize_timing phase=result_process duration_ms={process_ms:.2f} "
+                f"phase=total duration_ms={total_ms:.2f} "
+                f"intent_id={request.intent_id[:8]} "
+                f"data_fields={len(data)} "
+                f"urgency={urgency.value}"
+            )
+
             logger.info(
                 f"Synthesis complete for intent {request.intent_id}: "
-                f"{len(data)} data fields, urgency={urgency.value}"
+                f"{len(data)} data fields, urgency={urgency.value} ({total_ms:.0f}ms)"
             )
 
             return result
