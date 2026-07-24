@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS utterances (
     session_id  TEXT NOT NULL,
     raw_text    TEXT NOT NULL,
     created_at  INTEGER NOT NULL,
+    router_timing_breakdown TEXT,  -- JSON: detailed timing breakdown from intent router (prompt_ms, proxy_ms, parse_ms, process_ms, total_ms)
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
 
@@ -352,6 +353,9 @@ class SessionStore:
         # Migrate sessions table to add reformulation_count column
         await SessionStore._migrate_sessions_reformulation_count(db)
 
+        # Migrate utterances table to add router_timing_breakdown column
+        await SessionStore._migrate_utterances_router_timing_breakdown(db)
+
         await db.commit()
 
     @staticmethod
@@ -622,6 +626,32 @@ class SessionStore:
             logger.error(f"Failed to migrate sessions.reformulation_count: {e}")
             raise
 
+    @staticmethod
+    async def _migrate_utterances_router_timing_breakdown(db: aiosqlite.Connection) -> None:
+        """Migrate utterances table to add router_timing_breakdown column.
+
+        Stores detailed timing breakdown from intent router for latency analysis.
+        """
+        # Check if migration is needed by inspecting the utterances table schema
+        async with db.execute("PRAGMA table_info(utterances)") as cur:
+            utterance_cols = {row[1] for row in await cur.fetchall()}
+
+        if "router_timing_breakdown" in utterance_cols:
+            # Already migrated
+            return
+
+        # Migration needed: add router_timing_breakdown column
+        logger.info("Migrating utterances table to add router_timing_breakdown column")
+
+        try:
+            await db.execute(
+                "ALTER TABLE utterances ADD COLUMN router_timing_breakdown TEXT"
+            )
+            logger.info("Migration complete: utterances.router_timing_breakdown column added")
+        except Exception as e:
+            logger.error(f"Failed to migrate utterances.router_timing_breakdown: {e}")
+            raise
+
     async def close(self) -> None:
         """Close database connection pool."""
         # aiosqlite uses connection-per-context, so just ensure checkpoint
@@ -868,6 +898,37 @@ class SessionStore:
             )
             await db.commit()
         return utterance_id
+
+    async def update_utterance_router_timing(
+        self,
+        utterance_id: str,
+        timing_breakdown: dict | None,
+    ) -> None:
+        """Update utterance with router timing breakdown.
+
+        Args:
+            utterance_id: The utterance ID to update
+            timing_breakdown: Dict with detailed timing breakdown including:
+                - prompt_construction_ms: Prompt template construction time
+                - proxy_call_ms: Total ZAI proxy round-trip time (network + inference)
+                - proxy_network_ms: Network latency only (first byte received)
+                - proxy_inference_ms: Model inference time only (proxy_call_ms - proxy_network_ms)
+                - json_parse_ms: JSON parsing time
+                - process_ms: Classification processing time
+                - total_ms: Total classification time
+                - intents_count: Number of intents classified
+                - cached: True if result was from cache (no actual LLM call)
+        """
+        if timing_breakdown is None:
+            return
+
+        import json
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE utterances SET router_timing_breakdown = ? WHERE id = ?",
+                (json.dumps(timing_breakdown), utterance_id)
+            )
+            await db.commit()
 
     # Intent operations
     async def create_intent(
