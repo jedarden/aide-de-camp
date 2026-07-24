@@ -215,7 +215,33 @@ class ZAIClient:
         self._client: Optional[httpx.AsyncClient] = None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create HTTP client with HTTP/2 and optimized connection pooling."""
+        """Get or create HTTP client with HTTP/2 and optimized connection pooling.
+
+        Connection Pool Configuration:
+            The pool is sized to handle concurrent dispatch scenarios where multiple
+            intent threads may fetch/synthesize in parallel. Typical load: 5-15 concurrent
+            requests during peak dispatch periods.
+
+            max_connections (150): Maximum concurrent connections to the proxy.
+                - Sufficient for parallel fetch + synthesize operations
+                - Handles burst traffic from multi-intent utterances
+                - Prevents pool exhaustion under high concurrency
+
+            max_keepalive_connections (50): Connections kept alive for reuse.
+                - Reduces TLS handshake overhead (major latency factor)
+                - Enables connection reuse across request batches
+                - Complements HTTP/2 multiplexing efficiency
+
+            keepalive_expiry (180s): How long idle connections remain in pool.
+                - 3-minute TTL balances reuse vs connection freshness
+                - Spans multiple typical request cycles (router: ~2s, fetch: ~5-10s, synthesize: ~3-8s)
+                - Reduces reconnection overhead during active sessions
+
+        These settings work together with HTTP/2 to minimize latency:
+            - Connection reuse eliminates TCP+TLS setup (typically 200-500ms saved)
+            - HTTP/2 multiplexing allows concurrent requests on single connection
+            - Large pool handles connection-per-host edge cases
+        """
         if self._client is None:
             # Configure aggressive connection pooling for reduced latency
             # - HTTP/2 for multiplexing and connection reuse
