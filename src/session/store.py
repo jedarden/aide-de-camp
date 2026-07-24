@@ -188,6 +188,7 @@ CREATE INDEX IF NOT EXISTS idx_signals_result ON feedback_signals(result_id);
 CREATE TABLE IF NOT EXISTS dispatch_timings (
     intent_id                 TEXT PRIMARY KEY,
     router_ms                 INTEGER,
+    json_parse_ms             INTEGER,
     fetch_first_source_ms     INTEGER,
     fetch_total_ms            INTEGER,
     synthesize_first_token_ms INTEGER,
@@ -355,6 +356,9 @@ class SessionStore:
 
         # Migrate utterances table to add router_timing_breakdown column
         await SessionStore._migrate_utterances_router_timing_breakdown(db)
+
+        # Migrate dispatch_timings table to add json_parse_ms column
+        await SessionStore._migrate_dispatch_timings_json_parse_ms(db)
 
         await db.commit()
 
@@ -650,6 +654,31 @@ class SessionStore:
             logger.info("Migration complete: utterances.router_timing_breakdown column added")
         except Exception as e:
             logger.error(f"Failed to migrate utterances.router_timing_breakdown: {e}")
+            raise
+
+    async def _migrate_dispatch_timings_json_parse_ms(db: aiosqlite.Connection) -> None:
+        """Migrate dispatch_timings table to add json_parse_ms column.
+
+        Stores JSON parsing time separately from router_ms for precise latency analysis.
+        """
+        # Check if migration is needed by inspecting the dispatch_timings table schema
+        async with db.execute("PRAGMA table_info(dispatch_timings)") as cur:
+            timing_cols = {row[1] for row in await cur.fetchall()}
+
+        if "json_parse_ms" in timing_cols:
+            # Already migrated
+            return
+
+        # Migration needed: add json_parse_ms column
+        logger.info("Migrating dispatch_timings table to add json_parse_ms column")
+
+        try:
+            await db.execute(
+                "ALTER TABLE dispatch_timings ADD COLUMN json_parse_ms INTEGER"
+            )
+            logger.info("Migration complete: dispatch_timings.json_parse_ms column added")
+        except Exception as e:
+            logger.error(f"Failed to migrate dispatch_timings.json_parse_ms: {e}")
             raise
 
     async def close(self) -> None:

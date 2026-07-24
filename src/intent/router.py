@@ -704,6 +704,9 @@ class IntentRouter:
                 logger.warning(f"Failed to store router timing breakdown: {e}")
                 # Non-fatal: continue with routing
 
+            # Extract json_parse_ms from timing breakdown (0 for cache hits, actual ms for cache misses)
+            json_parse_ms = timing_breakdown.get("json_parse_ms", 0)
+
             routed_intents = []
             for classification in classifications:
                 # Create intent ID
@@ -715,7 +718,7 @@ class IntentRouter:
                     session_id=session_id,
                     utterance=classification.utterance_fragment,
                     router_ms=router_ms,
-                    json_parse_ms=json_parse_ms,  # Track parsing time for this intent thread
+                    json_parse_ms=json_parse_ms,  # Track parsing time for this intent thread (0 if cached)
                 )
                 routed_intents.append(routed_intent)
 
