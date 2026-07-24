@@ -2,7 +2,7 @@
 
 **Report Date:** 2026-07-24
 **Analysis Period:** Last 30 days (2026-06-24 to 2026-07-24)
-**Bead ID:** adc-655k0
+**Bead ID:** adc-4p64g
 **Clusters Analyzed:** iad-options, ardenone-cluster
 
 ---
@@ -926,7 +926,7 @@ IBKR MCP:
 
 **Report Status**: ✅ COMPLETE  
 **Next Review**: 2026-08-24 (30-day follow-up recommended)  
-**Contact**: For questions or clarifications, refer to bead adc-655k0
+**Contact**: For questions or clarifications, refer to bead adc-4p64g
 
 ---
 
