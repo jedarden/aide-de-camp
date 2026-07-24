@@ -1,3 +1,3 @@
 # Test Prompt
 
-Updated content for git commit test.
+Updated content for format test.
