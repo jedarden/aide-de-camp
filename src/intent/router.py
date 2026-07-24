@@ -249,11 +249,8 @@ class IntentRouter:
             raw_response = response
 
             # Parse JSON response using centralized parser (optimized with manual fence stripping)
-            try:
-                intents_data = parse_llm_response(response)
-            except ParseLLMError as e:
-                # Convert to json.JSONDecodeError for compatibility with existing error handling
-                raise json.JSONDecodeError(str(e), doc="", pos=0) from e
+            # Let ParseLLMError bubble to retry handler below
+            intents_data = parse_llm_response(response)
             classifications = []
 
             for intent_data in intents_data:
@@ -279,8 +276,16 @@ class IntentRouter:
             logger.info(f"Classified {len(classifications)} intents from utterance")
             return classifications
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse router response as JSON: {e}")
+        except ParseLLMError as e:
+            """
+            First parsing attempt failed - implement corrective retry.
+
+            Router uses corrective retry because it's the first step in the pipeline.
+            A malformed router response cascades to everything downstream.
+            One retry is justified because it's cheap (same prompt, 2048 tokens).
+            """
+            logger.error(f"Failed to parse router response: {e}")
+            raw_output = e.raw_response or raw_response  # Preserve for error reporting
 
             # Implement one corrective retry on malformed JSON
             if retry_on_malformed and retry_count == 0:
@@ -293,18 +298,18 @@ class IntentRouter:
                         session_id=session_id,
                         retry_on_malformed=False,  # Prevent infinite retry
                     )
-                except json.JSONDecode as retry_e:
+                except ParseLLMError as retry_e:
                     # Retry also failed - raise RouterMalformedError
                     raise RouterMalformedError(
-                        parse_error=str(e),
-                        raw_output=raw_response or "",
+                        parse_error=str(retry_e),
+                        raw_output=retry_e.raw_response or raw_response,
                         retry_count=retry_count,
                     ) from retry_e
 
-            # No retry or retry failed - raise RouterMalformedError
+            # No retry allowed or retry failed - raise RouterMalformedError
             raise RouterMalformedError(
                 parse_error=str(e),
-                raw_output=raw_response or "",
+                raw_output=raw_output,
                 retry_count=retry_count,
             ) from e
 
