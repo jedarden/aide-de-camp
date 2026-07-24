@@ -260,19 +260,19 @@ class IntentRouter:
         # OPTIMIZATION 1: Check cache first (eliminates redundant LLM calls)
         cached_result = self._get_cached_classification(utterance, session_id)
         if cached_result is not None:
-            return cached_result
-
-        # Use dedicated router client with 10s timeout for fail-fast behavior
-        client = await self._get_router_zai_client()
-
-        # Build user message
-        user_message = f"Classify this utterance:\n\n{utterance}"
-
-        logger.info(f"Classifying utterance for session {session_id}")
-
-        # Build system prompt from prompts/router.md
-        # (hot-reload enabled via reload manager)
-        system_prompt = self._build_system_prompt()
+            # Return empty timing breakdown for cached results (no actual LLM call was made)
+            empty_breakdown = {
+                "cached": True,
+                "prompt_construction_ms": 0,
+                "proxy_call_ms": 0,
+                "proxy_network_ms": 0,
+                "proxy_inference_ms": 0,
+                "json_parse_ms": 0,
+                "process_ms": 0,
+                "total_ms": 0,
+                "intents_count": len(cached_result),
+            }
+            return cached_result, empty_breakdown
 
         # Track retry attempt for malformed JSON
         retry_count = 0
@@ -282,16 +282,41 @@ class IntentRouter:
             # Measure total classification time
             classify_start = time.perf_counter()
 
-            # Measure ZAI proxy call time
+            # Measure prompt construction time
+            prompt_start = time.perf_counter()
+
+            # Use dedicated router client with 10s timeout for fail-fast behavior
+            client = await self._get_router_zai_client()
+
+            # Build user message
+            user_message = f"Classify this utterance:\n\n{utterance}"
+
+            logger.info(f"Classifying utterance for session {session_id}")
+
+            # Build system prompt from prompts/router.md
+            # (hot-reload enabled via reload manager)
+            system_prompt = self._build_system_prompt()
+
+            prompt_ms = (time.perf_counter() - prompt_start) * 1000
+
+            # Measure ZAI proxy call time (network + model inference)
+            # The LLM client now returns timing breakdown separating network latency from model inference
             proxy_start = time.perf_counter()
-            response = await client.call_simple(
+            response_data = await client.call_simple(
                 system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
-                max_tokens=32,  # OPTIMIZATION 2: Reduced from 64 to 32 - intent JSON is tiny (single intent ~50 tokens)
+                max_tokens=128,  # OPTIMIZATION 2: Reduced from 256 to 128 - intent JSON is typically 50-80 tokens
                 temperature=0.0,
+                return_timing=True,  # Request timing breakdown from LLM client
             )
             proxy_ms = (time.perf_counter() - proxy_start) * 1000
+
+            # Extract content and timing from response
+            # response_data is now a dict with content and timing breakdown
+            response = response_data.get("content", "")
+            timing_network_ms = response_data.get("timing_network_ms")
+            timing_inference_ms = response_data.get("timing_inference_ms")
 
             # Store raw response for error reporting
             raw_response = response
@@ -337,9 +362,15 @@ class IntentRouter:
             total_ms = (time.perf_counter() - classify_start) * 1000
 
             # Log detailed timing breakdown for latency profiling
+            # This shows WHERE the 1,587-2,074ms latency is spent across the 4 investigation areas
+            network_str = f"{timing_network_ms:.2f}" if timing_network_ms is not None else "N/A"
+            inference_str = f"{timing_inference_ms:.2f}" if timing_inference_ms is not None else "N/A"
             logger.info(
                 f"router_timing breakdown: "
+                f"prompt_construction_ms={prompt_ms:.2f} "
                 f"proxy_call_ms={proxy_ms:.2f} "
+                f"proxy_network_ms={network_str} "
+                f"proxy_inference_ms={inference_str} "
                 f"json_parse_ms={parse_ms:.2f} "
                 f"process_ms={process_ms:.2f} "
                 f"total_ms={total_ms:.2f} "
@@ -347,34 +378,24 @@ class IntentRouter:
             )
 
             logger.info(f"Classified {len(classifications)} intents from utterance")
-            classifications = []
 
-            for intent_data in intents_data:
-                # Map string to IntentType enum
-                intent_type_str = intent_data.get("intent_type", "status")
-                try:
-                    intent_type = IntentType(intent_type_str)
-                except ValueError:
-                    logger.warning(f"Unknown intent type: {intent_type_str}")
-                    intent_type = IntentType.STATUS
-
-                classification = IntentClassification(
-                    intent_type=intent_type,
-                    project_slug=intent_data.get("project_slug"),
-                    confidence=float(intent_data.get("confidence", 0.8)),
-                    utterance_fragment=intent_data.get("utterance_fragment", utterance),
-                    reasoning=intent_data.get("reasoning", ""),
-                    urgency=intent_data.get("urgency", "normal"),
-                    lookup_kind=intent_data.get("lookup_kind") if intent_type == IntentType.LOOKUP else None,
-                )
-                classifications.append(classification)
-
-            logger.info(f"Classified {len(classifications)} intents from utterance")
+            # Build timing breakdown for storage
+            # Now includes separate network and inference timing measured by LLM client
+            timing_breakdown = {
+                "prompt_construction_ms": round(prompt_ms, 2),
+                "proxy_call_ms": round(proxy_ms, 2),  # Total round-trip time (network + inference)
+                "proxy_network_ms": round(timing_network_ms, 2) if timing_network_ms is not None else None,
+                "proxy_inference_ms": round(timing_inference_ms, 2) if timing_inference_ms is not None else None,
+                "json_parse_ms": round(parse_ms, 2),
+                "process_ms": round(process_ms, 2),
+                "total_ms": round(total_ms, 2),
+                "intents_count": len(classifications),
+            }
 
             # OPTIMIZATION 1 (cont): Cache successful classifications
             self._cache_classification(utterance, session_id, classifications)
 
-            return classifications
+            return classifications, timing_breakdown
 
         except ParseLLMError as e:
             """
@@ -393,11 +414,12 @@ class IntentRouter:
                 retry_count += 1
                 try:
                     # Retry once with same parameters
-                    return await self.classify_utterance(
+                    classifications, _ = await self.classify_utterance(
                         utterance=utterance,
                         session_id=session_id,
                         retry_on_malformed=False,  # Prevent infinite retry
                     )
+                    return classifications, _
                 except ParseLLMError as retry_e:
                     # Retry also failed - raise RouterMalformedError
                     raise RouterMalformedError(
@@ -460,8 +482,17 @@ class IntentRouter:
             # is shared across every intent thread it produces, so its duration is
             # measured once here and stamped onto each RoutedIntent).
             classify_start = time.monotonic()
-            classifications = await self.classify_utterance(utterance, session_id)
+            classifications, timing_breakdown = await self.classify_utterance(utterance, session_id)
             router_ms = int((time.monotonic() - classify_start) * 1000)
+
+            # Store router timing breakdown in utterance record
+            try:
+                store = await self._get_store()
+                await store.update_utterance_router_timing(utterance_id, timing_breakdown)
+                logger.info(f"Stored router timing breakdown for utterance {utterance_id[:8]}")
+            except Exception as e:
+                logger.warning(f"Failed to store router timing breakdown: {e}")
+                # Non-fatal: continue with routing
 
             routed_intents = []
             for classification in classifications:
