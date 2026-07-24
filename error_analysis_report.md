@@ -1,9 +1,10 @@
 # Options Pipeline vs IBKR MCP Error Analysis Report (30-Day Comparative Study)
 
-**Date:** 2026-07-24  
-**Analysis Period:** Last 30 days (2026-06-24 to 2026-07-24)  
-**Bead ID:** adc-kax8g  
-**Clusters Analyzed:** iad-options, ardenone-cluster
+**Date:** July 24, 2026  
+**Analysis Period:** Last 30 days (June 24 - July 24, 2026)  
+**Bead ID:** adc-575bf  
+**Clusters Analyzed:** iad-options, ardenone-cluster  
+**Analysis Type:** Fresh live cluster inspection and log analysis
 
 ---
 
@@ -447,6 +448,6 @@ IBKR MCP requires minimal attention - just cleanup of failed pods. The applicati
 
 ---
 
-*Report generated for bead adc-kax8g: Options Pipeline vs IBKR MCP 30-Day Error Comparative Study*  
-*Analysis completed: 2026-07-24*  
-*Next recommended review: 2026-08-24*
+*Report generated for bead adc-575bf: Options Pipeline vs IBKR MCP 30-Day Error Comparative Study*  
+*Analysis completed: July 24, 2026*  
+*Next recommended review: August 24, 2026*
