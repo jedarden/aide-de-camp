@@ -282,11 +282,12 @@ class IntentRouter:
             # Measure total classification time
             classify_start = time.perf_counter()
 
-            # Measure prompt construction time
-            prompt_start = time.perf_counter()
-
             # Use dedicated router client with 10s timeout for fail-fast behavior
             client = await self._get_router_zai_client()
+
+            # Measure prompt construction time (template rendering, message formatting)
+            # This isolates client-side preparation cost from network and inference time
+            prompt_start = time.perf_counter()
 
             # Build user message
             user_message = f"Classify this utterance:\n\n{utterance}"
