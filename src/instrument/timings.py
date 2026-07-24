@@ -32,6 +32,7 @@ Clock = Callable[[], float]
 # accepts so a typo in a stage name is a KeyError, not a silent no-op.
 DISPATCH_TIMING_STAGES = (
     "router_ms",
+    "json_parse_ms",
     "fetch_first_source_ms",
     "fetch_total_ms",
     "synthesize_first_token_ms",

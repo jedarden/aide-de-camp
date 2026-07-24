@@ -149,6 +149,8 @@ def unwrap_zai_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
     The ZAI proxy wraps Anthropic responses under a "result" key.
     This function extracts the inner payload if present.
 
+    Optimized for hot-path with minimal overhead.
+
     Args:
         response_data: Raw response dict from ZAI proxy
 
@@ -161,11 +163,11 @@ def unwrap_zai_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
         >>> unwrap_zai_response({"content": [...]})
         {"content": [...]}
     """
-    # Check if response has "result" wrapper (ZAI proxy pattern)
-    if "result" in response_data and isinstance(response_data["result"], dict):
-        inner = response_data["result"]
+    # Optimized: Direct dict access with isinstance check inline
+    result = response_data.get("result")
+    if isinstance(result, dict):
         logger.debug("Unwrapped ZAI proxy response (removed 'result' field)")
-        return inner
+        return result
 
     return response_data
 
@@ -173,6 +175,8 @@ def unwrap_zai_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
 def extract_text_from_response(payload: Dict[str, Any]) -> str:
     """
     Extract text content from an Anthropic-style response payload.
+
+    Optimized for hot-path text extraction with minimal overhead.
 
     Args:
         payload: Response payload with "content" array
@@ -183,12 +187,16 @@ def extract_text_from_response(payload: Dict[str, Any]) -> str:
     Raises:
         ParseLLMError: If content cannot be extracted
     """
-    content = payload.get("content", [])
+    # Optimized: Direct dict access without intermediate variables
+    content = payload.get("content")
 
+    # Fast path: Direct access with early return
     if content and isinstance(content, list) and len(content) > 0:
-        text = cast(str, content[0].get("text", ""))
-        if text:
-            return text
+        first_item = content[0]
+        if isinstance(first_item, dict):
+            text = first_item.get("text")
+            if text:
+                return text
 
     # Fallback: try to stringify the content
     logger.warning("Could not extract text from content array, using fallback")
@@ -213,6 +221,7 @@ def parse_llm_response(
     Performance: Optimized with fast fence stripping and minimal overhead.
     Uses strip_markdown_fences() for fence removal which is 7-179x faster than regex.
     Added fast path for clean JSON (no fences) to skip fence processing.
+    Optimized string operations to reduce allocations.
 
     Args:
         raw_text: Raw response text from LLM
@@ -232,7 +241,7 @@ def parse_llm_response(
         '{"a": 1}'
     """
     try:
-        # Early validation for empty/None input
+        # Early validation for empty/None input (fast path)
         if not raw_text:
             if expect_json:
                 raise ParseLLMError("Empty response provided", raw_response=raw_text)
@@ -240,14 +249,14 @@ def parse_llm_response(
 
         # Fast path: Skip fence processing if not requested
         if not strip_fences:
-            text = raw_text.strip() if raw_text else ""
+            text = raw_text.strip()
             if not text and expect_json:
                 raise ParseLLMError("Empty response provided", raw_response=raw_text)
             if expect_json:
                 return _parse_json_fast(text, raw_text)
             return text
 
-        # Optimized fence detection and stripping with early exit for clean JSON
+        # Optimized: Single strip operation, reuse for fast-path check
         text = raw_text.strip()
 
         # Fast path: If text starts with '{' or '[', likely clean JSON - skip fence processing
@@ -260,7 +269,7 @@ def parse_llm_response(
         # Process fences if detected
         text = strip_markdown_fences(text)
 
-        # Check for empty after fence stripping
+        # Check for empty after fence stripping (reuse text variable)
         if not text or not text.strip():
             if expect_json:
                 raise ParseLLMError("Empty response provided", raw_response=raw_text)
@@ -327,6 +336,8 @@ def parse_zai_proxy_response(
     3. Strip markdown fences
     4. Parse JSON if expected
 
+    Optimized for minimal overhead with direct dict access and reduced function calls.
+
     Args:
         response_dict: Raw response dict from httpx.Response.json()
         extract_text: Whether to extract text from content array (default: True)
@@ -345,8 +356,10 @@ def parse_zai_proxy_response(
         {'a': 1}
     """
     try:
-        # Step 1: Unwrap ZAI proxy response
-        unwrapped = unwrap_zai_response(response_dict)
+        # Step 1: Unwrap ZAI proxy response (optimized: direct dict access)
+        unwrapped = response_dict.get("result", response_dict)
+        if not isinstance(unwrapped, dict):
+            unwrapped = response_dict
 
         # Step 2: Extract text from content structure
         if extract_text:

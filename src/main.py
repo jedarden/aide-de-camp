@@ -51,6 +51,7 @@ from .context.warmer import get_context_warmer
 from .feedback.background_analysis import get_background_processor
 from .intent.router import get_router as get_intent_router
 from .escalate import escalate_intent, EscalateRequest
+from .escalate.llm import warmup_zai_connections
 from .test.dispatch import router as test_router
 from .environment.discovery import (
     scan_environment, set_registry,
@@ -166,6 +167,13 @@ async def lifespan(app: FastAPI):
             )
     except Exception as e:
         logger.warning(f"Failed to check Telegram bridge reachability: {e}")
+
+    # Warm up ZAI proxy connections proactively
+    # This eliminates TLS handshake cost from the first actual LLM request
+    try:
+        await warmup_zai_connections()
+    except Exception as e:
+        logger.warning(f"ZAI proxy warmup failed (non-fatal): {e}")
 
     # Initialize bead watcher
     try:
