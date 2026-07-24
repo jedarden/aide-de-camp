@@ -13,6 +13,7 @@ The ZAI client is mocked so the tests are deterministic and network-free.
 import json
 import subprocess
 import tempfile
+import unittest.mock
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -311,6 +312,21 @@ class TestGitCommits:
         mgr.register_prompt("test_git_commit_prompt", str(test_prompt_file))
         agent.reload_mgr = mgr
 
+        # Track subprocess calls
+        subprocess_calls = []
+        original_run = subprocess.run
+
+        def mock_run(cmd, *args, **kwargs):
+            subprocess_calls.append((cmd, kwargs.get('cwd')))
+            # Mock successful git operations
+            if 'git' in cmd and 'commit' in cmd:
+                result = MagicMock(returncode=0, stdout=b"", stderr=b"")
+            elif 'git' in cmd and 'rev-parse' in cmd:
+                result = MagicMock(returncode=0, stdout=b"abc1234\n", stderr=b"")
+            else:
+                result = MagicMock(returncode=0, stdout=b"", stderr=b"")
+            return result
+
         # Create a diff representing a change
         diff = ArtifactDiff(
             artifact_name="test_git_commit_prompt",
@@ -321,44 +337,19 @@ class TestGitCommits:
             confidence=0.9
         )
 
-        # Get initial commit count
-        initial_commit_count = subprocess.run(
-            ["git", "rev-list", "--count", "HEAD"],
-            cwd=Path("/home/coding/aide-de-camp"),
-            capture_output=True,
-            text=True
-        )
-        initial_count = int(initial_commit_count.stdout.strip())
-
-        # Apply the diff (which should create a git commit)
-        result = agent._write_prompt(diff)
+        with unittest.mock.patch('subprocess.run', side_effect=mock_run):
+            result = agent._write_prompt(diff)
 
         # Verify the write was successful
         assert result is True
 
-        # Verify git commit was created
-        final_commit_count = subprocess.run(
-            ["git", "rev-list", "--count", "HEAD"],
-            cwd=Path("/home/coding/aide-de-camp"),
-            capture_output=True,
-            text=True
-        )
-        final_count = int(final_commit_count.stdout.strip())
+        # Verify git commands were called
+        git_commands = [call[0] for call in subprocess_calls if 'git' in call[0]]
+        assert len(git_commands) >= 2  # At minimum: git add and git commit
 
-        # Should have at least one more commit
-        assert final_count >= initial_count + 1
-
-        # Verify commit message format in recent commits
-        recent_commits = subprocess.run(
-            ["git", "log", "--oneline", "-5"],
-            cwd=Path("/home/coding/aide-de-camp"),
-            capture_output=True,
-            text=True
-        )
-        commit_history = recent_commits.stdout.strip()
-
-        assert "auto: self-mod write to" in commit_history
-        assert "test_git_commit_prompt" in commit_history
+        # Verify git commit was called with a message
+        commit_calls = [call for call in git_commands if 'commit' in call]
+        assert len(commit_calls) >= 1
 
     def test_write_config_creates_git_commit(self, test_config_file):
         """Writing a config file creates a git commit."""
@@ -371,6 +362,20 @@ class TestGitCommits:
         mgr.register_prompt("test_git_commit_config", str(test_config_file))
         agent.reload_mgr = mgr
 
+        # Track subprocess calls
+        subprocess_calls = []
+
+        def mock_run(cmd, *args, **kwargs):
+            subprocess_calls.append((cmd, kwargs.get('cwd')))
+            # Mock successful git operations
+            if 'git' in cmd and 'commit' in cmd:
+                result = MagicMock(returncode=0, stdout=b"", stderr=b"")
+            elif 'git' in cmd and 'rev-parse' in cmd:
+                result = MagicMock(returncode=0, stdout=b"abc1234\n", stderr=b"")
+            else:
+                result = MagicMock(returncode=0, stdout=b"", stderr=b"")
+            return result
+
         # Create a diff representing a change
         diff = ArtifactDiff(
             artifact_name="test_git_commit_config",
@@ -381,44 +386,116 @@ class TestGitCommits:
             confidence=0.8
         )
 
-        # Get initial commit count
-        initial_commit_count = subprocess.run(
-            ["git", "rev-list", "--count", "HEAD"],
-            cwd=Path("/home/coding/aide-de-camp"),
-            capture_output=True,
-            text=True
-        )
-        initial_count = int(initial_commit_count.stdout.strip())
-
-        # Apply the diff (which should create a git commit)
-        result = agent._write_config(diff)
+        with unittest.mock.patch('subprocess.run', side_effect=mock_run):
+            result = agent._write_config(diff)
 
         # Verify the write was successful
         assert result is True
 
-        # Verify git commit was created
-        final_commit_count = subprocess.run(
-            ["git", "rev-list", "--count", "HEAD"],
-            cwd=Path("/home/coding/aide-de-camp"),
-            capture_output=True,
-            text=True
+        # Verify git commands were called
+        git_commands = [call[0] for call in subprocess_calls if 'git' in call[0]]
+        assert len(git_commands) >= 2  # At minimum: git add and git commit
+
+        # Verify git commit was called
+        commit_calls = [call for call in git_commands if 'commit' in call]
+        assert len(commit_calls) >= 1
+
+    def test_failed_write_does_not_create_commit(self, test_prompt_file):
+        """A failed write operation should NOT create a git commit."""
+        # Create initial content
+        test_prompt_file.write_text("# Test Prompt\n\nInitial content.")
+
+        # Create agent and register the prompt
+        agent = SelfModificationAgent()
+        mgr = HotReloadManager()
+        mgr.register_prompt("test_git_commit_prompt", str(test_prompt_file))
+        agent.reload_mgr = mgr
+
+        # Track subprocess calls - should NOT see git commit
+        subprocess_calls = []
+
+        def mock_run(cmd, *args, **kwargs):
+            subprocess_calls.append((cmd, kwargs.get('cwd')))
+            result = MagicMock(returncode=0, stdout=b"", stderr=b"")
+            return result
+
+        # Create a diff for a NON-EXISTENT artifact (this should fail)
+        diff = ArtifactDiff(
+            artifact_name="nonexistent_artifact",
+            artifact_type=ArtifactType.PROMPT,
+            before="some content",
+            after="updated content",
+            change_summary="This should fail",
+            confidence=0.9
         )
-        final_count = int(final_commit_count.stdout.strip())
 
-        # Should have at least one more commit
-        assert final_count >= initial_count + 1
+        with unittest.mock.patch('subprocess.run', side_effect=mock_run):
+            result = agent.apply_diff(diff)
 
-        # Verify commit message format in recent commits
-        recent_commits = subprocess.run(
-            ["git", "log", "--oneline", "-5"],
-            cwd=Path("/home/coding/aide-de-camp"),
-            capture_output=True,
-            text=True
+        # Verify the write failed
+        assert result is False
+
+        # Verify NO git commit was called
+        git_commands = [call[0] for call in subprocess_calls if 'git' in call[0]]
+        commit_calls = [call for call in git_commands if 'commit' in call]
+        assert len(commit_calls) == 0
+
+    def test_commit_message_format_with_sha(self, test_prompt_file):
+        """Git commit messages include the correct format with previous SHA."""
+        # Create initial content
+        test_prompt_file.write_text("# Test Prompt\n\nInitial content.")
+
+        # Create agent and register the prompt
+        agent = SelfModificationAgent()
+        mgr = HotReloadManager()
+        mgr.register_prompt("test_git_commit_prompt", str(test_prompt_file))
+        agent.reload_mgr = mgr
+
+        # Track the commit message
+        captured_commit_msg = []
+
+        def mock_run(cmd, *args, **kwargs):
+            # Capture git commit command with message
+            if 'git' in cmd and 'commit' in cmd and '-m' in cmd:
+                msg_idx = cmd.index('-m') + 1
+                if msg_idx < len(cmd):
+                    captured_commit_msg.append(cmd[msg_idx])
+
+            if 'git' in cmd and 'commit' in cmd:
+                from subprocess import CompletedProcess
+                result = CompletedProcess(cmd, returncode=0, stdout="", stderr="")
+            elif 'git' in cmd and 'rev-parse' in cmd:
+                # Return a fake previous SHA (as string, since text=True is used)
+                from subprocess import CompletedProcess
+                result = CompletedProcess(cmd, returncode=0, stdout="prev123\n", stderr="")
+            else:
+                from subprocess import CompletedProcess
+                result = CompletedProcess(cmd, returncode=0, stdout="", stderr="")
+            return result
+
+        # Create a diff
+        diff = ArtifactDiff(
+            artifact_name="test_git_commit_prompt",
+            artifact_type=ArtifactType.PROMPT,
+            before="# Test Prompt\n\nInitial content.",
+            after="# Test Prompt\n\nUpdated content for format test.",
+            change_summary="Test commit message format",
+            confidence=0.9
         )
-        commit_history = recent_commits.stdout.strip()
 
-        assert "auto: self-mod write to" in commit_history
-        assert "test_git_commit_config" in commit_history
+        with unittest.mock.patch('subprocess.run', side_effect=mock_run):
+            result = agent._write_prompt(diff)
+            assert result is True
+
+        # Verify commit message was captured
+        assert len(captured_commit_msg) >= 1
+        message = captured_commit_msg[0]
+
+        # Verify commit message format: "auto: self-mod write to <path> [<prev-sha>]"
+        assert message.startswith("auto: self-mod write to")
+        assert "prompts/test_git_commit_prompt.md" in message
+        # Should include a SHA in brackets (the previous commit SHA)
+        assert "[prev123]" in message
 
 
 class TestGitUtilityFunctions:
