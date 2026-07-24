@@ -1,15 +1,15 @@
 {
-  "bead_id": "adc-25sn9",
+  "bead_id": "adc-2vpcl",
   "agent": "claude-code-glm-4.7",
   "provider": "zai",
   "model": "glm-4.7",
   "exit_code": 0,
   "outcome": "success",
-  "duration_ms": 99175,
+  "duration_ms": 136892,
   "input_tokens": null,
   "output_tokens": null,
   "cost_usd": null,
-  "captured_at": "2026-07-24T08:55:39.007954190Z",
+  "captured_at": "2026-07-24T08:24:44.292630954Z",
   "trace_format": "claude_json",
   "pruned": false,
   "template_version": null
