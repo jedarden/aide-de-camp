@@ -179,6 +179,44 @@ def git_rev_parse(ref: str, short: bool = False, cwd: Optional[Path] = None) -> 
     args.append(ref)
     return run_git_command(args, cwd=cwd)
 
+
+def generate_self_mod_commit_message(file_path: Path, cwd: Optional[Path] = None) -> str:
+    """
+    Generate a standardized commit message for self-modification writes.
+
+    Creates a commit message with the format:
+    'auto: self-mod write to <path> [<commit-short-sha>]'
+    where <commit-short-sha> is the short SHA of the current HEAD (the commit
+    we are building on top of).
+
+    Args:
+        file_path: Path to the file being modified (relative or absolute)
+        cwd: Working directory (defaults to aide-de-camp repo root)
+
+    Returns:
+        Commit message string with path and optional previous commit SHA
+    """
+    if cwd is None:
+        cwd = Path("/home/coding/aide-de-camp")
+
+    # Get relative path from repo root
+    try:
+        rel_path = Path(file_path).relative_to(cwd)
+    except ValueError:
+        # If file_path is already relative or outside repo, use as-is
+        rel_path = Path(file_path)
+
+    # Get the short SHA of the current HEAD (previous commit)
+    # This will be included in the commit message to show what we're building on
+    head_result = git_rev_parse('HEAD', short=True, cwd=cwd)
+
+    if head_result.success and head_result.stdout.strip():
+        prev_commit_sha = head_result.stdout.strip()
+        return f"auto: self-mod write to {rel_path} [{prev_commit_sha}]"
+    else:
+        # No previous commit (e.g., initial commit or empty repo)
+        return f"auto: self-mod write to {rel_path}"
+
 # Prompt paths read per-invocation so edits take effect without a server restart
 # (hot-reload), matching the pattern in src/synthesize/strand.py and
 # src/intent/router.py.
@@ -517,25 +555,27 @@ class SelfModificationAgent:
             # Get relative path from repo root
             rel_path = artifact_path.relative_to(repo_root)
 
-            # Stage the file (only this specific file)
+            # Stage the file (use -A to handle files that may be in weird states)
+            # This works for new files, modified files, and files that were deleted then recreated
             subprocess.run(
-                ['git', 'add', str(rel_path)],
+                ['git', 'add', '-A', str(rel_path)],
                 cwd=repo_root,
                 capture_output=True,
-                check=False,  # Don't fail if there are other uncommitted changes
+                check=False,
                 timeout=10
             )
 
-            # Create commit message with format: 'auto: self-mod write to <path>'
-            commit_msg = f"auto: self-mod write to {rel_path}"
+            # Generate standardized commit message with previous commit SHA
+            commit_msg = generate_self_mod_commit_message(rel_path, cwd=repo_root)
 
-            # Create the commit (only this specific file)
+            # Create the commit (file is now staged)
+            # Only commit staged changes, ignoring other unstaged changes
             result = subprocess.run(
-                ['git', 'commit', '-m', commit_msg, '--', str(rel_path)],
+                ['git', 'commit', '-m', commit_msg],
                 cwd=repo_root,
                 capture_output=True,
                 text=True,
-                check=False,  # Don't fail if there are other uncommitted changes
+                check=False,
                 timeout=10
             )
 
