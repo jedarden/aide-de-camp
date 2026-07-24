@@ -111,9 +111,24 @@ class ZAIClient:
         self._client: Optional[httpx.AsyncClient] = None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create HTTP client."""
+        """Get or create HTTP client with connection pooling."""
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=self.timeout, verify=False)
+            # Configure connection pooling for reduced latency
+            # - HTTP/1.1 keepalive for connection reuse
+            # - Connection limits for ZAI proxy
+            # - Softer timeouts for connection establishment
+            limits = httpx.Limits(
+                max_keepalive_connections=10,
+                max_connections=20,
+                keepalive_expiry=30.0
+            )
+            self._client = httpx.AsyncClient(
+                timeout=self.timeout,
+                verify=False,
+                limits=limits,
+                http1=True,  # Force HTTP/1.1 for better compatibility
+                headers={"Connection": "keep-alive"}
+            )
         return self._client
 
     async def close(self) -> None:
@@ -355,3 +370,22 @@ def get_zai_client(
             timeout=timeout,
         )
     return _client
+
+
+def get_router_zai_client(
+    proxy_url: str = ZAI_PROXY_URL,
+    default_model: str = DEFAULT_MODEL,
+    timeout: float = 8.0,
+) -> ZAIClient:
+    """
+    Get or create a dedicated ZAI client instance for router requests.
+
+    Uses more aggressive connection pooling and shorter timeout for fail-fast behavior.
+    Router requests are latency-sensitive and need rapid failure detection.
+    """
+    # Create a dedicated router client with optimized settings
+    return ZAIClient(
+        proxy_url=proxy_url,
+        default_model=default_model,
+        timeout=timeout,
+    )
