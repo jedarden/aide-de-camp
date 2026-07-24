@@ -17,6 +17,7 @@ from enum import Enum
 from ..components.hot_reload import get_reload_manager
 from ..components.library import get_library
 from ..escalate.llm import get_zai_client, ModelClass
+from ..freeze import ensure_unfrozen
 
 
 logger = getLogger(__name__)
@@ -526,12 +527,19 @@ class SelfModificationAgent:
             True if successful, False otherwise
         """
         try:
+            # Check freeze protection before writing
+            ensure_unfrozen()
+
             if diff.artifact_type == ArtifactType.PROMPT:
                 return self._write_prompt(diff)
             elif diff.artifact_type == ArtifactType.CONFIG:
                 return self._write_config(diff)
             elif diff.artifact_type == ArtifactType.COMPONENT:
                 return self._write_component(diff)
+            return False
+        except RuntimeError as e:
+            # Clear error for freeze protection
+            print(f"Cannot apply diff: {e}")
             return False
         except Exception as e:
             print(f"Failed to apply diff: {e}")
