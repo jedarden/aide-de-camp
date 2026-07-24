@@ -141,9 +141,16 @@ class SynthesizeStrand:
                 temperature=0.3,  # Lower temperature for more deterministic, faster outputs
             )
 
-            # Strip markdown code fences and parse JSON (using centralized parser for optimal performance)
-            raw = strip_markdown_fences(response)
-            result_data = json.loads(raw)
+            # Parse JSON response using centralized parser
+            # Note: Synthesize uses fallback result pattern (not corrective retry)
+            # because fetch operations are expensive and should not be discarded.
+            # See docs/error-handling-standardization.md for pattern comparison.
+            try:
+                result_data = parse_llm_response(response)
+            except ParseLLMError as e:
+                logger.error(f"Failed to parse synthesize response: {e}")
+                # Fall through to fallback result below
+                raise json.JSONDecodeError(str(e), doc="", pos=0) from e
 
             # Extract fields
             data = result_data.get("data", {})
@@ -185,11 +192,25 @@ class SynthesizeStrand:
             return result
 
         except json.JSONDecodeError as e:
+            """
+            Synthesize uses fallback result pattern (not corrective retry).
+
+            Reasoning: Synthesize runs AFTER expensive fetch operations.
+            Fetch data already obtained — should never be discarded.
+            Fallback result allows displaying raw data in degraded-state UX.
+            No retry needed (would re-run expensive fetch operations).
+
+            See docs/error-handling-standardization.md for pattern comparison.
+            """
             logger.error(f"Failed to parse synthesize response as JSON: {e}")
-            # Fallback: return minimal result
+            # Fallback: return minimal result with error context
             return SynthesizeResult(
                 intent_id=request.intent_id,
-                data={"type": "error", "error": "Failed to parse synthesis response"},
+                data={
+                    "type": "error",
+                    "error": "Failed to parse synthesis response",
+                    "parse_error": str(e),  # Preserve error details for debugging
+                },
                 summary="An error occurred while processing the result.",
                 urgency=Urgency.NORMAL,
             )
