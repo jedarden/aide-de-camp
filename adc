@@ -1,8 +1,9 @@
-#!/usr/bin/env python3
+#!/home/coding/aide-de-camp/.venv/bin/python
 """
 ADC (aide-de-camp) CLI entry point.
 
 This is the main executable script for the adc command-line interface.
+Uses the repo venv (.venv/bin/python) per CLAUDE.md guidelines.
 """
 
 import sys
