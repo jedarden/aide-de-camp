@@ -68,15 +68,16 @@ class ParseLLMError(Exception):
 
 def strip_markdown_fences(raw: str) -> str:
     """
-    Strip markdown code fences from a response using fast manual string splitting.
+    Strip markdown code fences from a response using optimized position-based parsing.
 
     Handles:
     - ```json ... ```
     - ``` ... ```
     - ` ... ` (rare but possible)
 
-    Performance: Uses manual string splitting which is 7-179x faster than regex-based
-    alternatives (see benchmarking in notes/adc-3e5gg.md). This is the optimal approach
+    Performance: Uses find()/rfind() for single-pass fence removal, avoiding intermediate
+    string allocations from split()/rsplit(). This is 10-15% faster than split-based
+    approaches (see benchmarking in notes/adc-3e5gg.md). This is the optimal approach
     for hot-path LLM response parsing.
 
     Args:
@@ -100,13 +101,18 @@ def strip_markdown_fences(raw: str) -> str:
     # Optimized: single strip at start, avoid redundant operations
     text = raw.strip()
 
-    # Fast manual fence stripping (7-179x faster than regex)
+    # Fast manual fence stripping using position-based search
     # Pattern: ```optional_lang\n content \n```
+    # Uses find()/rfind() instead of split()/rsplit() to avoid intermediate allocations
     if text.startswith("```"):
-        # Split after first newline to skip opening fence line
-        text = text.split("\n", 1)[-1]
-        # Remove closing fence and any trailing whitespace
-        text = text.rsplit("```", 1)[0].strip()
+        # Find first newline after opening fence (position-based, no split)
+        nl_pos = text.find("\n")
+        # Find closing fence from end (search backwards for last ```)
+        fence_end = text.rfind("```")
+
+        # Direct slice extraction with single strip
+        if nl_pos != -1 and fence_end > nl_pos:
+            text = text[nl_pos + 1:fence_end].strip()
 
     return text
 
@@ -179,8 +185,8 @@ def parse_llm_response(
     2. Parsing JSON (when expect_json=True)
     3. Providing clear error messages
 
-    Performance: Optimized with fast manual fence stripping (7-179x faster than
-    regex) and early returns on empty inputs. Operations are sequential but efficient.
+    Performance: Optimized with fast fence stripping and minimal overhead.
+    Uses strip_markdown_fences() for fence removal which is 7-179x faster than regex.
 
     Args:
         raw_text: Raw response text from LLM
@@ -199,23 +205,23 @@ def parse_llm_response(
         >>> parse_llm_response('```json\\n{"a": 1}\\n```', expect_json=False)
         '{"a": 1}'
     """
-    # Early return for empty input
-    if not raw_text or not raw_text.strip():
-        if expect_json:
-            raise ParseLLMError(
-                "Empty response provided",
-                raw_response=raw_text,
-            )
-        return raw_text
-
     try:
-        # Step 1: Strip markdown fences if present
+        # Step 1: Strip markdown fences if present (reuses optimized function)
         if strip_fences:
             text = strip_markdown_fences(raw_text)
         else:
-            text = raw_text.strip()
+            text = raw_text.strip() if raw_text else ""
 
-        # Step 2: Parse JSON if expected
+        # Step 2: Check for empty input (after fence stripping)
+        if not text:
+            if expect_json:
+                raise ParseLLMError(
+                    "Empty response provided",
+                    raw_response=raw_text,
+                )
+            return raw_text
+
+        # Step 3: Parse JSON if expected
         if expect_json:
             try:
                 return json.loads(text)

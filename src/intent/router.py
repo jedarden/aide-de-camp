@@ -228,9 +228,15 @@ class IntentRouter:
 
             # Measure JSON parsing time
             parse_start = time.perf_counter()
-            # Parse JSON response using centralized parser (optimized with manual fence stripping)
-            # Let ParseLLMError bubble to retry handler below
-            intents_data = parse_llm_response(response)
+            try:
+                # Optimized JSON parsing using centralized parser
+                # Uses single-pass find()/rfind() approach (faster than split/rsplit)
+                # Handles GLM-4.7's markdown-fenced responses efficiently
+                # See src/llm/response_parser.py for implementation
+                intents_data = parse_llm_response(response, strip_fences=True, expect_json=True)
+            except ParseLLMError as e:
+                # Already has raw_response attached; just re-raise
+                raise e
             parse_ms = (time.perf_counter() - parse_start) * 1000
 
             # Log detailed timing breakdown for latency profiling
