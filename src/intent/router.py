@@ -494,7 +494,7 @@ class IntentRouter:
                 system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
-                max_tokens=80,  # OPTIMIZATION 2: Reduced from 96 to 80 - intent JSON is typically 40-70 tokens (single: ~40-50, multi: ~60-80)
+                max_tokens=128,  # OPTIMIZATION 2: Increased from 80 to 128 - supports multi-intent responses (typically 100-120 tokens for 2-3 intents)
                 temperature=0.0,
                 return_timing=True,  # Request timing breakdown from LLM client
             )
