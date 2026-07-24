@@ -404,3 +404,102 @@ class TestIntentCache:
         cache.set("key_1000", [classification])
         stats = cache.get_stats()
         assert stats["size"] == 1000
+
+    def test_cache_stats_logging_format(self):
+        """Cache statistics string should have the correct format: cache_hit_rate=X.XX% entries=Y"""
+        from src.intent.router import IntentRouter
+
+        router = IntentRouter()
+
+        # Add some cache entries and generate hits/misses
+        classification = IntentClassification(
+            intent_type=IntentType.STATUS,
+            project_slug="test-project",
+            confidence=0.9,
+        )
+
+        # Add an entry to cache
+        router._cache.set("test_key", [classification])
+
+        # Generate some hits
+        for _ in range(5):
+            router._cache.get("test_key")
+
+        # Generate some misses
+        for _ in range(3):
+            router._cache.get("nonexistent_key")
+
+        # Get the cache stats string
+        stats_string = router._get_cache_stats_string()
+
+        # Verify format: cache_hit_rate=X.XX% entries=Y
+        assert "cache_hit_rate=" in stats_string
+        assert "%" in stats_string
+        assert "entries=" in stats_string
+
+        # Verify the format matches expected pattern
+        import re
+        pattern = r"cache_hit_rate=\d+\.\d{2}% entries=\d+"
+        assert re.match(pattern, stats_string), f"Stats string '{stats_string}' doesn't match expected format"
+
+        # Verify the actual values are correct
+        stats = router._cache.get_stats()
+        expected_hit_rate = f"{stats['hit_rate']:.2f}%"
+        expected_entries = f"entries={stats['size']}"
+        assert expected_hit_rate in stats_string
+        assert expected_entries in stats_string
+
+    def test_cache_stats_in_timing_breakdown(self):
+        """Cache statistics should appear in classify() timing breakdown log."""
+        import asyncio
+        import logging
+        from io import StringIO
+        from src.intent.router import IntentRouter
+
+        # Set up a log capture
+        log_capture = StringIO()
+        handler = logging.StreamHandler(log_capture)
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(message)s')
+        handler.setFormatter(formatter)
+
+        # Get the logger used by router
+        router_logger = logging.getLogger('src.intent.router')
+        router_logger.addHandler(handler)
+        router_logger.setLevel(logging.INFO)
+
+        router = IntentRouter()
+
+        # Prime the cache with a known utterance
+        classification = IntentClassification(
+            intent_type=IntentType.STATUS,
+            project_slug="test-project",
+            confidence=0.9,
+        )
+
+        # Add to cache
+        router._cache.set("test_utterance", [classification])
+
+        # Make a call that hits the cache
+        async def test_call():
+            result, timing = await router.classify_utterance("test_utterance", "test-session")
+            return result, timing
+
+        result, timing = asyncio.run(test_call())
+
+        # Get the log output
+        log_output = log_capture.getvalue()
+
+        # Clean up handler
+        router_logger.removeHandler(handler)
+
+        # Verify cache statistics appear in the log
+        assert "cache_hit_rate=" in log_output, f"Cache hit rate not found in log output: {log_output}"
+        assert "entries=" in log_output, f"Entries count not found in log output: {log_output}"
+
+        # Verify it's in the timing breakdown format
+        assert "router_timing breakdown:" in log_output, "Timing breakdown not found in log output"
+
+        # Verify the format includes both cache stats and timing breakdown
+        assert any(line for line in log_output.split('\n') if 'cache_hit_rate=' in line and 'entries=' in line), \
+            f"Cache statistics not found in timing breakdown: {log_output}"
