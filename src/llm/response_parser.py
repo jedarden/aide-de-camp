@@ -12,6 +12,33 @@ This utility is used across:
 - Synthesize Strand (src/synthesize/strand.py)
 - Self-Modification Agent (src/agents/self_modification.py)
 - Any other LLM interaction points
+
+## Error Handling Patterns
+
+When ParseLLMError is raised, choose recovery strategy based on context:
+
+### Corrective Retry Pattern (Router-style)
+Use when:
+- LLM call is early in pipeline (cheap to retry)
+- Failure cascades to downstream operations
+- Retrying doesn't require re-running expensive operations
+
+Example: Intent router retries once because malformed response affects all downstream processing.
+
+See: src/intent/router.py classify_utterance()
+
+### Fallback Result Pattern (Synthesize-style)
+Use when:
+- LLM call is AFTER expensive operations (fetch, DB queries, etc.)
+- Data already obtained should not be discarded
+- User should see partial results in degraded-state UX
+
+Example: Synthesize strand returns fallback result because fetch operations already completed.
+
+See: src/synthesize/strand.py synthesize()
+
+### Documentation
+See: docs/error-handling-standardization.md for complete pattern comparison and examples.
 """
 
 import json
@@ -23,7 +50,17 @@ logger = getLogger(__name__)
 
 
 class ParseLLMError(Exception):
-    """Raised when LLM response parsing fails."""
+    """
+    Raised when LLM response parsing fails.
+
+    Attributes:
+        message: Human-readable error message
+        raw_response: The raw LLM response text that failed parsing (preserved for debugging)
+
+    The raw_response attribute is critical for debugging and degraded-state UX.
+    Always pass it when raising ParseLLMError so error handlers can include
+    response snippets in error events and logs.
+    """
 
     def __init__(self, message: str, raw_response: Optional[str] = None):
         self.raw_response = raw_response
