@@ -341,6 +341,16 @@ class IntentRouter:
         cache_key = self.generate_cache_key(utterance, session_id)
         self._cache.set(cache_key, classifications)
 
+    def _get_cache_stats_string(self) -> str:
+        """
+        Get formatted cache statistics string for logging.
+
+        Returns:
+            Formatted string with cache hit rate and entries count
+        """
+        stats = self._cache.get_stats()
+        return f"cache_hit_rate={stats['hit_rate']:.2f}% entries={stats['size']}"
+
     def _log_cache_stats_if_needed(self) -> None:
         """Log cache hit rate statistics periodically."""
         if self._cache.should_log_stats():
@@ -421,6 +431,15 @@ class IntentRouter:
         if cached_result is not None:
             # Log cache statistics periodically
             self._log_cache_stats_if_needed()
+
+            # Log cache hit with cache statistics in timing breakdown format
+            cache_stats = self._get_cache_stats_string()
+            logger.info(
+                f"router_timing breakdown: "
+                f"cached=True "
+                f"intents={len(cached_result)} "
+                f"{cache_stats}"
+            )
 
             # Return empty timing breakdown for cached results (no actual LLM call was made)
             empty_breakdown = {
@@ -534,6 +553,7 @@ class IntentRouter:
             # This shows WHERE the 1,587-2,074ms latency is spent across the 4 investigation areas
             network_str = f"{timing_network_ms:.2f}" if timing_network_ms is not None else "N/A"
             calculated_inference_str = f"{calculated_inference_ms:.2f}" if calculated_inference_ms is not None else "N/A"
+            cache_stats = self._get_cache_stats_string()
             logger.info(
                 f"router_timing breakdown: "
                 f"prompt_construction_ms={prompt_ms:.2f} "
@@ -543,7 +563,8 @@ class IntentRouter:
                 f"json_parse_ms={parse_ms:.2f} "
                 f"process_ms={process_ms:.2f} "
                 f"total_ms={total_ms:.2f} "
-                f"intents={len(classifications)}"
+                f"intents={len(classifications)} "
+                f"{cache_stats}"
             )
 
             logger.info(f"Classified {len(classifications)} intents from utterance")
