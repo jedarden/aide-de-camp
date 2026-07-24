@@ -429,3 +429,50 @@ async def rehearsal(
     result = subprocess.run(cmd, cwd=repo_dir)
 
     return result.returncode
+
+
+def freeze_cmd(toggle: bool) -> int:
+    """
+    Manage self-modification freeze state.
+
+    View or toggle the freeze protection that blocks self-modification writes.
+
+    Args:
+        toggle: If True, toggle freeze state (create or remove sentinel file)
+
+    Returns:
+        Exit code (0 for success, non-zero for error)
+    """
+    from src.freeze import get_status, set_frozen
+
+    if toggle:
+        # Get current state before toggling
+        current = get_status()
+        new_state = not current["frozen"]
+        set_frozen(new_state)
+
+        if new_state:
+            print("✓ Self-modification frozen (created data/FREEZE)")
+            print("  To unfreeze, run: adc freeze --toggle")
+        else:
+            print("✓ Self-modification unfrozen (removed data/FREEZE)")
+        return 0
+
+    # Show current status
+    status = get_status()
+
+    print("\n🔒 Self-Modification Freeze Status\n")
+
+    if status["frozen"]:
+        print(f"  Status: 🔴 FROZEN")
+        print(f"  Reason: {status['reason']}\n")
+        print("  Self-modification writes are blocked.")
+        print("  To unfreeze:")
+        print("    - If env var: unset ADC_SELFMOD_FREEZE")
+        print("    - If sentinel: adc freeze --toggle\n")
+    else:
+        print(f"  Status: 🟢 UNFROZEN\n")
+        print("  Self-modification writes are enabled.")
+        print("  To freeze: adc freeze --toggle\n")
+
+    return 0
