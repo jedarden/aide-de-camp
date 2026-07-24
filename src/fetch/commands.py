@@ -5,9 +5,15 @@ Each intent type has a specific set of sources to query, with their
 corresponding commands and timeout settings.
 """
 
+from __future__ import annotations
+
+import time
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 
 class IntentType(Enum):
@@ -61,6 +67,196 @@ KUBECTL_PROXIES: dict[str, str] = {
     "iad-options": "http://traefik-iad-options:8001",
 }
 
+# Fetch configuration file path
+FETCH_CONFIG_PATH = Path(__file__).parent.parent.parent / "config" / "fetch.yaml"
+
+# In-memory cache for fetch config
+_fetch_config_cache: dict | None = None
+_fetch_config_mtime: float = 0
+
+
+class FetchConfigValidationError(Exception):
+    """Raised when the fetch config schema is invalid."""
+    def __init__(self, errors: list[str]):
+        self.errors = errors
+        message = "Fetch config validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
+        super().__init__(message)
+
+
+def _validate_timeout_ms(value: Any, source_name: str) -> int | None:
+    """
+    Validate a timeout_ms value.
+
+    Args:
+        value: The timeout value to validate
+        source_name: Name of the source for error messages
+
+    Returns:
+        The validated timeout as int in seconds, or None if not specified
+
+    Raises:
+        FetchConfigValidationError: If the timeout value is invalid
+    """
+    if value is None:
+        return None
+
+    # Must be an integer or float that can be converted to int
+    if not isinstance(value, (int, float)):
+        raise FetchConfigValidationError([
+            f"{source_name}: timeout_ms must be a number, got {type(value).__name__}"
+        ])
+
+    # Convert to seconds (timeout_ms is in milliseconds)
+    timeout_seconds = int(value) / 1000
+
+    # Must be positive
+    if timeout_seconds <= 0:
+        raise FetchConfigValidationError([
+            f"{source_name}: timeout_ms must be positive, got {value}"
+        ])
+
+    return timeout_seconds
+
+
+def _load_fetch_config() -> dict:
+    """
+    Load fetch configuration from YAML file.
+
+    Returns:
+        Dictionary with source timeouts. Empty dict if file not found or invalid.
+
+    Raises:
+        FetchConfigValidationError: If config schema is invalid
+    """
+    global _fetch_config_cache, _fetch_config_mtime
+
+    # Check if we need to reload (file modified or not loaded yet)
+    try:
+        current_mtime = FETCH_CONFIG_PATH.stat().st_mtime
+        if _fetch_config_cache is not None and current_mtime == _fetch_config_mtime:
+            return _fetch_config_cache
+    except OSError:
+        # File doesn't exist or can't be accessed
+        return {}
+
+    # Load the YAML file
+    try:
+        config = yaml.safe_load(FETCH_CONFIG_PATH.read_text()) or {}
+    except OSError:
+        return {}  # File doesn't exist
+
+    # Validate the config structure
+    errors = []
+
+    if "sources" in config:
+        if not isinstance(config["sources"], dict):
+            errors.append("'sources' must be a dictionary")
+        else:
+            # Validate each source timeout
+            for source_name, timeout_config in config["sources"].items():
+                if not isinstance(timeout_config, dict):
+                    errors.append(f"sources.{source_name}: must be a dictionary, got {type(timeout_config).__name__}")
+                    continue
+
+                if "timeout_ms" in timeout_config:
+                    try:
+                        _validate_timeout_ms(timeout_config["timeout_ms"], f"sources.{source_name}")
+                    except FetchConfigValidationError as e:
+                        errors.extend(e.errors)
+
+    if errors:
+        raise FetchConfigValidationError(errors)
+
+    # Cache the validated config
+    _fetch_config_cache = config
+    _fetch_config_mtime = current_mtime
+
+    return config
+
+
+def get_source_timeout_ms(source: FetchSource, project_slug: str | None = None) -> int | None:
+    """
+    Get the configured timeout (in seconds) for a fetch source.
+
+    Checks the config file for timeout_ms value and converts to seconds.
+    Priority order:
+    1. Project-specific override (if project_slug provided)
+    2. Global source-specific timeout
+    3. None (use default from spec)
+
+    Args:
+        source: The fetch source to get timeout for
+        project_slug: Optional project slug for project-specific overrides
+
+    Returns:
+        Timeout in seconds, or None if not configured
+
+    Raises:
+        FetchConfigValidationError: If config is invalid (on hot-reload)
+    """
+    try:
+        config = _load_fetch_config()
+    except FetchConfigValidationError:
+        # On validation error, return None (use default) but log would be useful
+        return None
+
+    source_key = source.value  # Use enum value as key
+
+    # Check for project-specific override FIRST (if provided)
+    if project_slug:
+        project_timeouts = config.get("project_timeouts", {})
+        if project_slug in project_timeouts:
+            project_config = project_timeouts[project_slug]
+            if isinstance(project_config, dict) and source_key in project_config:
+                source_override = project_config[source_key]
+                if isinstance(source_override, dict) and "timeout_ms" in source_override:
+                    timeout_ms = source_override["timeout_ms"]
+                    if timeout_ms is not None:
+                        return int(timeout_ms) / 1000
+
+    # Check for global source-specific timeout
+    sources_config = config.get("sources", {})
+    if source_key in sources_config:
+        source_config = sources_config[source_key]
+        if "timeout_ms" in source_config:
+            timeout_ms = source_config["timeout_ms"]
+            if timeout_ms is not None:
+                # Convert milliseconds to seconds
+                return int(timeout_ms) / 1000
+
+    # No timeout configured
+    return None
+
+
+def get_effective_timeout(spec: FetchCommandSpec, project_slug: str | None = None) -> int | float:
+    """
+    Get the effective timeout for a fetch command spec.
+
+    Priority order:
+    1. Project-specific timeout_ms from config file (if project_slug provided and set)
+    2. Global timeout_ms from config file (if set)
+    3. timeout_seconds from spec (default)
+    4. No timeout (infinity) if neither is set
+
+    Args:
+        spec: The fetch command spec
+        project_slug: Optional project slug for project-specific overrides
+
+    Returns:
+        Timeout in seconds, or float('inf') for no timeout
+    """
+    # Check config file first
+    config_timeout = get_source_timeout_ms(spec.source, project_slug)
+    if config_timeout is not None:
+        return config_timeout
+
+    # Fall back to spec's default
+    if spec.timeout_seconds is not None:
+        return spec.timeout_seconds
+
+    # No timeout - use infinity
+    return float('inf')
+
 
 @dataclass
 class FetchCommandSpec:
@@ -70,6 +266,7 @@ class FetchCommandSpec:
     timeout_seconds: int = 5
     required: bool = False
     cacheable: bool = True
+    timeout_ms: int | None = None  # Optional override from config/fetch.yaml
 
 
 # Command matrix per intent type
