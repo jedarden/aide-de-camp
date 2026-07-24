@@ -269,7 +269,7 @@ class TestProgressUpdatesOnThreadCards:
     """AC3: Test verifies progress updates appear on per-thread cards."""
 
     def test_thread_progress_updates_single_thread_card(self):
-        """A thread_progress event updates a single thread card's progress text
+        """A fetch_progress event updates a single thread card's progress text
         (e.g., '3/5 sources in')."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -278,8 +278,8 @@ class TestProgressUpdatesOnThreadCards:
                 "utterance": "Progress test",
                 "intent_ids": ["thread-progress-1"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-progress-1",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-progress-1",
                 "completed": 3,
                 "total": 5,
             }},
@@ -293,8 +293,8 @@ class TestProgressUpdatesOnThreadCards:
         assert t["pendingThreadCount"] == 1
 
     def test_thread_progress_targets_specific_thread_among_many(self):
-        """When multiple thread cards exist, a thread_progress event updates only
-        the specific thread card matching the thread_id, not all cards."""
+        """When multiple thread cards exist, a fetch_progress event updates only
+        the specific thread card matching the intent_id, not all cards."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
             {"action": "event", "name": "dispatch_ack", "data": {
@@ -302,8 +302,8 @@ class TestProgressUpdatesOnThreadCards:
                 "utterance": "Multiple threads progress",
                 "intent_ids": ["thread-a", "thread-b", "thread-c"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-b",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-b",
                 "completed": 7,
                 "total": 10,
             }},
@@ -329,18 +329,18 @@ class TestProgressUpdatesOnThreadCards:
                 "utterance": "Incremental progress",
                 "intent_ids": ["thread-incremental"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-incremental",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-incremental",
                 "completed": 1,
                 "total": 5,
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-incremental",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-incremental",
                 "completed": 2,
                 "total": 5,
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-incremental",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-incremental",
                 "completed": 5,
                 "total": 5,
             }},
@@ -364,8 +364,8 @@ class TestProgressUpdatesOnThreadCards:
                 "utterance": "Elapsed time test",
                 "intent_ids": ["thread-elapsed"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-elapsed",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-elapsed",
                 "completed": 2,
                 "total": 3,
             }},
