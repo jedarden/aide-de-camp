@@ -37,10 +37,15 @@ logger = getLogger(__name__)
 
 # Router response cache - LRU cache for repeated utterances within a session
 # Key: (utterance_hash, session_id), Value: (classifications, timestamp)
-# 15-minute TTL for cache entries - user intent doesn't change frequently in conversation
+# 5-minute TTL for cache entries - intent classification stable over short window
 _ROUTER_CACHE: dict[tuple[str, str], tuple[list, float]] = {}
-_CACHE_TTL = 900  # 15 minutes - longer TTL for better hit rate in conversation flow
+_CACHE_TTL = 300  # 5 minutes - intent classification stable over short window
 _MAX_CACHE_SIZE = 1000  # Increased capacity for more cache hits
+
+# Cache statistics for hit rate tracking
+_cache_hits = 0
+_cache_misses = 0
+_cache_stats_log_interval = 50  # Log cache stats every 50 classifications
 
 
 # Router error types for degraded-state handling
@@ -166,8 +171,39 @@ class IntentRouter:
         import hashlib
         return hashlib.md5(utterance.encode()).hexdigest()
 
+    def generate_cache_key(self, utterance: str, intent_type_context: str | None = None) -> str:
+        """
+        Generate a SHA256 hash key for caching based on utterance and optional context.
+
+        Args:
+            utterance: The user utterance to hash
+            intent_type_context: Optional context string (e.g., intent type, session state)
+
+        Returns:
+            SHA256 hex digest (32 characters) of the combined utterance and context
+
+        Examples:
+            >>> generate_cache_key("check pods", "status")
+            'a1b2c3d4e5f6...'  # 32-character hex string
+            >>> generate_cache_key("check pods", None)  # Same as no context
+            'differenthashvalue...'  # Different hash without context
+        """
+        import hashlib
+
+        # Handle None/empty context gracefully - treat as empty string
+        context = intent_type_context or ""
+
+        # Combine utterance and context with a delimiter to avoid collisions
+        # e.g., "test" + "status" vs "teststatus" + ""
+        combined = f"{utterance}|{context}"
+
+        # Generate SHA256 hash and return hex digest (32 characters)
+        return hashlib.sha256(combined.encode()).hexdigest()
+
     def _get_cached_classification(self, utterance: str, session_id: str) -> list[IntentClassification] | None:
         """Check cache for existing classification."""
+        global _cache_hits, _cache_misses
+
         utterance_hash = self._get_utterance_hash(utterance)
         cache_key = (utterance_hash, session_id)
 
@@ -175,6 +211,7 @@ class IntentRouter:
             classifications, timestamp = _ROUTER_CACHE[cache_key]
             age = time.time() - timestamp
             if age < _CACHE_TTL:
+                _cache_hits += 1
                 logger.info(f"Router cache HIT for utterance hash {utterance_hash[:8]} (age: {age:.1f}s)")
                 return classifications
             else:
@@ -182,6 +219,8 @@ class IntentRouter:
                 del _ROUTER_CACHE[cache_key]
                 logger.info(f"Router cache EXPIRED for utterance hash {utterance_hash[:8]}")
 
+        # Cache miss or expired
+        _cache_misses += 1
         return None
 
     def _cache_classification(self, utterance: str, session_id: str, classifications: list[IntentClassification]) -> None:
@@ -197,6 +236,29 @@ class IntentRouter:
         cache_key = (utterance_hash, session_id)
         _ROUTER_CACHE[cache_key] = (classifications, time.time())
         logger.info(f"Router cache STORED utterance hash {utterance_hash[:8]} (cache size: {len(_ROUTER_CACHE)})")
+
+    def _log_cache_stats_if_needed(self) -> None:
+        """Log cache hit rate statistics periodically."""
+        global _cache_hits, _cache_misses
+        total_requests = _cache_hits + _cache_misses
+
+        if total_requests > 0 and total_requests % _cache_stats_log_interval == 0:
+            hit_rate = (_cache_hits / total_requests) * 100
+            logger.info(
+                f"Router cache statistics: "
+                f"hits={_cache_hits} misses={_cache_misses} "
+                f"hit_rate={hit_rate:.1f}% "
+                f"total_requests={total_requests} "
+                f"cache_size={len(_ROUTER_CACHE)}"
+            )
+
+    def _clear_cache(self) -> None:
+        """Clear the router cache. Used primarily for testing and diagnostics."""
+        global _ROUTER_CACHE, _cache_hits, _cache_misses
+        _ROUTER_CACHE.clear()
+        _cache_hits = 0
+        _cache_misses = 0
+        logger.info("Router cache cleared")
 
     async def _get_store(self):
         """Get or create session store."""
@@ -237,7 +299,7 @@ class IntentRouter:
         utterance: str,
         session_id: str,
         retry_on_malformed: bool = True,
-    ) -> list[IntentClassification]:
+    ) -> tuple[list[IntentClassification], dict]:
         """
         Classify an utterance into intents.
 
@@ -249,7 +311,7 @@ class IntentRouter:
             retry_on_malformed: If True, perform one corrective retry on JSON parse failure
 
         Returns:
-            List of IntentClassification objects
+            Tuple of (classifications list, timing_breakdown dict)
 
         Raises:
             RouterTimeoutError: LLM call timed out
@@ -260,6 +322,9 @@ class IntentRouter:
         # OPTIMIZATION 1: Check cache first (eliminates redundant LLM calls)
         cached_result = self._get_cached_classification(utterance, session_id)
         if cached_result is not None:
+            # Log cache statistics periodically
+            self._log_cache_stats_if_needed()
+
             # Return empty timing breakdown for cached results (no actual LLM call was made)
             empty_breakdown = {
                 "cached": True,
@@ -389,6 +454,7 @@ class IntentRouter:
             # Build timing breakdown for storage
             # Now includes separate network and inference timing measured by LLM client
             timing_breakdown = {
+                "cached": False,  # Cache miss - result from fresh ZAI proxy call
                 "prompt_construction_ms": round(prompt_ms, 2),
                 "proxy_call_ms": round(proxy_ms, 2),  # Total round-trip time (network + inference)
                 "proxy_network_ms": round(timing_network_ms, 2) if timing_network_ms is not None else None,
@@ -401,6 +467,9 @@ class IntentRouter:
 
             # OPTIMIZATION 1 (cont): Cache successful classifications
             self._cache_classification(utterance, session_id, classifications)
+
+            # Log cache statistics periodically (including this cache miss)
+            self._log_cache_stats_if_needed()
 
             return classifications, timing_breakdown
 
@@ -1340,3 +1409,20 @@ def get_router(store=None) -> IntentRouter:
     if _router is None:
         _router = IntentRouter(store=store)
     return _router
+
+
+def clear_router_cache() -> None:
+    """
+    Clear the global router cache.
+
+    This function resets the in-memory classification cache and statistics.
+    Primarily used for testing to ensure test isolation.
+
+    Example:
+        >>> clear_router_cache()
+        >>> router = get_router()
+        >>> classifications, timing = await router.classify_utterance("test", "session-1")
+        >>> assert timing["cached"] is False  # Fresh call after cache clear
+    """
+    router = get_router()
+    router._clear_cache()
