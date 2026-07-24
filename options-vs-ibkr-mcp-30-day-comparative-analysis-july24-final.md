@@ -1,7 +1,7 @@
 # Options Pipeline vs IBKR MCP: 30-Day Comparative Analysis - Final Report
 **Date:** July 24, 2026  
 **Analysis Period:** June 24 - July 24, 2026 (30 days)  
-**Bead ID:** adc-4fi39  
+**Bead ID:** adc-40dcg  
 **Analysis Type:** Comprehensive comparative analysis with fresh data verification
 
 ---
@@ -389,7 +389,7 @@ kubectl --server=http://traefik-ardenone-cluster:8001 delete pod ibkr-mcp-server
 **Report Generated:** July 24, 2026 15:45 EDT  
 **Analysis Period:** June 24, 2026 - July 24, 2026 (30 days)  
 **Clusters Analyzed:** iad-options, ardenone-cluster  
-**Bead ID:** adc-4fi39  
+**Bead ID:** adc-40dcg  
 **Analysis Status:** ✅ COMPLETED - Comprehensive comparative analysis with fresh data verification
 
 **Data Sources:**
