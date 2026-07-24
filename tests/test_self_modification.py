@@ -11,6 +11,7 @@ The ZAI client is mocked so the tests are deterministic and network-free.
 """
 
 import json
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -18,9 +19,17 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.agents.self_modification import (
+    ArtifactDiff,
     ArtifactType,
     ModificationRequest,
     SelfModificationAgent,
+    GitResult,
+    run_git_command,
+    git_status,
+    git_add,
+    git_commit,
+    git_show,
+    git_rev_parse,
 )
 from src.components.hot_reload import HotReloadManager
 from src.escalate.llm import ModelClass
@@ -262,3 +271,308 @@ class TestProcessInstructionEndToEnd:
         # heuristic stub would have produced for this instruction.
         assert "# User feedback:" not in diff.after
         assert "3 restarts" in diff.after
+
+
+class TestGitCommits:
+    """Git commits are created for prompt and config writes."""
+
+    @pytest.fixture
+    def test_prompt_file(self):
+        """Create a test prompt file in the prompts directory."""
+        test_prompt_path = Path("/home/coding/aide-de-camp/prompts/test_git_commit_prompt.md")
+        original_content = test_prompt_path.read_text() if test_prompt_path.exists() else None
+
+        yield test_prompt_path
+
+        # Cleanup: remove the test file (git keeps it in history)
+        if test_prompt_path.exists():
+            test_prompt_path.unlink()
+
+    @pytest.fixture
+    def test_config_file(self):
+        """Create a test config file in the config directory."""
+        test_config_path = Path("/home/coding/aide-de-camp/config/test_git_commit_config.yaml")
+        original_content = test_config_path.read_text() if test_config_path.exists() else None
+
+        yield test_config_path
+
+        # Cleanup: remove the test file (git keeps it in history)
+        if test_config_path.exists():
+            test_config_path.unlink()
+
+    def test_write_prompt_creates_git_commit(self, test_prompt_file):
+        """Writing a prompt file creates a git commit."""
+        # Create initial content
+        test_prompt_file.write_text("# Test Prompt\n\nInitial content.")
+
+        # Create agent and register the prompt
+        agent = SelfModificationAgent()
+        mgr = HotReloadManager()
+        mgr.register_prompt("test_git_commit_prompt", str(test_prompt_file))
+        agent.reload_mgr = mgr
+
+        # Create a diff representing a change
+        diff = ArtifactDiff(
+            artifact_name="test_git_commit_prompt",
+            artifact_type=ArtifactType.PROMPT,
+            before="# Test Prompt\n\nInitial content.",
+            after="# Test Prompt\n\nUpdated content for git commit test.",
+            change_summary="Update test prompt for git commit",
+            confidence=0.9
+        )
+
+        # Get initial commit count
+        initial_commit_count = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD"],
+            cwd=Path("/home/coding/aide-de-camp"),
+            capture_output=True,
+            text=True
+        )
+        initial_count = int(initial_commit_count.stdout.strip())
+
+        # Apply the diff (which should create a git commit)
+        result = agent._write_prompt(diff)
+
+        # Verify the write was successful
+        assert result is True
+
+        # Verify git commit was created
+        final_commit_count = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD"],
+            cwd=Path("/home/coding/aide-de-camp"),
+            capture_output=True,
+            text=True
+        )
+        final_count = int(final_commit_count.stdout.strip())
+
+        # Should have at least one more commit
+        assert final_count >= initial_count + 1
+
+        # Verify commit message format in recent commits
+        recent_commits = subprocess.run(
+            ["git", "log", "--oneline", "-5"],
+            cwd=Path("/home/coding/aide-de-camp"),
+            capture_output=True,
+            text=True
+        )
+        commit_history = recent_commits.stdout.strip()
+
+        assert "auto: self-mod write to" in commit_history
+        assert "test_git_commit_prompt" in commit_history
+
+    def test_write_config_creates_git_commit(self, test_config_file):
+        """Writing a config file creates a git commit."""
+        # Create initial content
+        test_config_file.write_text("key: value\noriginal: true")
+
+        # Create agent and register the config
+        agent = SelfModificationAgent()
+        mgr = HotReloadManager()
+        mgr.register_prompt("test_git_commit_config", str(test_config_file))
+        agent.reload_mgr = mgr
+
+        # Create a diff representing a change
+        diff = ArtifactDiff(
+            artifact_name="test_git_commit_config",
+            artifact_type=ArtifactType.CONFIG,
+            before="key: value\noriginal: true",
+            after="key: new_value\noriginal: false",
+            change_summary="Update test config for git commit",
+            confidence=0.8
+        )
+
+        # Get initial commit count
+        initial_commit_count = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD"],
+            cwd=Path("/home/coding/aide-de-camp"),
+            capture_output=True,
+            text=True
+        )
+        initial_count = int(initial_commit_count.stdout.strip())
+
+        # Apply the diff (which should create a git commit)
+        result = agent._write_config(diff)
+
+        # Verify the write was successful
+        assert result is True
+
+        # Verify git commit was created
+        final_commit_count = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD"],
+            cwd=Path("/home/coding/aide-de-camp"),
+            capture_output=True,
+            text=True
+        )
+        final_count = int(final_commit_count.stdout.strip())
+
+        # Should have at least one more commit
+        assert final_count >= initial_count + 1
+
+        # Verify commit message format in recent commits
+        recent_commits = subprocess.run(
+            ["git", "log", "--oneline", "-5"],
+            cwd=Path("/home/coding/aide-de-camp"),
+            capture_output=True,
+            text=True
+        )
+        commit_history = recent_commits.stdout.strip()
+
+        assert "auto: self-mod write to" in commit_history
+        assert "test_git_commit_config" in commit_history
+
+
+class TestGitUtilityFunctions:
+    """Git subprocess utility functions are testable in isolation."""
+
+    def test_run_git_command_success(self):
+        """run_git_command executes successfully and returns structured output."""
+        result = run_git_command(['status', '--short'])
+
+        assert result.success is True
+        assert result.returncode == 0
+        assert result.timed_out is False
+        assert isinstance(result.stdout, str)
+        assert isinstance(result.stderr, str)
+
+    def test_run_git_command_non_zero_exit(self):
+        """run_git_command handles non-zero exit codes gracefully."""
+        # 'git' with no arguments should fail
+        result = run_git_command(['invalid-subcommand'])
+
+        assert result.success is False
+        assert result.returncode != 0
+        assert result.timed_out is False
+
+    def test_run_git_command_timeout(self):
+        """run_git_command handles timeouts."""
+        # Use a very short timeout; git operations shouldn't normally timeout
+        result = run_git_command(['status'], timeout=0.001)
+
+        assert result.success is False
+        assert result.timed_out is True
+
+    def test_git_status_executes_and_returns_output(self):
+        """git_status executes 'git status' and returns output."""
+        result = git_status(short=True)
+
+        assert result.success is True
+        assert result.returncode == 0
+        assert isinstance(result.stdout, str)
+
+    def test_git_status_long_format(self):
+        """git_status supports long format output."""
+        result = git_status(short=False)
+
+        assert result.success is True
+        assert result.returncode == 0
+        # Long format should have more verbose output
+        assert len(result.stdout) > 0
+
+    def test_git_add_files(self, tmp_path):
+        """git_add stages files for commit."""
+        # Initialize a git repo first
+        subprocess.run(['git', 'init'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.email', 'test@example.com'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=tmp_path, capture_output=True)
+
+        # Create a test file
+        test_file = tmp_path / "test_add.txt"
+        test_file.write_text("test content")
+
+        result = git_add([str(test_file)], cwd=tmp_path)
+
+        assert result.success is True
+        assert result.returncode == 0
+
+    def test_git_commit_creates_commit(self, tmp_path):
+        """git_commit creates a commit with a message."""
+        # Initialize a git repo
+        subprocess.run(['git', 'init'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.email', 'test@example.com'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=tmp_path, capture_output=True)
+
+        # Create and stage a file
+        test_file = tmp_path / "test_commit.txt"
+        test_file.write_text("test content")
+        git_add([str(test_file)], cwd=tmp_path)
+
+        # Create commit
+        result = git_commit("Test commit message", cwd=tmp_path)
+
+        assert result.success is True
+        assert result.returncode == 0
+
+    def test_git_commit_with_specific_paths(self, tmp_path):
+        """git_commit can commit specific paths."""
+        # Initialize a git repo
+        subprocess.run(['git', 'init'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.email', 'test@example.com'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=tmp_path, capture_output=True)
+
+        # Create and stage multiple files
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file1.write_text("content 1")
+        file2.write_text("content 2")
+
+        git_add([str(file1), str(file2)], cwd=tmp_path)
+
+        # Commit only file1
+        result = git_commit("Commit file1", paths=["file1.txt"], cwd=tmp_path)
+
+        assert result.success is True
+        assert result.returncode == 0
+
+    def test_git_rev_parse_short_sha(self, tmp_path):
+        """git_rev_parse returns short SHA."""
+        # Initialize a git repo with a commit
+        subprocess.run(['git', 'init'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.email', 'test@example.com'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=tmp_path, capture_output=True)
+
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("test")
+        git_add([str(test_file)], cwd=tmp_path)
+        git_commit("Initial commit", cwd=tmp_path)
+
+        result = git_rev_parse('HEAD', short=True, cwd=tmp_path)
+
+        assert result.success is True
+        assert result.returncode == 0
+        # Short SHA should be 7 characters
+        assert len(result.stdout.strip()) == 7
+
+    def test_git_show_file_content(self, tmp_path):
+        """git_show returns file content from a reference."""
+        # Initialize a git repo with a file
+        subprocess.run(['git', 'init'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.email', 'test@example.com'], cwd=tmp_path, capture_output=True)
+        subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=tmp_path, capture_output=True)
+
+        test_file = tmp_path / "test.txt"
+        test_content = "test content for git show"
+        test_file.write_text(test_content)
+        git_add([str(test_file)], cwd=tmp_path)
+        git_commit("Add test file", cwd=tmp_path)
+
+        result = git_show('HEAD:test.txt', cwd=tmp_path)
+
+        assert result.success is True
+        assert result.returncode == 0
+        assert test_content in result.stdout
+
+    def test_git_result_dataclass(self):
+        """GitResult dataclass correctly stores all fields."""
+        result = GitResult(
+            success=True,
+            stdout="test output",
+            stderr="test error",
+            returncode=0,
+            timed_out=False
+        )
+
+        assert result.success is True
+        assert result.stdout == "test output"
+        assert result.stderr == "test error"
+        assert result.returncode == 0
+        assert result.timed_out is False
