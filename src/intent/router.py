@@ -322,6 +322,12 @@ class IntentRouter:
             # Store raw response for error reporting
             raw_response = response
 
+            # Calculate model inference time: proxy response time - network time
+            # This gives us the actual model inference duration by subtracting network RTT
+            calculated_inference_ms = None
+            if timing_network_ms is not None:
+                calculated_inference_ms = proxy_ms - timing_network_ms
+
             # Measure JSON parsing time
             parse_start = time.perf_counter()
             try:
@@ -365,13 +371,13 @@ class IntentRouter:
             # Log detailed timing breakdown for latency profiling
             # This shows WHERE the 1,587-2,074ms latency is spent across the 4 investigation areas
             network_str = f"{timing_network_ms:.2f}" if timing_network_ms is not None else "N/A"
-            inference_str = f"{timing_inference_ms:.2f}" if timing_inference_ms is not None else "N/A"
+            calculated_inference_str = f"{calculated_inference_ms:.2f}" if calculated_inference_ms is not None else "N/A"
             logger.info(
                 f"router_timing breakdown: "
                 f"prompt_construction_ms={prompt_ms:.2f} "
                 f"proxy_call_ms={proxy_ms:.2f} "
                 f"proxy_network_ms={network_str} "
-                f"proxy_inference_ms={inference_str} "
+                f"proxy_inference_ms={calculated_inference_str} "
                 f"json_parse_ms={parse_ms:.2f} "
                 f"process_ms={process_ms:.2f} "
                 f"total_ms={total_ms:.2f} "
@@ -386,7 +392,7 @@ class IntentRouter:
                 "prompt_construction_ms": round(prompt_ms, 2),
                 "proxy_call_ms": round(proxy_ms, 2),  # Total round-trip time (network + inference)
                 "proxy_network_ms": round(timing_network_ms, 2) if timing_network_ms is not None else None,
-                "proxy_inference_ms": round(timing_inference_ms, 2) if timing_inference_ms is not None else None,
+                "proxy_inference_ms": round(calculated_inference_ms, 2) if calculated_inference_ms is not None else None,
                 "json_parse_ms": round(parse_ms, 2),
                 "process_ms": round(process_ms, 2),
                 "total_ms": round(total_ms, 2),
