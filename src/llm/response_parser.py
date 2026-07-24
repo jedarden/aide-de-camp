@@ -41,9 +41,16 @@ See: src/synthesize/strand.py synthesize()
 See: docs/error-handling-standardization.md for complete pattern comparison and examples.
 """
 
-import json
 from logging import getLogger
 from typing import Any, Dict, Optional, Union, cast
+
+# Use orjson for faster JSON parsing (2-3x speedup vs standard json)
+try:
+    import orjson
+    _HAS_ORJSON = True
+except ImportError:
+    import json
+    _HAS_ORJSON = False
 
 logger = getLogger(__name__)
 
@@ -205,6 +212,7 @@ def parse_llm_response(
 
     Performance: Optimized with fast fence stripping and minimal overhead.
     Uses strip_markdown_fences() for fence removal which is 7-179x faster than regex.
+    Added fast path for clean JSON (no fences) to skip fence processing.
 
     Args:
         raw_text: Raw response text from LLM
@@ -224,33 +232,43 @@ def parse_llm_response(
         '{"a": 1}'
     """
     try:
-        # Step 1: Strip markdown fences if present (reuses optimized function)
-        if strip_fences:
-            text = strip_markdown_fences(raw_text)
-        else:
-            text = raw_text.strip() if raw_text else ""
-
-        # Step 2: Check for empty input (after fence stripping)
-        # Use strip() to catch whitespace-only strings
-        if not text or not text.strip():
+        # Early validation for empty/None input
+        if not raw_text:
             if expect_json:
-                raise ParseLLMError(
-                    "Empty response provided",
-                    raw_response=raw_text,
-                )
+                raise ParseLLMError("Empty response provided", raw_response=raw_text)
             return raw_text
 
-        # Step 3: Parse JSON if expected
+        # Fast path: Skip fence processing if not requested
+        if not strip_fences:
+            text = raw_text.strip() if raw_text else ""
+            if not text and expect_json:
+                raise ParseLLMError("Empty response provided", raw_response=raw_text)
+            if expect_json:
+                return _parse_json_fast(text, raw_text)
+            return text
+
+        # Optimized fence detection and stripping with early exit for clean JSON
+        text = raw_text.strip()
+
+        # Fast path: If text starts with '{' or '[', likely clean JSON - skip fence processing
+        # This avoids the expensive fence detection for the majority of cases
+        if text and (text[0] == '{' or text[0] == '['):
+            if expect_json:
+                return _parse_json_fast(text, raw_text)
+            return text
+
+        # Process fences if detected
+        text = strip_markdown_fences(text)
+
+        # Check for empty after fence stripping
+        if not text or not text.strip():
+            if expect_json:
+                raise ParseLLMError("Empty response provided", raw_response=raw_text)
+            return raw_text
+
+        # Parse JSON if expected
         if expect_json:
-            try:
-                return json.loads(text)
-            except json.JSONDecodeError as e:
-                # Provide helpful error message with snippet
-                snippet = text[:200] if text else "(empty)"
-                raise ParseLLMError(
-                    f"Failed to parse JSON: {e}\nResponse snippet: {snippet}...",
-                    raw_response=raw_text,
-                ) from e
+            return _parse_json_fast(text, raw_text)
 
         return text
 
@@ -261,6 +279,35 @@ def parse_llm_response(
         raise ParseLLMError(
             f"Unexpected error parsing response: {e}",
             raw_response=raw_text,
+        ) from e
+
+
+def _parse_json_fast(text: str, raw_response: str) -> Dict[str, Any]:
+    """
+    Fast JSON parsing helper with optimized error handling.
+
+    Args:
+        text: Text to parse as JSON
+        raw_response: Original raw response for error reporting
+
+    Returns:
+        Parsed JSON object
+
+    Raises:
+        ParseLLMError: If JSON parsing fails
+    """
+    try:
+        if _HAS_ORJSON:
+            # orjson.loads() returns dict/list directly for JSON objects/arrays
+            return orjson.loads(text)
+        else:
+            return json.loads(text)
+    except (orjson.JSONDecodeError if _HAS_ORJSON else json.JSONDecodeError) as e:
+        # Provide helpful error message with snippet
+        snippet = text[:200] if text else "(empty)"
+        raise ParseLLMError(
+            f"Failed to parse JSON: {e}\nResponse snippet: {snippet}...",
+            raw_response=raw_response,
         ) from e
 
 

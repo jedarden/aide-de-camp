@@ -10,6 +10,7 @@ Reads prompts/synthesize.md per invocation (hot-reload).
 """
 
 import json
+import time
 from dataclasses import dataclass
 from enum import Enum
 from logging import getLogger
@@ -19,7 +20,7 @@ from typing import Any, Optional
 from ..components.hot_reload import get_reload_manager
 from ..escalate.llm import get_zai_client, ModelClass
 from ..fetch.commands import FetchResult, IntentType
-from ..llm.response_parser import strip_markdown_fences, ParseLLMError
+from ..llm.response_parser import strip_markdown_fences, ParseLLMError, parse_llm_response
 
 
 logger = getLogger(__name__)
@@ -162,7 +163,9 @@ class SynthesizeStrand:
 
             # Measure JSON parsing time
             parse_start = time.perf_counter()
-            # Parse JSON response using centralized parser
+            # Parse JSON response using optimized centralized parser
+            # - Fast-path for clean JSON (skips fence processing when not needed)
+            # - orjson provides 2-3x faster parsing than standard json
             # Note: Synthesize uses fallback result pattern (not corrective retry)
             # because fetch operations are expensive and should not be discarded.
             # See docs/error-handling-standardization.md for pattern comparison.
