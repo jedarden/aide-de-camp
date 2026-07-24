@@ -38,6 +38,7 @@ from src.fetch.commands import (
     IntentType as FetchIntentType,
 )
 from src.intent.router import IntentRouter, IntentType
+from src.fetch.commands import IntentType as FetchIntentType
 
 # --- pre-canned utterances --------------------------------------------------
 # Each entry: (utterance, canned LLM JSON response, expected IntentType).
@@ -253,8 +254,15 @@ def router(temp_router_md, temp_urgency_md):
 def _make_router_with_response(router, response_text):
     """Wire a mock ZAI client onto the router that returns response_text."""
     mock_client = AsyncMock()
-    mock_client.call_simple = AsyncMock(return_value=response_text)
+    # The router expects call_simple to return a dict with content and timing
+    mock_response = {
+        "content": response_text,
+        "timing_network_ms": 100.0,
+        "timing_inference_ms": 200.0,
+    }
+    mock_client.call_simple = AsyncMock(return_value=mock_response)
     router._zai_client = mock_client
+    router._router_zai_client = mock_client  # Also mock the dedicated router client
     return router
 
 
@@ -274,7 +282,7 @@ class TestIntentClassification:
     ):
         r = _make_router_with_response(router, canned_response)
 
-        classifications = await r.classify_utterance(utterance, "session-test")
+        classifications, _ = await r.classify_utterance(utterance, "session-test")
 
         assert len(classifications) == 1
         assert classifications[0].intent_type == expected_type
@@ -294,7 +302,7 @@ class TestIntentClassification:
         }])
         r = _make_router_with_response(router, canned)
 
-        [classification] = await r.classify_utterance(
+        [classification], _ = await r.classify_utterance(
             "is weather-fast down?", "session-test"
         )
 
@@ -312,7 +320,7 @@ class TestIntentClassification:
         }])
         r = _make_router_with_response(router, canned)
 
-        [classification] = await r.classify_utterance("mystery", "session-test")
+        [classification], _ = await r.classify_utterance("mystery", "session-test")
 
         assert classification.intent_type == IntentType.STATUS
 
@@ -331,7 +339,7 @@ class TestMarkdownFenceStripping:
         }]) + "\n```"
         r = _make_router_with_response(router, fenced)
 
-        [classification] = await r.classify_utterance(
+        [classification], _ = await r.classify_utterance(
             "show me the logs", "session-test"
         )
 
@@ -346,7 +354,7 @@ class TestMarkdownFenceStripping:
         }])
         r = _make_router_with_response(router, bare)
 
-        [classification] = await r.classify_utterance("remind me", "session-test")
+        [classification], _ = await r.classify_utterance("remind me", "session-test")
 
         assert classification.intent_type == IntentType.REMINDER
 
@@ -378,7 +386,7 @@ class TestMultiIntentSegmentation:
         ])
         r = _make_router_with_response(router, canned)
 
-        classifications = await r.classify_utterance(
+        classifications, _ = await r.classify_utterance(
             "deploy the pipeline and check if it synced", "session-test"
         )
 
@@ -481,7 +489,7 @@ class TestMetaTypeHandling:
         }])
         r = _make_router_with_response(router, canned)
 
-        [classification] = await r.classify_utterance(
+        [classification], _ = await r.classify_utterance(
             "implement the digest feature", "session-test"
         )
 
@@ -504,7 +512,7 @@ class TestMetaTypeHandling:
         }])
         r = _make_router_with_response(router, canned)
 
-        [classification] = await r.classify_utterance("what?", "session-test")
+        [classification], _ = await r.classify_utterance("what?", "session-test")
 
         assert classification.intent_type == IntentType.CLARIFICATION
         # Its value is absent from the fetch matrix.
@@ -589,7 +597,7 @@ class TestEdgeCases:
         """
         r = _make_router_with_response(router, "[]")
 
-        classifications = await r.classify_utterance(
+        classifications, _ = await r.classify_utterance(
             "anything — model returned no intents", "session-test"
         )
 
@@ -607,7 +615,7 @@ class TestEdgeCases:
         canned = json.dumps([{"intent_type": "status"}])
         r = _make_router_with_response(router, canned)
 
-        [classification] = await r.classify_utterance(utterance, "session-test")
+        [classification], _ = await r.classify_utterance(utterance, "session-test")
 
         assert classification.intent_type == IntentType.STATUS
         assert classification.project_slug is None
@@ -652,3 +660,321 @@ class TestEdgeCases:
         [classification] = await r.classify_utterance("something", "session-test")
 
         assert classification.intent_type == IntentType.STATUS
+
+
+# --- 8. cache key generation (bead adc-4a3kd) ----------------------------------
+
+class TestCacheKeyGeneration:
+    """
+    Cache key generation ensures consistent hash values for identical inputs.
+    The generate_cache_key() function produces SHA256 hex digests for
+    utterance + optional context combinations.
+    """
+
+    def test_generate_cache_key_returns_64_char_hex_string(self):
+        """
+        Cache key must be a 64-character hexadecimal string (SHA256 hex digest).
+        SHA256 produces 256 bits = 32 bytes = 64 hex characters.
+        """
+        router = IntentRouter()
+        key = router.generate_cache_key("test utterance", "status")
+
+        assert len(key) == 64
+        # Verify it's a valid hex string (only contains 0-9 and a-f)
+        assert all(c in "0123456789abcdef" for c in key)
+
+    def test_generate_cache_key_consistent_for_same_inputs(self):
+        """
+        Same inputs must produce the same hash (deterministic behavior).
+        This is the core property that makes caching work.
+        """
+        router = IntentRouter()
+        utterance = "check the pods in ardenone-manager"
+        context = "status"
+
+        key1 = router.generate_cache_key(utterance, context)
+        key2 = router.generate_cache_key(utterance, context)
+
+        assert key1 == key2
+
+    def test_generate_cache_key_different_for_different_utterances(self):
+        """
+        Different utterances must produce different hashes (no collisions).
+        """
+        router = IntentRouter()
+
+        key1 = router.generate_cache_key("first utterance", "status")
+        key2 = router.generate_cache_key("second utterance", "status")
+
+        assert key1 != key2
+
+    def test_generate_cache_key_different_for_different_contexts(self):
+        """
+        Same utterance with different contexts must produce different hashes.
+        This ensures cache keys are context-sensitive.
+        """
+        router = IntentRouter()
+        utterance = "check pods"
+
+        key_status = router.generate_cache_key(utterance, "status")
+        key_action = router.generate_cache_key(utterance, "action")
+
+        assert key_status != key_action
+
+    def test_generate_cache_key_handles_none_context_gracefully(self):
+        """
+        None context must be treated as empty string (no crash).
+        """
+        router = IntentRouter()
+        utterance = "check pods"
+
+        # Should not raise
+        key_with_none = router.generate_cache_key(utterance, None)
+        key_with_empty = router.generate_cache_key(utterance, "")
+
+        # None and empty string should produce the same hash
+        assert key_with_none == key_with_empty
+
+    def test_generate_cache_key_handles_empty_string_context(self):
+        """
+        Empty string context must be handled gracefully.
+        """
+        router = IntentRouter()
+
+        # Should not raise
+        key = router.generate_cache_key("utterance", "")
+
+        assert len(key) == 64
+        assert all(c in "0123456789abcdef" for c in key)
+
+    def test_generate_cache_key_delimiter_prevents_collisions(self):
+        """
+        The delimiter ('|') must prevent hash collisions between:
+        - "A" + "BC" vs "AB" + "C"
+        Without proper delimiter, these would collide.
+        """
+        router = IntentRouter()
+
+        key1 = router.generate_cache_key("A", "BC")
+        key2 = router.generate_cache_key("AB", "C")
+
+        assert key1 != key2
+
+    def test_generate_cache_key_special_characters(self):
+        """
+        Special characters in utterance or context must not break hashing.
+        """
+        router = IntentRouter()
+
+        # Test with various special characters
+        key = router.generate_cache_key(
+            "check pods!@#$%^&*()",
+            "status-context-with-dashes"
+        )
+
+        assert len(key) == 64
+        assert all(c in "0123456789abcdef" for c in key)
+
+    def test_generate_cache_key_unicode_characters(self):
+        """
+        Unicode characters (emoji, non-ASCII) must be handled correctly.
+        """
+        router = IntentRouter()
+
+        # Test with emoji and unicode
+        key = router.generate_cache_key("check pods 🚀", "状态-状态")
+
+        assert len(key) == 64
+        assert all(c in "0123456789abcdef" for c in key)
+
+    def test_generate_cache_key_long_inputs(self):
+        """
+        Very long utterances or contexts must hash correctly.
+        """
+        router = IntentRouter()
+
+        long_utterance = "check pods " * 100  # ~1100 characters
+        long_context = "status-context-" * 50  # ~700 characters
+
+        key = router.generate_cache_key(long_utterance, long_context)
+
+        assert len(key) == 64
+        assert all(c in "0123456789abcdef" for c in key)
+
+    def test_generate_cache_key_whitespace_sensitivity(self):
+        """
+        Whitespace differences must produce different hashes.
+        """
+        router = IntentRouter()
+
+        key1 = router.generate_cache_key("check pods", "status")
+        key2 = router.generate_cache_key("check  pods", "status")  # double space
+        key3 = router.generate_cache_key("check pods ", "status")  # trailing space
+
+        assert key1 != key2
+        assert key1 != key3
+
+
+# --- 9. cache behavior (bead adc-2qhmb) ---------------------------------------
+
+class TestRouterCacheBehavior:
+    """
+    Router response caching eliminates redundant ZAI proxy calls for similar
+    utterances. Cache key: (utterance_hash, session_id), TTL: 5 minutes.
+    """
+
+    @pytest.fixture(autouse=True)
+    def clear_cache_before_each_test(self):
+        """Clear the router cache before each test to ensure isolation."""
+        from src.intent.router import clear_router_cache
+        clear_router_cache()
+        yield
+        # Also clear after the test
+        clear_router_cache()
+
+    @pytest.mark.asyncio
+    async def test_cache_hit_skips_zai_call(self, router):
+        """
+        A cache hit returns cached classifications without calling the ZAI proxy.
+        The cached result includes all original classification fields.
+        """
+        canned = json.dumps([{
+            "intent_type": "status",
+            "project_slug": "kalshi-tape",
+            "urgency": "high",
+            "utterance_fragment": "check pods",
+            "confidence": 0.95,
+            "reasoning": "cluster health check",
+        }])
+        r = _make_router_with_response(router, canned)
+
+        # First call: cache miss, calls ZAI
+        classifications1, timing1 = await r.classify_utterance(
+            "check pods", "session-123"
+        )
+        assert len(classifications1) == 1
+        assert timing1["cached"] is False
+        assert timing1["total_ms"] > 0
+
+        # Second call: cache hit, no ZAI call
+        classifications2, timing2 = await r.classify_utterance(
+            "check pods", "session-123"
+        )
+        assert len(classifications2) == 1
+        assert timing2["cached"] is True
+        assert timing2["total_ms"] == 0
+
+        # Cached result matches original
+        assert classifications2[0].intent_type == classifications1[0].intent_type
+        assert classifications2[0].project_slug == classifications1[0].project_slug
+        assert classifications2[0].urgency == classifications1[0].urgency
+
+    @pytest.mark.asyncio
+    async def test_cache_miss_for_different_utterance(self, router):
+        """Different utterances produce cache misses and call ZAI each time."""
+        r = _make_router_with_response(router, json.dumps([{
+            "intent_type": "status",
+            "utterance_fragment": "first",
+        }]))
+
+        await r.classify_utterance("first", "session-123")
+
+        # Change the canned response for the second call
+        r = _make_router_with_response(router, json.dumps([{
+            "intent_type": "action",
+            "utterance_fragment": "second",
+        }]))
+
+        classifications2, timing2 = await r.classify_utterance(
+            "second", "session-123"
+        )
+        assert timing2["cached"] is False
+        assert classifications2[0].intent_type == IntentType.ACTION
+
+    @pytest.mark.asyncio
+    async def test_cache_key_includes_session_id(self, router):
+        """
+        Cache key includes session_id: same utterance in different sessions
+        produces cache misses (different cache keys).
+        """
+        r = _make_router_with_response(router, json.dumps([{
+            "intent_type": "status",
+            "utterance_fragment": "check status",
+        }]))
+
+        await r.classify_utterance("check status", "session-123")
+        _, timing2 = await r.classify_utterance("check status", "session-456")
+
+        assert timing2["cached"] is False
+
+    @pytest.mark.asyncio
+    async def test_cache_hit_statistics_tracking(self, router):
+        """Cache statistics track hits and misses correctly."""
+        import src.intent.router as router_module
+
+        r = _make_router_with_response(router, json.dumps([{
+            "intent_type": "status",
+            "utterance_fragment": "test",
+        }]))
+
+        # First call: miss (cache was cleared by fixture, so stats start at 0)
+        await r.classify_utterance("test", "session-1")
+        assert router_module._cache_misses == 1
+        assert router_module._cache_hits == 0
+
+        # Second call: hit
+        await r.classify_utterance("test", "session-1")
+        assert router_module._cache_hits == 1
+        assert router_module._cache_misses == 1
+
+    @pytest.mark.asyncio
+    async def test_cache_ttl_is_five_minutes(self, router):
+        """
+        Cache TTL is 5 minutes (300 seconds). Entries older than TTL are treated
+        as misses and removed.
+        """
+        import time
+        from unittest.mock import patch
+
+        canned = json.dumps([{
+            "intent_type": "status",
+            "utterance_fragment": "test",
+        }])
+        r = _make_router_with_response(router, canned)
+
+        # First call: populate cache
+        await r.classify_utterance("test", "session-1")
+
+        # Mock time.time() to simulate 301 seconds later (beyond 300s TTL)
+        with patch('time.time', return_value=time.time() + 301):
+            # Should be a cache miss due to TTL expiration
+            _, timing = await r.classify_utterance("test", "session-1")
+            assert timing["cached"] is False
+
+    @pytest.mark.asyncio
+    async def test_cache_stats_logged_periodically(self, router, caplog):
+        """
+        Cache statistics are logged every 50 requests (by default). This test
+        verifies the periodic logging behavior.
+        """
+        import logging
+        caplog.set_level(logging.INFO)
+
+        r = _make_router_with_response(router, json.dumps([{
+            "intent_type": "status",
+            "utterance_fragment": "test",
+        }]))
+
+        import src.intent.router as router_module
+
+        # Set stats so next request triggers logging (49 hits so far)
+        router_module._cache_hits = 49
+        router_module._cache_misses = 0
+
+        # This 50th request should trigger stats logging
+        with caplog.at_level(logging.INFO):
+            await r.classify_utterance("test", "session-1")
+
+        # Verify stats were logged (look for the stats log message)
+        assert any("Router cache statistics" in record.message for record in caplog.records)
+        assert any("hit_rate=" in record.message for record in caplog.records)
