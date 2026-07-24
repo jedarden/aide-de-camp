@@ -7,6 +7,7 @@ based on user feedback.
 
 import time
 import json
+import subprocess
 from logging import getLogger
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
@@ -19,6 +20,164 @@ from ..escalate.llm import get_zai_client, ModelClass
 
 
 logger = getLogger(__name__)
+
+
+# Git subprocess utilities
+
+@dataclass
+class GitResult:
+    """Result of a git command execution."""
+    success: bool
+    stdout: str
+    stderr: str
+    returncode: int
+    timed_out: bool = False
+
+
+def run_git_command(
+    args: List[str],
+    cwd: Optional[Path] = None,
+    timeout: int = 10,
+    check: bool = False
+) -> GitResult:
+    """
+    Run a git command via subprocess and return structured output.
+
+    Args:
+        args: Git command arguments (e.g., ['status', '--short'])
+        cwd: Working directory (defaults to aide-de-camp repo root)
+        timeout: Command timeout in seconds (default: 10)
+        check: If True, raise exception on non-zero exit (default: False)
+
+    Returns:
+        GitResult with success status, stdout, stderr, returncode, and timeout flag
+    """
+    if cwd is None:
+        cwd = Path("/home/coding/aide-de-camp")
+
+    cmd = ['git'] + args
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=check,
+            timeout=timeout
+        )
+        return GitResult(
+            success=result.returncode == 0,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            returncode=result.returncode,
+            timed_out=False
+        )
+    except subprocess.TimeoutExpired as e:
+        return GitResult(
+            success=False,
+            stdout=e.stdout.decode() if e.stdout else "",
+            stderr=e.stderr.decode() if e.stderr else "Command timed out",
+            returncode=-1,
+            timed_out=True
+        )
+    except subprocess.CalledProcessError as e:
+        return GitResult(
+            success=False,
+            stdout=e.stdout,
+            stderr=e.stderr,
+            returncode=e.returncode,
+            timed_out=False
+        )
+    except Exception as e:
+        return GitResult(
+            success=False,
+            stdout="",
+            stderr=str(e),
+            returncode=-1,
+            timed_out=False
+        )
+
+
+def git_status(cwd: Optional[Path] = None, short: bool = True) -> GitResult:
+    """
+    Run git status.
+
+    Args:
+        cwd: Working directory (defaults to aide-de-camp repo root)
+        short: If True, use --short format (default: True)
+
+    Returns:
+        GitResult with status output
+    """
+    args = ['status', '--short'] if short else ['status']
+    return run_git_command(args, cwd=cwd)
+
+
+def git_add(paths: List[str], cwd: Optional[Path] = None) -> GitResult:
+    """
+    Stage files for commit.
+
+    Args:
+        paths: List of file paths to stage (relative to cwd)
+        cwd: Working directory (defaults to aide-de-camp repo root)
+
+    Returns:
+        GitResult with add output
+    """
+    args = ['add'] + paths
+    return run_git_command(args, cwd=cwd)
+
+
+def git_commit(message: str, paths: Optional[List[str]] = None, cwd: Optional[Path] = None) -> GitResult:
+    """
+    Create a git commit.
+
+    Args:
+        message: Commit message
+        paths: Optional list of specific paths to commit (default: all staged)
+        cwd: Working directory (defaults to aide-de-camp repo root)
+
+    Returns:
+        GitResult with commit output
+    """
+    args = ['commit', '-m', message]
+    if paths is not None:
+        args.extend(['--'] + paths)
+    return run_git_command(args, cwd=cwd)
+
+
+def git_show(ref: str, cwd: Optional[Path] = None) -> GitResult:
+    """
+    Show git object content (e.g., 'HEAD:path/to/file').
+
+    Args:
+        ref: Git reference (e.g., 'HEAD:path/to/file')
+        cwd: Working directory (defaults to aide-de-camp repo root)
+
+    Returns:
+        GitResult with show output
+    """
+    return run_git_command(['show', ref], cwd=cwd)
+
+
+def git_rev_parse(ref: str, short: bool = False, cwd: Optional[Path] = None) -> GitResult:
+    """
+    Get git SHA for a reference.
+
+    Args:
+        ref: Git reference (e.g., 'HEAD')
+        short: If True, return short SHA (default: False)
+        cwd: Working directory (defaults to aide-de-camp repo root)
+
+    Returns:
+        GitResult with SHA output
+    """
+    args = ['rev-parse']
+    if short:
+        args.append('--short')
+    args.append(ref)
+    return run_git_command(args, cwd=cwd)
 
 # Prompt paths read per-invocation so edits take effect without a server restart
 # (hot-reload), matching the pattern in src/synthesize/strand.py and
@@ -340,6 +499,68 @@ class SelfModificationAgent:
             print(f"Failed to apply diff: {e}")
             return False
 
+    def _commit_artifact_write(self, artifact_path: Path, artifact_type: ArtifactType) -> None:
+        """
+        Create a git commit for an artifact write.
+
+        Creates a commit with a machine-generated message following the convention:
+        'auto: self-mod write to <path> [<commit-short-sha>]'
+
+        Args:
+            artifact_path: Path to the artifact that was written
+            artifact_type: Type of artifact (prompt/config)
+        """
+        try:
+            # Get the repo root directory
+            repo_root = Path("/home/coding/aide-de-camp")
+
+            # Get relative path from repo root
+            rel_path = artifact_path.relative_to(repo_root)
+
+            # Stage the file (only this specific file)
+            subprocess.run(
+                ['git', 'add', str(rel_path)],
+                cwd=repo_root,
+                capture_output=True,
+                check=False,  # Don't fail if there are other uncommitted changes
+                timeout=10
+            )
+
+            # Create commit message with format: 'auto: self-mod write to <path>'
+            commit_msg = f"auto: self-mod write to {rel_path}"
+
+            # Create the commit (only this specific file)
+            result = subprocess.run(
+                ['git', 'commit', '-m', commit_msg, '--', str(rel_path)],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False,  # Don't fail if there are other uncommitted changes
+                timeout=10
+            )
+
+            # Only log if commit was successful
+            if result.returncode == 0:
+                # Get the short SHA of the commit just created
+                sha_result = subprocess.run(
+                    ['git', 'rev-parse', '--short', 'HEAD'],
+                    cwd=repo_root,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=10
+                )
+
+                short_sha = sha_result.stdout.strip()
+                logger.info(f"Created git commit {short_sha} for {artifact_type.value} write to {rel_path}")
+            else:
+                logger.warning(f"Failed to create git commit: stdout={result.stdout}, stderr={result.stderr}, returncode={result.returncode}")
+
+        except subprocess.TimeoutExpired:
+            logger.error("Git command timed out")
+        except Exception as e:
+            logger.error(f"Failed to create git commit for artifact write: {e}")
+
     def _write_prompt(self, diff: ArtifactDiff) -> bool:
         """Write updated prompt file."""
         artifact = self.reload_mgr._artifacts.get(diff.artifact_name)
@@ -351,6 +572,10 @@ class SelfModificationAgent:
 
         # Force reload to pick up changes
         self.reload_mgr.force_reload(diff.artifact_name)
+
+        # Create git commit for the prompt write
+        self._commit_artifact_write(artifact.path, diff.artifact_type)
+
         return True
 
     def _write_config(self, diff: ArtifactDiff) -> bool:
@@ -364,6 +589,10 @@ class SelfModificationAgent:
 
         # Force reload
         self.reload_mgr.force_reload(diff.artifact_name)
+
+        # Create git commit for the config write
+        self._commit_artifact_write(artifact.path, diff.artifact_type)
+
         return True
 
     def _write_component(self, diff: ArtifactDiff) -> bool:
