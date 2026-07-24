@@ -1231,61 +1231,43 @@
                 delete pendingPlaceholders[utteranceId];
             });
 
-            // Thread-level progress event
-            eventSource.addEventListener('thread_progress', (event) => {
-                const data = JSON.parse(event.data);
-                const threadId = data.thread_id;
-
-                if (!threadId) {
-                    console.warn('thread_progress: missing thread_id in event data');
-                    return;
-                }
-
-                // Find the pending thread card by thread_id
-                const threadCard = document.querySelector('[data-pending-id="' + threadId + '"]');
-                if (!threadCard) {
-                    console.warn('thread_progress: threadCard not found for thread_id=' + threadId);
-                    return;
-                }
-                if (!threadCard.classList.contains('pending-card')) {
-                    console.warn('thread_progress: threadCard does not have pending-card class for thread_id=' + threadId);
-                    return;
-                }
-                if (typeof _setProgress !== 'function') {
-                    console.warn('thread_progress: _setProgress is not a function');
-                    return;
-                }
-
-                // Pass progress message (e.g., '3/5 sources in') to _setProgress()
-                const completed = data.completed;
-                const total = data.total;
-                _setProgress(threadCard, { completed: completed, total: total });
-            });
-
-            // Per-source progress update for a thread
-            eventSource.addEventListener('progress_update', (event) => {
+            // Per-source progress update during fetch window
+            // Backend emits fetch_progress events as each source completes
+            eventSource.addEventListener('fetch_progress', (event) => {
                 const data = JSON.parse(event.data);
                 const intentId = data.intent_id;
                 const completed = data.completed;
                 const total = data.total;
+                const sourceName = data.source_name;
+                const sourceStatus = data.source_status;
 
-                if (!intentId) return;
+                if (!intentId) {
+                    console.warn('fetch_progress: missing intent_id in event data');
+                    return;
+                }
 
-                // Find the pending thread card by intent_id
+                // Find the pending thread card by intent_id (data-pending-id)
                 const threadCard = document.querySelector('[data-pending-id="' + intentId + '"]');
                 if (!threadCard) {
-                    console.warn('progress_update: threadCard is null for intent_id=' + intentId);
+                    console.warn('fetch_progress: threadCard not found for intent_id=' + intentId);
                     return;
                 }
                 if (!threadCard.classList.contains('pending-card')) {
-                    console.warn('progress_update: threadCard does not have pending-card class for intent_id=' + intentId);
+                    console.warn('fetch_progress: threadCard does not have pending-card class for intent_id=' + intentId);
                     return;
                 }
                 if (typeof _setProgress !== 'function') {
-                    console.warn('progress_update: _setProgress is not a function');
+                    console.warn('fetch_progress: _setProgress is not a function');
                     return;
                 }
+
+                // Update progress display (e.g., '3/5 sources in')
                 _setProgress(threadCard, { completed: completed, total: total });
+
+                // Optional: Add visual indication for last completed source
+                if (sourceName && sourceStatus) {
+                    console.log('Source completed:', sourceName, 'status:', sourceStatus);
+                }
             });
 
             eventSource.addEventListener('result_created', (event) => {

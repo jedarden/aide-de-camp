@@ -1,7 +1,7 @@
 """
-Headless tests for thread_progress SSE events and per-thread progress updates.
+Headless tests for fetch_progress SSE events and per-source progress updates.
 
-Tests that thread_progress events correctly update pending thread cards with:
+Tests that fetch_progress events correctly update pending thread cards with:
 - Per-source progress ('3/5 sources in')
 - Elapsed time counters
 - XSS protection via escapeHtml()
@@ -96,11 +96,11 @@ def _plan(
 # === AC1: thread_progress event fires and verifies card update =================
 
 
-class TestThreadProgressEvent:
-    """AC1: Test fires thread_progress event and verifies card update."""
+class TestFetchProgressEvent:
+    """AC1: Test fires fetch_progress event and verifies card update."""
 
-    def test_thread_progress_updates_card_by_thread_id(self):
-        """A thread_progress event with thread_id finds the matching pending card
+    def test_fetch_progress_updates_card_by_intent_id(self):
+        """A fetch_progress event with intent_id finds the matching pending card
         and updates its progress text (e.g., '3/5 sources in')."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -109,8 +109,8 @@ class TestThreadProgressEvent:
                 "utterance": "Track progress",
                 "intent_ids": ["thread-123"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-123",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-123",
                 "completed": 3,
                 "total": 5,
             }},
@@ -123,9 +123,9 @@ class TestThreadProgressEvent:
         pending_ids = [pc["pendingId"] for pc in t["pendingCards"]]
         assert "thread-123" in pending_ids
 
-    def test_thread_progress_targets_correct_thread_among_many(self):
-        """When multiple thread cards exist, thread_progress events target only
-        the specific thread by thread_id (not all threads)."""
+    def test_fetch_progress_targets_correct_thread_among_many(self):
+        """When multiple thread cards exist, fetch_progress events target only
+        the specific thread by intent_id (not all threads)."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
             {"action": "event", "name": "dispatch_ack", "data": {
@@ -133,8 +133,8 @@ class TestThreadProgressEvent:
                 "utterance": "Parallel threads",
                 "intent_ids": ["thread-a", "thread-b", "thread-c"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-b",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-b",
                 "completed": 5,
                 "total": 10,
             }},
@@ -156,8 +156,8 @@ class TestThreadProgressEvent:
 class TestElapsedTimeCounter:
     """AC2: Test verifies elapsed time counter appears on thread cards."""
 
-    def test_thread_progress_includes_elapsed_time_footer(self):
-        """A thread_progress event also ensures the elapsed time footer is present
+    def test_fetch_progress_includes_elapsed_time_footer(self):
+        """A fetch_progress event also ensures the elapsed time footer is present
         on the card (e.g., '0s elapsed')."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -166,8 +166,8 @@ class TestElapsedTimeCounter:
                 "utterance": "Time tracking",
                 "intent_ids": ["thread-time"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-time",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-time",
                 "completed": 2,
                 "total": 7,
             }},
@@ -203,7 +203,7 @@ class TestXSSProtection:
     """AC3: Test uses escapeHtml() for all interpolated values (no XSS vectors)."""
 
     def test_progress_values_escaped_via_escapeHtml(self):
-        """Thread progress values are escaped through escapeHtml() to prevent XSS
+        """Fetch progress values are escaped through escapeHtml() to prevent XSS
         injection via progress text. All values use textContent, not innerHTML."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -212,8 +212,8 @@ class TestXSSProtection:
                 "utterance": "Test XSS",
                 "intent_ids": ["thread-xss"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-xss",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-xss",
                 "completed": 1,
                 "total": 1,
             }},
@@ -236,8 +236,8 @@ class TestXSSProtection:
                 "utterance": "Verify escaping",
                 "intent_ids": ["thread-escape"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-escape",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-escape",
                 "completed": 2,
                 "total": 3,
             }},
@@ -257,8 +257,8 @@ class TestXSSProtection:
 class TestProgressAndTimeTogether:
     """AC4: Test both progress and time updates together on the same card."""
 
-    def test_progress_and_elapsed_time_work_together(self):
-        """Test that both progress updates and elapsed time counters work together
+    def test_fetch_progress_and_elapsed_time_work_together(self):
+        """Test that both fetch progress updates and elapsed time counters work together
         on the same card without interference."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -267,8 +267,8 @@ class TestProgressAndTimeTogether:
                 "utterance": "Combined test",
                 "intent_ids": ["thread-together"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-together",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-together",
                 "completed": 7,
                 "total": 9,
             }},
@@ -293,18 +293,18 @@ class TestProgressAndTimeTogether:
                 "utterance": "Progress with elapsed",
                 "intent_ids": ["thread-multi-elapsed"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-multi-elapsed",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-multi-elapsed",
                 "completed": 1,
                 "total": 5,
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-multi-elapsed",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-multi-elapsed",
                 "completed": 3,
                 "total": 5,
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-multi-elapsed",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-multi-elapsed",
                 "completed": 5,
                 "total": 5,
             }},
@@ -335,18 +335,18 @@ class TestProgressUpdateEdgeCases:
                 "utterance": "Multiple updates",
                 "intent_ids": ["thread-multi"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-multi",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-multi",
                 "completed": 1,
                 "total": 4,
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-multi",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-multi",
                 "completed": 2,
                 "total": 4,
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-multi",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-multi",
                 "completed": 4,
                 "total": 4,
             }},
@@ -370,8 +370,8 @@ class TestProgressUpdateEdgeCases:
                 "utterance": "Hide progress",
                 "intent_ids": ["thread-hide"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-hide",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-hide",
                 "completed": 0,
                 "total": 0,
             }},
@@ -390,20 +390,20 @@ class TestProgressUpdateEdgeCases:
                 "intent_ids": ["thread-1", "thread-2", "thread-3"],
             }},
             # Update thread-1
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-1",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-1",
                 "completed": 1,
                 "total": 2,
             }},
             # Update thread-2
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-2",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-2",
                 "completed": 5,
                 "total": 10,
             }},
             # Update thread-1 again
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-1",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-1",
                 "completed": 2,
                 "total": 2,
             }},
