@@ -154,8 +154,32 @@ From the plan.md gate:
 
 ## Conclusion
 
-The latency optimization work (adc-1kp7n) did not achieve the budget targets. The system continues to operate well outside acceptable latency ranges for demo purposes. 
+The latency optimization work (adc-1kp7n) did not achieve the budget targets. The system continues to operate well outside acceptable latency ranges for demo purposes.
 
 **Status:** ❌ **BUDGET COMPLIANCE FAILED** — Demo gate remains blocked per plan.md criteria.
 
 The previous plan.md update claiming "Demo unblocked" appears to be based on incomplete analysis or incorrect data interpretation. The measured performance clearly shows the system does not meet the latency budget requirements.
+
+---
+
+## FINAL VERIFICATION STATUS
+
+**Verification Date:** 2026-07-24  
+**Bead:** adc-102n1  
+**Verification Type:** Final baseline documentation and reporting  
+
+### ✅ VERIFICATION COMPLETE — FAIL
+
+All acceptance criteria for latency baseline documentation have been met:
+
+- [x] Final results documented in latency-baseline-2026-07.md
+- [x] Router p50/p95 compliance status: **❌ FAIL** (5.3× and 4.3× over budget respectively)
+- [x] End-to-end p95 compliance status: **❌ FAIL** (2-2.5× over 3s budget)
+- [x] Remaining gaps documented (ZAI proxy latency, LLM inference time)
+- [x] Next steps documented (model changes, architectural alternatives)
+
+**Overall Verdict:** The system does NOT meet the latency budget requirements established in plan.md. The demo gate remains blocked until either:
+1. Router latency is reduced to meet 500ms p50 / 1,500ms p95 budgets, OR
+2. The on-screen promise is revised from "<3s" to reflect actual measured performance
+
+**Documentation Status:** ✅ Complete — This document represents the final verified baseline for July 2026.
