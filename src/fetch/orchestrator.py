@@ -147,8 +147,7 @@ class FetchStrand:
                     duration_ms=int(timeout * 1000),
                 )
                 timed_out.append(source)
-                if required:
-                    caveats.append(f"Required source {source.value} timed out")
+                caveats.append(f"{source.value} timed out after {timeout}s")
 
             except Exception as e:
                 logger.error(f"Error fetching {source.value}: {e}", exc_info=True)

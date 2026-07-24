@@ -216,6 +216,122 @@ class ZAIClient:
         response = await self.call(request)
         return response.content
 
+    async def call_streaming(
+        self,
+        system_prompt: str,
+        user_message: str,
+        model: str | None = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+    ):
+        """
+        Stream LLM response for progressive card fill.
+
+        Yields text chunks as they arrive from the API.
+
+        Args:
+            system_prompt: System prompt for the LLM
+            user_message: User message
+            model: Model to use (defaults to client's default_model)
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+
+        Yields:
+            Text chunks as they arrive
+
+        Returns:
+            Complete response text and usage info in the final iteration
+        """
+        request = LLMRequest(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            model=model or self.default_model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+
+        client = await self._get_client()
+
+        try:
+            payload = request.to_payload()
+            payload["stream"] = True  # Enable streaming
+
+            logger.debug(f"LLM streaming request: model={request.model}")
+
+            async with client.stream(
+                "POST",
+                self.proxy_url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                # Check for rate limit
+                if response.status_code == 429:
+                    raise LLMRateLimitError("Rate limited by ZAI proxy")
+
+                response.raise_for_status()
+
+                accumulated_text = []
+                input_tokens = 0
+                output_tokens = 0
+
+                # Process server-sent events
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[6:]  # Remove "data: " prefix
+
+                        if data_str == "[DONE]":
+                            break
+
+                        try:
+                            data = json.loads(data_str)
+
+                            # Handle ZAI proxy wrapping
+                            if "result" in data:
+                                data = data["result"]
+
+                            # Extract delta from streaming event
+                            if data.get("type") == "content_block_delta":
+                                delta = data.get("delta", {})
+                                text = delta.get("text", "")
+                                if text:
+                                    accumulated_text.append(text)
+                                    yield text
+
+                            # Extract final usage
+                            if data.get("type") == "message_stop":
+                                usage = data.get("usage", {})
+                                input_tokens = usage.get("input_tokens", 0)
+                                output_tokens = usage.get("output_tokens", 0)
+
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Failed to parse streaming event: {e}")
+
+                # Yield final result with usage info
+                full_text = "".join(accumulated_text)
+                logger.debug(f"LLM streaming complete: input_tokens={input_tokens}, output_tokens={output_tokens}")
+                yield {
+                    "text": full_text,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "finish_reason": "stop",
+                }
+
+        except asyncio.TimeoutError as e:
+            raise LLMTimeoutError(f"LLM streaming request timed out after {self.timeout}s") from e
+        except httpx.TimeoutException as e:
+            raise LLMTimeoutError(f"LLM streaming request timed out: {e}") from e
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                raise LLMRateLimitError("Rate limited by ZAI proxy") from e
+            raise LLMError(f"LLM streaming request failed: {e.response.status_code}") from e
+        except (LLMTimeoutError, LLMRateLimitError, LLMError):
+            raise
+        except Exception as e:
+            raise LLMError(f"LLM streaming request failed: {e}") from e
+
 
 # Global ZAI client instance
 _client: Optional[ZAIClient] = None

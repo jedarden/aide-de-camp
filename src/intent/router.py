@@ -27,7 +27,7 @@ from ..session.store import get_store
 from ..fetch.commands import FetchRequest, FetchContext, IntentType as FetchIntentType, get_fetch_commands
 from ..fetch.orchestrator import execute_fetch
 from ..synthesize.strand import SynthesizeRequest, synthesize_intent
-from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
+from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType, broadcast_fetch_progress
 
 
 logger = getLogger(__name__)
@@ -603,12 +603,29 @@ class IntentRouter:
             # pending card). fetch_total_ms = the fetch window close.
             fetch_start = timings.clock()
             first_source_at: list[float | None] = [None]
+            total_sources = len(get_fetch_commands(fetch_intent_type))
+            completed_sources: list[int] = [0]
 
-            def _on_first_source(_source, _result) -> None:
+            def _on_fetch_progress(source, result) -> None:
+                """Track fetch timing and broadcast progress events to pending card."""
+                # Track first source timing for fetch_first_source_ms metric
                 if first_source_at[0] is None:
                     first_source_at[0] = timings.clock()
 
-            fetch_result = await execute_fetch(fetch_request, _on_first_source)
+                # Increment completed count
+                completed_sources[0] += 1
+
+                # Broadcast progress event to canvas ('3/5 sources in')
+                asyncio.create_task(broadcast_fetch_progress(
+                    intent_id=routed_intent.intent_id,
+                    session_id=routed_intent.session_id,
+                    completed=completed_sources[0],
+                    total=total_sources,
+                    source_name=source.value,
+                    source_status=result.status,
+                ))
+
+            fetch_result = await execute_fetch(fetch_request, _on_fetch_progress)
             timings.record("fetch_total_ms", fetch_result.total_duration_ms)
             if first_source_at[0] is not None:
                 timings.record(
