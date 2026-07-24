@@ -19,7 +19,7 @@ from typing import Any, Optional
 from ..components.hot_reload import get_reload_manager
 from ..escalate.llm import get_zai_client, ModelClass
 from ..fetch.commands import FetchResult, IntentType
-from ..llm.response_parser import strip_markdown_fences
+from ..llm.response_parser import strip_markdown_fences, ParseLLMError
 
 
 logger = getLogger(__name__)
