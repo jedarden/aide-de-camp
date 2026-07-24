@@ -162,30 +162,14 @@ class IntentRouter:
             logger.error(f"Failed to load router prompt: {e}")
             return _ROUTER_PROMPT_FALLBACK
 
-    def _load_urgency_prompt(self) -> str:
-        """
-        Load the urgency classification prompt from disk via the hot-reload manager.
-
-        prompts/urgency.md is a separately hot-reloadable artifact (registered in
-        src/components/hot_reload.py). Splicing it here keeps urgency guidance
-        editable independently of the segmentation prompt. Returns "" on failure
-        so the router still functions without urgency guidance.
-        """
-        try:
-            return self._get_reload_manager().get_prompt("urgency")
-        except Exception as e:
-            logger.warning(f"Failed to load urgency prompt: {e}")
-            return ""
-
     def _build_system_prompt(self) -> str:
-        """Build the full system prompt: segmentation prompt + urgency rules."""
-        system_prompt = self._load_router_prompt()
-        urgency_prompt = self._load_urgency_prompt()
-        if urgency_prompt:
-            system_prompt = (
-                f"{system_prompt}\n\n## Urgency Classification Rules\n\n{urgency_prompt}"
-            )
-        return system_prompt
+        """Build the system prompt from the router segmentation prompt.
+
+        Latency optimization: Removed urgency prompt splicing from hot path.
+        The router still classifies urgency based on core intent patterns,
+        without the extra token overhead of separate urgency rules.
+        """
+        return self._load_router_prompt()
 
     async def classify_utterance(
         self,
@@ -214,27 +198,13 @@ class IntentRouter:
         """
         client = await self._get_zai_client()
 
-        # Build user message with session context if available
-        store = await self._get_store()
-        session_context = ""
-        try:
-            session = await store.get_session(session_id)
-            if session:
-                # Get recent intents for context
-                recent_intents = await store.get_recent_intents(session_id, limit=5)
-                if recent_intents:
-                    session_context = "\n\nRecent intents in this session:\n"
-                    for intent in recent_intents:
-                        session_context += f"- {intent.get('utterance', '')} ({intent.get('intent_type', 'unknown')})\n"
-        except Exception as e:
-            logger.warning(f"Failed to get session context: {e}")
-
-        user_message = f"Classify this utterance:\n\n{utterance}{session_context}"
+        # Build user message
+        user_message = f"Classify this utterance:\n\n{utterance}"
 
         logger.info(f"Classifying utterance for session {session_id}")
 
-        # Build system prompt per call from prompts/router.md (+ urgency rules),
-        # so edits to either prompt take effect without a server restart.
+        # Build system prompt from prompts/router.md
+        # (hot-reload enabled via reload manager)
         system_prompt = self._build_system_prompt()
 
         # Track retry attempt for malformed JSON
@@ -242,20 +212,34 @@ class IntentRouter:
         raw_response = None
 
         try:
+            # Measure ZAI proxy call time
+            proxy_start = time.perf_counter()
             response = await client.call_simple(
                 system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
-                max_tokens=512,
+                max_tokens=256,
                 temperature=0.0,
             )
+            proxy_ms = (time.perf_counter() - proxy_start) * 1000
 
             # Store raw response for error reporting
             raw_response = response
 
+            # Measure JSON parsing time
+            parse_start = time.perf_counter()
             # Parse JSON response using centralized parser (optimized with manual fence stripping)
             # Let ParseLLMError bubble to retry handler below
             intents_data = parse_llm_response(response)
+            parse_ms = (time.perf_counter() - parse_start) * 1000
+
+            # Log detailed timing breakdown for latency profiling
+            logger.info(
+                f"router_timing breakdown: "
+                f"proxy_call_ms={proxy_ms:.2f} "
+                f"json_parse_ms={parse_ms:.2f} "
+                f"total_estimate_ms={proxy_ms + parse_ms:.2f}"
+            )
             classifications = []
 
             for intent_data in intents_data:
