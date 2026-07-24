@@ -1,0 +1,7 @@
+No errors encountered during baseline measurement.
+
+All 20 measurements completed successfully with detailed router timing breakdown captured.
+
+Minor warnings:
+- API endpoint /api/v1/sessions/{id}/utterances returned 404 (fallback to direct DB query used)
+- No cached requests in measurement set (all uncached as intended for baseline)

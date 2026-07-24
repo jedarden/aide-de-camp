@@ -1,0 +1,19 @@
+{
+  "bead_id": "adc-2pim9",
+  "agent": "claude-code-glm-4.7",
+  "provider": "zai",
+  "model": "glm-4.7",
+  "exit_code": 0,
+  "outcome": "success",
+  "duration_ms": 180000,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_usd": null,
+  "captured_at": "2026-07-24T07:15:00.000000000Z",
+  "trace_format": "claude_json",
+  "pruned": false,
+  "template_version": null,
+  "methodology": "adc-2xf52",
+  "measurement_count": 20,
+  "measurement_type": "router_latency_baseline"
+}
