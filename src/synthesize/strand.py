@@ -135,9 +135,9 @@ class SynthesizeStrand:
             response = await client.call_simple(
                 system_prompt=system_prompt,
                 user_message=user_message,
-                model=ModelClass.SONNET.value,
-                max_tokens=4096,
-                temperature=0.5,  # Lower temperature for consistent output
+                model=ModelClass.HAIKU.value,  # Use Haiku for faster synthesis
+                max_tokens=1024,  # Reduced from 4096 - most outputs are smaller
+                temperature=0.3,  # Lower temperature for more deterministic, faster outputs
             )
 
             # Strip markdown code fences if present

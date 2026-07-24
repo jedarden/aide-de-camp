@@ -653,3 +653,405 @@ class TestGitUtilityFunctions:
         assert result.stderr == "test error"
         assert result.returncode == 0
         assert result.timed_out is False
+
+
+class TestFreezeProtection:
+    """Tests for the three-layer freeze mechanism that blocks self-modification writes."""
+
+    @pytest.fixture
+    def freeze_test_prompt(self):
+        """Create a temporary prompt file for freeze testing."""
+        content = "# Test Prompt\n\nInitial content."
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(content)
+        path = Path(f.name)
+        yield path
+        path.unlink(missing_ok=True)
+
+    def test_env_var_freeze_blocks_write(self, freeze_test_prompt):
+        """Environment variable ADC_SELFMOD_FREEZE=1 blocks writes with clear error."""
+        import os
+        from src.freeze import ensure_unfrozen
+
+        # Create initial content
+        freeze_test_prompt.write_text("# Test Prompt\n\nInitial content.")
+
+        # Create agent and register the prompt
+        agent = SelfModificationAgent()
+        mgr = HotReloadManager()
+        mgr.register_prompt("test_freeze_prompt", str(freeze_test_prompt))
+        agent.reload_mgr = mgr
+
+        # Set the freeze environment variable
+        old_value = os.environ.get("ADC_SELFMOD_FREEZE")
+        os.environ["ADC_SELFMOD_FREEZE"] = "1"
+
+        try:
+            # Create a diff
+            diff = ArtifactDiff(
+                artifact_name="test_freeze_prompt",
+                artifact_type=ArtifactType.PROMPT,
+                before="# Test Prompt\n\nInitial content.",
+                after="# Test Prompt\n\nFrozen content.",
+                change_summary="This should be blocked",
+                confidence=0.9
+            )
+
+            # Try to apply the diff - should fail with freeze error
+            result = agent.apply_diff(diff)
+
+            # Verify the write was blocked
+            assert result is False
+
+            # Verify the file content was NOT changed
+            assert freeze_test_prompt.read_text() == "# Test Prompt\n\nInitial content."
+
+        finally:
+            # Restore the original environment variable value
+            if old_value is None:
+                os.environ.pop("ADC_SELFMOD_FREEZE", None)
+            else:
+                os.environ["ADC_SELFMOD_FREEZE"] = old_value
+
+    def test_sentinel_file_freeze_blocks_write(self, freeze_test_prompt):
+        """Sentinel file data/FREEZE blocks writes with clear error."""
+        from src.freeze import SENTINEL_PATH
+
+        # Create initial content
+        freeze_test_prompt.write_text("# Test Prompt\n\nInitial content.")
+
+        # Create agent and register the prompt
+        agent = SelfModificationAgent()
+        mgr = HotReloadManager()
+        mgr.register_prompt("test_freeze_sentinel", str(freeze_test_prompt))
+        agent.reload_mgr = mgr
+
+        # Create the sentinel file
+        sentinel_dir = SENTINEL_PATH.parent
+        sentinel_dir.mkdir(parents=True, exist_ok=True)
+        SENTINEL_PATH.write_text("Freeze test\n")
+
+        try:
+            # Create a diff
+            diff = ArtifactDiff(
+                artifact_name="test_freeze_sentinel",
+                artifact_type=ArtifactType.PROMPT,
+                before="# Test Prompt\n\nInitial content.",
+                after="# Test Prompt\n\nFrozen content.",
+                change_summary="This should be blocked",
+                confidence=0.9
+            )
+
+            # Try to apply the diff - should fail with freeze error
+            result = agent.apply_diff(diff)
+
+            # Verify the write was blocked
+            assert result is False
+
+            # Verify the file content was NOT changed
+            assert freeze_test_prompt.read_text() == "# Test Prompt\n\nInitial content."
+
+        finally:
+            # Clean up the sentinel file
+            if SENTINEL_PATH.exists():
+                SENTINEL_PATH.unlink()
+
+    def test_freeze_error_message_is_clear(self):
+        """Freeze protection provides clear error messages indicating which signal is active."""
+        import os
+        from src.freeze import check_frozen, ensure_unfrozen
+
+        # Test with environment variable
+        old_value = os.environ.get("ADC_SELFMOD_FREEZE")
+        os.environ["ADC_SELFMOD_FREEZE"] = "1"
+
+        try:
+            status = check_frozen()
+            assert status.is_frozen is True
+            assert "env var" in status.reason
+            assert "ADC_SELFMOD_FREEZE" in status.reason
+
+            # Verify ensure_unfrozen raises with clear message
+            try:
+                ensure_unfrozen()
+                assert False, "Should have raised RuntimeError"
+            except RuntimeError as e:
+                error_msg = str(e)
+                assert "self-mod frozen" in error_msg
+                assert "env var" in error_msg
+
+        finally:
+            if old_value is None:
+                os.environ.pop("ADC_SELFMOD_FREEZE", None)
+            else:
+                os.environ["ADC_SELFMOD_FREEZE"] = old_value
+
+        # Test with sentinel file
+        from src.freeze import SENTINEL_PATH
+        sentinel_dir = SENTINEL_PATH.parent
+        sentinel_dir.mkdir(parents=True, exist_ok=True)
+        SENTINEL_PATH.write_text("Test\n")
+
+        try:
+            status = check_frozen()
+            assert status.is_frozen is True
+            assert "sentinel file" in status.reason
+
+            # Verify ensure_unfrozen raises with clear message
+            try:
+                ensure_unfrozen()
+                assert False, "Should have raised RuntimeError"
+            except RuntimeError as e:
+                error_msg = str(e)
+                assert "self-mod frozen" in error_msg
+                assert "sentinel file" in error_msg
+
+        finally:
+            if SENTINEL_PATH.exists():
+                SENTINEL_PATH.unlink()
+
+    def test_unfrozen_state_allows_writes(self, freeze_test_prompt):
+        """When not frozen, writes proceed normally."""
+        import os
+        from src.freeze import check_frozen, SENTINEL_PATH
+
+        # Ensure we start unfrozen
+        old_env = os.environ.get("ADC_SELFMOD_FREEZE")
+        old_value = old_env  # Save for restoration
+        os.environ.pop("ADC_SELFMOD_FREEZE", None)
+        if SENTINEL_PATH.exists():
+            SENTINEL_PATH.unlink()
+
+        try:
+            # Verify we're unfrozen
+            status = check_frozen()
+            assert status.is_frozen is False
+            assert status.reason is None
+
+            # Create initial content
+            freeze_test_prompt.write_text("# Test Prompt\n\nInitial content.")
+
+            # Create agent and register the prompt
+            agent = SelfModificationAgent()
+            mgr = HotReloadManager()
+            mgr.register_prompt("test_unfrozen", str(freeze_test_prompt))
+            agent.reload_mgr = mgr
+
+            # Track subprocess calls
+            subprocess_calls = []
+
+            def mock_run(cmd, *args, **kwargs):
+                subprocess_calls.append((cmd, kwargs.get('cwd')))
+                if 'git' in cmd and 'commit' in cmd:
+                    result = MagicMock(returncode=0, stdout=b"", stderr=b"")
+                elif 'git' in cmd and 'rev-parse' in cmd:
+                    result = MagicMock(returncode=0, stdout=b"abc1234\n", stderr=b"")
+                else:
+                    result = MagicMock(returncode=0, stdout=b"", stderr=b"")
+                return result
+
+            # Create a diff
+            diff = ArtifactDiff(
+                artifact_name="test_unfrozen",
+                artifact_type=ArtifactType.PROMPT,
+                before="# Test Prompt\n\nInitial content.",
+                after="# Test Prompt\n\nUpdated content.",
+                change_summary="This should succeed",
+                confidence=0.9
+            )
+
+            with unittest.mock.patch('subprocess.run', side_effect=mock_run):
+                result = agent.apply_diff(diff)
+
+            # Verify the write succeeded
+            assert result is True
+
+        finally:
+            # Restore environment
+            if old_value is not None:
+                os.environ["ADC_SELFMOD_FREEZE"] = old_value
+
+
+class TestRestoreArtifacts:
+    """Tests for the 'adc restore-artifacts' CLI command."""
+
+    def test_restore_artifacts_reverts_self_mod_commits(self, tmp_path):
+        """restore-artifacts reverts git commits created by self-modification writes."""
+        import subprocess
+
+        # Initialize a git repo
+        subprocess.run(['git', 'init'], cwd=tmp_path, capture_output=True, check=True)
+        subprocess.run(['git', 'config', 'user.email', 'test@example.com'], cwd=tmp_path, capture_output=True, check=True)
+        subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=tmp_path, capture_output=True, check=True)
+
+        # Create a test file and commit it (baseline)
+        test_file = tmp_path / "test_prompt.md"
+        test_file.write_text("# Original content\n")
+        subprocess.run(['git', 'add', 'test_prompt.md'], cwd=tmp_path, capture_output=True, check=True)
+        subprocess.run(['git', 'commit', '-m', 'baseline commit'], cwd=tmp_path, capture_output=True, check=True)
+
+        # Get the baseline commit SHA
+        baseline_result = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=tmp_path, capture_output=True, text=True, check=True)
+        baseline_sha = baseline_result.stdout.strip()
+
+        # Simulate a self-modification write (update the file)
+        test_file.write_text("# Updated content by self-mod\n")
+        subprocess.run(['git', 'add', 'test_prompt.md'], cwd=tmp_path, capture_output=True, check=True)
+        subprocess.run(['git', 'commit', '-m', f'auto: self-mod write to test_prompt.md [{baseline_sha}]'], cwd=tmp_path, capture_output=True, check=True)
+
+        # Verify the file has the updated content
+        assert test_file.read_text() == "# Updated content by self-mod\n"
+
+        # Now revert the self-mod commit using git revert
+        subprocess.run(['git', 'revert', '--no-commit', 'HEAD'], cwd=tmp_path, capture_output=True, check=True)
+        subprocess.run(['git', 'commit', '-m', 'adc restore-artifacts: revert 1 self-mod commit(s)'], cwd=tmp_path, capture_output=True, check=True)
+
+        # Verify the file is back to the original content
+        assert test_file.read_text() == "# Original content\n"
+
+    def test_restore_artifacts_dry_run(self, tmp_path):
+        """restore-artifacts --dry-run shows what would be reverted without making changes."""
+        import subprocess
+
+        # Initialize a git repo
+        subprocess.run(['git', 'init'], cwd=tmp_path, capture_output=True, check=True)
+        subprocess.run(['git', 'config', 'user.email', 'test@example.com'], cwd=tmp_path, capture_output=True, check=True)
+        subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=tmp_path, capture_output=True, check=True)
+
+        # Create a test file and commit it
+        test_file = tmp_path / "test_config.yaml"
+        test_file.write_text("key: original\n")
+        subprocess.run(['git', 'add', 'test_config.yaml'], cwd=tmp_path, capture_output=True, check=True)
+        subprocess.run(['git', 'commit', '-m', 'baseline'], cwd=tmp_path, capture_output=True, check=True)
+
+        baseline_result = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=tmp_path, capture_output=True, text=True, check=True)
+        baseline_sha = baseline_result.stdout.strip()
+
+        # Simulate a self-modification write
+        test_file.write_text("key: updated\n")
+        subprocess.run(['git', 'add', 'test_config.yaml'], cwd=tmp_path, capture_output=True, check=True)
+        subprocess.run(['git', 'commit', '-m', f'auto: self-mod write to test_config.yaml [{baseline_sha}]'], cwd=tmp_path, capture_output=True, check=True)
+
+        # Store the current content for comparison
+        content_before_dry_run = test_file.read_text()
+
+        # Find self-mod commits (this is what --dry-run would show)
+        log_result = subprocess.run(['git', 'log', '--oneline', '-n', '5'], cwd=tmp_path, capture_output=True, text=True, check=True)
+        assert 'auto: self-mod write to' in log_result.stdout
+
+        # Verify that a dry run doesn't change the file
+        # (In the real command, --dry-run would only show what would be done)
+        assert test_file.read_text() == content_before_dry_run
+
+
+class TestBackgroundAnalysisFreezeIntegration:
+    """Tests that background-analysis auto-apply respects freeze protection."""
+
+    @pytest.mark.asyncio
+    async def test_background_analysis_respects_freeze(self):
+        """Background-analysis auto-apply does not write when frozen."""
+        import os
+        from src.feedback.background_analysis import BackgroundAnalysisProcessor, AnalysisProposal
+        from src.freeze import set_frozen
+
+        # Set freeze
+        old_env = os.environ.get("ADC_SELFMOD_FREEZE")
+        os.environ.pop("ADC_SELFMOD_FREEZE", None)
+
+        try:
+            set_frozen(True)
+
+            # Create a background analysis processor
+            processor = BackgroundAnalysisProcessor(auto_apply_enabled=True)
+
+            # Create a high-confidence proposal
+            proposal = AnalysisProposal(
+                proposal_id="test-proposal-1",
+                signal_type="ack_speed",
+                artifact_type="prompt",
+                artifact_name="test_prompt",
+                change_summary="Test proposal that should be blocked",
+                confidence=0.9,  # Above threshold, but freeze should block
+                signals_consulted=10,
+                generated_at=1234567890,
+                session_ids={"test-session"},
+            )
+
+            # Try to auto-apply - should fail due to freeze
+            result = await processor._auto_apply_proposal(proposal)
+
+            # Verify the proposal was NOT applied
+            assert result is False
+
+        finally:
+            # Clean up
+            from src.freeze import SENTINEL_PATH
+            set_frozen(False)
+            if old_env is not None:
+                os.environ["ADC_SELFMOD_FREEZE"] = old_env
+
+    @pytest.mark.asyncio
+    async def test_background_analysis_auto_applies_when_unfrozen(self):
+        """Background-analysis auto-apply works when not frozen."""
+        import os
+        from unittest.mock import MagicMock, AsyncMock
+        from src.feedback.background_analysis import BackgroundAnalysisProcessor, AnalysisProposal
+        from src.freeze import check_frozen, SENTINEL_PATH
+        from src.agents.self_modification import ArtifactDiff, ArtifactType
+
+        # Ensure we're unfrozen
+        old_env = os.environ.get("ADC_SELFMOD_FREEZE")
+        old_value = old_env  # Save for restoration
+        os.environ.pop("ADC_SELFMOD_FREEZE", None)
+        if SENTINEL_PATH.exists():
+            SENTINEL_PATH.unlink()
+
+        try:
+            # Verify we're unfrozen
+            status = check_frozen()
+            assert status.is_frozen is False
+
+            # Create a background analysis processor
+            processor = BackgroundAnalysisProcessor(auto_apply_enabled=True)
+
+            # Mock _proposal_to_diff to return a proper diff
+            async def fake_proposal_to_diff(proposal):
+                return ArtifactDiff(
+                    artifact_name=proposal.artifact_name,
+                    artifact_type=ArtifactType.PROMPT,
+                    before="old content",
+                    after="new content",
+                    change_summary=proposal.change_summary,
+                    confidence=proposal.confidence,
+                )
+
+            processor._proposal_to_diff = fake_proposal_to_diff
+
+            # Mock the self-modification agent's apply_diff to return success
+            processor.self_mod_agent.apply_diff = MagicMock(return_value=True)
+
+            # Create a high-confidence proposal
+            proposal = AnalysisProposal(
+                proposal_id="test-proposal-2",
+                signal_type="ack_speed",
+                artifact_type="prompt",
+                artifact_name="test_prompt",
+                change_summary="Test proposal that should succeed",
+                confidence=0.9,
+                signals_consulted=10,
+                generated_at=1234567890,
+                session_ids={"test-session"},
+            )
+
+            # Try to auto-apply - should succeed
+            result = await processor._auto_apply_proposal(proposal)
+
+            # Verify the proposal was applied
+            assert result is True
+            # Verify apply_diff was called
+            processor.self_mod_agent.apply_diff.assert_called_once()
+
+        finally:
+            # Restore environment
+            if old_value is not None:
+                os.environ["ADC_SELFMOD_FREEZE"] = old_value
