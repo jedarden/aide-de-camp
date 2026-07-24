@@ -22,6 +22,7 @@ from ..escalate.handler import EscalateRequest, escalate_intent
 from ..escalate.llm import get_zai_client, ModelClass, LLMTimeoutError, LLMRateLimitError, LLMError
 from ..errors.degraded_state import get_degraded_state_handler
 from ..instrument.timings import DispatchTimings
+from ..llm.response_parser import parse_llm_response, ParseLLMError
 from ..render.hot_path import derive_result_type, get_renderer
 from ..session.store import get_store
 from ..fetch.commands import FetchRequest, FetchContext, IntentType as FetchIntentType, get_fetch_commands
@@ -247,14 +248,12 @@ class IntentRouter:
             # Store raw response for error reporting
             raw_response = response
 
-            # Strip markdown code fences if present (ZAI proxy wraps in ```json...```)
-            raw = response.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[-1]
-                raw = raw.rsplit("```", 1)[0].strip()
-
-            # Parse JSON response
-            intents_data = json.loads(raw)
+            # Parse JSON response using centralized parser (optimized with manual fence stripping)
+            try:
+                intents_data = parse_llm_response(response)
+            except ParseLLMError as e:
+                # Convert to json.JSONDecodeError for compatibility with existing error handling
+                raise json.JSONDecodeError(str(e), doc="", pos=0) from e
             classifications = []
 
             for intent_data in intents_data:
