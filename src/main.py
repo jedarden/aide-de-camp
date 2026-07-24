@@ -218,8 +218,9 @@ async def get_store():
 async def health_check():
     """Health check endpoint.
 
-    Returns overall service status and watcher liveness block (alive, last_tick_at,
-    tick_count, interval). Watcher alive is true only while the task is running
+    Returns overall service status, watcher liveness block (alive, last_tick_at,
+    tick_count, interval), and recent latency percentiles for router/fetch/synthesize
+    stages. Watcher alive is true only while the task is running
     AND last_tick_at is within 2x the poll interval. If _bead_watcher is None
     (failed start), watcher.alive is false.
     """
@@ -237,6 +238,32 @@ async def health_check():
             "tick_count": 0,
             "interval": 0,
         }
+
+    # Add recent latency percentiles (last hour = 3600 seconds ago)
+    try:
+        store = await get_store()
+        import time
+        since = int(time.time()) - 3600  # Last hour
+        latency_data = await store.get_latency_percentiles(since=since)
+
+        # Include only router, fetch, and synthesize metrics (not escalate or client-side)
+        # Format to match the /api/v1/timings/percentiles endpoint structure
+        response["latency"] = {
+            "router_ms": latency_data.get("router_ms", {"p50": None, "p95": None, "count": 0}),
+            "fetch_total_ms": latency_data.get("fetch_total_ms", {"p50": None, "p95": None, "count": 0}),
+            "synthesize_total_ms": latency_data.get("synthesize_total_ms", {"p50": None, "p95": None, "count": 0}),
+            "window_seconds": 3600,
+        }
+    except Exception as e:
+        # Latency data is optional - don't fail health check if unavailable
+        logger.warning(f"Failed to fetch latency data for health check: {e}")
+        response["latency"] = {
+            "router_ms": {"p50": None, "p95": None, "count": 0, "error": str(e)},
+            "fetch_total_ms": {"p50": None, "p95": None, "count": 0},
+            "synthesize_total_ms": {"p50": None, "p95": None, "count": 0},
+            "window_seconds": 3600,
+        }
+
     return response
 
 
