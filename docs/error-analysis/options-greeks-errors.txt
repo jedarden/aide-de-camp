@@ -1,0 +1,164 @@
+2026-07-24 13:00:47,574 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:01:32,813 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:02:17,398 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:03:02,176 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:03:47,047 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:04:31,796 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:05:46,901 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:08:01,967 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:08:46,541 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:09:31,187 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:10:16,088 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:11:00,713 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:11:45,739 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:12:31,114 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:13:16,314 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:14:01,339 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:14:46,241 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:15:31,080 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:16:15,678 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:17:00,476 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:17:45,052 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:18:30,278 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:19:15,374 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:20:00,065 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:20:45,129 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:21:30,008 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:22:16,289 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:23:01,766 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:23:46,726 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:24:31,846 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:25:16,835 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:26:01,921 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:26:47,098 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:27:32,451 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:28:17,590 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:29:02,780 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:29:47,901 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:30:33,038 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:31:17,944 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:32:03,343 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:32:48,566 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:35:03,588 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:38:48,620 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:42:33,487 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:44:48,266 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:45:33,631 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:46:18,383 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:47:03,269 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:47:47,839 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:48:32,637 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:49:17,522 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:50:02,347 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:50:46,881 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:51:31,597 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:52:16,655 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:53:01,615 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:53:46,392 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:54:31,338 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:55:15,862 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:56:30,637 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:58:45,390 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 13:59:30,194 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:00:15,135 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:00:59,774 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:01:44,610 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:02:29,461 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:03:14,348 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:03:59,314 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:04:44,089 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:05:28,629 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:06:13,701 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:06:58,732 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:07:43,905 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:08:29,085 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:09:14,016 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:09:58,700 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:10:43,673 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:11:28,533 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:12:13,502 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:12:58,176 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:13:42,901 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
+2026-07-24 14:14:57,858 ERROR __main__ - Unexpected error
+ZeroDivisionError: division by zero
