@@ -35,17 +35,147 @@ from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType, broadcast_fe
 
 logger = getLogger(__name__)
 
-# Router response cache - LRU cache for repeated utterances within a session
-# Key: (utterance_hash, session_id), Value: (classifications, timestamp)
-# 5-minute TTL for cache entries - intent classification stable over short window
-_ROUTER_CACHE: dict[tuple[str, str], tuple[list, float]] = {}
-_CACHE_TTL = 300  # 5 minutes - intent classification stable over short window
-_MAX_CACHE_SIZE = 1000  # Increased capacity for more cache hits
 
-# Cache statistics for hit rate tracking
-_cache_hits = 0
-_cache_misses = 0
-_cache_stats_log_interval = 50  # Log cache stats every 50 classifications
+# --- Intent Cache with TTL ----------------------------------------------------
+class IntentCache:
+    """
+    In-memory cache store for intent classifications with TTL support.
+
+    Storage format: {cache_key -> (intent_mapping, expiry_timestamp)}
+    - cache_key: SHA256 hash of utterance + optional context
+    - intent_mapping: list[IntentClassification] to return on cache hit
+    - expiry_timestamp: Unix timestamp when entry expires (now + ttl_seconds)
+
+    Automatic cleanup:
+    - Expired entries are removed on get() when cache size > 1000
+    - Oldest entry is evicted when cache reaches capacity
+
+    Thread-safety: Not thread-safe - assumes single-threaded async execution.
+    """
+
+    def __init__(self, ttl_seconds: int = 300, max_size: int = 1000):
+        """
+        Initialize the cache.
+
+        Args:
+            ttl_seconds: Time-to-live for cache entries in seconds (default: 300 = 5 minutes)
+            max_size: Maximum number of entries before eviction (default: 1000)
+        """
+        self.ttl_seconds = ttl_seconds
+        self.max_size = max_size
+        self._cache: dict[str, tuple[list, float]] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._stats_log_interval = 50  # Log stats every N operations
+
+    def get(self, key: str) -> list | None:
+        """
+        Retrieve cached intent mapping if exists and not expired.
+
+        Args:
+            key: Cache key (SHA256 hash)
+
+        Returns:
+            Cached intent mapping if exists and not expired, None otherwise
+        """
+        # Automatic cleanup: if cache size > 1000, remove all expired entries first
+        # This prevents memory leaks from accumulating expired entries
+        if len(self._cache) > 1000:
+            removed = self._cleanup_expired()
+            if removed > 0:
+                logger.debug(f"Auto-cleanup removed {removed} expired entries (size: {len(self._cache)})")
+
+        if key in self._cache:
+            intent_mapping, expiry_timestamp = self._cache[key]
+
+            # Check if entry has expired
+            if time.time() < expiry_timestamp:
+                self._cache_hits += 1
+                age = time.time() - (expiry_timestamp - self.ttl_seconds)
+                logger.debug(f"Cache HIT for key {key[:8]} (age: {age:.1f}s)")
+                return intent_mapping
+            else:
+                # Remove expired entry
+                del self._cache[key]
+                logger.debug(f"Cache EXPIRED for key {key[:8]}")
+
+        # Cache miss or expired
+        self._cache_misses += 1
+        return None
+
+    def set(self, key: str, value: list) -> None:
+        """
+        Store intent mapping with expiry timestamp.
+
+        Args:
+            key: Cache key (SHA256 hash)
+            value: Intent mapping to cache (list[IntentClassification])
+        """
+        # Prune cache if at capacity (evict oldest entry - first in dict)
+        if len(self._cache) >= self.max_size:
+            oldest_key = next(iter(self._cache))
+            del self._cache[oldest_key]
+            logger.debug(f"Cache pruned oldest entry (size: {len(self._cache)})")
+
+        # Store with expiry timestamp
+        expiry_timestamp = time.time() + self.ttl_seconds
+        self._cache[key] = (value, expiry_timestamp)
+        logger.debug(f"Cache STORED key {key[:8]} (cache size: {len(self._cache)})")
+
+    def _cleanup_expired(self) -> int:
+        """
+        Remove all expired entries from the cache.
+
+        Returns:
+            Number of entries removed
+        """
+        current_time = time.time()
+        expired_keys = [
+            key for key, (_, expiry) in self._cache.items()
+            if expiry < current_time
+        ]
+
+        for key in expired_keys:
+            del self._cache[key]
+
+        if expired_keys:
+            logger.debug(f"Cache cleanup removed {len(expired_keys)} expired entries")
+
+        return len(expired_keys)
+
+    def get_stats(self) -> dict[str, Any]:
+        """
+        Get cache statistics.
+
+        Returns:
+            Dict with hits, misses, hit_rate, size
+        """
+        total_requests = self._cache_hits + self._cache_misses
+        hit_rate = (self._cache_hits / total_requests * 100) if total_requests > 0 else 0.0
+
+        return {
+            "hits": self._cache_hits,
+            "misses": self._cache_misses,
+            "hit_rate": hit_rate,
+            "size": len(self._cache),
+        }
+
+    def clear(self) -> None:
+        """Clear the cache and reset statistics."""
+        self._cache.clear()
+        self._cache_hits = 0
+        self._cache_misses = 0
+        logger.debug("Cache cleared")
+
+    def should_log_stats(self) -> bool:
+        """
+        Check if stats should be logged based on operation interval.
+
+        Returns:
+            True if stats should be logged, False otherwise
+        """
+        total_requests = self._cache_hits + self._cache_misses
+        return total_requests > 0 and total_requests % self._stats_log_interval == 0
 
 
 # Router error types for degraded-state handling
@@ -144,12 +274,13 @@ class IntentRouter:
     - Dedicated 10s timeout for fail-fast behavior
     """
 
-    def __init__(self, store=None, prompt_path: Optional[Path] = None):
+    def __init__(self, store=None, prompt_path: Optional[Path] = None, cache_ttl: int = 300):
         self.store = store
         self.prompt_path = prompt_path or ROUTER_PROMPT_PATH
         self._zai_client = None
         self._router_zai_client = None  # Dedicated client with 10s timeout
         self._reload_manager = None
+        self._cache = IntentCache(ttl_seconds=cache_ttl)
 
     async def _get_zai_client(self):
         """Get or create ZAI client."""
@@ -202,63 +333,29 @@ class IntentRouter:
 
     def _get_cached_classification(self, utterance: str, session_id: str) -> list[IntentClassification] | None:
         """Check cache for existing classification."""
-        global _cache_hits, _cache_misses
-
-        utterance_hash = self._get_utterance_hash(utterance)
-        cache_key = (utterance_hash, session_id)
-
-        if cache_key in _ROUTER_CACHE:
-            classifications, timestamp = _ROUTER_CACHE[cache_key]
-            age = time.time() - timestamp
-            if age < _CACHE_TTL:
-                _cache_hits += 1
-                logger.info(f"Router cache HIT for utterance hash {utterance_hash[:8]} (age: {age:.1f}s)")
-                return classifications
-            else:
-                # Remove expired entry
-                del _ROUTER_CACHE[cache_key]
-                logger.info(f"Router cache EXPIRED for utterance hash {utterance_hash[:8]}")
-
-        # Cache miss or expired
-        _cache_misses += 1
-        return None
+        cache_key = self.generate_cache_key(utterance, session_id)
+        return self._cache.get(cache_key)
 
     def _cache_classification(self, utterance: str, session_id: str, classifications: list[IntentClassification]) -> None:
         """Cache classification result."""
-        # Prune cache if at capacity
-        if len(_ROUTER_CACHE) >= _MAX_CACHE_SIZE:
-            # Remove oldest entry (first in dict)
-            oldest_key = next(iter(_ROUTER_CACHE))
-            del _ROUTER_CACHE[oldest_key]
-            logger.info(f"Router cache pruned oldest entry (size: {len(_ROUTER_CACHE)})")
-
-        utterance_hash = self._get_utterance_hash(utterance)
-        cache_key = (utterance_hash, session_id)
-        _ROUTER_CACHE[cache_key] = (classifications, time.time())
-        logger.info(f"Router cache STORED utterance hash {utterance_hash[:8]} (cache size: {len(_ROUTER_CACHE)})")
+        cache_key = self.generate_cache_key(utterance, session_id)
+        self._cache.set(cache_key, classifications)
 
     def _log_cache_stats_if_needed(self) -> None:
         """Log cache hit rate statistics periodically."""
-        global _cache_hits, _cache_misses
-        total_requests = _cache_hits + _cache_misses
-
-        if total_requests > 0 and total_requests % _cache_stats_log_interval == 0:
-            hit_rate = (_cache_hits / total_requests) * 100
+        if self._cache.should_log_stats():
+            stats = self._cache.get_stats()
             logger.info(
                 f"Router cache statistics: "
-                f"hits={_cache_hits} misses={_cache_misses} "
-                f"hit_rate={hit_rate:.1f}% "
-                f"total_requests={total_requests} "
-                f"cache_size={len(_ROUTER_CACHE)}"
+                f"hits={stats['hits']} misses={stats['misses']} "
+                f"hit_rate={stats['hit_rate']:.1f}% "
+                f"total_requests={stats['hits'] + stats['misses']} "
+                f"cache_size={stats['size']}"
             )
 
     def _clear_cache(self) -> None:
         """Clear the router cache. Used primarily for testing and diagnostics."""
-        global _ROUTER_CACHE, _cache_hits, _cache_misses
-        _ROUTER_CACHE.clear()
-        _cache_hits = 0
-        _cache_misses = 0
-        logger.info("Router cache cleared")
+        self._cache.clear()
 
     async def _get_store(self):
         """Get or create session store."""
@@ -1424,5 +1521,6 @@ def clear_router_cache() -> None:
         >>> classifications, timing = await router.classify_utterance("test", "session-1")
         >>> assert timing["cached"] is False  # Fresh call after cache clear
     """
-    router = get_router()
-    router._clear_cache()
+    global _router
+    if _router is not None:
+        _router._cache.clear()
