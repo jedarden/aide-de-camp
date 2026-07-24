@@ -1,0 +1,168 @@
+{
+  "collection_info": {
+    "timestamp": "2026-07-24T00:00:00Z",
+    "date_window": {
+      "start_date": "2026-06-24",
+      "end_date": "2026-07-24",
+      "days": 30
+    },
+    "cluster": "ardenone-cluster",
+    "access_method": "kubectl-proxy over Tailscale"
+  },
+  "services": {
+    "pbx-web": {
+      "namespace": "pbx-web",
+      "deployments": {
+        "lab-rebuild-relay": {
+          "revision_count": 1,
+          "revisions": [{"revision": 1, "change_cause": "<none>"}]
+        },
+        "pbx-rebuild-relay": {
+          "revision_count": 5,
+          "revisions": [
+            {"revision": 2, "change_cause": "<none>"},
+            {"revision": 3, "change_cause": "<none>"},
+            {"revision": 4, "change_cause": "<none>"},
+            {"revision": 5, "change_cause": "<none>"}
+          ]
+        },
+        "pbx-web": {
+          "revision_count": 12,
+          "revisions": [
+            {"revision": 2, "change_cause": "<none>"},
+            {"revision": 3, "change_cause": "<none>"},
+            {"revision": 4, "change_cause": "<none>"},
+            {"revision": 5, "change_cause": "<none>"},
+            {"revision": 6, "change_cause": "<none>"},
+            {"revision": 7, "change_cause": "<none>"},
+            {"revision": 8, "change_cause": "<none>"},
+            {"revision": 9, "change_cause": "<none>"},
+            {"revision": 10, "change_cause": "<none>"},
+            {"revision": 11, "change_cause": "<none>"},
+            {"revision": 12, "change_cause": "<none>"}
+          ]
+        }
+      },
+      "events": [
+        {
+          "event_type": "Warning",
+          "reason": "deprecatedAnnotation",
+          "message": "Service uses deprecated annotation metallb.universe.tf/allow-shared-ip",
+          "reporting_component": "metallb-controller",
+          "first_timestamp": "2026-05-01T14:28:10Z",
+          "last_timestamp": "2026-07-24T17:20:58Z",
+          "count": 216,
+          "involved_object": "Service/pbx-web"
+        }
+      ],
+      "pods": [
+        {
+          "name": "lab-rebuild-relay-79d6d858bb-gfbf2",
+          "status": "Running",
+          "restarts": 0
+        },
+        {
+          "name": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+          "status": "Running",
+          "restarts": 0
+        },
+        {
+          "name": "pbx-web-5ff68464d-97b8p",
+          "status": "Running",
+          "restarts": 0
+        }
+      ],
+      "logs_file": "/tmp/pbx-web-pbx-web-logs.txt",
+      "pod_describe_file": "/tmp/pbx-web-main-pod-describe.txt"
+    },
+    "whisper-stt": {
+      "namespace": "whisper-stt",
+      "deployments": {
+        "whisper-openai": {
+          "revision_count": 11,
+          "revisions": [
+            {"revision": 14, "change_cause": "<none>"},
+            {"revision": 15, "change_cause": "<none>"},
+            {"revision": 16, "change_cause": "<none>"},
+            {"revision": 17, "change_cause": "<none>"},
+            {"revision": 18, "change_cause": "<none>"},
+            {"revision": 19, "change_cause": "<none>"},
+            {"revision": 20, "change_cause": "<none>"},
+            {"revision": 21, "change_cause": "<none>"},
+            {"revision": 22, "change_cause": "<none>"},
+            {"revision": 23, "change_cause": "<none>"},
+            {"revision": 24, "change_cause": "<none>"}
+          ]
+        },
+        "whisper-stt": {
+          "revision_count": 11,
+          "revisions": [
+            {"revision": 22, "change_cause": "<none>"},
+            {"revision": 23, "change_cause": "<none>"},
+            {"revision": 24, "change_cause": "<none>"},
+            {"revision": 25, "change_cause": "<none>"},
+            {"revision": 26, "change_cause": "<none>"},
+            {"revision": 27, "change_cause": "<none>"},
+            {"revision": 28, "change_cause": "<none>"},
+            {"revision": 29, "change_cause": "<none>"},
+            {"revision": 30, "change_cause": "<none>"},
+            {"revision": 31, "change_cause": "<none>"},
+            {"revision": 32, "change_cause": "<none>"}
+          ]
+        }
+      },
+      "events": [
+        {
+          "event_type": "Warning",
+          "reason": "deprecatedAnnotation",
+          "message": "Service uses deprecated annotation metallb.universe.tf/allow-shared-ip",
+          "reporting_component": "metallb-controller",
+          "first_timestamp": "2026-04-16T16:38:18Z",
+          "last_timestamp": "2026-07-24T17:20:53Z",
+          "count": 216,
+          "involved_object": "Service/whisper-stt"
+        }
+      ],
+      "pods": [
+        {
+          "name": "whisper-openai-6885fc878b-jjm5j",
+          "status": "Failed",
+          "restarts": 0,
+          "failure_reason": "Evicted",
+          "failure_message": "The node was low on resource: ephemeral-storage. Threshold quantity: 1631311281, available: 1137364Ki",
+          "exit_code": 137,
+          "start_time": "2026-06-14T00:52:14-04:00",
+          "error_details": "ContainerStatusUnknown - The container could not be located when the pod was terminated"
+        },
+        {
+          "name": "whisper-openai-68966786fb-jsb5d",
+          "status": "Running",
+          "restarts": 0
+        },
+        {
+          "name": "whisper-stt-847fd8d7b9-v2rs5",
+          "status": "Running",
+          "restarts": 0
+        }
+      ],
+      "logs_file": "/tmp/whisper-stt-main-logs.txt",
+      "pod_describe_file": "/tmp/whisper-stt-main-describe.txt",
+      "failed_pod_describe_file": "/tmp/whisper-openai-failed-describe.txt"
+    }
+  },
+  "summary": {
+    "total_services": 2,
+    "total_deployments": 5,
+    "total_pods": 6,
+    "running_pods": 5,
+    "failed_pods": 1,
+    "events_captured": 2,
+    "deployment_revisions": {
+      "pbx-web": 12,
+      "pbx-rebuild-relay": 5,
+      "lab-rebuild-relay": 1,
+      "whisper-stt": 11,
+      "whisper-openai": 11
+    }
+  }
+}
