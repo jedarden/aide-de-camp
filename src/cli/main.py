@@ -184,6 +184,26 @@ def create_parser() -> argparse.ArgumentParser:
         help="Toggle freeze state (create or remove data/FREEZE)",
     )
 
+    # restore-artifacts command
+    restore_parser = subparsers.add_parser(
+        "restore-artifacts",
+        help="Restore artifacts from git history",
+        description="Revert self-modification commits to restore previous artifact versions",
+    )
+    restore_parser.add_argument(
+        "-n",
+        "--commits",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of self-mod commits to revert (default: 1)",
+    )
+    restore_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be reverted without making changes",
+    )
+
     return parser
 
 
@@ -254,6 +274,12 @@ async def run_command(args: argparse.Namespace) -> int:
         elif args.command == "freeze":
             return commands.freeze_cmd(
                 toggle=args.toggle,
+            )
+
+        elif args.command == "restore-artifacts":
+            return commands.restore_artifacts_cmd(
+                commits=args.commits,
+                dry_run=args.dry_run,
             )
 
         else:
