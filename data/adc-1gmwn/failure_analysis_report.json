@@ -1,0 +1,110 @@
+{
+  "analysis_date": "2026-07-24T14:30:19.706611",
+  "analysis_period": "30 days (2026-06-24 to 2026-07-24)",
+  "services_analyzed": [
+    "pbx-web",
+    "whisper-stt"
+  ],
+  "findings": {
+    "total_distinct_failure_modes": 4,
+    "infrastructure_failures": {
+      "Pod:Failed": {
+        "count": 1,
+        "category": "infrastructure",
+        "severity": "High",
+        "services": {
+          "whisper-stt": 1
+        },
+        "source": "pod_status"
+      }
+    },
+    "service_specific_failures": {
+      "AppLog:http_error": {
+        "count": 2,
+        "category": "service-specific",
+        "severity": "Medium",
+        "services": {
+          "pbx-web": 2
+        },
+        "source": "application_logs"
+      }
+    },
+    "configuration_failures": {
+      "Warning:deprecatedAnnotation": {
+        "count": 432,
+        "category": "configuration",
+        "severity": "Warning",
+        "services": {
+          "pbx-web": 216,
+          "whisper-stt": 216
+        },
+        "source": "kubernetes_events"
+      }
+    },
+    "environmental_failures": {
+      "AppLog:broken_pipe": {
+        "count": 5,
+        "category": "environmental",
+        "severity": "Medium",
+        "services": {
+          "pbx-web": 5
+        },
+        "source": "application_logs"
+      }
+    },
+    "other_failures": {}
+  },
+  "service_breakdown": {
+    "pbx-web": {
+      "failure_count": 223,
+      "categories": {
+        "configuration": 216,
+        "environmental": 5,
+        "service-specific": 2
+      }
+    },
+    "whisper-stt": {
+      "failure_count": 217,
+      "categories": {
+        "configuration": 216,
+        "infrastructure": 1
+      }
+    }
+  },
+  "severity_distribution": {},
+  "recurring_issues": [
+    {
+      "failure": "Warning:deprecatedAnnotation",
+      "count": 432,
+      "category": "configuration",
+      "services": {
+        "pbx-web": 216,
+        "whisper-stt": 216
+      }
+    },
+    {
+      "failure": "AppLog:broken_pipe",
+      "count": 5,
+      "category": "environmental",
+      "services": {
+        "pbx-web": 5
+      }
+    }
+  ],
+  "one_off_issues": [
+    {
+      "failure": "Pod:Failed",
+      "category": "infrastructure",
+      "services": {
+        "whisper-stt": 1
+      }
+    }
+  ],
+  "workflow_analysis": {
+    "total_runs": 0,
+    "successful": 0,
+    "failed": 0,
+    "error_patterns": {},
+    "note": "No workflow executions found in 30-day retention window"
+  }
+}
