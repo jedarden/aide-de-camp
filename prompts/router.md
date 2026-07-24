@@ -65,9 +65,65 @@ Use available project context to map utterances to projects:
 
 ## Segmentation Guidelines
 
-- Split multi-part utterances: "how's the pipeline and what about the ibkr mcp" → two intents
-- Keep related clauses together: "are the pods running and healthy" → one intent
-- Extract compound workflows: "deploy the pipeline and check if it synced" → two intents (action, then status)
+Segment utterances into distinct intent threads. Each thread should represent a single, coherent query or action that can be independently processed.
+
+### When to Split
+
+Split into separate intents when:
+
+1. **Different projects or targets**: "check pbx status and pull up whisper logs" → 2 intents (different projects)
+2. **Different intent types**: "deploy the pipeline and check if it synced" → 2 intents (action + status)
+3. **Independent questions**: "how's the pipeline and what about the ibkr mcp" → 2 intents (independent queries)
+4. **Sequential workflow**: "restart the pod and verify it's healthy" → 2 intents (action → status)
+5. **Different lookup kinds**: "show me the logs and the config for armor" → 2 intents (lookup:logs + lookup:config)
+
+### When to Keep Together
+
+Keep as a single intent when:
+
+1. **Same intent type + same target**: "are the pods running and healthy" → 1 intent (single status query)
+2. **Modifying phrases**: "check the pipeline status, specifically the deploy stage" → 1 intent (refinement, not new intent)
+3. **Contextual elaboration**: "what's deployed, I need to know the version" → 1 intent (elaboration)
+4. **Compound condition**: "show me errors and warnings from the logs" → 1 intent (single lookup with filters)
+
+### Utterance Fragment Assignment
+
+For each intent, extract the minimal fragment that captures that specific thread:
+
+- **Full split**: "check pbx and whisper status" → fragments: "check pbx status" / "whisper status"
+- **Partial overlap**: "deploy pipeline and check if it synced" → fragments: "deploy the pipeline" / "check if pipeline synced"
+- **Single intent**: "how are the pods doing in production" → fragment: "how are the pods doing in production" (full utterance)
+
+The fragment should be:
+- Specific enough to identify the intent's scope
+- Complete enough to be understood independently
+- Free of cross-intent conjunctions ("and", "also", "while")
+
+### Context and Relationships
+
+- **Session context helps**: Use recent intents to resolve ambiguous references ("it", "the service")
+- **Project inference**: "check the pipeline" → infer project from session history or default context
+- **Maintain causality**: "restart and verify" → second intent depends on first, but both are independent threads
+
+### Confidence in Multi-Intent Scenarios
+
+- **High-confidence splits (≥0.9)**: Clear project boundaries, explicit conjunctions ("and", "also", "plus")
+- **Medium confidence (0.7-0.9)**: Implicit boundaries, context-dependent references
+- **Low confidence (<0.7)**: Ambiguous utterance → return "clarification" intent type
+
+When in doubt, split conservatively. Over-segmentation is preferable to under-segmentation.
+
+### Examples
+
+**Multi-intent splits:**
+- "check pbx, pull up whisper logs, and verify armor config" → 3 intents (status, lookup:logs, lookup:config)
+- "how's the pipeline doing and did the deploy finish" → 2 intents (status, status - same project, distinct questions)
+- "restart the pod and show me the recent logs" → 2 intents (action, lookup:logs)
+
+**Single-intent keeps:**
+- "are the pods running and healthy" → 1 intent (status - single cohesive query)
+- "show me the build logs and any errors from the last deploy" → 1 intent (lookup:logs - single lookup with scope)
+- "check pipeline status, specifically the production environment" → 1 intent (status - refinement, not new intent)
 
 ## Confidence Threshold
 
