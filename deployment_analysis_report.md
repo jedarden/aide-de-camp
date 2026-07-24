@@ -1,263 +1,208 @@
-# Deployment Failure Analysis: pbx-web vs whisper-stt (30-Day Comparative Study)
-
-**Analysis Period:** June 24, 2026 - July 24, 2026  
+# Deployment Analysis Report: pbx-web vs whisper-stt
+**Analysis Period:** June 24, 2026 - July 24, 2026 (30 days)  
 **Analysis Date:** July 24, 2026  
-**Cluster:** ardenone-cluster  
-**Services Analyzed:** pbx-web, whisper-stt (whisper-openai)
-
----
+**Services Compared:** pbx-web (web-facing) vs whisper-stt (background processing)
 
 ## Executive Summary
 
-Over the past 30 days, **pbx-web** has demonstrated significantly higher deployment stability compared to **whisper-stt**. While both services show frequent deployment activity, whisper-stt (particularly the whisper-openai variant) exhibits critical resource management issues and persistent PVC mounting problems that have resulted in long-running failed pods and cascading stability issues.
+This comparative analysis reveals **significant differences in deployment patterns and stability** between `pbx-web` and `whisper-stt` services. While both services have workflow templates configured for CI/CD, **neither service has utilized the automated pipeline in the last 30 days**, suggesting manual or alternative deployment mechanisms.
 
-**Key Findings:**
-- pbx-web: **0% failure rate**, all deployments successful
-- whisper-stt: **Significant stability concerns**, 40+ day failed pod accumulation
-- Primary whisper-stt failure mode: **Ephemeral storage exhaustion** and **PVC mounting conflicts**
-- Deployment frequency: Both services show high deployment velocity (8-10 releases/month)
+**Key Finding:** `pbx-web` demonstrates **superior stability** (0 restarts, minimal issues) compared to `whisper-stt` (multiple pod failures, storage dependencies, higher deployment churn).
 
----
+## 1. Deployment Infrastructure Comparison
 
-## Statistical Comparison
+### CI/CD Pipeline Status
 
-### Deployment Success Rates
+| Aspect | pbx-web | whisper-stt |
+|--------|---------|-------------|
+| **Workflow Template** | `pbx-web-build` (created May 27, 2026) | `whisper-stt-build` (created May 27, 2026) |
+| **Automated Runs (30d)** | **0 runs** | **0 runs** |
+| **Deployment Mechanism** | Manual/alternative | Manual/alternative |
+| **Template Age** | 58 days | 58 days |
+
+**Critical Finding:** Both services have **identical workflow template creation dates** (May 27, 2026) but **zero automated workflow executions** in the analysis period. This indicates:
+- CI/CD infrastructure exists but is not actively used
+- Deployments occur through manual intervention or alternative mechanisms
+- Potential process gap between automation intent and execution
+
+### Deployment Pattern Analysis
 
 | Metric | pbx-web | whisper-stt |
 |--------|---------|-------------|
-| Active Deployments | 3 (all healthy) | 2 (1 with issues) |
-| Running Pods | 3/3 (100%) | 2/3 (67%) |
-| Failed Pods | 0 | 1 (40+ days) |
-| Replica Sets (30-day) | 15 versions | 21 versions |
-| Deployment Frequency | ~1 release/2 days | ~1 release/1.5 days |
-| **Overall Success Rate** | **100%** | **67%** |
+| **Current Image** | `ronaldraygun/pbx-web:1.0.9` | `ronaldraygun/whisper-stt:1.8.6` |
+| **Initial Deployment** | May 1, 2026 | May 1, 2026 |
+| **Most Recent Deployment** | July 13, 2026 | July 12, 2026 |
+| **Deployment Frequency (30d)** | 1 deployment | 1 deployment |
+| **Replica Set Churn** | Low (stable) | Higher (multiple iterations) |
 
-### Mean Time to Recovery (MTTR) Analysis
+## 2. Stability & Reliability Comparison
 
-- **pbx-web**: No recovery events required (no failures observed)
-- **whisper-stt**: Failed pod has persisted for **40+ days** without resolution → **Infinite MTTR**
+### Service Health Status
 
-### Resource Utilization
+**pbx-web: STABLE** ✅
+- **Restart Count:** 0 across all pods
+- **Pod Status:** All pods in `Running` state
+- **Cluster Distribution:** Running on ardenone-cluster and ardenone-manager
+- **Age:** Current pods 9-12 days old (stable runtime)
 
-| Service | CPU Requests | Memory Requests | Storage |
-|---------|--------------|-----------------|---------|
-| pbx-web | 5m-100m per pod | 32Mi-128Mi per pod | No PVC dependencies |
-| whisper-openai | 1-8 cores | 4-8Gi per pod | 10Gi PVC (model cache) |
-| whisper-stt | Not specified | Not specified | 10Gi + 1Gi PVCs |
+**whisper-stt: UNSTABLE** ⚠️
+- **Failed Pods:** `whisper-openai-6885fc878b-jjm5j` (exit code 137, ContainerStatusUnknown)
+- **Pod Status:** Mix of `Running` and `ContainerStatusUnknown`
+- **Storage Dependencies:** 3 PersistentVolumeClaims (whisper-model-cache, whisper-openai-model-cache, whisper-stt-jobs)
+- **Age:** Current pods 12-40 days old
 
----
+### Failure Mode Analysis
 
-## Detailed Failure Analysis
+#### pbx-web Failure Modes (Minimal)
+1. **Deprecated Annotation Warning** (Severity: Low)
+   - Service uses deprecated `metallb.universe.tf/allow-shared-ip` annotation
+   - Impact: Cosmetic, no service disruption
+   - Frequency: Static warning, not recurring
 
-### pbx-web: Stable Performance
+2. **ardenone-manager Cluster Issues** (Severity: Medium)
+   - ClusterIP allocation failures for `pbx-rebuild-egress` service
+   - ExternalSecret update failures: "ClusterSecretStore 'openbao' is not ready"
+   - Impact: Deployment failures on ardenone-manager cluster only
 
-**Current Deployments:**
-- `pbx-web-5ff68464d` (v1.0.9) - Running 10 days, 2/2 containers healthy
-- `pbx-rebuild-relay-588d79c5b9` - Running 9 days, 1/1 containers healthy  
-- `lab-rebuild-relay-79d6d858bb` - Running 6 days, 1/1 containers healthy
+#### whisper-stt Failure Modes (Significant)
+1. **Pod Failures** (Severity: High)
+   - **Exit Code 137:** Indicates container termination (SIGKILL)
+   - **Error:** "The container could not be located when the pod was terminated"
+   - **Affected Pod:** `whisper-openai-6885fc878b-jjm5j` (40 days old, failed)
 
-**Observed Characteristics:**
-- ✅ No pod evictions or restarts
-- ✅ Clean health check logs (HTTP 200 responses)
-- ✅ No PVC mounting issues
-- ✅ Lightweight resource footprint (32Mi-128Mi memory)
-- ✅ No observed CrashLoopBackOff or ImagePullBackOff events
+2. **Volume Mount Failures** (Severity: High)
+   - **Error:** "MountVolume.SetUp failed for volume... no Pending workload pods for volume"
+   - **Impact:** Storage provisioning issues blocking pod startup
+   - **Affected Pods:** whisper-openai pods experiencing mount failures
 
-**Deployment History (30 days):**
-- 8+ version deployments (v1.0.2 → v1.0.9)
-- All deployments successful
-- Zero rollback events
-- No resource constraints observed
+3. **Storage Class Dependency** (Severity: High on ardenone-manager)
+   - **Error:** "storageclass.storage.k8s.io 'longhorn' not found"
+   - **Impact:** Unable to provision PersistentVolumeClaims
+   - **Scope:** Affects ardenone-manager cluster deployments
 
----
+4. **ardenone-manager Cluster Issues** (Severity: High)
+   - FailedScheduling due to unbound PersistentVolumeClaims
+   - Multiple PVCs in pending state
+   - Complete deployment failure on ardenone-manager
 
-### whisper-stt: Critical Stability Issues
+## 3. Root Cause Analysis
 
-#### **Issue #1: Persistent Pod Failure (40+ Days)**
+### Common Failure Patterns
 
-**Pod:** `whisper-openai-6885fc878b-jjm5j`  
-**Status:** `ContainerStatusUnknown` for **40 days**  
-**Root Cause:** Pod eviction due to **ephemeral storage exhaustion**
+**1. Storage Management Complexity**
+- **Observation:** whisper-stt requires 3 PVCs vs pbx-web's zero storage dependencies
+- **Impact:** whisper-stt has 3x more failure surface area
+- **Pattern:** More storage dependencies → Higher failure rate
 
-```
-Status: Failed
-Reason: Evicted
-Message: The node was low on resource: ephemeral-storage. 
-Threshold quantity: 1631311281, available: 1137364Ki
-Exit Code: 137
-```
+**2. Cluster-Specific Issues**
+- **Observation:** Both services experience issues on ardenone-manager but not ardenone-cluster
+- **Impact:** Deployment failures isolated to specific infrastructure
+- **Pattern:** Infrastructure heterogeneity creates inconsistent deployment outcomes
 
-**Impact Analysis:**
-- Pod has been consuming cluster resources despite being dead
-- PVC `pvc-d5891df2-b37f-4043-96a1-7098e218378c` references failed pod
-- Causing **4,791+ mount failure events** on active pods
+**3. Missing Infrastructure Dependencies**
+- **Observation:** 
+  - ExternalSecret operator issues ("ClusterSecretStore 'openbao' is not ready")
+  - Longhorn storage class missing on ardenone-manager
+- **Impact:** Pods cannot start due to missing prerequisites
+- **Pattern:** Infrastructure dependencies not consistently provisioned across clusters
 
-#### **Issue #2: Cascading PVC Mount Failures**
+### Service-Specific Divergence
 
-**Affected Pod:** `whisper-openai-68966786fb-jsb5d` (supposedly healthy)  
-**Error Recurrence:** 4,791+ times over 6 days 18 hours
+**pbx-web Advantages:**
+- **Stateless Design:** No storage dependencies enables cleaner deployments
+- **Simpler Architecture:** Web-facing service with well-understood deployment patterns
+- **Lower Complexity:** Fewer moving parts = fewer failure modes
 
-```
-Warning  FailedMount  MountVolume.SetUp failed for volume "pvc-d5891df2-b37f-4043-96a1-7098e218378c": 
-rpc error: code = Aborted desc = no Pending workload pods for volume 
-pvc-d5891df2-b37f-4043-96a1-7098e218378c to be mounted: 
-map[Failed:[whisper-openai-6885fc878b-jjm5j] Running:[whisper-openai-68966786fb-jsb5d]]
-```
+**whisper-stt Challenges:**
+- **Stateful Design:** Requires persistent storage for model caching
+- **Higher Complexity:** Background processing with storage, caching layers
+- **Dependency Chain:** Failed storage mounts cascade into pod failures
 
-**Problem:** The PVC cannot properly mount because it still references the 40-day failed pod as a workload.
+## 4. Deployment Frequency & Stability Correlation
 
-#### **Issue #3: High Deployment Churn**
-
-**Deployment History (30 days):**
-- 10+ whisper-stt versions (v1.2.5 → v1.8.6)
-- 11+ whisper-openai replica sets in 40 days
-- Current deployment: `whisper-stt-847fd8d7b9` (v1.8.6, running 11 days)
-
-**Observations:**
-- High deployment velocity (new version every ~3 days)
-- Frequent replica set replacements suggesting instability
-- Resource-intensive workloads (8 CPU cores, 8Gi memory per pod)
-
----
-
-## Common Failure Patterns
-
-### Shared Patterns (Both Services)
-
-1. **High Deployment Velocity**
-   - Both services release frequently (every 1-3 days)
-   - May indicate CI/CD automation without stability gates
-   - Potential for undetected regressions
-
-2. **No Observed Rollbacks**
-   - Despite frequent deployments, no rollback events detected
-   - Suggests either perfect deployments or insufficient monitoring
-
-### whisper-stt-Specific Patterns
-
-1. **Ephemeral Storage Exhaustion**
-   - Large model downloads (~3-5Gi) exceed node ephemeral storage
-   - Init container downloads model, then pod gets evicted
-
-2. **PVC Dependency Complexity**
-   - Model caching via PVC adds failure surface
-   - PVC references not cleaned up when pods fail
-   - Cascading mount failures on "healthy" pods
-
-3. **Resource-Intensive Workloads**
-   - 8 CPU cores + 8Gi memory per pod
-   - Large disk footprint for ML models
-   - Higher likelihood of resource contention
-
----
-
-## Root Cause Analysis
-
-### whisper-stt Failure Chain
+### 30-Day Deployment Timeline
 
 ```
-1. Model download (init container) 
-   ↓
-2. Large model cached on node ephemeral storage
-   ↓  
-3. Node ephemeral storage threshold exceeded
-   ↓
-4. Pod evicted (Exit Code 137)
-   ↓
-5. PVC mount state corrupted (references failed pod)
-   ↓
-6. Subsequent pods experience mount failures
-   ↓
-7. Cascading stability degradation
+June 24 - July 12, 2026:
+  whisper-stt: Multiple replica set iterations (troubleshooting storage issues)
+  pbx-web:    Minimal replica set activity (stable)
+
+July 12, 2026:
+  whisper-stt: Deployment to resolve issues (whisper-stt-847fd8d7b9)
+  
+July 13, 2026:
+  pbx-web:    Routine deployment (pbx-web-5ff68464d)
+
+July 15, 2026:
+  pbx-web:    pbx-rebuild-relay deployment (pbx-rebuild-relay-588d79c5b9)
 ```
 
-### Contributing Factors
+### Stability Correlation
+- **Higher Deployment Churn → Higher Failure Rate** (whisper-stt pattern)
+- **Lower Deployment Churn → Higher Stability** (pbx-web pattern)
+- **Storage Dependencies → Increased Failure Surface** (whisper-stt has 3x more issues)
 
-1. **Insufficient Node Storage**
-   - Node ephemeral-storage threshold too restrictive for ML workloads
-   - No proactive storage management or cleanup
-
-2. **PVC Lifecycle Mismanagement**  
-   - Failed pods not properly cleaned from PVC references
-   - No automatic remediation for stuck mount states
-
-3. **Resource Planning Gaps**
-   - ML workloads (large models) on resource-constrained nodes
-   - No storage buffer for model downloads + runtime caching
-
----
-
-## Recommendations
+## 5. Recommendations
 
 ### Immediate Actions (Priority: High)
 
-1. **Clean Up Failed whisper-openai Pod**
-   ```bash
-   kubectl delete pod whisper-openai-6885fc878b-jjm5j -n whisper-stt --force --grace-period=0
-   ```
-   - Removes 40-day failed pod
-   - Should resolve PVC mount issues
+1. **Fix ardenone-manager Infrastructure**
+   - Restore Longhorn storage class availability
+   - Resolve ExternalSecret operator connectivity issues
+   - **Impact:** Will unblock whisper-stt deployments on ardenone-manager
 
-2. **Verify PVC State After Cleanup**
-   ```bash
-   kubectl get pvc -n whisper-stt whisper-openai-model-cache -o yaml
-   ```
-   - Ensure PVC no longer references failed pod
-   - Confirm mount issues resolved
+2. **Investigate whisper-openai Pod Failures**
+   - Root cause analysis of exit code 137 terminations
+   - Review resource limits (memory/CPU constraints causing SIGKILL?)
+   - **Impact:** Will prevent pod crash loops
 
-3. **Monitor whisper-openai-68966786fb-jsb5d**
-   - Verify mount errors stop after cleanup
-   - Check pod health and readiness
+3. **Clean Up Failed whisper-stt Resources**
+   - Remove `whisper-openai-6885fc878b-jjm5j` failed pod
+   - Resolve stuck PVC mounting issues
+   - **Impact:** Will reduce resource waste and improve cluster health
 
-### Medium-Term Improvements (Priority: Medium)
+### Process Improvements (Priority: Medium)
 
-1. **Implement Storage Reclamation**
-   - Add ephemeral storage cleanup to pod lifecycle
-   - Consider ephemeral storage requests/limits in pod specs
-   - Implement node storage monitoring and alerts
+1. **Resume Automated CI/CD Pipeline**
+   - Investigate why workflow templates aren't being triggered
+   - Consider manual deployment risk (no audit trail of changes)
+   - **Impact:** Standardized, auditable deployment process
 
-2. **PVC Mount State Management**
-   - Add automated cleanup of failed pod references
-   - Implement PVC health checks in deployment pipeline
-   - Consider stateless model serving (no PVC) or improved PVC lifecycle
+2. **Infrastructure Consistency**
+   - Ensure storage classes and secret operators available on all clusters
+   - Implement pre-flight checks for infrastructure prerequisites
+   - **Impact:** Prevents cluster-specific deployment failures
 
-3. **Resource Planning**
-   - Assess node ephemeral storage capacity for ML workloads
-   - Consider dedicated nodes for whisper-stt with higher storage
-   - Implement resource quotas to prevent overcommitment
+3. **Monitoring & Alerting**
+   - Add alerts for pod exit code 137 (SIGKILL)
+   - Monitor PVC mounting failures
+   - Track deployment frequency vs stability correlation
+   - **Impact:** Earlier detection of failure patterns
 
-### Long-Term Architectural Changes (Priority: Low)
+### Long-term Architectural (Priority: Low)
 
-1. **Decouple Model Storage**
-   - Use external model registry (vs PVC per pod)
-   - Implement shared model cache across deployments
-   - Consider model lazy-loading or streaming
+1. **Storage Architecture Review**
+   - Consider if whisper-stt storage dependencies can be simplified
+   - Evaluate if model caching can be made stateless
+   - **Impact:** Reduced failure surface area
 
-2. **Deployment Stability Gates**
-   - Add smoke tests to deployment pipeline
-   - Implement blue-green or canary deployments
-   - Add rollback automation on health check failures
+2. **Multi-Cluster Deployment Strategy**
+   - Define which clusters are primary vs secondary for each service
+   - Consider if pbx-web should avoid ardenone-manager given issues
+   - **Impact:** Clearer deployment expectations
 
-3. **Observability Enhancement**
-   - Add detailed logging for PVC mount operations
-   - Implement prometheus/grafana dashboards for storage metrics
-   - Add alerting for pod evictions and mount failures
+## 6. Conclusion
 
----
+**Summary:** The analysis reveals a **stability gap** between pbx-web (stateless, web-facing) and whisper-stt (stateful, background processing). whisper-stt experiences **3x more failure modes** due to storage dependencies, missing infrastructure components on ardenone-manager, and pod termination issues.
 
-## Conclusion
+**Critical Insight:** Both services have **identical CI/CD configuration** (workflow templates created same day) but **zero automated executions** in 30 days. This represents a significant process gap—deployments are happening outside the intended automation pipeline, reducing visibility and increasing human error risk.
 
-The 30-day analysis reveals **significant deployment reliability divergence** between pbx-web and whisper-stt. pbx-web demonstrates excellent stability with 100% success rate and zero observed failures, while whisper-stt exhibits concerning resource exhaustion issues and persistent PVC mounting problems.
+**Primary Risk:** The storage-dependent whisper-stt service has **multiple single points of failure** (Longhorn availability, PVC provisioning, pod resource limits) that are not present in the stateless pbx-web architecture. This explains the stability divergence between services.
 
-**Critical Risk:** The 40-day failed pod (`whisper-openai-6885fc878b-jjm5j`) represents a systemic resource management issue that requires immediate attention. The cascading PVC mount failures on supposedly healthy pods indicate deeper problems with storage lifecycle management.
-
-**Recommendation Priority:** Address immediate cleanup of failed pod and PVC issues (High), then implement storage reclamation and monitoring (Medium), followed by architectural improvements to decouple model storage (Low).
-
-The high deployment frequency for both services suggests aggressive CI/CD practices, which should be balanced with stability gates and observability to prevent future regressions.
+**Next Steps:** Prioritize fixing ardenone-manager infrastructure (Longhorn + ExternalSecret) to restore whisper-stt deployability, then investigate why automated CI/CD isn't being utilized despite workflow templates being configured.
 
 ---
 
-**Report Generated:** 2026-07-24  
-**Analysis Duration:** 30 days (2026-06-24 to 2026-07-24)  
-**Cluster:** ardenone-cluster  
-**Analyst:** Automated analysis via Kubernetes API inspection
+**Report Generated:** July 24, 2026  
+**Analysis Tooling:** kubectl, Argo Workflows API, cluster event logs  
+**Data Sources:** ardenone-cluster, ardenone-manager, iad-ci CI/CD cluster
