@@ -246,6 +246,9 @@ class RoutedIntent:
     # (one LLM call per utterance) and shared across every intent thread from
     # that utterance — see Latency Budget & Instrumentation in docs/plan/plan.md.
     router_ms: int | None = None
+    # json_parse_ms is the JSON parsing time from the router response (optional,
+    # None for cached responses where no actual parsing occurred)
+    json_parse_ms: int | None = None
 
 
 # Path to the router segmentation prompt. Read from disk on each classify_utterance()
@@ -458,6 +461,7 @@ class IntentRouter:
                 "process_ms": 0,
                 "total_ms": 0,
                 "intents_count": len(cached_result),
+                "json_parse_ms": 0,  # No parsing occurred for cached results
             }
             return cached_result, empty_breakdown
 
@@ -518,15 +522,20 @@ class IntentRouter:
             # Measure JSON parsing time
             parse_start = time.perf_counter()
             try:
-                # Optimized JSON parsing using centralized parser
-                # Uses single-pass find()/rfind() approach (faster than split/rsplit)
-                # Handles GLM-4.7's markdown-fenced responses efficiently
-                # See src/llm/response_parser.py for implementation
+                # Fast-path optimized JSON parsing:
+                # - Early fence detection skips processing for clean JSON (common case)
+                # - orjson provides 2-3x faster parsing than standard json
+                # - Single-pass fence stripping with position-based search
+                # See src/llm/response_parser.py for implementation details
                 intents_data = parse_llm_response(response, strip_fences=True, expect_json=True)
             except ParseLLMError as e:
                 # Already has raw_response attached; just re-raise
                 raise e
             parse_ms = (time.perf_counter() - parse_start) * 1000
+
+            # Store json_parse_ms in RoutedIntent for downstream instrumentation
+            # This allows tracking parsing time separately from router_ms
+            json_parse_ms = parse_ms
 
             # Measure classification processing time
             process_start = time.perf_counter()
@@ -706,6 +715,7 @@ class IntentRouter:
                     session_id=session_id,
                     utterance=classification.utterance_fragment,
                     router_ms=router_ms,
+                    json_parse_ms=json_parse_ms,  # Track parsing time for this intent thread
                 )
                 routed_intents.append(routed_intent)
 
@@ -784,6 +794,7 @@ class IntentRouter:
         # the dispatch itself.
         timings = DispatchTimings()
         timings.record("router_ms", routed_intent.router_ms)
+        timings.record("json_parse_ms", routed_intent.json_parse_ms)  # Track JSON parsing time
 
         # Honesty guards for unimplemented intents
         if classification.intent_type == IntentType.ACTION:
