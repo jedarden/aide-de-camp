@@ -172,6 +172,18 @@ def create_parser() -> argparse.ArgumentParser:
         help="Inject a slow step at given step number (for testing violation detection)",
     )
 
+    # freeze command
+    freeze_parser = subparsers.add_parser(
+        "freeze",
+        help="Manage self-modification freeze state",
+        description="View or toggle self-modification freeze protection",
+    )
+    freeze_parser.add_argument(
+        "--toggle",
+        action="store_true",
+        help="Toggle freeze state (create or remove data/FREEZE)",
+    )
+
     return parser
 
 
@@ -237,6 +249,11 @@ async def run_command(args: argparse.Namespace) -> int:
             return await commands.rehearsal(
                 server=server_url,
                 inject_slow_step=args.inject_slow_step,
+            )
+
+        elif args.command == "freeze":
+            return commands.freeze_cmd(
+                toggle=args.toggle,
             )
 
         else:
