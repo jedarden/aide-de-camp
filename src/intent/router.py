@@ -268,10 +268,12 @@ class IntentRouter:
     For task-profile intents, routes to escalate strand for bead creation.
     For other intents, routes to fetch + synthesize strands (TODO).
 
-    Latency optimizations:
+    Latency optimizations (adc-1kp7n):
     - LRU cache for repeated utterances (5-minute TTL)
-    - Reduced max_tokens (128 vs 256) for faster generation
-    - Dedicated 10s timeout for fail-fast behavior
+    - Simplified prompt (removed confidence field/redundant rules)
+    - Reduced max_tokens (80 vs 96) for faster generation
+    - Temperature 0.0 for deterministic sampling
+    - Dedicated 8s timeout for fail-fast behavior
     """
 
     def __init__(self, store=None, prompt_path: Optional[Path] = None, cache_ttl: int = 300):
@@ -488,7 +490,7 @@ class IntentRouter:
                 system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
-                max_tokens=96,  # OPTIMIZATION 2: Reduced from 128 to 96 - intent JSON is typically 40-80 tokens (single: ~40-60, multi: ~80-100)
+                max_tokens=80,  # OPTIMIZATION 2: Reduced from 96 to 80 - intent JSON is typically 40-70 tokens (single: ~40-50, multi: ~60-80)
                 temperature=0.0,
                 return_timing=True,  # Request timing breakdown from LLM client
             )
