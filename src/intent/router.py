@@ -9,6 +9,7 @@ import asyncio
 import json
 import time
 import uuid
+import re
 from dataclasses import dataclass
 from enum import Enum
 from logging import getLogger
@@ -36,10 +37,10 @@ logger = getLogger(__name__)
 
 # Router response cache - LRU cache for repeated utterances within a session
 # Key: (utterance_hash, session_id), Value: (classifications, timestamp)
-# 5-minute TTL for cache entries to balance freshness with performance
-_ROUTER_CACHE: dict[tuple[str, str], tuple[list[IntentClassification], float]] = {}
-_CACHE_TTL = 300  # 5 minutes
-_MAX_CACHE_SIZE = 100
+# 15-minute TTL for cache entries - user intent doesn't change frequently in conversation
+_ROUTER_CACHE: dict[tuple[str, str], tuple[list, float]] = {}
+_CACHE_TTL = 900  # 15 minutes - longer TTL for better hit rate in conversation flow
+_MAX_CACHE_SIZE = 1000  # Increased capacity for more cache hits
 
 
 # Router error types for degraded-state handling
@@ -152,14 +153,12 @@ class IntentRouter:
         return self._zai_client
 
     async def _get_router_zai_client(self):
-        """Get or create dedicated ZAI client for router with 10s timeout for fail-fast behavior."""
+        """Get or create dedicated ZAI client for router with optimized settings for low latency."""
         if self._router_zai_client is None:
-            from ..escalate.llm import ZAI_CLIENT_TIMEOUT, ZAI_PROXY_URL, DEFAULT_MODEL
-            self._router_zai_client = get_zai_client(
-                proxy_url=ZAI_PROXY_URL,
-                default_model=DEFAULT_MODEL,
-                timeout=10.0,  # Router should fail fast - 10s instead of default 30s
-            )
+            from ..escalate.llm import get_router_zai_client
+            # Router needs fail-fast behavior with aggressive timeout
+            # 8-second timeout allows: ~2s connection + ~4-5s inference + ~1s parsing
+            self._router_zai_client = get_router_zai_client(timeout=8.0)
         return self._router_zai_client
 
     def _get_utterance_hash(self, utterance: str) -> str:
@@ -280,13 +279,16 @@ class IntentRouter:
         raw_response = None
 
         try:
+            # Measure total classification time
+            classify_start = time.perf_counter()
+
             # Measure ZAI proxy call time
             proxy_start = time.perf_counter()
             response = await client.call_simple(
                 system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
-                max_tokens=128,  # OPTIMIZATION 2: Reduced from 256 - intent JSON is small
+                max_tokens=32,  # OPTIMIZATION 2: Reduced from 64 to 32 - intent JSON is tiny (single intent ~50 tokens)
                 temperature=0.0,
             )
             proxy_ms = (time.perf_counter() - proxy_start) * 1000
@@ -307,13 +309,44 @@ class IntentRouter:
                 raise e
             parse_ms = (time.perf_counter() - parse_start) * 1000
 
+            # Measure classification processing time
+            process_start = time.perf_counter()
+            classifications = []
+
+            for intent_data in intents_data:
+                # Map string to IntentType enum
+                intent_type_str = intent_data.get("intent_type", "status")
+                try:
+                    intent_type = IntentType(intent_type_str)
+                except ValueError:
+                    logger.warning(f"Unknown intent type: {intent_type_str}")
+                    intent_type = IntentType.STATUS
+
+                classification = IntentClassification(
+                    intent_type=intent_type,
+                    project_slug=intent_data.get("project_slug"),
+                    confidence=float(intent_data.get("confidence", 0.8)),
+                    utterance_fragment=intent_data.get("utterance_fragment", utterance),
+                    reasoning=intent_data.get("reasoning", ""),
+                    urgency=intent_data.get("urgency", "normal"),
+                    lookup_kind=intent_data.get("lookup_kind") if intent_type == IntentType.LOOKUP else None,
+                )
+                classifications.append(classification)
+            process_ms = (time.perf_counter() - process_start) * 1000
+
+            total_ms = (time.perf_counter() - classify_start) * 1000
+
             # Log detailed timing breakdown for latency profiling
             logger.info(
                 f"router_timing breakdown: "
                 f"proxy_call_ms={proxy_ms:.2f} "
                 f"json_parse_ms={parse_ms:.2f} "
-                f"total_estimate_ms={proxy_ms + parse_ms:.2f}"
+                f"process_ms={process_ms:.2f} "
+                f"total_ms={total_ms:.2f} "
+                f"intents={len(classifications)}"
             )
+
+            logger.info(f"Classified {len(classifications)} intents from utterance")
             classifications = []
 
             for intent_data in intents_data:
