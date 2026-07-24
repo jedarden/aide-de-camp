@@ -12,14 +12,12 @@ Classify the utterance into intents. Return ONLY a JSON array.
 
 ## Schema per intent
 {
-  "intent_type": "<type from above>",
+  "intent_type": "<type>",
   "project_slug": "<project-id or null>",
   "utterance_fragment": "<text fragment>",
-  "lookup_kind": "<logs|config|docs for lookup intents>",
-  "confidence": 0.0-1.0
+  "lookup_kind": "<logs|config|docs for lookup intents>"
 }
 
 ## Rules
 - Different type/project/target → separate intents
 - Map projects by name/alias/context
-- Confidence >= 0.8 → dispatch, < 0.6 → clarification
