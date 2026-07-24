@@ -244,3 +244,132 @@ def test_parse_llm_response_empty_input():
     """Test that empty input is handled correctly."""
     with pytest.raises(ParseLLMError):
         parse_llm_response("")
+
+
+# ============================================================================
+# Intent Router Specific Tests
+# ============================================================================
+
+def test_intent_router_parsing_correctness():
+    """Test parsing of typical intent router response (JSON array)."""
+    router_response = '''```json
+[
+    {
+        "intent_type": "status",
+        "project_slug": "aide-de-camp",
+        "confidence": 0.95,
+        "utterance_fragment": "how are the pods doing?",
+        "reasoning": "User wants pod status",
+        "urgency": "normal"
+    },
+    {
+        "intent_type": "lookup",
+        "project_slug": "aide-de-camp",
+        "confidence": 0.85,
+        "utterance_fragment": "check the logs",
+        "reasoning": "User wants to see logs",
+        "urgency": "high",
+        "lookup_kind": "logs"
+    }
+]
+```'''
+    result = parse_llm_response(router_response)
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert result[0]["intent_type"] == "status"
+    assert result[1]["intent_type"] == "lookup"
+    assert result[1]["lookup_kind"] == "logs"
+
+
+def test_intent_router_parsing_with_extra_whitespace():
+    """Test parsing with irregular whitespace (GLM-4.7 sometimes adds extra spacing)."""
+    router_response = '''```json
+
+[
+    {
+        "intent_type": "status",
+        "project_slug": "aide-de-camp"
+    }
+]
+
+```'''
+    result = parse_llm_response(router_response)
+    assert isinstance(result, list)
+    assert len(result) == 1
+
+
+def test_intent_router_parsing_fence_with_language_marker():
+    """Test parsing with different fence language markers."""
+    for fence_lang in ["```json", "```JSON", "```", "```javascript"]:
+        router_response = f'''{fence_lang}
+[
+    {{"intent_type": "status", "project_slug": "aide-de-camp"}}
+]
+{fence_lang}'''
+        result = parse_llm_response(router_response)
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+
+def test_intent_router_parsing_single_intent():
+    """Test parsing single intent (router can return 1+ intents)."""
+    router_response = '''```json
+[
+    {
+        "intent_type": "action",
+        "project_slug": "spaxel",
+        "confidence": 0.90,
+        "utterance_fragment": "deploy the latest",
+        "reasoning": "User wants to deploy"
+    }
+]
+```'''
+    result = parse_llm_response(router_response)
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert result[0]["intent_type"] == "action"
+
+
+def test_intent_router_parsing_error_handling_malformed():
+    """Test that malformed router responses raise ParseLLMError with raw_response."""
+    malformed = '''```json
+[
+    {{"intent_type": "status", "invalid": }}
+]
+```'''
+    with pytest.raises(ParseLLMError) as exc_info:
+        parse_llm_response(malformed)
+
+    # Verify raw_response is preserved for error reporting
+    assert exc_info.value.raw_response is not None
+    assert "invalid" in exc_info.value.raw_response or "Failed to parse" in str(exc_info.value)
+
+
+def test_intent_router_parsing_bare_json():
+    """Test parsing router response without fences (some models don't fence)."""
+    bare_json = '''[
+    {"intent_type": "status", "project_slug": "aide-de-camp"}
+]'''
+    result = parse_llm_response(bare_json)
+    assert isinstance(result, list)
+    assert len(result) == 1
+
+
+def test_intent_router_parsing_empty_fences():
+    """Test handling of fences with empty/whitespace content."""
+    with pytest.raises(ParseLLMError):
+        parse_llm_response("```json\n\n```")
+
+
+def test_fence_stripping_no_trailing_newline_before_fence():
+    """Test fence stripping when closing fence is directly after JSON (no trailing newline)."""
+    no_trailing_nl = '```json\n{"key": "value"}```'
+    result = strip_markdown_fences(no_trailing_nl)
+    assert result == '{"key": "value"}'
+
+
+def test_fence_stripping_multiple_fences():
+    """Test that only outermost fences are stripped (content may contain ```)."""
+    with_fences_in_content = '```json\n{"code": "console.log(````hello```")"}\n```'
+    result = strip_markdown_fences(with_fences_in_content)
+    assert result == '{"code": "console.log(````hello```")"}'

@@ -28,9 +28,14 @@ DEFAULT_MODEL = "claude-sonnet-4-20250514"
 
 
 class ModelClass(Enum):
-    """Available model classes."""
-    HAIKU = "claude-haiku-4-20250514"  # Fast, cheap - for routing
-    SONNET = "claude-sonnet-4-20250514"  # Balanced - for synthesis
+    """Available model classes.
+
+    Performance note: For routing tasks, SONNET is empirically faster than HAIKU
+    (median ~2362ms vs ~3861ms in our tests). Use SONNET for router despite HAIKU
+    being marketed as "fast". SONNET provides better price-performance for this use case.
+    """
+    HAIKU = "claude-haiku-4-20250514"  # Fast, cheap - but slower for routing in practice
+    SONNET = "claude-sonnet-4-20250514"  # Balanced - fastest for routing tasks
     OPUS = "claude-opus-4-20250514"  # Highest quality - for complex tasks
 
 
