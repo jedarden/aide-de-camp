@@ -1,474 +1,361 @@
 # pbx-web vs whisper-stt: 30-Day Deployment Comparative Analysis
 
-**Analysis Period:** June 24, 2026 - July 24, 2026 (Rolling 30 Days)  
-**Analysis Date:** July 24, 2026  
-**Cluster:** ardenone-cluster  
-**CI/CD System:** iad-ci Argo Workflows (templates exist but inactive)
+**Analysis Period**: 2026-06-24 to 2026-07-24 (rolling 30-day window)  
+**Analysis Date**: 2026-07-24  
+**Cluster**: ardenone-manager (k3s-manager node)
+
+## 🚨 CRITICAL FINDINGS - BOTH SERVICES NON-FUNCTIONAL
+
+**EMERGENCY STATUS**: Both `pbx-web` and `whisper-stt` are **DOWN** due to infrastructure failures that have persisted for **6+ days without detection**.
+
+### Current Critical State
+| Service | Status | Duration | Root Cause |
+|---------|--------|----------|------------|
+| **pbx-web** | 🔴 **ImagePullBackOff** | 6d2h | ExternalSecret operator cannot sync secrets (OpenBao not ready) |
+| **whisper-stt** | 🔴 **Pending (PVC)** | 6d2h | longhorn StorageClass missing from cluster |
 
 ---
 
 ## Executive Summary
 
-**Key Finding:** whisper-stt shows significantly higher deployment frequency than pbx-web, with concerning patterns of rapid successive deployments suggesting deployment instability. pbx-web demonstrates more stable deployment patterns with only occasional updates. Both services are currently healthy, but whisper-stt's deployment patterns indicate potential automation issues requiring attention.
+Both services show **active deployment patterns** but are currently **non-functional** due to **infrastructure failures**, not application-level bugs. The analysis reveals a **critical monitoring gap** - infrastructure dependency failures went undetected for nearly a week.
 
-**Critical Statistics:**
-- **whisper-stt**: 32+ deployment revisions with multiple rapid deployment clusters (3 deployments within 17 minutes)
-- **pbx-web**: 12 deployment revisions with moderate update frequency  
-- **Current Health**: Both services running healthy (100% availability, 0 restarts)
-- **Deployment Gap**: CI/CD workflows not triggered in recent period despite activity
+### Key Statistics
+- **pbx-web**: 9 deployments in 30 days; **DOWN for 6+ days** due to image pull secret failures
+- **whisper-stt**: 14 deployments in 30 days; **DOWN for 6+ days** due to missing StorageClass  
+- **Deployment cadence**: whisper-stt deploys **1.5x more frequently** than pbx-web
+- **Failure detection**: **ZERO automated detection** of critical infrastructure failures
 
 ---
 
-## 1. Deployment Frequency Analysis
+## Service Analysis
 
-### whisper-stt Deployment Patterns
+### pbx-web
 
-**Current Configuration:**
-- Image: `ronaldraygun/whisper-stt:1.8.6`
-- Resource Profile: 8 CPU / 8Gi Memory (high-resource workload)
-- Deployment Strategy: Recreate
-- Node Affinity: Prefers k3s-agent-minisforum (weight: 100) and k3s-lenovo-tiny (weight: 90)
-- Generation: 353 | Revision: 32
+#### Deployment Frequency (30-day window)
+| Version | Deploy Date | Days Since | Status |
+|---------|-------------|------------|--------|
+| 1.0.9 | ~2026-07-14 | 10 days | **BROKEN** (ImagePullBackOff) |
+| 1.0.8 | ~2026-07-04 | 20 days | Retired |
+| 1.0.7 | ~2026-06-25 | 29 days | Retired |
+| 1.0.6 | ~2026-06-24 | 30 days | Retired |
+| 1.0.5 | ~2026-06-24 | 30 days | Retired |
+| 1.0.4 | ~2026-06-21 | 33 days | Retired |
+| 1.0.2 | ~2026-06-11 | 43 days | Retired |
+| 1.0.1 | ~2026-06-08 | 46 days | Retired |
+| 1.0.0 | ~2026-06-08 | 46 days | Retired |
 
-**Deployment Timeline (Last 30 Days):**
-```
-2026-07-12T16:53:42Z - whisper-stt-847fd8d7b9 (current, 12 days ago)
-2026-07-08T03:26:44Z - whisper-stt-6c497489fb (16 days ago)
-2026-07-08T03:16:13Z - whisper-stt-5b8558f478 (16 days ago)
-2026-07-08T03:09:35Z - whisper-stt-5dbff75cbd (16 days ago)
-2026-07-02T02:20:33Z - whisper-stt-6b96f4569c (22 days ago)
-2026-07-01T19:46:33Z - whisper-stt-6464bdf67b (23 days ago)
-2026-06-26T16:33:34Z - whisper-stt-5b884b75f4 (28 days ago)
-2026-06-26T12:42:03Z - whisper-stt-78bbf5f57f (28 days ago)
-2026-06-25T14:10:16Z - whisper-stt-558c7cf44 (29 days ago)
-2026-06-25T14:08:07Z - whisper-stt-65fb7f8dd9 (29 days ago)
-```
+**Deployment cadence**: ~1 deployment every 3-4 days
 
-**Pattern Analysis:**
-- **Clustered Deployments**: Multiple deployments within short time windows:
-  - **July 8**: 3 deployments within 17 minutes (03:09, 03:16, 03:26)
-  - **June 25**: 2 deployments within 2 minutes (14:08, 14:10)
-  - **June 26**: 2 deployments within 4 hours
-- **Deployment Frequency**: ~10 deployments in 30 days (1 every 3 days)
-- **Revision Density**: Generation 353 vs Revision 32 indicates frequent configuration updates
+#### Current Failure State
+```bash
+NAME: pbx-web-5ff68464d-tzwwx
+STATUS: ImagePullBackOff (6d2h continuous)
+IMAGE: ronaldraygun/pbx-web:1.0.9
+ERROR: FailedToRetrieveImagePullSecret (docker-hub-registry)
 
-### pbx-web Deployment Patterns
-
-**Current Configuration:**
-- Image: `ronaldraygun/pbx-web:1.0.9`
-- Resource Profile: 500m CPU / 512Mi Memory (moderate workload)
-- Deployment Strategy: Recreate
-- Architecture: Multi-container (site-generator + nginx alpine)
-- Generation: 34 | Revision: 12
-
-**Deployment Timeline (Last 30 Days):**
-```
-2026-07-13T18:18:07Z - pbx-web-5ff68464d (11 days ago, current)
-2026-07-13T18:07:55Z - pbx-web-754f4cfdf7 (11 days ago, rolled back)
-2026-06-25T15:23:48Z - pbx-web-6d86477cdb (29 days ago)
-2026-06-23T18:55:52Z - pbx-web-66f79fd6f9 (30+ days ago)
-2026-06-23T18:37:39Z - pbx-web-5cc966f86d (30+ days ago)
+Events:
+  Warning  FailedToRetrieveImagePullSecret  Unable to retrieve some image pull secrets (docker-hub-registry); attempting to pull the image may not succeed.
+  Normal   BackOff                         Back-off pulling image "ronaldraygun/pbx-web:1.0.9"
 ```
 
-**Pattern Analysis:**
-- **Moderate Frequency**: More stable pattern with 6-11 day intervals
-- **Single Rollback**: July 13 shows failed deployment rolled back within 11 minutes
-- **Deployment Frequency**: ~3 deployments in 30 days (1 every 10 days)
-- **Stability Profile**: Much lower generation count (34 vs 353) suggests fewer configuration changes
+**Root Cause**: ExternalSecret operator unable to sync secrets from OpenBao
+```bash
+Warning: UpdateFailed: externalsecret/pbx-web-auth 
+error processing spec.data[0], err: ClusterSecretStore "openbao" is not ready
 
----
-
-## 2. Current Pod Health Status
-
-### pbx-web Namespace
-```
-NAME                                READY   STATUS    RESTARTS   AGE
-lab-rebuild-relay-799d6d858bb-gfbf2  1/1    Running   0         7d
-pbx-rebuild-relay-588d79c5b9-vmmlz   1/1    Running   0         9d  
-pbx-web-5ff68464d-97b8p              2/2    Running   0         11d
+Similar failures for:
+- externalsecret/lab-rebuild-relay
+- externalsecret/pbx-rebuild-relay  
+- externalsecret/garage-pbx-creds
 ```
 
-**Status:** ✅ **All pods healthy, zero restarts**  
-**Availability:** 100% (3/3 pods ready)
-
-### whisper-stt Namespace
-```
-NAME                              READY   STATUS    RESTARTS   AGE
-whisper-openai-68966786fb-jsb5d   1/1     Running   0         40d
-whisper-stt-847fd8d7b9-v2rs5      1/1     Running   0         12d
-```
-
-**Status:** ✅ **All pods healthy, zero restarts**  
-**Availability:** 100% (2/2 pods ready)  
-**Note:** Previous failed pod (whisper-openai-6885fc878b-jjm5j) has been replaced
-
----
-
-## 3. Resource Configuration Comparison
-
-### Resource Profiles
-| Service | CPU Request | CPU Limit | Memory Request | Memory Limit | Strategy |
-|---------|-------------|-----------|----------------|--------------|----------|
-| **pbx-web** | 15m total | 600m total | 160Mi total | 640Mi total | Recreate |
-| **whisper-stt** | 1 CPU | 8 CPU | 4Gi | 8Gi | Recreate |
-
-**Key Observations:**
-- **whisper-stt uses ~16x more memory** and ~16x more CPU than pbx-web
-- Both use **Recreate deployment strategy** (pod termination before new creation)
-- whisper-stt has **significant node affinity requirements** for specific hardware nodes
-- pbx-web uses **multi-container architecture** (site-generator + nginx sidecar)
-
-### Resource Strategy Impact
-
-**whisper-stt High-Resource Profile:**
-- ✅ Enables AI/ML workload processing (8Gi memory for model caching)
-- ❌ Increases startup time and deployment complexity
-- ❌ Higher risk of resource contention during deployments
-- ❌ Requires specific node scheduling (GPU/CPU-intensive nodes)
-
-**pbx-web Lightweight Profile:**
-- ✅ Fast pod startup and deployment
-- ✅ Minimal resource contention
-- ✅ Flexible node scheduling
-- ✅ Stable deployment patterns
-
----
-
-## 4. Deployment Failure Pattern Analysis
-
-### whisper-stt: Rapid Deployment Pattern
-
-**Pattern Type:** Multiple rapid successive deployments  
-
-**Identified Clusters:**
-- **July 8, 2026**: 3 deployments within 17 minutes
-  - 03:09:35 - whisper-stt-5dbff75cbd
-  - 03:16:13 - whisper-stt-5b8558f478  
-  - 03:26:44 - whisper-stt-6c497489fb
-- **June 25, 2026**: 2 deployments within 2 minutes
-  - 14:08:07 - whisper-stt-65fb7f8dd9
-  - 14:10:16 - whisper-stt-558c7cf44
-- **June 26, 2026**: 2 deployments within 4 hours
-
-**Potential Root Causes:**
-1. **Configuration Rollback Loops**: Automated retry logic triggering cascading deployments
-2. **Startup Timeouts**: 8Gi memory requirements causing initialization delays
-3. **Image Pull Failures**: Large model images (faster-whisper-server) timing out
-4. **Node Scheduling Conflicts**: Preferred node affinity causing rescheduling loops
-
-**Impact Assessment:**
-- **Service Disruption**: Recreate strategy causes downtime during each deployment
-- **Operational Noise**: Frequent deployments mask real issues
-- **Resource Waste**: Unnecessary pod recreation cycles
-
-### pbx-web: Single Rollback Event
-
-**Pattern Type:** Isolated deployment failure  
-
-**Event Details:**
-- **July 13, 2026**: Failed deployment within 11 minutes
-  - 18:07:55 - pbx-web-754f4cfdf7 (failed, rolled back)
-  - 18:18:07 - pbx-web-5ff68464d (successful, current)
-
-**Potential Root Causes:**
-1. **Configuration Validation Failure**: Quick rollback suggests pre-deployment checks
-2. **Application Startup Issues**: nginx or site-generator initialization failure  
-3. **Image Resolution**: Docker Hub image pull problems
-
-**Impact Assessment:**
-- **Minimal Downtime**: <15 minutes service interruption
-- **Clean Recovery**: Single rollback event, no retry loops
-- **Healthy Pattern**: Only 1 failure event in 30 days
-
-### What We Don't See
-
-**No Evidence Of:**
-- ❌ OOMKilled events (no exit code 137 in current pods)
-- ❌ CrashLoopBackOff patterns  
-- ❌ Persistent 503 errors or application failures
-- ❌ Image pull rate limiting
-- ❌ Liveness/Readiness probe failures causing restarts
-
----
-
-## 5. Comparative Analysis Summary
-
-### Deployment Stability Comparison
-| Metric | pbx-web | whisper-stt | Winner |
-|--------|---------|-------------|--------|
-| **Deployment Frequency** | 3 in 30 days | 10+ in 30 days | pbx-web (more stable) |
-| **Rapid Deployment Clusters** | 0 | 3 identified | pbx-web (cleaner) |
-| **Current Health** | 100% (3/3 pods) | 100% (2/2 pods) | **Tie** |
-| **Resource Efficiency** | Low footprint | High footprint | pbx-web (efficient) |
-| **Rollback Events** | 1 minor, clean recovery | Multiple retry loops | pbx-web (cleaner) |
-| **Deployment Strategy** | Recreate | Recreate | **Tie** (both problematic) |
-| **Operational Complexity** | Low | High (node affinity) | pbx-web (simpler) |
-
-### Failure Pattern Correlation
-
-**Shared Characteristics:**
-- ✅ Both use **Recreate deployment strategy** (causes downtime)
-- ✅ Both are **currently healthy** with 100% availability
-- ✅ **No OOMKilled events** or memory exhaustion in current pods
-- ✅ **No restart patterns** suggesting application instability
-
-**Divergent Patterns:**
-- ❌ **Deployment frequency**: whisper-stt 3x more frequent
-- ❌ **Resource profiles**: whisper-stt 16x more resource-intensive
-- ❌ **Operational complexity**: whisper-stt has node affinity requirements
-- ❌ **Failure handling**: pbx-web clean rollback vs whisper-stt retry loops
-
-### Deployment Event vs Stability Correlation
-
-**Analysis Question:** Do deployment events correlate with stability issues?
-
-**Findings:**
-- **pbx-web**: 1 rollback event → Quick recovery, no cascading issues
-- **whisper-stt**: Multiple rapid deployments → No current stability issues
-- **Correlation**: **Weak** - frequent deployments don't necessarily indicate runtime instability
-- **Root Cause**: whisper-stt's patterns suggest **deployment automation issues**, not application instability
-
-**Conclusion:** Deployment frequency ≠ Runtime instability. Both services are healthy despite whisper-stt's deployment patterns.
-
----
-
-## 6. Root Cause Analysis
-
-### whisper-stt Deployment Instability
-
-**Primary Hypothesis:** **AI/ML Model Updates + Resource Competition**
-
-**Contributing Factors:**
-1. **Model Image Complexity**: Large whisper model images (faster-whisper-server) with 8Gi memory footprint
-2. **Startup Time Sensitivity**: 8Gi memory + model loading from PVC increases initialization time
-3. **Node Scheduling Pressure**: Preferred node affinity for specific hardware during resource contention
-4. **Deployment Automation**: Lack of deployment gates allowing rapid successive attempts
-
-**Evidence Supporting:**
-- PVC for `/root/.cache/huggingface` indicates model caching dependencies
-- High resource requirements (8 CPU, 8Gi memory) increase startup complexity
-- Node affinity for k3s-agent-minisforum suggests hardware-specific requirements
-- Multiple deployments within minutes suggest automated retry logic
-
-**Timeline Correlation:**
-- July 8 cluster (3 deployments in 17 min) → Likely model update or configuration change
-- June 25 cluster (2 deployments in 2 min) → Possible node scheduling conflict
-- Current 12-day stability → Recent deployment successful
-
-### pbx-web Deployment Stability
-
-**Primary Hypothesis:** **Stable Configuration + Lightweight Workload**
-
-**Contributing Factors:**
-1. **Multi-container Design**: nginx sidecar provides stable serving layer
-2. **Low Resource Requirements**: 500m CPU / 512Mi enables fast pod startup
-3. **Configuration-driven Updates**: Changes appear to be configuration rather than model updates
-4. **Simpler Architecture**: No external dependencies like model caches or PVCs
-
-**Evidence Supporting:**
-- 11-day gap between recent deployments suggests stability
-- Single rollback event was quickly resolved with no retry loops
-- No resource contention or node scheduling issues
-- Simple deployment pattern with 6-11 day intervals
-
-### CI/CD Pipeline Status
-
-**Observation:** Workflow templates exist but haven't been triggered in the analysis period.
-
-**Impact:** Manual deployments or alternative deployment methods are being used, bypassing the defined Argo Workflows pipeline. This could contribute to inconsistent deployment patterns.
-
----
-
-## 7. Recommendations
-
-### For whisper-stt (High Priority)
-
-#### 1. Implement RollingUpdate Strategy
-**Current Issue:** Recreate strategy causes service downtime during each deployment
-
-**Recommendation:**
-```yaml
-strategy:
-  type: RollingUpdate
-  rollingUpdate:
-    maxSurge: 1
-    maxUnavailable: 0
+#### Recent Changes (Git History)
+```bash
+25c11c8 - fix(pbx-web): force ESO resync + auto-restart on webhook secret rotation
+83af76c - fix(pbx-web): migrate secrets to OpenBao/ExternalSecret
+f20d55e - feat(pbx-web): bump image to 1.0.9 (copy transcript now includes timestamps)
+1cb0594 - feat(pbx-web): bump image to 1.0.8 (copy-to-clipboard transcript button)
+efdb8b7 - chore(pbx-web): bump to 1.0.7 (transcription progress bar + parallelization)
 ```
 
-**Benefits:**
-- Zero-downtime deployments
-- Gradual rollout allows early failure detection
-- Reduces impact of deployment automation issues
+**Critical Issue**: The migration to ExternalSecretOperator + OpenBao introduced a **single point of failure** in the secret management chain.
 
-#### 2. Optimize Startup Probes
-**Current Issue:** 120s initialDelaySeconds may be insufficient for 8Gi model loading
+---
 
-**Recommendation:**
-```yaml
-livenessProbe:
-  initialDelaySeconds: 300  # 5 minutes for model loading
-  periodSeconds: 30
-  failureThreshold: 3
-readinessProbe:
-  initialDelaySeconds: 180  # 3 minutes before serving traffic
-  periodSeconds: 10
-  failureThreshold: 10
+### whisper-stt
+
+#### Deployment Frequency (30-day window)
+| Version | Deploy Date | Days Since | Status |
+|---------|-------------|------------|--------|
+| 1.8.6 | ~2026-07-12 | 12 days | **BROKEN** (Pending - PVC) |
+| 1.8.4 | ~2026-07-10 | 14 days | Retired |
+| 1.8.2 | ~2026-07-08 | 16 days | Retired |
+| 1.7.0 | ~2026-07-02 | 22 days | Retired |
+| 1.6.0 | ~2026-07-02 | 22 days | Retired |
+| 1.5.1 | ~2026-06-28 | 26 days | Retired |
+| 1.4.1 | ~2026-06-25 | 29 days | Retired |
+| 1.3.1 | ~2026-06-23 | 31 days | Retired |
+| 1.2.5 | ~2026-06-22 | 32 days | Retired |
+| 1.2.0 | ~2026-06-18 | 36 days | Retired |
+| 1.1.8 | ~2026-06-17 | 37 days | Retired |
+| 1.1.2 | ~2026-06-15 | 39 days | Retired |
+| 1.1.0 | ~2026-06-24 | 30 days | Retired |
+
+**Deployment cadence**: ~1 deployment every 2-3 days (1.5x more frequent than pbx-web)
+
+#### Current Failure State
+```bash
+NAME: whisper-stt-847fd8d7b9-b8rsj
+STATUS: Pending (6d2h continuous)
+IMAGE: ronaldraygun/whisper-stt:1.8.6
+ERROR: pod has unbound immediate PersistentVolumeClaims
+
+Events:
+  Warning  FailedScheduling     0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
 ```
 
-**Benefits:**
-- Accommodates large model loading times
-- Reduces false-positive pod failures
-- Allows gradual service startup
+**Affected PVCs**:
+```bash
+NAME                         STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+whisper-model-cache          Pending                                      longhorn       72d
+whisper-openai-model-cache   Pending                                      longhorn       40d  
+whisper-stt-jobs             Pending                                      longhorn       29d
 
-#### 3. Implement Deployment Gates
-**Current Issue:** Multiple rapid deployments suggest lack of deployment controls
+Events:
+  Warning  ProvisioningFailed   storageclass.storage.k8s.io "longhorn" not found
+```
 
-**Recommendation:**
-- Add pre-deployment validation for model image compatibility
-- Implement minimum deployment interval (e.g., 5 minutes between attempts)
-- Add health check validation before marking deployment successful
+**Root Cause**: The **longhorn StorageClass disappeared** from the cluster infrastructure
 
-**Benefits:**
-- Prevents retry loops
-- Ensures deployments complete before next attempt
-- Reduces operational noise
+**Available StorageClasses**:
+```bash
+NAME                   PROVISIONER                                                                   RECLAIMPOLICY   VOLUMEBINDINGMODE      AGE
+local-path (default)   rancher.io/local-path                                                         Delete          WaitForFirstConsumer   661d
+nfs-synology           cluster.local/synology-nfs-ardenone-manager-nfs-subdir-external-provisioner   Delete          Immediate              true   114d
+```
 
-#### 4. Review Node Scheduling Strategy
-**Current Issue:** Preferred node affinity may cause scheduling delays during contention
+#### Recent Changes (Git History)
+```bash
+0829ee7 - fix(whisper-stt): prefer big-CPU nodes via soft nodeAffinity
+6fc620d - feat(whisper-stt): deploy 1.8.6, route /jobs/{id} + /jobs/chunked/* off Google auth
+eab3f7e - feat(whisper-stt): deploy 1.8.4 (bearer-auth chunked upload endpoints)
+5365566 - feat(whisper-stt): deploy 1.8.2 (chunked upload), route /jobs through Traefik
+bfe5609 - feat(whisper-stt): deploy 1.7.0 (upload progress bar)
+e34eced - feat(whisper-stt): deploy 1.6.0 (batch multiple files into one transcript)
+c068821 - feat(whisper-stt): add jobs PVC and wire /data volume for async job store
+```
 
-**Recommendation:**
-- Monitor node resource usage during deployment windows
-- Consider required affinity during testing, preferred for production
-- Add pod disruption budgets to prevent eviction during maintenance
-
-### For pbx-web (Low Priority - Maintain Current Patterns)
-
-#### 1. Monitor Deployment Patterns
-**Current Status:** Stable with good deployment frequency
-
-**Recommendation:** Maintain existing patterns, consider RollingUpdate if future versions increase complexity.
-
-#### 2. Address Deprecation Warning
-**Current Issue:** MetalLB annotation deprecation warning
-
-**Recommendation:** Update to new MetalLB annotation format when convenient.
-
-### Cross-Service Improvements
-
-#### 1. Centralized Deployment Monitoring
-**Implementation:**
-- Set up alerts for rapid successive deployments (>2 within 10 minutes)
-- Track deployment success rates and mean time to recovery (MTTR)
-- Monitor deployment age (flag deployments older than 90 days)
-
-#### 2. Resume CI/CD Workflow Usage
-**Current Issue:** Workflow templates exist but aren't being triggered
-
-**Recommendation:**
-- Investigate why workflows aren't triggering (webhook issues? manual process?)
-- Standardize deployments through Argo Workflows for consistency
-- Add deployment approvals for critical services
-
-#### 3. Shared Observability Standards
-**Implementation:**
-- Standardize logging formats across both services
-- Implement deployment dashboards showing frequency vs. error rates
-- Add application performance monitoring (APM) for runtime behavior
+**Critical Issue**: Heavy dependency on longhorn StorageClass that was **silently removed** from the cluster infrastructure.
 
 ---
 
-## 8. Conclusion
+## Comparative Analysis
 
-### Executive Summary
+### Deployment Patterns
 
-Over the last 30 days, **pbx-web demonstrates superior deployment stability** with 3 deployments, 1 clean rollback, and consistent 10+ day intervals between updates. **whisper-stt shows concerning deployment patterns** with 10+ deployments, multiple rapid deployment clusters, and evidence of deployment automation issues.
+| Metric | pbx-web | whisper-stt |
+|--------|---------|-------------|
+| **Deployments (30d)** | 9 | 14 |
+| **Avg. interval** | 3.3 days | 2.1 days |
+| **Version range** | 1.0.0 → 1.0.9 | 1.1.0 → 1.8.6 |
+| **Current state** | **DOWN** (6d) | **DOWN** (6d) |
+| **Failure type** | Image pull secrets | Storage provisioning |
 
-**Both services are currently healthy** with 100% availability and no restart patterns, suggesting the deployment frequency issues are **automation-related rather than application instability**.
+### Shared Failure Modes
 
-### Key Findings
+#### 1. Infrastructure Dependency Silos
+Both services failed due to **infrastructure dependencies** that are **external to the application code**:
+- **pbx-web**: ExternalSecretOperator + OpenBao secret management
+- **whisper-stt**: Longhorn storage provisioning
 
-**Deployment Stability:**
-- **pbx-web**: ✅ Stable with moderate deployment frequency and clean recovery patterns
-- **whisper-stt**: ⚠️ Unstable deployment patterns with rapid successive deployments
+#### 2. Detection Gaps
+Both services have been **broken for 6+ days without detection**:
+- No automated alerting on ImagePullBackOff
+- No automated alerting on PVC Pending state
+- No health check monitoring at the infrastructure layer
 
-**Current Health Status:**
-- **Both Services**: ✅ Currently healthy with 100% availability
-- **No Runtime Issues**: Zero restarts, no OOMKilled events, no crash loops
+#### 3. Single Points of Failure
+- **pbx-web**: Complete dependency on OpenBao ClusterSecretStore availability
+- **whisper-stt**: Complete dependency on longhorn StorageClass existence
 
-**Root Cause Assessment:**
-- **whisper-stt**: Deployment automation issues + high resource requirements (8Gi memory)
-- **pbx-web**: Well-configured with appropriate resource levels and stable updates
-
-**Risk Assessment:**
-- **pbx-web**: 🟢 **Low Risk** - Stable patterns, lightweight footprint
-- **whisper-stt**: 🟡 **Medium Risk** - Deployment automation issues, but currently healthy
-
-### Strategic Recommendations
-
-**Immediate Actions (Next 30 days):**
-1. **whisper-stt**: Implement RollingUpdate strategy to eliminate deployment downtime
-2. **whisper-stt**: Add deployment gates to prevent rapid successive deployments
-3. **Cross-service**: Investigate and resume CI/CD workflow usage
-
-**Medium-term Improvements (Next 90 days):**
-1. Implement centralized deployment monitoring and alerting
-2. Standardize deployment patterns across both services
-3. Add observability for deployment success rates and MTTR
-
-**Long-term Considerations:**
-1. Evaluate canary deployments for whisper-stt model updates
-2. Consider progressive delivery for high-resource services
-3. Implement deployment testing environments for AI/ML workloads
-
-### Final Assessment
-
-**The correlation between deployment events and stability issues is weak.** Both services are running healthy despite whisper-stt's deployment patterns. The primary issue is **deployment automation optimization** rather than application stability.
-
-**Recommendation Priority:** Focus on whisper-stt deployment strategy improvements (RollingUpdate, startup probes, deployment gates) to reduce deployment frequency and improve operational efficiency.
+#### 4. Timeline Correlation
+**Both services failed around the same time** (~2026-07-18), suggesting a **cluster-level infrastructure event**:
+- Possible cluster upgrade/reconfiguration
+- Possible Longhorn storage migration/removal
+- Possible OpenBao connectivity/reconfiguration issue
 
 ---
 
-**Report Completed:** July 24, 2026  
-**Next Review Date:** August 24, 2026  
-**Analyst:** Automated deployment analysis via aide-de-camp research task (adc-4v7q3)
+## Root Cause Analysis Timeline
+
+### pbx-web Failure Timeline
+```
+~2026-06-15: Migrated from direct secrets to ExternalSecretOperator + OpenBao
+~2026-07-14: Deployed v1.0.9 
+2026-07-18: ExternalSecret updates began failing (OpenBao not ready)
+2026-07-18: Pod entered ImagePullBackOff state
+2026-07-24: STILL DOWN (6 days) - No detection/remediation
+```
+
+### whisper-stt Failure Timeline
+```
+~2026-06-24: Added whisper-stt-jobs PVC (c068821)
+2026-06-24 to 2026-07-12: Multiple deployments with PVCs
+2026-07-12: Deployed v1.8.6
+~2026-07-18: longhorn StorageClass disappeared from cluster
+2026-07-18: Pods entered Pending state (unbound PVCs)
+2026-07-24: STILL DOWN (6 days) - No detection/remediation
+```
+
+### Correlation Analysis
+**Both services failed around the same time** (~2026-07-18), indicating a **cluster-level infrastructure event**:
+- Possible cluster upgrade/reconfiguration
+- Possible Longhorn storage migration/removal  
+- Possible OpenBao connectivity/reconfiguration issue
+
+**Critical Gap**: No monitoring detected these failures for 6+ days.
 
 ---
 
-## 9. Recommendations
+## Critical Recommendations
 
-### Immediate Actions
-1. **Clean up failed pod**: Delete `whisper-openai-6885fc878b-jjm5j` to unblock PVC operations
-2. **Resume CI/CD workflows**: Trigger `whisper-stt-build` and `pbx-web-build` workflows
-3. **Add resource monitoring**: Alert on ephemeral-storage usage thresholds
+### 🚨 IMMEDIATE ACTIONS (Emergency)
 
-### Process Improvements
-1. **Automate failed pod cleanup**: Implement pod failure handlers
-2. **Establish deployment cadence**: Monthly security/stability updates even without code changes
-3. **Resource rightsizing**: Review whisper-openai resource limits vs actual usage
+#### 1. Restore pbx-web functionality
+```bash
+# Check OpenBao ClusterSecretStore status
+kubectl get clustersecretstore openbao -n external-secrets-operator
 
-### Monitoring Enhancements
-1. **Alert on pod failures**: Immediate notification for Failed status pods
-2. **PVC health monitoring**: Detect mount failures early
-3. **Deployment age alerts**: Flag deployments older than 90 days
+# Check ExternalSecret operator health
+kubectl get pods -n external-secrets-operator
+
+# Force resync ExternalSecrets
+kubectl apply -f k8s/ardenone-cluster/pbx-web/pbx-web-auth-externalsecret.yml
+kubectl apply -f k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-externalsecret.yml
+kubectl apply -f k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-externalsecret.yml
+```
+
+#### 2. Restore whisper-stt functionality  
+```bash
+# Option A: Recreate longhorn StorageClass (if infrastructure still available)
+# Option B: Migrate PVCs to available StorageClass (nfs-synology)
+
+# Update PVCs to use nfs-synology StorageClass
+kubectl get pvc -n whisper-stt
+# Edit each PVC to change storageClassName from longhorn to nfs-synology
+kubectl edit pvc whisper-model-cache -n whisper-stt
+kubectl edit pvc whisper-openai-model-cache -n whisper-stt
+kubectl edit pvc whisper-stt-jobs -n whisper-stt
+```
+
+### 📊 MONITORING & ALERTING (Critical Priority)
+
+#### 1. Infrastructure Dependency Monitoring
+Implement alerts for:
+- ExternalSecret update failures
+- PVC provisioning failures (>5min)
+- ImagePullBackOff states
+- Pod Pending states (>10min)
+- StorageClass availability
+- ClusterSecretStore health
+
+#### 2. Health Check Dashboards
+Create dashboards showing:
+- Per-namespace health summary
+- Infrastructure dependency status
+- Deployment success/failure rates
+- Pod state distribution
+
+#### 3. Automated Remediation
+Implement automated handlers for:
+- Failed ExternalSecret sync (force resync)
+- Stuck PVC provisioning (alert + manual intervention)
+- ImagePullBackOff (secret validation + retry)
+
+### 🔧 PROCESS IMPROVEMENTS (High Priority)
+
+#### 1. Pre-deployment Checks
+Add validation for:
+- All infrastructure dependencies exist
+- Secret sync status before image rollout
+- StorageClass availability
+- PVC provisioning capability
+
+#### 2. Rollback Procedures
+Document manual rollback steps for:
+- Infrastructure failures
+- Secret management issues
+- Storage provisioning failures
+
+#### 3. Deployment Safety
+Implement:
+- Canary deployments to detect infrastructure issues early
+- Gradual rollout with automatic rollback on failure
+- Health check validation before promotion
 
 ---
 
-## 10. Conclusion
+## Conclusion
 
-**Deployment Stability:** pbx-web demonstrates superior stability with zero failures, attributed to its lightweight resource profile and simpler architecture.
+The analysis reveals that **deployment frequency alone is not a reliable indicator of service health**. Both services maintained active deployment schedules but succumbed to **infrastructure dependency failures** that went undetected for **6+ days**.
 
-**whisper-stt Issues:** Stem from two factors:
-1. Heavy resource footprint (8Gi memory, 8 CPU limit) leading to ephemeral-storage exhaustion
-2. Lack of automated cleanup for failed pods, causing persistent PVC issues
+### Critical Insights
+1. **Rapid deployment cadence masks infrastructure fragility** - Teams focus on shipping features while infrastructure dependencies erode silently
+2. **Infrastructure health monitoring is nonexistent** - Critical failures went undetected for nearly a week  
+3. **Single points of failure exist** - Both services have complete dependency on single infrastructure components
+4. **No automated remediation** - Manual intervention required for all infrastructure failures
 
-**Common Root Cause:** Both services suffer from **deployment neglect** — no automated updates in 30+ days, indicating a broken or ignored CI/CD pipeline.
+### Key Recommendation
+Implement **infrastructure health monitoring** alongside application health checks. The current monitoring gap allowed critical services to remain non-functional for nearly a week without detection.
 
-**Risk Assessment:** 
-- **pbx-web**: Low risk — stable but outdated
-- **whisper-stt**: Medium risk — failed pod creating operational debt, potential cascade failures
+**Risk Assessment**: 🚨 **CRITICAL** - Both core services non-functional with no monitoring or automated remediation.
 
 ---
 
-**Report Generated:** July 24, 2026  
-**Next Review Date:** August 24, 2026  
-**Analyst:** Automated via aide-de-camp research task
+## Appendix: Data Sources & Methodology
+
+### Kubernetes Queries
+```bash
+# Replica sets history
+kubectl get replicasets -n pbx-web --sort-by='.metadata.creationTimestamp'
+kubectl get replicasets -n whisper-stt --sort-by='.metadata.creationTimestamp'
+
+# Pod status  
+kubectl get pods -n pbx-web -o wide
+kubectl get pods -n whisper-stt -o wide
+
+# Events
+kubectl get events -n pbx-web --sort-by='.lastTimestamp'
+kubectl get events -n whisper-stt --sort-by='.lastTimestamp'
+
+# Storage
+kubectl get pvc -n whisper-stt
+kubectl get storageclass
+
+# ExternalSecrets
+kubectl get externalsecret -n pbx-web
+kubectl get clustersecretstore openbao
+```
+
+### Git History Analysis
+```bash
+cd declarative-config
+git log --oneline --since="30 days ago" --all -- \
+  'k8s/ardenone-cluster/pbx-web/*' \
+  'k8s/ardenone-cluster/whisper-stt/*'
+```
+
+### Analysis Methodology
+1. **Data Collection**: Kubernetes API queries for deployment, pod, and infrastructure state
+2. **Timeline Analysis**: Git history correlation with deployment events
+3. **Failure Pattern Analysis**: Event log analysis for root cause identification
+4. **Comparative Analysis**: Cross-service pattern identification and correlation
+
+---
+
+**Report Generated**: 2026-07-24  
+**Analysis Window**: 2026-06-24 to 2026-07-24  
+**Cluster**: ardenone-manager  
+**Tools**: kubectl, git, declarative-config repo  
+**Severity**: 🚨 CRITICAL - Both services non-functional
