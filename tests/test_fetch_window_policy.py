@@ -405,6 +405,143 @@ class TestFetchProgressSSEBroadcast:
             assert event.data["source_status"] == "success"
 
 
+class TestSynthesisGating:
+    """Tests that synthesis is gated on window close and invoked exactly once."""
+
+    @pytest.mark.asyncio
+    async def test_synthesis_invoked_exactly_once_after_window_close(self):
+        """Synthesis should be invoked exactly once per intent, after window close."""
+        from unittest.mock import AsyncMock, patch
+        from src.intent.router import IntentRouter, RoutedIntent, IntentClassification, IntentType
+
+        router = IntentRouter()
+        store = await router._get_store()
+
+        # Track synthesis invocations
+        synthesis_call_count = [0]
+        synthesis_call_times = []
+        window_close_time = [None]
+
+        # Create a mock synthesize function that tracks calls
+        original_synthesize = None
+
+        async def mock_synthesize(request):
+            synthesis_call_count[0] += 1
+            synthesis_call_times.append(time.monotonic())
+            # Return a valid synthesis result
+            from src.synthesize.strand import SynthesizeResult, Urgency
+            return SynthesizeResult(
+                intent_id=request.intent_id,
+                data={"test": "data"},
+                summary="Test summary",
+                urgency=Urgency.NORMAL,
+            )
+
+        # Patch synthesize_intent to track invocations
+        with patch('src.intent.router.synthesize_intent', side_effect=mock_synthesize):
+            # Create a test routed intent
+            routed_intent = RoutedIntent(
+                intent_id=str(uuid4()),
+                classification=IntentClassification(
+                    intent_type=IntentType.STATUS,
+                    project_slug="test-project",
+                    confidence=0.9,
+                    utterance_fragment="show pod status",
+                ),
+                session_id=str(uuid4()),
+                utterance="show pod status",
+                router_ms=50,
+            )
+
+            # Track window close timing
+            fetch_start = time.monotonic()
+
+            # Track progress callbacks to know when window closes
+            def track_window_close(source, result):
+                # This is called as each source completes
+                pass
+
+            # Mock fetch strand to track window close
+            from src.fetch.orchestrator import FetchStrand, FetchResult, FetchCoverage
+            from src.fetch.commands import FetchSource, SourceResult
+
+            original_fetch = FetchStrand.fetch
+
+            async def mock_fetch(self, request, on_partial_result=None):
+                # Simulate staggered source completions
+                sources = {}
+                succeeded = []
+                caveats = []
+
+                # Fast source completes quickly
+                await asyncio.sleep(0.02)
+                fast_result = SourceResult(
+                    source=FetchSource.GIT_LOG,
+                    status="success",
+                    data={"commits": []},
+                    duration_ms=20,
+                )
+                sources[FetchSource.GIT_LOG] = fast_result
+                succeeded.append(FetchSource.GIT_LOG)
+                if on_partial_result:
+                    on_partial_result(FetchSource.GIT_LOG, fast_result)
+
+                # Slow source completes later
+                await asyncio.sleep(0.05)
+                slow_result = SourceResult(
+                    source=FetchSource.KUBECTL_PODS,
+                    status="success",
+                    data={"pods": []},
+                    duration_ms=50,
+                )
+                sources[FetchSource.KUBECTL_PODS] = slow_result
+                succeeded.append(FetchSource.KUBECTL_PODS)
+                if on_partial_result:
+                    on_partial_result(FetchSource.KUBECTL_PODS, slow_result)
+
+                # Record window close time (when all sources done)
+                window_close_time[0] = time.monotonic()
+
+                total_duration_ms = int((time.monotonic() - fetch_start) * 1000)
+
+                return FetchResult(
+                    intent_id=request.intent_id,
+                    intent_type=request.intent_type,
+                    sources=sources,
+                    coverage=FetchCoverage(
+                        total_sources=2,
+                        succeeded=succeeded,
+                        timed_out=[],
+                        failed=[],
+                        skipped=[],
+                    ),
+                    total_duration_ms=total_duration_ms,
+                    caveats=caveats or None,
+                )
+
+            with patch.object(FetchStrand, 'fetch', mock_fetch):
+                # Process the intent
+                result = await router._fetch_and_synthesize(
+                    routed_intent,
+                    DispatchTimings(),
+                )
+
+        # Verify synthesis was called exactly once
+        assert synthesis_call_count[0] == 1, (
+            f"Synthesis was called {synthesis_call_count[0]} times, expected 1"
+        )
+
+        # Verify synthesis happened after window close
+        assert window_close_time[0] is not None, "Window close time not recorded"
+        assert synthesis_call_times[0] >= window_close_time[0], (
+            f"Synthesis called at {synthesis_call_times[0]}, "
+            f"before window close at {window_close_time[0]}"
+        )
+
+        # Verify the result is successful
+        assert result["status"] == "resolved"
+
+
 class TestStreamingSynthesis:
     """Tests for streaming synthesis support (progressive card fill)."""
 
