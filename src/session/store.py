@@ -1475,6 +1475,35 @@ class SessionStore:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
+    async def get_topic(self, topic_id: str) -> Optional[dict]:
+        """Get a topic by ID, including project_slugs.
+
+        Returns the topic dict with project_slugs parsed from JSON, or None if not found.
+        """
+        import json
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM topics WHERE id = ?""",
+                (topic_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if not row:
+                    return None
+
+                topic = dict(row)
+                # Parse project_slugs from JSON
+                if topic.get("project_slugs"):
+                    try:
+                        topic["project_slugs"] = json.loads(topic["project_slugs"])
+                    except json.JSONDecodeError:
+                        topic["project_slugs"] = []
+                else:
+                    topic["project_slugs"] = []
+
+                return topic
+
     async def get_latest_result_for_topic(self, topic_id: str) -> Optional[dict]:
         """Get the most recent result for a topic."""
         async with aiosqlite.connect(self.db_path) as db:

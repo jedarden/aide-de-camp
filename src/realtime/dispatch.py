@@ -105,8 +105,10 @@ async def dispatch_intent(
 
         # Trigger prefetch for likely follow-up patterns
         if suggested_topic_id:
-            # Get project slugs for the topic (simplified - in practice, would fetch from topic)
-            project_slugs = detected_topics  # Placeholder
+            # Fetch actual project slugs from the topic's registry entry
+            topic = await store.get_topic(suggested_topic_id)
+            project_slugs = topic.get("project_slugs", []) if topic else []
+
             if project_slugs:
                 predictions = await prefetcher.analyze_utterance(
                     session_id=session_id,

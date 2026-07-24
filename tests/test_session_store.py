@@ -994,3 +994,54 @@ async def test_get_all_results_includes_dismissable_cards(store: SessionStore, s
     all_results_final = await store.get_all_results()
     result_ids_final = [r["id"] for r in all_results_final]
     assert failed_result_id not in result_ids_final
+
+
+@pytest.mark.asyncio
+async def test_get_topic_with_project_slugs(store: SessionStore) -> None:
+    """Test that get_topic correctly parses project_slugs from JSON."""
+    # Create a topic with project_slugs
+    topic_id = await store.create_topic(
+        label="Test Project",
+        topic_type="project",
+        project_slugs=["pbx-web", "whisper-stt"],
+        scope="session",
+        session_id="test-session-project-slugs",
+    )
+
+    # Fetch the topic using get_topic
+    topic = await store.get_topic(topic_id)
+
+    assert topic is not None
+    assert topic["id"] == topic_id
+    assert topic["label"] == "Test Project"
+    assert topic["type"] == "project"
+    # Verify project_slugs is correctly parsed as a list
+    assert topic["project_slugs"] == ["pbx-web", "whisper-stt"]
+
+
+@pytest.mark.asyncio
+async def test_get_topic_without_project_slugs(store: SessionStore) -> None:
+    """Test that get_topic handles topics without project_slugs."""
+    # Create a topic without project_slugs
+    topic_id = await store.create_topic(
+        label="Test Topic",
+        topic_type="personal",
+        project_slugs=None,
+        scope="session",
+        session_id="test-session-no-slugs",
+    )
+
+    # Fetch the topic using get_topic
+    topic = await store.get_topic(topic_id)
+
+    assert topic is not None
+    assert topic["id"] == topic_id
+    # Verify project_slugs is an empty list when None in DB
+    assert topic["project_slugs"] == []
+
+
+@pytest.mark.asyncio
+async def test_get_topic_nonexistent(store: SessionStore) -> None:
+    """Test that get_topic returns None for nonexistent topic."""
+    topic = await store.get_topic("nonexistent-topic-id")
+    assert topic is None
