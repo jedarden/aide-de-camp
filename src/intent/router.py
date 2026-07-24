@@ -150,11 +150,16 @@ class IntentRouter:
         return self._reload_manager
 
     def _load_router_prompt(self) -> str:
-        """Load the router segmentation prompt from disk (hot-reload, per call)."""
+        """
+        Load the router segmentation prompt via hot-reload manager.
+
+        Uses the cached prompt from the hot-reload manager, which only reloads
+        when the file mtime changes. This avoids disk I/O on every classification.
+        """
         try:
-            return self.prompt_path.read_text()
+            return self._get_reload_manager().get_prompt("router")
         except Exception as e:
-            logger.error(f"Failed to load router prompt from {self.prompt_path}: {e}")
+            logger.error(f"Failed to load router prompt: {e}")
             return _ROUTER_PROMPT_FALLBACK
 
     def _load_urgency_prompt(self) -> str:
@@ -241,8 +246,8 @@ class IntentRouter:
                 system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
-                max_tokens=2048,
-                temperature=0.3,  # Lower temperature for consistent classification
+                max_tokens=512,
+                temperature=0.0,
             )
 
             # Store raw response for error reporting
