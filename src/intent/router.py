@@ -14,6 +14,7 @@ from enum import Enum
 from logging import getLogger
 from pathlib import Path
 from typing import Any, Optional
+from functools import lru_cache
 
 import httpx
 
@@ -32,6 +33,13 @@ from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType, broadcast_fe
 
 
 logger = getLogger(__name__)
+
+# Router response cache - LRU cache for repeated utterances within a session
+# Key: (utterance_hash, session_id), Value: (classifications, timestamp)
+# 5-minute TTL for cache entries to balance freshness with performance
+_ROUTER_CACHE: dict[tuple[str, str], tuple[list[IntentClassification], float]] = {}
+_CACHE_TTL = 300  # 5 minutes
+_MAX_CACHE_SIZE = 100
 
 
 # Router error types for degraded-state handling
@@ -123,12 +131,18 @@ class IntentRouter:
 
     For task-profile intents, routes to escalate strand for bead creation.
     For other intents, routes to fetch + synthesize strands (TODO).
+
+    Latency optimizations:
+    - LRU cache for repeated utterances (5-minute TTL)
+    - Reduced max_tokens (128 vs 256) for faster generation
+    - Dedicated 10s timeout for fail-fast behavior
     """
 
     def __init__(self, store=None, prompt_path: Optional[Path] = None):
         self.store = store
         self.prompt_path = prompt_path or ROUTER_PROMPT_PATH
         self._zai_client = None
+        self._router_zai_client = None  # Dedicated client with 10s timeout
         self._reload_manager = None
 
     async def _get_zai_client(self):
@@ -136,6 +150,54 @@ class IntentRouter:
         if self._zai_client is None:
             self._zai_client = get_zai_client()
         return self._zai_client
+
+    async def _get_router_zai_client(self):
+        """Get or create dedicated ZAI client for router with 10s timeout for fail-fast behavior."""
+        if self._router_zai_client is None:
+            from ..escalate.llm import ZAI_CLIENT_TIMEOUT, ZAI_PROXY_URL, DEFAULT_MODEL
+            self._router_zai_client = get_zai_client(
+                proxy_url=ZAI_PROXY_URL,
+                default_model=DEFAULT_MODEL,
+                timeout=10.0,  # Router should fail fast - 10s instead of default 30s
+            )
+        return self._router_zai_client
+
+    def _get_utterance_hash(self, utterance: str) -> str:
+        """Generate hash key for utterance caching."""
+        import hashlib
+        return hashlib.md5(utterance.encode()).hexdigest()
+
+    def _get_cached_classification(self, utterance: str, session_id: str) -> list[IntentClassification] | None:
+        """Check cache for existing classification."""
+        utterance_hash = self._get_utterance_hash(utterance)
+        cache_key = (utterance_hash, session_id)
+
+        if cache_key in _ROUTER_CACHE:
+            classifications, timestamp = _ROUTER_CACHE[cache_key]
+            age = time.time() - timestamp
+            if age < _CACHE_TTL:
+                logger.info(f"Router cache HIT for utterance hash {utterance_hash[:8]} (age: {age:.1f}s)")
+                return classifications
+            else:
+                # Remove expired entry
+                del _ROUTER_CACHE[cache_key]
+                logger.info(f"Router cache EXPIRED for utterance hash {utterance_hash[:8]}")
+
+        return None
+
+    def _cache_classification(self, utterance: str, session_id: str, classifications: list[IntentClassification]) -> None:
+        """Cache classification result."""
+        # Prune cache if at capacity
+        if len(_ROUTER_CACHE) >= _MAX_CACHE_SIZE:
+            # Remove oldest entry (first in dict)
+            oldest_key = next(iter(_ROUTER_CACHE))
+            del _ROUTER_CACHE[oldest_key]
+            logger.info(f"Router cache pruned oldest entry (size: {len(_ROUTER_CACHE)})")
+
+        utterance_hash = self._get_utterance_hash(utterance)
+        cache_key = (utterance_hash, session_id)
+        _ROUTER_CACHE[cache_key] = (classifications, time.time())
+        logger.info(f"Router cache STORED utterance hash {utterance_hash[:8]} (cache size: {len(_ROUTER_CACHE)})")
 
     async def _get_store(self):
         """Get or create session store."""
@@ -196,7 +258,13 @@ class IntentRouter:
             RouterProxyError: LLM proxy unreachable
             RouterMalformedError: Malformed JSON after corrective retry
         """
-        client = await self._get_zai_client()
+        # OPTIMIZATION 1: Check cache first (eliminates redundant LLM calls)
+        cached_result = self._get_cached_classification(utterance, session_id)
+        if cached_result is not None:
+            return cached_result
+
+        # Use dedicated router client with 10s timeout for fail-fast behavior
+        client = await self._get_router_zai_client()
 
         # Build user message
         user_message = f"Classify this utterance:\n\n{utterance}"
@@ -218,7 +286,7 @@ class IntentRouter:
                 system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,
-                max_tokens=256,
+                max_tokens=128,  # OPTIMIZATION 2: Reduced from 256 - intent JSON is small
                 temperature=0.0,
             )
             proxy_ms = (time.perf_counter() - proxy_start) * 1000
@@ -269,6 +337,10 @@ class IntentRouter:
                 classifications.append(classification)
 
             logger.info(f"Classified {len(classifications)} intents from utterance")
+
+            # OPTIMIZATION 1 (cont): Cache successful classifications
+            self._cache_classification(utterance, session_id, classifications)
+
             return classifications
 
         except ParseLLMError as e:
