@@ -555,15 +555,25 @@ class SelfModificationAgent:
             # Get relative path from repo root
             rel_path = artifact_path.relative_to(repo_root)
 
-            # Stage the file (use -A to handle files that may be in weird states)
+            # Verify the file exists before trying to stage it
+            if not artifact_path.exists():
+                logger.error(f"Cannot commit artifact write: file does not exist at {artifact_path}")
+                return
+
+            # Stage the file for commit
             # This works for new files, modified files, and files that were deleted then recreated
-            subprocess.run(
-                ['git', 'add', '-A', str(rel_path)],
+            add_result = subprocess.run(
+                ['git', 'add', str(rel_path)],
                 cwd=repo_root,
                 capture_output=True,
+                text=True,
                 check=False,
                 timeout=10
             )
+
+            if add_result.returncode != 0:
+                logger.error(f"git add failed: stderr={add_result.stderr}, stdout={add_result.stdout}, returncode={add_result.returncode}")
+                return
 
             # Generate standardized commit message with previous commit SHA
             commit_msg = generate_self_mod_commit_message(rel_path, cwd=repo_root)
