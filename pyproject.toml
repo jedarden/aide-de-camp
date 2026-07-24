@@ -10,6 +10,7 @@ dependencies = [
     "websockets>=13.1",
     "pydantic>=2.9.0",
     "aiosqlite>=0.20.0",
+    "orjson>=3.10.0",  # Faster JSON parsing (2-3x speedup vs standard json)
 ]
 
 [project.optional-dependencies]
