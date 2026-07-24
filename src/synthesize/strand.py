@@ -19,6 +19,7 @@ from typing import Any, Optional
 from ..components.hot_reload import get_reload_manager
 from ..escalate.llm import get_zai_client, ModelClass
 from ..fetch.commands import FetchResult, IntentType
+from ..llm.response_parser import strip_markdown_fences
 
 
 logger = getLogger(__name__)
@@ -140,13 +141,8 @@ class SynthesizeStrand:
                 temperature=0.3,  # Lower temperature for more deterministic, faster outputs
             )
 
-            # Strip markdown code fences if present
-            raw = response.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[-1]
-                raw = raw.rsplit("```", 1)[0].strip()
-
-            # Parse JSON response
+            # Strip markdown code fences and parse JSON (using centralized parser for optimal performance)
+            raw = strip_markdown_fences(response)
             result_data = json.loads(raw)
 
             # Extract fields
