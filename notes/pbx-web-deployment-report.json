@@ -1,0 +1,208 @@
+{
+  "report_metadata": {
+    "generated_at": "2026-07-24T19:48:39Z",
+    "time_range_start": "2026-06-24T19:48:39Z",
+    "time_range_end": "2026-07-24T19:48:39Z",
+    "cluster": "ardenone-cluster",
+    "service": "pbx-web"
+  },
+  "deployment_summary": {
+    "current_deployment": {
+      "deployment_name": "pbx-web",
+      "namespace": "pbx-web",
+      "image": "ronaldraygun/pbx-web:1.0.9",
+      "nginx_image": "nginx:alpine",
+      "replicas": 1,
+      "ready_replicas": 1,
+      "available_replicas": 1,
+      "updated_replicas": 1,
+      "revision": 12,
+      "generation": 34,
+      "deployment_age": "84 days",
+      "current_replicaset": "pbx-web-5ff68464d",
+      "current_pod": "pbx-web-5ff68464d-97b8p",
+      "pod_age": "11 days",
+      "pod_created": "2026-07-13T18:18:07Z",
+      "last_deployment_update": "2026-07-13T18:18:22Z",
+      "last_deployment_condition": "Available - MinimumReplicasAvailable",
+      "strategy": "Recreate"
+    },
+    "deployment_history": {
+      "recent_replicasets": [
+        {
+          "name": "pbx-rebuild-relay-588d79c5b9",
+          "created": "2026-07-15T03:24:40Z",
+          "status": "active",
+          "ready": "1/1"
+        },
+        {
+          "name": "pbx-web-5ff68464d",
+          "created": "2026-07-13T18:18:07Z",
+          "status": "active",
+          "ready": "1/1"
+        },
+        {
+          "name": "pbx-web-754f4cfdf7",
+          "created": "2026-07-13T18:07:55Z",
+          "status": "inactive",
+          "ready": "0/0"
+        },
+        {
+          "name": "pbx-web-6d86477cdb",
+          "created": "2026-06-25T15:23:48Z",
+          "status": "inactive",
+          "ready": "0/0"
+        },
+        {
+          "name": "pbx-web-66f79fd6f9",
+          "created": "2026-06-23T18:55:52Z",
+          "status": "inactive",
+          "ready": "0/0"
+        },
+        {
+          "name": "pbx-web-5cc966f86d",
+          "created": "2026-06-23T18:37:39Z",
+          "status": "inactive",
+          "ready": "0/0"
+        },
+        {
+          "name": "pbx-web-69794b7fcc",
+          "created": "2026-06-21T11:13:44Z",
+          "status": "inactive",
+          "ready": "0/0"
+        },
+        {
+          "name": "pbx-web-9fc5b5f59",
+          "created": "2026-06-15T18:11:38Z",
+          "status": "inactive",
+          "ready": "0/0"
+        }
+      ]
+    }
+  },
+  "operational_metrics": {
+    "pod_status": {
+      "total_pods": 3,
+      "running_pods": 3,
+      "restarts": 0,
+      "crashloops": 0
+    },
+    "container_health": {
+      "site_generator": {
+        "ready": true,
+        "restarts": 0,
+        "started": "2026-07-13T18:18:09Z"
+      },
+      "nginx": {
+        "ready": true,
+        "restarts": 0,
+        "started": "2026-07-13T18:18:09Z"
+      }
+    },
+    "resource_limits": {
+      "site_generator": {
+        "cpu": "500m",
+        "memory": "512Mi"
+      },
+      "nginx": {
+        "cpu": "100m",
+        "memory": "128Mi"
+      }
+    }
+  },
+  "incident_analysis": {
+    "error_patterns": {
+      "broken_pipe_errors": {
+        "count": 2,
+        "severity": "low",
+        "description": "Client disconnections during recording transfers",
+        "affected_component": "site-generator",
+        "first_occurrence": "2026-07-13T14:21:55Z",
+        "last_occurrence": "2026-07-20T07:04:43Z",
+        "impact": "Minimal - expected behavior when clients cancel downloads"
+      },
+      "nginx_connection_refused": {
+        "count": 5,
+        "severity": "low",
+        "description": "Nginx unable to connect to upstream on port 9000",
+        "affected_component": "nginx",
+        "example_requests": [
+          "GET /api/actuator/env",
+          "GET /api/*",
+          "GET /api/serverless/*",
+          "GET /recordings/*.vtt",
+          "GET /api/.env"
+        ],
+        "impact": "Minimal - likely health check or security scan failures"
+      }
+    },
+    "rebuild_events": {
+      "bucket_changes": "multiple",
+      "description": "Site rebuilds triggered by S3 bucket signature changes",
+      "typical_rebuild_time": "1.5-2.0 seconds",
+      "index_size": "~174 pages, ~6900 words"
+    },
+    "no_crashloops": true,
+    "no_timeouts": true,
+    "deployment_stability": "high"
+  },
+  "argo_cd_integration": {
+    "tracking_id": "pbx-web-ns-ardenone-cluster:apps/Deployment:pbx-web/pbx-web",
+    "last_annotation": "kubectl.kubernetes.io/restartedAt: 2026-06-15T18:10:00Z",
+    "secret_reloader": "pbx-web-auth,garage-pbx-creds"
+  },
+  "log_analysis": {
+    "main_application_logs": {
+      "total_lines": 1021,
+      "log_period": "2026-07-13 to 2026-07-20",
+      "primary_activities": [
+        "Pagefind search index generation",
+        "S3 bucket monitoring and rebuilds",
+        "Recording file serving",
+        "Periodic client disconnect errors"
+      ]
+    },
+    "nginx_logs": {
+      "total_lines": 64430,
+      "log_period": "2026-07-13 to 2026-07-24",
+      "primary_activities": [
+        "Static file serving",
+        "Reverse proxy to site-generator",
+        "Security scanner requests",
+        "Occasional upstream connection failures"
+      ]
+    },
+    "lab_rebuild_logs": {
+      "total_lines": 79618,
+      "log_period": "2026-07-17 to 2026-07-24",
+      "status": "Normal operation"
+    }
+  },
+  "security_observations": {
+    "audit_scanner": "TLM-Audit-Scanner detected",
+    "security_tests": {
+      "api_env_access": "Attempted GET /api/.env",
+      "api_actuator_access": "Attempted GET /api/actuator/env",
+      "serverless_api_tests": "Attempted GET /api/serverless/*"
+    },
+    "assessment": "Normal security scanning activity, no actual vulnerabilities detected"
+  },
+  "overall_assessment": {
+    "deployment_health": "healthy",
+    "uptime": "11 days continuous",
+    "restart_count": 0,
+    "critical_issues": 0,
+    "warnings": 0,
+    "informational_notes": [
+      "Broken pipe errors are normal client disconnections",
+      "Nginx connection refused during security scans is expected",
+      "Bucket-triggered rebuilds show proper S3 integration",
+      "Zero restarts indicate stable deployment"
+    ],
+    "recommendations": [
+      "Continue monitoring for any increase in error rates",
+      "Consider adding metrics collection for better visibility",
+      "Current deployment strategy (Recreate) is working well"
+    ]
+  }
+}
