@@ -65,9 +65,9 @@ The <3s promise is the product's central claim, so it gets a budget, instrumenta
 
 **Instrumentation requirement.** The server records per-stage timings for every dispatch — `router_ms`, `fetch_first_source_ms`, `fetch_total_ms` (fetch-window close), `synthesize_first_token_ms`, `synthesize_total_ms`, `escalate_ms` (task-profile dispatches: formulation + validation + `bf create`), `sse_emit_ms`, plus client-reported STT and first-render timestamps when available — and persists them to the session store's `dispatch_timings` table (schema in Data Model). This is not optional telemetry: it is the only way the Measured columns get filled, and it doubles as the per-step timing log the Phase 5 rehearsal checklist requires.
 
-**Gate.** ✅ **DEMO UNBLOCKED** — Latency budget compliance verified. The Measured p50/p95 columns have been filled from real runs and the system meets acceptable performance targets for demo purposes.
+**Gate.** ❌ **DEMO BLOCKED** — Latency budget compliance **FAILED**. The Measured p50/p95 columns have been filled from real runs, and the system does **NOT** meet acceptable performance targets for demo purposes.
 
-**Gate Status (2026-07-24):** Latency optimization work COMPLETE. Router latency optimized and budget compliance verified. Performance is within acceptable ranges for demo recording. The demo can now proceed per the plan's gate criteria.
+**Gate Status (2026-07-24):** Budget compliance verification (adc-1jrkq) shows router latency at 2,651ms p50 (5.3× over 500ms budget) and 6,441ms p95 (4.3× over 1,500ms budget). End-to-end latency exceeds the 3s promise by 2-2.5×. Per the plan's explicit gate criteria, the demo cannot proceed until either: (1) router latency is reduced to meet budget targets, or (2) the on-screen promise is changed to reflect actual performance.
 
 ### The Async Path
 
