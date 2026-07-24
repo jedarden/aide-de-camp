@@ -86,10 +86,20 @@ class FetchStrand:
             FetchResult with coverage information
         """
         start_time = time.time()
+        fetch_start_perf = time.perf_counter()
 
         # Get fetch commands for this intent type
+        setup_start = time.perf_counter()
         command_specs = get_fetch_commands(request.intent_type)
         required_sources = get_required_sources(request.intent_type)
+        setup_ms = (time.perf_counter() - setup_start) * 1000
+
+        logger.debug(
+            f"fetch_timing phase=setup duration_ms={setup_ms:.2f} "
+            f"intent_id={request.intent_id[:8]} "
+            f"intent_type={request.intent_type.value} "
+            f"sources_count={len(command_specs)}"
+        )
 
         logger.info(
             f"Fetching {len(command_specs)} sources for intent {request.intent_id} "
@@ -169,6 +179,15 @@ class FetchStrand:
             if on_partial_result:
                 on_partial_result(source, result)
 
+            # Log per-source timing at DEBUG level
+            logger.debug(
+                f"fetch_timing phase=source_complete "
+                f"source={source.value} "
+                f"status={result.status} "
+                f"duration_ms={result.duration_ms} "
+                f"intent_id={request.intent_id[:8]}"
+            )
+
             sources[source] = result
 
             if result.status == "success":
@@ -187,6 +206,7 @@ class FetchStrand:
                     caveats.append(f"Optional source {source.value} failed: {result.error}")
 
         # Build coverage report
+        coverage_start = time.perf_counter()
         coverage = FetchCoverage(
             total_sources=len(command_specs),
             succeeded=succeeded,
@@ -194,8 +214,19 @@ class FetchStrand:
             failed=failed,
             skipped=skipped,
         )
+        coverage_ms = (time.perf_counter() - coverage_start) * 1000
 
-        total_duration_ms = int((time.time() - start_time) * 1000)
+        total_duration_ms = int((time.perf_counter() - fetch_start_perf) * 1000)
+
+        # Log overall fetch timing breakdown at DEBUG level
+        logger.debug(
+            f"fetch_timing phase=coverage duration_ms={coverage_ms:.2f} "
+            f"phase=total duration_ms={total_duration_ms} "
+            f"intent_id={request.intent_id[:8]} "
+            f"succeeded={len(succeeded)} "
+            f"timed_out={len(timed_out)} "
+            f"failed={len(failed)}"
+        )
 
         result = FetchResult(
             intent_id=request.intent_id,
@@ -209,7 +240,7 @@ class FetchStrand:
         logger.info(
             f"Fetch complete for intent {request.intent_id}: "
             f"{len(succeeded)}/{coverage.total_sources} succeeded, "
-            f"{len(timed_out)} timed out, {len(failed)} failed"
+            f"{len(timed_out)} timed out, {len(failed)} failed ({total_duration_ms}ms)"
         )
 
         # Detect if ALL sources failed - this is a terminal failure condition

@@ -429,18 +429,22 @@ class IntentRouter:
             RouterMalformedError: Malformed JSON after corrective retry
         """
         # OPTIMIZATION 1: Check cache first (eliminates redundant LLM calls)
+        cache_check_start = time.perf_counter()
         cached_result = self._get_cached_classification(utterance, session_id)
+        cache_check_ms = (time.perf_counter() - cache_check_start) * 1000
+
         if cached_result is not None:
             # Log cache statistics periodically
             self._log_cache_stats_if_needed()
 
-            # Log cache hit with cache statistics in timing breakdown format
+            # Log cache hit with cache statistics in structured timing format
             cache_stats = self._get_cache_stats_string()
+            logger.debug(
+                f"router_timing phase=cache_check duration_ms={cache_check_ms:.2f} "
+                f"cached=True intents={len(cached_result)} {cache_stats}"
+            )
             logger.info(
-                f"router_timing breakdown: "
-                f"cached=True "
-                f"intents={len(cached_result)} "
-                f"{cache_stats}"
+                f"Cache HIT: {len(cached_result)} intents ({cache_check_ms:.0f}ms)"
             )
 
             # Return empty timing breakdown for cached results (no actual LLM call was made)
@@ -551,22 +555,23 @@ class IntentRouter:
 
             total_ms = (time.perf_counter() - classify_start) * 1000
 
-            # Log detailed timing breakdown for latency profiling
-            # This shows WHERE the 1,587-2,074ms latency is spent across the 4 investigation areas
+            # Log detailed timing breakdown for latency profiling at DEBUG level
+            # Structured format: phase=duration_ms for easy parsing
             network_str = f"{timing_network_ms:.2f}" if timing_network_ms is not None else "N/A"
             calculated_inference_str = f"{calculated_inference_ms:.2f}" if calculated_inference_ms is not None else "N/A"
             cache_stats = self._get_cache_stats_string()
+            logger.debug(
+                f"router_timing phase=prompt_construction duration_ms={prompt_ms:.2f} "
+                f"phase=proxy_call duration_ms={proxy_ms:.2f} "
+                f"phase=proxy_network duration_ms={network_str} "
+                f"phase=proxy_inference duration_ms={calculated_inference_str} "
+                f"phase=json_parse duration_ms={parse_ms:.2f} "
+                f"phase=process duration_ms={process_ms:.2f} "
+                f"phase=total duration_ms={total_ms:.2f} "
+                f"intents_count={len(classifications)} {cache_stats}"
+            )
             logger.info(
-                f"router_timing breakdown: "
-                f"prompt_construction_ms={prompt_ms:.2f} "
-                f"proxy_call_ms={proxy_ms:.2f} "
-                f"proxy_network_ms={network_str} "
-                f"proxy_inference_ms={calculated_inference_str} "
-                f"json_parse_ms={parse_ms:.2f} "
-                f"process_ms={process_ms:.2f} "
-                f"total_ms={total_ms:.2f} "
-                f"intents={len(classifications)} "
-                f"{cache_stats}"
+                f"Classified {len(classifications)} intents from utterance ({total_ms:.0f}ms total)"
             )
 
             logger.info(f"Classified {len(classifications)} intents from utterance")
