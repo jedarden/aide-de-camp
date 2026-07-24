@@ -294,4 +294,4 @@ ibkr-mcp-server-7dd7c9c9bc-6cn57:       Evicted (infrastructure)
 
 ---
 
-*Report generated as part of bead adc-47ca4: Options Pipeline vs IBKR MCP Error Comparison Analysis (30-Day Failure Pattern Analysis)*
+*Report generated as part of bead adc-1stit: Options Pipeline vs IBKR MCP Error Comparison Analysis (30-Day Failure Pattern Analysis)*
