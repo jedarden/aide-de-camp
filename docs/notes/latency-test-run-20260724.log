@@ -1,0 +1,96 @@
+/home/coding/aide-de-camp/test_e2e_latency.py:98: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  result["timestamp"] = datetime.utcnow().isoformat()
+/home/coding/aide-de-camp/test_e2e_latency.py:196: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp": datetime.utcnow().isoformat(),
+Starting end-to-end latency tests...
+Target: 30 runs per shape
+API endpoint: http://localhost:8000
+
+Testing multi-intent (30 runs)...
+  0/30 runs complete...
+  5/30 runs complete...
+  10/30 runs complete...
+  15/30 runs complete...
+  20/30 runs complete...
+  25/30 runs complete...
+
+Testing lookup (30 runs)...
+  0/30 runs complete...
+  5/30 runs complete...
+  10/30 runs complete...
+  15/30 runs complete...
+  20/30 runs complete...
+  25/30 runs complete...
+
+Testing brainstorm (30 runs)...
+  0/30 runs complete...
+  5/30 runs complete...
+  10/30 runs complete...
+  15/30 runs complete...
+  20/30 runs complete...
+  25/30 runs complete...
+
+============================================================
+LATENCY TEST SUMMARY
+============================================================
+
+MULTI-INTENT:
+  Successful runs: 0/30
+  Dispatch latency (p50): 3969ms
+  Dispatch latency (p95): 9600ms
+  Dispatch latency (min): 2513ms
+  Dispatch latency (max): 13453ms
+  Dispatch latency (mean): 4641ms
+
+LOOKUP:
+  Successful runs: 30/30
+  Dispatch latency (p50): 2641ms
+  Dispatch latency (p95): 4336ms
+  Dispatch latency (min): 1083ms
+  Dispatch latency (max): 8400ms
+  Dispatch latency (mean): 2656ms
+
+BRAINSTORM:
+  Successful runs: 30/30
+  Dispatch latency (p50): 2253ms
+  Dispatch latency (p95): 4768ms
+  Dispatch latency (min): 1095ms
+  Dispatch latency (max): 4970ms
+  Dispatch latency (mean): 2461ms
+
+============================================================
+BUDGET COMPARISON
+============================================================
+
+Router budget: ~500ms
+E2E budget: <3000ms
+
+multi-intent:
+  p50: 3969ms ❌ (7.9x budget)
+  p95: 9600ms ❌ (19.2x budget)
+
+lookup:
+  p50: 2641ms ❌ (5.3x budget)
+  p95: 4336ms ❌ (8.7x budget)
+
+brainstorm:
+  p50: 2253ms ❌ (4.5x budget)
+  p95: 4768ms ❌ (9.5x budget)
+
+Results saved to /tmp/e2e-latency-test-results.json
+
+============================================================
+COMPARISON WITH JULY 2026 BASELINE
+============================================================
+
+multi-intent:
+  p50: 2074ms → 3969ms (+91.4%)
+  p95: 4301ms → 9600ms (+123.2%)
+
+lookup:
+  p50: 1640ms → 2641ms (+61.1%)
+  p95: 3298ms → 4336ms (+31.5%)
+
+brainstorm:
+  p50: 1587ms → 2253ms (+42.0%)
+  p95: 2527ms → 4768ms (+88.7%)

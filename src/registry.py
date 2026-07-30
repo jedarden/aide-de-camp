@@ -5,6 +5,11 @@ Discovery scans a root path for git repos and generates project entries for each
 YAML entries override/enrich auto-discovered ones (cluster, namespace, aliases, etc.).
 
 Cached with a 5-minute TTL so the router picks up new repos without restart.
+
+Precedence rule: The scanner (discovery.py) only proposes entries. Once an entry
+exists in registry.yaml (written by the self-modification agent), it is never
+overwritten by discovery. The _merge() function enforces this: YAML entries take
+precedence over discovered entries on all fields.
 """
 
 import os
@@ -21,6 +26,109 @@ CACHE_TTL = 300  # 5 minutes
 
 _cache: dict | None = None
 _cache_at: float = 0
+
+
+class RegistryValidationError(Exception):
+    """Raised when the registry schema is invalid."""
+    def __init__(self, errors: list[str]):
+        self.errors = errors
+        message = "Registry validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
+        super().__init__(message)
+
+
+def _validate_project_entry(slug: str, entry: dict) -> list[str]:
+    """
+    Validate a single project entry against the required schema.
+    Returns a list of error messages (empty if valid).
+    """
+    errors = []
+
+    # Required fields - must be present
+    required_fields = {
+        "description": str,
+        "aliases": list,
+        "intent_support": list,
+    }
+
+    # Optional fields - if present, must match type; can be omitted entirely
+    nullable_fields = {
+        "cluster": (str, type(None)),
+        "namespace": (str, type(None)),
+        "repo_path": (str, type(None)),
+        "argocd_app": (str, type(None)),  # Defaults to project slug if missing
+    }
+
+    # Check required fields exist
+    for field, expected_type in required_fields.items():
+        if field not in entry:
+            errors.append(f"{slug}: missing required field '{field}'")
+            continue
+
+        value = entry[field]
+        if not isinstance(value, expected_type):
+            errors.append(f"{slug}: '{field}' must be {expected_type.__name__}, got {type(value).__name__}")
+
+    # Check optional fields (if present)
+    for field, expected_types in nullable_fields.items():
+        if field not in entry:
+            continue  # Optional field can be omitted
+
+        value = entry[field]
+        if value is None and field in ["cluster", "namespace", "repo_path", "argocd_app"]:
+            # These fields can explicitly be null
+            continue
+        elif value is None:
+            errors.append(f"{slug}: '{field}' cannot be null (use explicit value or omit)")
+        elif not isinstance(value, expected_types):
+            type_names = [t.__name__ for t in expected_types]
+            errors.append(f"{slug}: '{field}' must be {' or '.join(type_names)}, got {type(value).__name__}")
+
+    # Validate aliases is list of non-empty strings
+    if "aliases" in entry and isinstance(entry["aliases"], list):
+        for i, alias in enumerate(entry["aliases"]):
+            if not isinstance(alias, str) or not alias.strip():
+                errors.append(f"{slug}: aliases[{i}] must be a non-empty string")
+
+    # Validate intent_support is list of known intent types
+    known_intents = {"status", "action", "brainstorm", "lookup", "reminder",
+                     "self-modification", "monitoring-config", "task-profile", "clarification"}
+    if "intent_support" in entry and isinstance(entry["intent_support"], list):
+        for intent in entry["intent_support"]:
+            if intent not in known_intents:
+                errors.append(f"{slug}: unknown intent type '{intent}' in intent_support")
+
+    # Validate optional sla_hours field
+    if "sla_hours" in entry:
+        sla = entry["sla_hours"]
+        if sla is not None and not isinstance(sla, (int, float)):
+            errors.append(f"{slug}: sla_hours must be a number or null, got {type(sla).__name__}")
+        elif sla is not None and sla <= 0:
+            errors.append(f"{slug}: sla_hours must be positive, got {sla}")
+
+    return errors
+
+
+def _validate_registry(registry: dict) -> None:
+    """
+    Validate the entire registry schema.
+    Raises RegistryValidationError if any errors are found.
+    """
+    if "projects" not in registry:
+        raise RegistryValidationError(["Missing 'projects' section in registry"])
+
+    projects = registry["projects"]
+    if not isinstance(projects, dict):
+        raise RegistryValidationError(["'projects' must be a dictionary"])
+
+    all_errors = []
+    for slug, entry in projects.items():
+        if not isinstance(entry, dict):
+            all_errors.append(f"{slug}: project entry must be a dictionary, got {type(entry).__name__}")
+            continue
+        all_errors.extend(_validate_project_entry(slug, entry))
+
+    if all_errors:
+        raise RegistryValidationError(all_errors)
 
 
 def _slug(name: str) -> str:
@@ -74,20 +182,46 @@ def _load_yaml() -> dict:
 
 
 def _merge(discovered: dict, from_yaml: dict) -> dict:
-    """Merge discovered repos with YAML registry. YAML wins on conflicts."""
+    """
+    Merge discovered repos with YAML registry.
+
+    PRECEDENCE RULE: YAML entries take precedence over discovered entries.
+    Once an entry exists in registry.yaml (written by the self-modification agent),
+    it is never overwritten by discovery. The scanner (discovery.py) only proposes
+    new entries; it does not modify existing ones.
+
+    This behavior protects agent-authored entries from being clobbered by
+    automatic scanning, ensuring the self-modification agent is the sole ongoing
+    author of the registry after initial seeding.
+
+    Args:
+        discovered: Dict of auto-discovered repos (from _discover_repos)
+        from_yaml: Dict of projects from registry.yaml (agent-authored)
+
+    Returns:
+        Merged dict where YAML entries always win on conflicts
+    """
+    # First, ensure discovered entries have argocd_app (default to slug)
+    for slug, entry in discovered.items():
+        if "argocd_app" not in entry or entry.get("argocd_app") is None:
+            entry["argocd_app"] = slug
+
     merged = dict(discovered)
     for slug, entry in from_yaml.items():
         if slug in merged:
-            # YAML enriches the discovered entry
+            # YAML enriches the discovered entry - YAML values take precedence
             base = dict(merged[slug])
             base.update({k: v for k, v in entry.items() if v is not None})
-            # Merge aliases without duplicates
-            all_aliases = list(dict.fromkeys(
-                base.get("aliases", []) + entry.get("aliases", [])
-            ))
+
+            # Merge aliases: union of discovered and YAML aliases, deduplicated
+            discovered_aliases = merged[slug].get("aliases", [])
+            yaml_aliases = entry.get("aliases", [])
+            all_aliases = list(dict.fromkeys(discovered_aliases + yaml_aliases))
             base["aliases"] = all_aliases
+
             merged[slug] = base
         else:
+            # New YAML entry - add it as-is
             merged[slug] = entry
     return merged
 
@@ -106,12 +240,17 @@ def _build_registry() -> dict:
     discovered = _discover_repos(DISCOVERY_ROOT)
     projects = _merge(discovered, yaml_projects)
 
-    return {
+    registry = {
         "projects": projects,
         "clusters": raw.get("clusters", {}),
         "argocd": raw.get("argocd", {}),
         "global_aliases": raw.get("global_aliases", {}),
     }
+
+    # Validate the registry before returning
+    _validate_registry(registry)
+
+    return registry
 
 
 def get_registry(force: bool = False) -> dict:

@@ -281,9 +281,9 @@ class TestArgocdApp:
                 }
             ]
         }
-        mock_httpx(FakeResponse(json_data=apps))
+        client = mock_httpx(FakeResponse(json_data=apps))
         strand = FetchStrand()
-        data = await strand._fetch_argocd_app(_ctx(app_name="my-app"))
+        data = await strand._fetch_argocd_app(_ctx(app_name="my-app", cluster="ardenone-cluster"))
 
         assert data["name"] == "my-app"
         assert data["sync_status"] == "Synced"
@@ -294,15 +294,130 @@ class TestArgocdApp:
     async def test_empty_items_returns_not_found(self, mock_httpx):
         mock_httpx(FakeResponse(json_data={"items": []}))
         strand = FetchStrand()
-        data = await strand._fetch_argocd_app(_ctx(app_name="ghost"))
+        data = await strand._fetch_argocd_app(_ctx(app_name="ghost", cluster="ardenone-cluster"))
         assert "not found" in data["error"].lower()
 
     @pytest.mark.asyncio
     async def test_no_app_name_returns_error(self, mock_httpx):
         client = mock_httpx(FakeResponse(json_data={"items": []}))
         strand = FetchStrand()
-        data = await strand._fetch_argocd_app(_ctx(app_name=None, project_slug=None))
+        data = await strand._fetch_argocd_app(_ctx(app_name=None, project_slug=None, cluster="ardenone-cluster"))
         assert data["error"] == "No application name specified"
+        assert client.requests == []
+
+    @pytest.mark.asyncio
+    async def test_queries_correct_argocd_base_url(self, mock_httpx):
+        """Mapped read-only cluster queries the correct ArgoCD API base URL."""
+        apps = {"items": []}
+        client = mock_httpx(FakeResponse(json_data=apps))
+        strand = FetchStrand()
+        await strand._fetch_argocd_app(_ctx(app_name="test-app", cluster="ardenone-cluster"))
+
+        # Assert the requested URL contains the ardenone-cluster ArgoCD API base
+        assert client.requests
+        url = client.requests[0][0]
+        assert "argocd-ro-ardenone-manager-ts.ardenone.com:8444" in url
+
+    @pytest.mark.asyncio
+    async def test_app_name_falls_back_to_project_slug(self, mock_httpx):
+        """Omitting app_name falls back to project_slug for the ArgoCD application name."""
+        apps = {
+            "items": [
+                {
+                    "status": {
+                        "sync": {"status": "Synced"},
+                        "health": {"status": "Healthy"},
+                    },
+                }
+            ]
+        }
+        client = mock_httpx(FakeResponse(json_data=apps))
+        strand = FetchStrand()
+        await strand._fetch_argocd_app(_ctx(app_name=None, project_slug="my-proj", cluster="ardenone-cluster"))
+
+        # The app name should be passed as a query parameter
+        assert client.requests
+        params = client.requests[0][1]
+        assert params == {"name": "my-proj"}
+
+    @pytest.mark.asyncio
+    async def test_authenticated_cluster_fails_fast_with_caveat(self, mock_httpx):
+        """
+        apexalgo-iad (access: authenticated) raises ArgocdEndpointUnresolvable
+        with a reason mentioning authentication — ZERO HTTP requests issued.
+        This proves a wrong-instance query is impossible.
+        """
+        from src.fetch.clusters import ArgocdEndpointUnresolvable, reset_cache
+
+        reset_cache()  # ensure fresh clusters.yaml read
+        client = mock_httpx(FakeResponse(json_data={"items": []}))
+        strand = FetchStrand()
+
+        # apexalgo-iad is mapped in clusters.yaml with access: authenticated
+        with pytest.raises(ArgocdEndpointUnresolvable) as exc_info:
+            await strand._fetch_argocd_app(
+                _ctx(app_name="test-app", cluster="apexalgo-iad")
+            )
+
+        # The exception carries the cluster and a human-readable reason
+        assert exc_info.value.cluster == "apexalgo-iad"
+        assert "authentication" in exc_info.value.reason.lower()
+        assert "apexalgo-iad" in exc_info.value.reason
+
+        # CRITICAL: no HTTP request was made — proving no wrong-instance query
+        assert client.requests == []
+
+    @pytest.mark.asyncio
+    async def test_unmapped_cluster_fails_fast_with_caveat(self, mock_httpx):
+        """
+        A cluster absent from clusters.yaml (e.g., 'some-unmapped-cluster')
+        raises ArgocdEndpointUnresolvable with a reason mentioning no ArgoCD
+        mapping — ZERO HTTP requests issued. This proves a wrong-instance
+        query is impossible.
+        """
+        from src.fetch.clusters import ArgocdEndpointUnresolvable, reset_cache
+
+        reset_cache()  # ensure fresh clusters.yaml read
+        client = mock_httpx(FakeResponse(json_data={"items": []}))
+        strand = FetchStrand()
+
+        # 'some-unmapped-cluster' does not exist in clusters.yaml
+        with pytest.raises(ArgocdEndpointUnresolvable) as exc_info:
+            await strand._fetch_argocd_app(
+                _ctx(app_name="test-app", cluster="some-unmapped-cluster")
+            )
+
+        # The exception carries the cluster and a human-readable reason
+        assert exc_info.value.cluster == "some-unmapped-cluster"
+        assert "no argocd mapping" in exc_info.value.reason.lower()
+        assert "some-unmapped-cluster" in exc_info.value.reason
+
+        # CRITICAL: no HTTP request was made — proving no wrong-instance query
+        assert client.requests == []
+
+    @pytest.mark.asyncio
+    async def test_none_cluster_fails_fast_with_caveat(self, mock_httpx):
+        """
+        cluster=None (unconfigured) raises ArgocdEndpointUnresolvable with
+        a reason mentioning no cluster configured — ZERO HTTP requests issued.
+        """
+        from src.fetch.clusters import ArgocdEndpointUnresolvable, reset_cache
+
+        reset_cache()
+        client = mock_httpx(FakeResponse(json_data={"items": []}))
+        strand = FetchStrand()
+
+        # cluster=None means no cluster is configured for the project
+        with pytest.raises(ArgocdEndpointUnresolvable) as exc_info:
+            await strand._fetch_argocd_app(
+                _ctx(app_name="test-app", cluster=None)
+            )
+
+        # The exception carries a human-readable reason
+        assert exc_info.value.cluster is None
+        assert "no cluster configured" in exc_info.value.reason.lower()
+
+        # CRITICAL: no HTTP request was made
         assert client.requests == []
 
 
@@ -462,7 +577,7 @@ class TestStrandWiring:
 
         request = FetchRequest(
             intent_type=IntentType.STATUS,
-            context=_ctx(app_name="my-app"),
+            context=_ctx(app_name="my-app", cluster="ardenone-cluster"),
             intent_id="intent-status-utterance",
             session_id="session-test",
         )

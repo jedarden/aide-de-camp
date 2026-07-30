@@ -7,6 +7,7 @@ Replaces text input with voice session.
 import asyncio
 import logging
 import os
+import time
 import uuid
 from logging import getLogger
 from pathlib import Path
@@ -21,7 +22,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
 
@@ -50,12 +51,14 @@ from .context.warmer import get_context_warmer
 from .feedback.background_analysis import get_background_processor
 from .intent.router import get_router as get_intent_router
 from .escalate import escalate_intent, EscalateRequest
+from .escalate.llm import warmup_zai_connections
 from .test.dispatch import router as test_router
 from .environment.discovery import (
     scan_environment, set_registry,
     refresh_registry, start_background_refresh, stop_background_refresh,
     get_last_scan_at,
 )
+from .registry import get_registry as get_yaml_registry
 
 
 logger = getLogger(__name__)
@@ -165,6 +168,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Failed to check Telegram bridge reachability: {e}")
 
+    # Warm up ZAI proxy connections proactively
+    # This eliminates TLS handshake cost from the first actual LLM request
+    try:
+        await warmup_zai_connections()
+    except Exception as e:
+        logger.warning(f"ZAI proxy warmup failed (non-fatal): {e}")
+
     # Initialize bead watcher
     try:
         _bead_watcher = BeadWatcher(_store, _surface_router)
@@ -214,8 +224,55 @@ async def get_store():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "ok", "service": "adc-voice"}
+    """Health check endpoint.
+
+    Returns overall service status, watcher liveness block (alive, last_tick_at,
+    tick_count, interval), and recent latency percentiles for router/fetch/synthesize
+    stages. Watcher alive is true only while the task is running
+    AND last_tick_at is within 2x the poll interval. If _bead_watcher is None
+    (failed start), watcher.alive is false.
+    """
+    response = {
+        "status": "ok",
+        "service": "adc-voice",
+    }
+    if _bead_watcher is not None:
+        response["watcher"] = _bead_watcher.health_snapshot()
+    else:
+        # Watcher failed to start or not initialized
+        response["watcher"] = {
+            "alive": False,
+            "last_tick_at": None,
+            "tick_count": 0,
+            "interval": 0,
+        }
+
+    # Add recent latency percentiles (last hour = 3600 seconds ago)
+    try:
+        store = await get_store()
+        import time
+        since = int(time.time()) - 3600  # Last hour
+        latency_data = await store.get_latency_percentiles(since=since)
+
+        # Include only router, fetch, and synthesize metrics (not escalate or client-side)
+        # Format to match the /api/v1/timings/percentiles endpoint structure
+        response["latency"] = {
+            "router_ms": latency_data.get("router_ms", {"p50": None, "p95": None, "count": 0}),
+            "fetch_total_ms": latency_data.get("fetch_total_ms", {"p50": None, "p95": None, "count": 0}),
+            "synthesize_total_ms": latency_data.get("synthesize_total_ms", {"p50": None, "p95": None, "count": 0}),
+            "window_seconds": 3600,
+        }
+    except Exception as e:
+        # Latency data is optional - don't fail health check if unavailable
+        logger.warning(f"Failed to fetch latency data for health check: {e}")
+        response["latency"] = {
+            "router_ms": {"p50": None, "p95": None, "count": 0, "error": str(e)},
+            "fetch_total_ms": {"p50": None, "p95": None, "count": 0},
+            "synthesize_total_ms": {"p50": None, "p95": None, "count": 0},
+            "window_seconds": 3600,
+        }
+
+    return response
 
 
 @app.get("/")
@@ -436,6 +493,7 @@ async def route_intent(request: dict):
                 session_id=session_id,
                 project_slug=classification.project_slug,
                 intent_type=classification.intent_type.value,
+                lookup_kind=classification.lookup_kind,
             )
 
             # Process the intent (escalate or fetch+synthesize)
@@ -506,6 +564,7 @@ async def dispatch_intent(request: dict):
                 session_id=session_id,
                 project_slug=classification.project_slug,
                 intent_type=classification.intent_type.value,
+                lookup_kind=classification.lookup_kind,
             )
             intent_ids.append(routed_intent.intent_id)
 
@@ -528,18 +587,39 @@ async def dispatch_intent(request: dict):
 
                     # Broadcast result_created so canvas reloads topics
                     if _broadcaster and surface_id:
+                        emit_start = time.monotonic()
+                        # Include rendered card HTML in SSE so canvas injects it directly
+                        # (Component card when matched, fallback when card_fallback=True)
+                        sse_data = {
+                            "intent_id": intent_id,
+                            "topic_id": result.get("topic_id"),
+                            "summary": result.get("summary"),
+                            "urgency": result.get("urgency"),
+                        }
+                        # Add component_id when available (for canvas tracking)
+                        if result.get("component_id") is not None:
+                            sse_data["component_id"] = result["component_id"]
+                        # Add card_fallback flag when available (signals client to use fallback)
+                        if result.get("card_fallback") is not None:
+                            sse_data["card_fallback"] = result["card_fallback"]
+
                         await _broadcaster.broadcast(
                             SSEEvent(
                                 event_type="result_created",
                                 target_surface_id=surface_id,
-                                data={
-                                    "intent_id": intent_id,
-                                    "topic_id": result.get("topic_id"),
-                                    "summary": result.get("summary"),
-                                    "urgency": result.get("urgency"),
-                                }
+                                data=sse_data,
+                                rendered_html=result.get("rendered_html"),
                             )
                         )
+                        # Record the SSE emit cost for this intent thread
+                        # (Latency Budget & Instrumentation). Non-fatal.
+                        try:
+                            await store.record_dispatch_timings(
+                                intent_id,
+                                sse_emit_ms=int((time.monotonic() - emit_start) * 1000),
+                            )
+                        except Exception as te:
+                            logger.warning(f"sse_emit timing not recorded for {intent_id}: {te}")
 
                 except Exception as e:
                     logger.error(f"Intent processing failed: {e}")
@@ -570,6 +650,66 @@ async def dispatch_intent(request: dict):
             status_code=500,
             content={"error": f"Dispatch error: {str(e)}"}
         )
+
+
+@app.post("/api/v1/timings")
+async def report_client_timings(request: dict):
+    """Record client-reported dispatch timings for an intent thread.
+
+    The server-side stages (router/fetch/synthesize/escalate/sse_emit_ms) are
+    recorded by the router and the /dispatch endpoint; this endpoint is the wire
+    for the two client-reported stages in the latency budget — STT final
+    transcript (stt_ms) and first card render (first_render_ms) — which only the
+    client can measure (see Latency Budget & Instrumentation in docs/plan/plan.md).
+    Both are nullable: a dispatch with no client reporter (the text box, the
+    /api/v1/test/dispatch harness) simply never calls this and those columns
+    stay NULL.
+
+    Body: {"intent_id": "...", "stt_ms": 312, "first_render_ms": 90}
+    Either timing field is optional; intent_id is required.
+    """
+    intent_id = request.get("intent_id")
+    if not intent_id:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "intent_id is required"},
+        )
+
+    fields: dict[str, int] = {}
+    for name in ("stt_ms", "first_render_ms"):
+        value = request.get(name)
+        if value is not None:
+            fields[name] = int(value)
+
+    store = await get_store()
+    try:
+        # Upserts into the existing server-written row (created_at unchanged);
+        # if no server row exists yet this still creates one keyed by the
+        # client-reported intent_id so the timing is never lost.
+        await store.record_dispatch_timings(intent_id, **fields)
+    except Exception as e:
+        logger.warning(f"client timings not recorded for {intent_id}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to record timings: {e}"},
+        )
+
+    return {"ok": True, "intent_id": intent_id, "recorded": list(fields.keys())}
+
+
+@app.get("/api/v1/timings/percentiles")
+async def get_latency_percentiles_endpoint(since: int | None = None):
+    """Aggregate p50/p95 per dispatch stage (Latency Budget & Instrumentation).
+
+    Returns ``{stage: {"p50": ms, "p95": ms, "count": n}}`` for every stage
+    that has at least one captured sample. The latency-baseline bead consumes
+    the un-windowed store helper directly; this endpoint exposes the same
+    numbers over HTTP for the Phase 5 rehearsal checklist and on-demand
+    inspection. Optional ``since`` (unix timestamp) windows to recent
+    dispatches only.
+    """
+    store = await get_store()
+    return await store.get_latency_percentiles(since=since)
 
 
 @app.post("/escalate")
@@ -668,6 +808,31 @@ async def get_environment():
         "last_scan_at": get_last_scan_at(),
         "repos": entries,
     }
+
+
+@app.get("/api/v1/registry")
+async def get_registry_endpoint():
+    """Return the merged project registry (config/registry.yaml + discovery).
+
+    This is the DB-independent data source for the first-run welcome card (the
+    built-in family #2 — see plan, Component Library → Built-in cards, and Cold
+    start & demo seed). The welcome card renders even against an empty
+    components.db because the project list comes from this YAML-backed registry,
+    not the component DB. Returns only the welcome-relevant fields per project
+    (slug, name, description, intent_support, aliases) so no internal paths leak
+    to the served frontend.
+    """
+    reg = get_yaml_registry()
+    projects = []
+    for slug, entry in (reg.get("projects") or {}).items():
+        projects.append({
+            "slug": slug,
+            "name": slug,
+            "description": entry.get("description") or "",
+            "intent_support": entry.get("intent_support") or [],
+            "aliases": entry.get("aliases") or [],
+        })
+    return {"projects": projects}
 
 
 @app.post("/api/v1/environment/refresh")
@@ -833,6 +998,17 @@ class ApprovalRequest(BaseModel):
     approval_id: str
 
 
+class BeadApproveRequest(BaseModel):
+    approval_id: str
+    session_id: str
+
+
+class BeadRejectRequest(BaseModel):
+    approval_id: str
+    session_id: str
+    reason: Optional[str] = None
+
+
 class RollbackRequest(BaseModel):
     artifact_name: str
     artifact_type: str
@@ -855,6 +1031,14 @@ class ComponentIterateRequest(BaseModel):
     component_id: str
     feedback: str
     result_data: Optional[dict] = None
+
+
+class UsagePatternRecord(BaseModel):
+    """Request body for recording component usage patterns."""
+    component_id: str
+    result_type: str
+    match_score: float
+    layout_bucket: str = "normal"
 
 
 # Canvas and Surface endpoints
@@ -904,6 +1088,21 @@ async def api_v1_get_session_topics(session_id: str):
     return {
         "cards": [card.to_dict() for card in cards]
     }
+
+
+@app.delete("/api/v1/sessions/{session_id}/results/{result_id}")
+async def api_v1_delete_result(session_id: str, result_id: str):
+    """Delete a result card by ID, ensuring it belongs to the specified session.
+
+    Used by the canvas to dismiss stuck/failed cards.
+    Returns the number of results deleted (0 or 1).
+    """
+    store = await get_store()
+
+    # Delete the result with session isolation
+    deletion_result = await store.delete_result(result_id, session_id)
+
+    return deletion_result
 
 
 @app.get("/api/v1/sse")
@@ -1115,6 +1314,175 @@ async def api_v1_rollback(request: RollbackRequest):
     }
 
 
+# Bead approval endpoints
+@app.post("/api/v1/beads/approve")
+async def api_v1_approve_bead(request: BeadApproveRequest):
+    """Approve a pending bead and create it via bf CLI.
+
+    Takes an approval_id from a pending_bead_approvals row, creates the bead,
+    and returns the pending card for the surface.
+    """
+    from .escalate.handler import get_escalate_handler, EscalateRequest
+    import json
+
+    store = session_store_get_store()
+
+    # Get the pending approval
+    approval = await store.get_pending_approval(request.approval_id)
+    if not approval:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Approval not found or expired"}
+        )
+
+    if approval["status"] != "pending":
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Approval already {approval['status']}"}
+        )
+
+    if approval["session_id"] != request.session_id:
+        return JSONResponse(
+            status_code=403,
+            content={"error": "Session mismatch"}
+        )
+
+    logger.info(f"Approving bead {request.approval_id} for intent {approval['intent_id']}")
+
+    try:
+        # Create the bead using the escalate handler
+        escalate_handler = get_escalate_handler(store)
+
+        # Build an escalate request from the approval data
+        escalate_request = EscalateRequest(
+            intent_id=approval["intent_id"],
+            session_id=approval["session_id"],
+            utterance=approval["utterance"],
+            intent_type="action",  # Default to action for approved beads
+            project_slug=approval["project_slug"],
+            topic_id=approval["topic_id"],
+        )
+
+        # Create the bead with the stored body
+        bead_id = await escalate_handler._create_bead_with_type(
+            request=escalate_request,
+            bead_body=approval["bead_body"],
+            bead_type=approval["bead_type"],
+        )
+
+        # Create bead_watch row for circuit breaker tracking
+        await escalate_handler._create_bead_watch(
+            bead_ref=bead_id,
+            project_slug=approval["project_slug"],
+            intent_type="action",
+        )
+
+        # Update approval status
+        await store.update_approval_status(request.approval_id, "approved")
+
+        # Update intent status
+        await store.update_intent_status(
+            intent_id=approval["intent_id"],
+            status="dispatched",
+        )
+
+        # Build pending card
+        pending_card = escalate_handler.build_pending_card(
+            request=escalate_request,
+            bead_id=bead_id,
+            bead_type=approval["bead_type"],
+        )
+
+        # Broadcast result_created event to canvas
+        await _broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.RESULT_CREATED,
+                data={
+                    "intent_id": approval["intent_id"],
+                    "session_id": approval["session_id"],
+                    "result_id": f"result-{bead_id}",  # Use bead_id as result_id
+                    "topic_id": approval["topic_id"],
+                    "summary": pending_card["summary"],
+                    "urgency": pending_card["urgency"],
+                    "bead_id": bead_id,
+                },
+                target_session_id=approval["session_id"],
+            )
+        )
+
+        logger.info(f"Created bead {bead_id} from approval {request.approval_id}")
+
+        return {
+            "status": "approved",
+            "bead_id": bead_id,
+            "pending_card": pending_card,
+            "message": f"Bead {bead_id} created successfully",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to approve bead {request.approval_id}: {e}")
+        # Update approval status to rejected on error
+        await store.update_approval_status(request.approval_id, "rejected")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to create bead: {str(e)}"}
+        )
+
+
+@app.post("/api/v1/beads/reject")
+async def api_v1_reject_bead(request: BeadRejectRequest):
+    """Reject a pending bead approval.
+
+    Marks the approval as rejected and updates the intent status.
+    """
+    store = session_store_get_store()
+
+    # Get the pending approval
+    approval = await store.get_pending_approval(request.approval_id)
+    if not approval:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Approval not found or expired"}
+        )
+
+    if approval["session_id"] != request.session_id:
+        return JSONResponse(
+            status_code=403,
+            content={"error": "Session mismatch"}
+        )
+
+    logger.info(f"Rejecting bead approval {request.approval_id}")
+
+    # Update approval status
+    await store.update_approval_status(request.approval_id, "rejected")
+
+    # Update intent status to cancelled
+    await store.update_intent_status(
+        intent_id=approval["intent_id"],
+        status="cancelled",
+    )
+
+    # Broadcast rejection event to canvas
+    await _broadcaster.broadcast(
+        SSEEvent(
+            event_type=EventType.INTENT_RESOLVED,
+            data={
+                "intent_id": approval["intent_id"],
+                "session_id": approval["session_id"],
+                "status": "cancelled",
+                "message": "Bead approval was rejected",
+                "reason": request.reason,
+            },
+            target_session_id=approval["session_id"],
+        )
+    )
+
+    return {
+        "status": "rejected",
+        "message": "Bead approval rejected",
+    }
+
+
 # Component Library endpoints
 @app.get("/api/v1/components")
 async def api_v1_list_components(limit: int = 50):
@@ -1140,6 +1508,304 @@ async def api_v1_list_components(limit: int = 50):
         ]
     }
 
+
+# =============================================================================
+# Usage patterns routes (must come before /{component_id} routes to avoid conflicts)
+# =============================================================================
+
+@app.post("/api/v1/patterns")
+async def api_v1_record_pattern(request: UsagePatternRecord):
+    """Record or update a component usage pattern.
+
+    Simple endpoint for recording component usage patterns.
+    Upserts pattern (update if exists, insert if new) and sets updated_at to current timestamp.
+
+    Request body:
+        - result_type: str - The type of result
+        - component_id: str - The component that was used
+        - layout_bucket: str - The layout bucket used (default 'normal')
+        - match_score: float - How well the component matched (0.0-1.0)
+
+    Returns:
+        {"status": "ok", "pattern": {...}} on success
+    """
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    try:
+        # Validate inputs
+        if not request.component_id or not request.result_type:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "component_id and result_type are required"}
+            )
+
+        if not 0.0 <= request.match_score <= 1.0:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "match_score must be between 0.0 and 1.0"}
+            )
+
+        if request.layout_bucket not in _component_library.LAYOUT_BUCKETS:
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"layout_bucket must be one of {', '.join(_component_library.LAYOUT_BUCKETS)}"}
+            )
+
+        # Record the pattern (upsert: update if exists, insert if new)
+        _component_library.record_usage_pattern(
+            component_id=request.component_id,
+            result_type=request.result_type,
+            match_score=request.match_score,
+            layout_bucket=request.layout_bucket,
+        )
+
+        logger.info(
+            f"Recorded usage pattern: component={request.component_id}, "
+            f"result_type={request.result_type}, layout_bucket={request.layout_bucket}, "
+            f"match_score={request.match_score}"
+        )
+
+        return {
+            "status": "ok",
+            "pattern": {
+                "component_id": request.component_id,
+                "result_type": request.result_type,
+                "layout_bucket": request.layout_bucket,
+                "match_score": request.match_score,
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to record usage pattern: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to record usage pattern: {str(e)}"}
+        )
+
+
+@app.get("/api/v1/patterns")
+async def api_v1_get_patterns(result_type: str = Query(..., description="Result type to filter patterns (required)")):
+    """Get component usage patterns by result_type.
+
+    Query params:
+        result_type: Filter by result type (required)
+
+    Returns:
+        {"patterns": [...]} ordered by match_score DESC
+        404 if no patterns found for the result_type
+    """
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    try:
+        import sqlite3
+
+        conn = _component_library._get_conn()
+
+        # Query patterns for the specified result_type, ordered by match_score DESC
+        query = """
+            SELECT result_type, component_id, layout_bucket, match_score, sample_count, updated_at
+            FROM component_usage_patterns
+            WHERE result_type = ?
+            ORDER BY match_score DESC, sample_count DESC
+        """
+
+        rows = conn.execute(query, (result_type,)).fetchall()
+
+        # Return 404 if no patterns found
+        if not rows:
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"No patterns found for result_type: {result_type}"}
+            )
+
+        patterns = [
+            {
+                "result_type": row[0],
+                "component_id": row[1],
+                "layout_bucket": row[2],
+                "match_score": row[3],
+                "sample_count": row[4],
+                "updated_at": row[5],
+            }
+            for row in rows
+        ]
+
+        return {
+            "patterns": patterns,
+            "count": len(patterns),
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get usage patterns: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to get usage patterns: {str(e)}"}
+        )
+
+
+@app.post("/api/v1/components/usage-patterns")
+async def api_v1_record_usage_pattern(request: UsagePatternRecord):
+    """Record or update a component usage pattern.
+
+    Called by the UI-regen agent to record pattern mappings discovered during
+    component generation or iteration. This endpoint updates the
+    component_usage_patterns table with the latest match score and usage data.
+
+    Returns:
+        {"status": "ok", "pattern": {...}} on success
+    """
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    try:
+        # Validate inputs
+        if not request.component_id or not request.result_type:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "component_id and result_type are required"}
+            )
+
+        if not 0.0 <= request.match_score <= 1.0:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "match_score must be between 0.0 and 1.0"}
+            )
+
+        if request.layout_bucket not in _component_library.LAYOUT_BUCKETS:
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"layout_bucket must be one of {', '.join(_component_library.LAYOUT_BUCKETS)}"}
+            )
+
+        # Record the pattern
+        _component_library.record_usage_pattern(
+            component_id=request.component_id,
+            result_type=request.result_type,
+            match_score=request.match_score,
+            layout_bucket=request.layout_bucket,
+        )
+
+        logger.info(
+            f"Recorded usage pattern: component={request.component_id}, "
+            f"result_type={request.result_type}, layout_bucket={request.layout_bucket}, "
+            f"match_score={request.match_score}"
+        )
+
+        return {
+            "status": "ok",
+            "pattern": {
+                "component_id": request.component_id,
+                "result_type": request.result_type,
+                "layout_bucket": request.layout_bucket,
+                "match_score": request.match_score,
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to record usage pattern: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to record usage pattern: {str(e)}"}
+        )
+
+
+@app.get("/api/v1/components/usage-patterns")
+async def api_v1_list_usage_patterns(
+    result_type: Optional[str] = Query(None, description="Filter by result type"),
+    component_id: Optional[str] = Query(None, description="Filter by component ID"),
+    limit: int = Query(100, description="Maximum number of patterns to return"),
+):
+    """List component usage patterns, optionally filtered.
+
+    Query params:
+        result_type: Filter by result type (optional)
+        component_id: Filter by component ID (optional)
+        limit: Maximum number of patterns to return (default 100)
+
+    Returns:
+        {"patterns": [...], "count": <total>}
+    """
+    if not _component_library:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Component library not initialized"}
+        )
+
+    try:
+        import sqlite3
+
+        conn = _component_library._get_conn()
+
+        # Build query with filters
+        where_clauses = []
+        params = []
+
+        if result_type:
+            where_clauses.append("result_type = ?")
+            params.append(result_type)
+
+        if component_id:
+            where_clauses.append("component_id = ?")
+            params.append(component_id)
+
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        query = f"""
+            SELECT result_type, component_id, layout_bucket, match_score, sample_count, updated_at
+            FROM component_usage_patterns
+            WHERE {where_sql}
+            ORDER BY match_score DESC, sample_count DESC
+            LIMIT ?
+        """
+
+        params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+
+        patterns = [
+            {
+                "result_type": row[0],
+                "component_id": row[1],
+                "layout_bucket": row[2],
+                "match_score": row[3],
+                "sample_count": row[4],
+                "updated_at": row[5],
+            }
+            for row in rows
+        ]
+
+        # Get total count
+        count_query = f"SELECT COUNT(*) FROM component_usage_patterns WHERE {where_sql}"
+        count_params = params[:-1]  # Exclude limit
+        total = conn.execute(count_query, count_params).fetchone()[0]
+
+        return {
+            "patterns": patterns,
+            "count": total,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to list usage patterns: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to list usage patterns: {str(e)}"}
+        )
+
+
+# =============================================================================
+# Component-specific routes (/{component_id} routes must come after specific paths)
+# =============================================================================
 
 @app.get("/api/v1/components/{component_id}")
 async def api_v1_get_component(component_id: str):

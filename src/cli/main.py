@@ -159,6 +159,51 @@ def create_parser() -> argparse.ArgumentParser:
         help="Show current configuration",
     )
 
+    # rehearsal command
+    rehearsal_parser = subparsers.add_parser(
+        "rehearsal",
+        help="Run Phase 5 demo rehearsal",
+        description="Execute the golden path demo script and validate smooth criteria",
+    )
+    rehearsal_parser.add_argument(
+        "--inject-slow-step",
+        type=int,
+        metavar="STEP",
+        help="Inject a slow step at given step number (for testing violation detection)",
+    )
+
+    # freeze command
+    freeze_parser = subparsers.add_parser(
+        "freeze",
+        help="Manage self-modification freeze state",
+        description="View or toggle self-modification freeze protection",
+    )
+    freeze_parser.add_argument(
+        "--toggle",
+        action="store_true",
+        help="Toggle freeze state (create or remove data/FREEZE)",
+    )
+
+    # restore-artifacts command
+    restore_parser = subparsers.add_parser(
+        "restore-artifacts",
+        help="Restore artifacts from git history",
+        description="Revert self-modification commits to restore previous artifact versions",
+    )
+    restore_parser.add_argument(
+        "-n",
+        "--commits",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of self-mod commits to revert (default: 1)",
+    )
+    restore_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be reverted without making changes",
+    )
+
     return parser
 
 
@@ -218,6 +263,23 @@ async def run_command(args: argparse.Namespace) -> int:
                 set_server=args.set_server,
                 set_session=args.set_session,
                 show=args.show,
+            )
+
+        elif args.command == "rehearsal":
+            return await commands.rehearsal(
+                server=server_url,
+                inject_slow_step=args.inject_slow_step,
+            )
+
+        elif args.command == "freeze":
+            return commands.freeze_cmd(
+                toggle=args.toggle,
+            )
+
+        elif args.command == "restore-artifacts":
+            return commands.restore_artifacts_cmd(
+                commits=args.commits,
+                dry_run=args.dry_run,
             )
 
         else:

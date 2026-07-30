@@ -4,6 +4,10 @@
 # Updated by the self-modification agent.
 # Hot-reloaded by the monitoring ticker.
 
+# Tick interval for ambient monitoring checks (seconds). Default: 300 (5 minutes)
+# The watcher daemon hot-reloads this value on each tick.
+tick_interval_seconds: 300
+
 monitoring:
   # Active topics being watched for state changes
   active_topics:

@@ -1,0 +1,1333 @@
+{
+  "timestamp": "2026-07-24T11:20:04.564606",
+  "runs_per_shape": 30,
+  "shapes": {
+    "multi-intent": "Has the pbx web caught up, and what's the state of whisper stt?",
+    "lookup": "Pull up the recent logs for whisper stt",
+    "brainstorm": "Brainstorm improvements to the pbx web deployment pipeline"
+  },
+  "summary": {
+    "multi-intent": {
+      "p50": 3969.1412169486284,
+      "p95": 9599.553782492876,
+      "min": 2513.4400241076946,
+      "max": 13453.40340025723,
+      "mean": 4641.284900996834,
+      "count": 30,
+      "successful_runs": 0,
+      "failed_runs": 30
+    },
+    "lookup": {
+      "p50": 2641.2545097991824,
+      "p95": 4335.9732972458005,
+      "min": 1082.8430522233248,
+      "max": 8399.687767960131,
+      "mean": 2655.902452580631,
+      "count": 30,
+      "successful_runs": 30,
+      "failed_runs": 0
+    },
+    "brainstorm": {
+      "p50": 2252.797782421112,
+      "p95": 4767.531854100525,
+      "min": 1095.2776120975614,
+      "max": 4970.264805480838,
+      "mean": 2461.3084269687533,
+      "count": 30,
+      "successful_runs": 30,
+      "failed_runs": 0
+    }
+  },
+  "all_results": [
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 2917.991103604436,
+      "run": 0,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:14:43.376547"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 2794.8187282308936,
+      "run": 1,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:14:46.175466"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 4276.448827236891,
+      "run": 2,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:14:50.464709"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3597.3253725096583,
+      "run": 3,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:14:54.067699"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3149.860101751983,
+      "run": 4,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:14:57.221625"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3969.1412169486284,
+      "run": 5,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:01.197007"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 13453.40340025723,
+      "run": 6,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:14.656070"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 2513.4400241076946,
+      "run": 7,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:17.176618"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3213.6204801499844,
+      "run": 8,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:20.396670"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 4028.914072550833,
+      "run": 9,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:24.432377"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3157.806310802698,
+      "run": 10,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:27.596293"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 8457.92752224952,
+      "run": 11,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:36.068891"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 2824.216516688466,
+      "run": 12,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:38.899963"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 4139.659323729575,
+      "run": 13,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:43.045470"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 7425.076763145626,
+      "run": 14,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:50.477808"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 4427.40957159549,
+      "run": 15,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:54.911079"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3958.327377215028,
+      "run": 16,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:15:58.873270"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3921.7697735875845,
+      "run": 17,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:02.798706"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 4534.639807417989,
+      "run": 18,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:07.338610"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 4286.250313743949,
+      "run": 19,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:11.628817"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 5547.666655853391,
+      "run": 20,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:17.188327"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 4758.1376591697335,
+      "run": 21,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:21.954676"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3370.034205727279,
+      "run": 22,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:25.329790"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 4715.770003385842,
+      "run": 23,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:30.054462"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 2620.1970037072897,
+      "run": 24,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:32.683104"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 7347.373670898378,
+      "run": 25,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:40.035790"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3513.7775912880898,
+      "run": 26,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:43.555637"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 9599.553782492876,
+      "run": 27,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:53.167387"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3198.5976146534085,
+      "run": 28,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:56.371667"
+    },
+    {
+      "error": "HTTP 500",
+      "dispatch_ms": 3519.3922352045774,
+      "run": 29,
+      "shape": "multi-intent",
+      "timestamp": "2026-07-24T11:16:59.901363"
+    },
+    {
+      "dispatch_ms": 2671.8039829283953,
+      "intent_count": 1,
+      "intent_ids": [
+        "947fb7f4-2f93-42a9-9aca-3c3b207d92fa"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "947fb7f4-2f93-42a9-9aca-3c3b207d92fa",
+          "router_ms": 1426,
+          "fetch_total_ms": 37,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 0,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:03.089978"
+    },
+    {
+      "dispatch_ms": 3426.2494798749685,
+      "intent_count": 1,
+      "intent_ids": [
+        "3dc5f896-6b5e-45d8-8ccf-64973c3533aa"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "3dc5f896-6b5e-45d8-8ccf-64973c3533aa",
+          "router_ms": 1426,
+          "fetch_total_ms": 35,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 1,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:07.041445"
+    },
+    {
+      "dispatch_ms": 3568.790875375271,
+      "intent_count": 1,
+      "intent_ids": [
+        "bcf84ae8-9317-403f-a5f2-36805741ba5b"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "bcf84ae8-9317-403f-a5f2-36805741ba5b",
+          "router_ms": 1426,
+          "fetch_total_ms": 35,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 2,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:11.132077"
+    },
+    {
+      "dispatch_ms": 2774.667162448168,
+      "intent_count": 1,
+      "intent_ids": [
+        "fab4ced4-5270-4b58-bb27-e4412b06ab34"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "fab4ced4-5270-4b58-bb27-e4412b06ab34",
+          "router_ms": 1428,
+          "fetch_total_ms": 35,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 3,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:14.428947"
+    },
+    {
+      "dispatch_ms": 1834.7668293863535,
+      "intent_count": 1,
+      "intent_ids": [
+        "99ffea13-5ddc-4898-afee-22ee777e43aa"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "99ffea13-5ddc-4898-afee-22ee777e43aa",
+          "router_ms": 1428,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 4,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:16.784434"
+    },
+    {
+      "dispatch_ms": 2783.6640113964677,
+      "intent_count": 1,
+      "intent_ids": [
+        "f01e401e-568a-4dcb-9440-98fddd815b7a"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "f01e401e-568a-4dcb-9440-98fddd815b7a",
+          "router_ms": 1428,
+          "fetch_total_ms": 35,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 5,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:20.083946"
+    },
+    {
+      "dispatch_ms": 2694.982558488846,
+      "intent_count": 1,
+      "intent_ids": [
+        "16c7c7eb-c7ea-465f-a428-0f1181e5bfdf"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "16c7c7eb-c7ea-465f-a428-0f1181e5bfdf",
+          "router_ms": 1428,
+          "fetch_total_ms": 34,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 6,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:23.301971"
+    },
+    {
+      "dispatch_ms": 1962.81308401376,
+      "intent_count": 1,
+      "intent_ids": [
+        "4ed8aecf-da9f-42ab-9bef-a33888a6de27"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "4ed8aecf-da9f-42ab-9bef-a33888a6de27",
+          "router_ms": 1441,
+          "fetch_total_ms": 34,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 7,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:25.784345"
+    },
+    {
+      "dispatch_ms": 3688.5005980730057,
+      "intent_count": 1,
+      "intent_ids": [
+        "3d64383d-5b5e-4a9f-998b-2d74c711bc32"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "3d64383d-5b5e-4a9f-998b-2d74c711bc32",
+          "router_ms": 1441,
+          "fetch_total_ms": 34,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 8,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:29.985348"
+    },
+    {
+      "dispatch_ms": 3435.7103472575545,
+      "intent_count": 1,
+      "intent_ids": [
+        "8edb11ff-4c25-499a-92c8-5e184d8ed21d"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "8edb11ff-4c25-499a-92c8-5e184d8ed21d",
+          "router_ms": 1490,
+          "fetch_total_ms": 34,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 9,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:33.945954"
+    },
+    {
+      "dispatch_ms": 2228.325949050486,
+      "intent_count": 1,
+      "intent_ids": [
+        "baacd1f5-e687-4a38-8036-96cb27b8c597"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "baacd1f5-e687-4a38-8036-96cb27b8c597",
+          "router_ms": 1490,
+          "fetch_total_ms": 34,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 10,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:36.696348"
+    },
+    {
+      "dispatch_ms": 8399.687767960131,
+      "intent_count": 1,
+      "intent_ids": [
+        "8d860cfa-6d76-48b7-a312-717d825578e6"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "8d860cfa-6d76-48b7-a312-717d825578e6",
+          "router_ms": 1505,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 11,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:45.619269"
+    },
+    {
+      "dispatch_ms": 1212.4057468026876,
+      "intent_count": 1,
+      "intent_ids": [
+        "d4d1c0a5-a23f-4558-9dff-5c1645fcdcaf"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "d4d1c0a5-a23f-4558-9dff-5c1645fcdcaf",
+          "router_ms": 1505,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 12,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:47.347092"
+    },
+    {
+      "dispatch_ms": 1245.9960822016,
+      "intent_count": 1,
+      "intent_ids": [
+        "b5f92d8a-d387-4b75-bd54-566df8a720a7"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "b5f92d8a-d387-4b75-bd54-566df8a720a7",
+          "router_ms": 1505,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 13,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:49.106142"
+    },
+    {
+      "dispatch_ms": 3200.269665569067,
+      "intent_count": 1,
+      "intent_ids": [
+        "6b65129a-3616-4f43-9667-20d1e5f513d9"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "6b65129a-3616-4f43-9667-20d1e5f513d9",
+          "router_ms": 1505,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 14,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:52.831804"
+    },
+    {
+      "dispatch_ms": 1863.4586120024323,
+      "intent_count": 1,
+      "intent_ids": [
+        "0c46465c-c9e7-4016-ad3d-bc11823e958d"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "0c46465c-c9e7-4016-ad3d-bc11823e958d",
+          "router_ms": 1505,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 15,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:55.211100"
+    },
+    {
+      "dispatch_ms": 1082.8430522233248,
+      "intent_count": 1,
+      "intent_ids": [
+        "3f08d4e1-1809-4128-b4fe-209a2d4e1c8e"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "3f08d4e1-1809-4128-b4fe-209a2d4e1c8e",
+          "router_ms": 1505,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 16,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:56.808167"
+    },
+    {
+      "dispatch_ms": 1949.5384050533175,
+      "intent_count": 1,
+      "intent_ids": [
+        "1f10d2df-270a-48b5-b023-574707b274a4"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "1f10d2df-270a-48b5-b023-574707b274a4",
+          "router_ms": 1505,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 17,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:17:59.280157"
+    },
+    {
+      "dispatch_ms": 1883.5395816713572,
+      "intent_count": 1,
+      "intent_ids": [
+        "eab08349-613e-41e9-b939-bd679b969103"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "eab08349-613e-41e9-b939-bd679b969103",
+          "router_ms": 1505,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 18,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:01.687794"
+    },
+    {
+      "dispatch_ms": 2809.324729256332,
+      "intent_count": 1,
+      "intent_ids": [
+        "499cfcac-a68c-42e2-ac2b-659fcf576936"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "499cfcac-a68c-42e2-ac2b-659fcf576936",
+          "router_ms": 1537,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 19,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:05.020783"
+    },
+    {
+      "dispatch_ms": 1853.9504576474428,
+      "intent_count": 1,
+      "intent_ids": [
+        "871c6d92-e214-4f8b-8cf7-9f94af313bf1"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "871c6d92-e214-4f8b-8cf7-9f94af313bf1",
+          "router_ms": 1537,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 20,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:07.390580"
+    },
+    {
+      "dispatch_ms": 1200.352793559432,
+      "intent_count": 1,
+      "intent_ids": [
+        "667b3f6d-fa66-4021-a312-043c74a816f3"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "667b3f6d-fa66-4021-a312-043c74a816f3",
+          "router_ms": 1537,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 21,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:09.104941"
+    },
+    {
+      "dispatch_ms": 1202.7605129405856,
+      "intent_count": 1,
+      "intent_ids": [
+        "1e87f0b0-1c7a-4efd-839f-7f4b798489fe"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "1e87f0b0-1c7a-4efd-839f-7f4b798489fe",
+          "router_ms": 1543,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 22,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:10.824373"
+    },
+    {
+      "dispatch_ms": 1883.4904450923204,
+      "intent_count": 1,
+      "intent_ids": [
+        "1b2d77e6-cfbc-45a2-b53c-05957c302663"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "1b2d77e6-cfbc-45a2-b53c-05957c302663",
+          "router_ms": 1543,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 23,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:13.227969"
+    },
+    {
+      "dispatch_ms": 4243.634596467018,
+      "intent_count": 1,
+      "intent_ids": [
+        "5b51566e-9dc2-44bb-b8bd-8afcc1fd09b2"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "5b51566e-9dc2-44bb-b8bd-8afcc1fd09b2",
+          "router_ms": 1537,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 24,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:17.994965"
+    },
+    {
+      "dispatch_ms": 3700.509775429964,
+      "intent_count": 1,
+      "intent_ids": [
+        "178ca14f-4c24-4b53-8a13-c0835a1e60b6"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "178ca14f-4c24-4b53-8a13-c0835a1e60b6",
+          "router_ms": 1543,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 25,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:22.218491"
+    },
+    {
+      "dispatch_ms": 2641.2545097991824,
+      "intent_count": 1,
+      "intent_ids": [
+        "86a03cbc-cc50-4734-b6ed-6dbeb202c031"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "86a03cbc-cc50-4734-b6ed-6dbeb202c031",
+          "router_ms": 1557,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 26,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:25.375444"
+    },
+    {
+      "dispatch_ms": 2009.187332354486,
+      "intent_count": 1,
+      "intent_ids": [
+        "a1779f55-bf96-4edb-93a4-8fbc57933399"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "a1779f55-bf96-4edb-93a4-8fbc57933399",
+          "router_ms": 1557,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 27,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:27.898499"
+    },
+    {
+      "dispatch_ms": 4335.9732972458005,
+      "intent_count": 1,
+      "intent_ids": [
+        "23314b31-624f-46f6-a0d8-fe9ecad2f460"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "23314b31-624f-46f6-a0d8-fe9ecad2f460",
+          "router_ms": 1557,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 28,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:32.751072"
+    },
+    {
+      "dispatch_ms": 1888.621335849166,
+      "intent_count": 1,
+      "intent_ids": [
+        "9213247e-f4c1-41e4-bc9c-9ffe6ebf39f2"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "9213247e-f4c1-41e4-bc9c-9ffe6ebf39f2",
+          "router_ms": 1560,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 29,
+      "shape": "lookup",
+      "timestamp": "2026-07-24T11:18:35.153555"
+    },
+    {
+      "dispatch_ms": 3764.2625868320465,
+      "intent_count": 1,
+      "intent_ids": [
+        "28af37e9-c7e0-4cfd-8a87-eb7fafe07acf"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "28af37e9-c7e0-4cfd-8a87-eb7fafe07acf",
+          "router_ms": 1598,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 0,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:18:39.433301"
+    },
+    {
+      "dispatch_ms": 1381.7651132121682,
+      "intent_count": 1,
+      "intent_ids": [
+        "c7618fb0-a8ae-4229-9806-d4349ac3f73d"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "c7618fb0-a8ae-4229-9806-d4349ac3f73d",
+          "router_ms": 1598,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 1,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:18:41.327585"
+    },
+    {
+      "dispatch_ms": 2541.7685620486736,
+      "intent_count": 1,
+      "intent_ids": [
+        "797ea2cb-21f1-44dd-83f0-22ce4cb982e7"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "797ea2cb-21f1-44dd-83f0-22ce4cb982e7",
+          "router_ms": 1598,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 2,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:18:44.394382"
+    },
+    {
+      "dispatch_ms": 3424.029908142984,
+      "intent_count": 1,
+      "intent_ids": [
+        "389bdc42-6e30-46f5-92eb-7c69a948ebc0"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "389bdc42-6e30-46f5-92eb-7c69a948ebc0",
+          "router_ms": 1598,
+          "fetch_total_ms": 33,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 3,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:18:48.343461"
+    },
+    {
+      "dispatch_ms": 1762.2520178556442,
+      "intent_count": 1,
+      "intent_ids": [
+        "4233cd86-0a19-41ab-b6eb-f31a08e898ee"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "4233cd86-0a19-41ab-b6eb-f31a08e898ee",
+          "router_ms": 1598,
+          "fetch_total_ms": 32,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 4,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:18:50.627719"
+    },
+    {
+      "dispatch_ms": 1942.4901269376278,
+      "intent_count": 1,
+      "intent_ids": [
+        "ea9af31d-319d-426a-88f2-97499ed2efd2"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "ea9af31d-319d-426a-88f2-97499ed2efd2",
+          "router_ms": 1598,
+          "fetch_total_ms": 32,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 5,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:18:53.092909"
+    },
+    {
+      "dispatch_ms": 2008.009472861886,
+      "intent_count": 1,
+      "intent_ids": [
+        "28658b4d-6b64-4d6e-b6ce-40ddf623efb7"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "28658b4d-6b64-4d6e-b6ce-40ddf623efb7",
+          "router_ms": 1615,
+          "fetch_total_ms": 32,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 6,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:18:55.615277"
+    },
+    {
+      "dispatch_ms": 1990.890265442431,
+      "intent_count": 1,
+      "intent_ids": [
+        "785e43c6-1e14-4efd-8f8f-f66b2040e1d6"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "785e43c6-1e14-4efd-8f8f-f66b2040e1d6",
+          "router_ms": 1615,
+          "fetch_total_ms": 31,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 7,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:18:58.125301"
+    },
+    {
+      "dispatch_ms": 4767.531854100525,
+      "intent_count": 1,
+      "intent_ids": [
+        "b89f24bb-9344-434e-af1c-a451d951fe3b"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "b89f24bb-9344-434e-af1c-a451d951fe3b",
+          "router_ms": 1643,
+          "fetch_total_ms": 31,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 8,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:03.401012"
+    },
+    {
+      "dispatch_ms": 2938.097035512328,
+      "intent_count": 1,
+      "intent_ids": [
+        "ad2a8cc4-812c-4d6b-a398-12b81d7837cd"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "ad2a8cc4-812c-4d6b-a398-12b81d7837cd",
+          "router_ms": 1668,
+          "fetch_total_ms": 31,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 9,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:06.854580"
+    },
+    {
+      "dispatch_ms": 1511.9716944172978,
+      "intent_count": 1,
+      "intent_ids": [
+        "3fa3601a-09d0-46ad-8c10-36677573249c"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "3fa3601a-09d0-46ad-8c10-36677573249c",
+          "router_ms": 1668,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 10,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:08.889513"
+    },
+    {
+      "dispatch_ms": 1934.4471478834748,
+      "intent_count": 1,
+      "intent_ids": [
+        "9958ba83-3829-439d-b319-c7b653886563"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "9958ba83-3829-439d-b319-c7b653886563",
+          "router_ms": 1668,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 11,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:11.340550"
+    },
+    {
+      "dispatch_ms": 2431.7269260063767,
+      "intent_count": 1,
+      "intent_ids": [
+        "33c32aa8-05f9-4281-9450-df3caea64372"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "33c32aa8-05f9-4281-9450-df3caea64372",
+          "router_ms": 1681,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 12,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:14.286841"
+    },
+    {
+      "dispatch_ms": 2252.797782421112,
+      "intent_count": 1,
+      "intent_ids": [
+        "6bbca55a-b36c-44bd-83f6-0775dd875543"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "6bbca55a-b36c-44bd-83f6-0775dd875543",
+          "router_ms": 1681,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 13,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:17.062085"
+    },
+    {
+      "dispatch_ms": 2977.3462899029255,
+      "intent_count": 1,
+      "intent_ids": [
+        "9f381007-1360-4e2a-9c05-c1eb1897ad2e"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "9f381007-1360-4e2a-9c05-c1eb1897ad2e",
+          "router_ms": 1681,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 14,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:20.564738"
+    },
+    {
+      "dispatch_ms": 3426.362640224397,
+      "intent_count": 1,
+      "intent_ids": [
+        "170d1abf-0514-41a9-aad7-e3cfda5dcc4c"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "170d1abf-0514-41a9-aad7-e3cfda5dcc4c",
+          "router_ms": 1681,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 15,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:24.517793"
+    },
+    {
+      "dispatch_ms": 1681.3494954258204,
+      "intent_count": 1,
+      "intent_ids": [
+        "e0f03cf5-663a-48cb-890f-e9ae892053fa"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "e0f03cf5-663a-48cb-890f-e9ae892053fa",
+          "router_ms": 1681,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 16,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:26.720344"
+    },
+    {
+      "dispatch_ms": 2804.298591800034,
+      "intent_count": 1,
+      "intent_ids": [
+        "44ba15c7-5e2f-48b0-87c7-f3d45ee698b6"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "44ba15c7-5e2f-48b0-87c7-f3d45ee698b6",
+          "router_ms": 1695,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 17,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:30.040819"
+    },
+    {
+      "dispatch_ms": 4970.264805480838,
+      "intent_count": 1,
+      "intent_ids": [
+        "ccb75899-8b17-4024-8adf-ebc3afe27ee6"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "ccb75899-8b17-4024-8adf-ebc3afe27ee6",
+          "router_ms": 1698,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 18,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:35.528302"
+    },
+    {
+      "dispatch_ms": 1722.7645739912987,
+      "intent_count": 1,
+      "intent_ids": [
+        "a974192b-fdc7-4302-a0ab-e67f96144d7e"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "a974192b-fdc7-4302-a0ab-e67f96144d7e",
+          "router_ms": 1698,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 19,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:37.767918"
+    },
+    {
+      "dispatch_ms": 1095.2776120975614,
+      "intent_count": 1,
+      "intent_ids": [
+        "0032e64b-8c2b-4272-b1a0-2f37d42f40b4"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "0032e64b-8c2b-4272-b1a0-2f37d42f40b4",
+          "router_ms": 1698,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 20,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:39.379292"
+    },
+    {
+      "dispatch_ms": 1853.3563409000635,
+      "intent_count": 1,
+      "intent_ids": [
+        "5de57d83-d5a5-4b08-b72c-348502dcfd3e"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "5de57d83-d5a5-4b08-b72c-348502dcfd3e",
+          "router_ms": 1698,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 21,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:41.749455"
+    },
+    {
+      "dispatch_ms": 1188.567128032446,
+      "intent_count": 1,
+      "intent_ids": [
+        "fce65984-fa27-478c-92a4-ef1003e5bffe"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "fce65984-fa27-478c-92a4-ef1003e5bffe",
+          "router_ms": 1695,
+          "fetch_total_ms": 30,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 22,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:43.461868"
+    },
+    {
+      "dispatch_ms": 2289.6319795399904,
+      "intent_count": 1,
+      "intent_ids": [
+        "e8e98fc3-3094-4a6e-9469-1aaaeca51647"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "e8e98fc3-3094-4a6e-9469-1aaaeca51647",
+          "router_ms": 1695,
+          "fetch_total_ms": 29,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 23,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:46.276379"
+    },
+    {
+      "dispatch_ms": 2204.805975779891,
+      "intent_count": 1,
+      "intent_ids": [
+        "95d3030f-5d24-49e3-8049-0d8703e1bd28"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "95d3030f-5d24-49e3-8049-0d8703e1bd28",
+          "router_ms": 1695,
+          "fetch_total_ms": 29,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 24,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:49.004675"
+    },
+    {
+      "dispatch_ms": 3437.5195428729057,
+      "intent_count": 1,
+      "intent_ids": [
+        "22a289f7-1b28-4c36-a5cd-9f984fe3d395"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "22a289f7-1b28-4c36-a5cd-9f984fe3d395",
+          "router_ms": 1695,
+          "fetch_total_ms": 29,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 25,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:52.957825"
+    },
+    {
+      "dispatch_ms": 1716.8980073183775,
+      "intent_count": 1,
+      "intent_ids": [
+        "a37ada40-b54e-4a24-8ba4-33958183f64b"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "a37ada40-b54e-4a24-8ba4-33958183f64b",
+          "router_ms": 1698,
+          "fetch_total_ms": 29,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 26,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:55.187609"
+    },
+    {
+      "dispatch_ms": 3514.9949099868536,
+      "intent_count": 1,
+      "intent_ids": [
+        "c5891090-2a0b-4f23-9982-cb14c47bc03c"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "c5891090-2a0b-4f23-9982-cb14c47bc03c",
+          "router_ms": 1708,
+          "fetch_total_ms": 29,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 27,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:19:59.218011"
+    },
+    {
+      "dispatch_ms": 2295.094136148691,
+      "intent_count": 1,
+      "intent_ids": [
+        "a2121af6-7e05-4e7c-867c-cf887a9a47b5"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "a2121af6-7e05-4e7c-867c-cf887a9a47b5",
+          "router_ms": 1708,
+          "fetch_total_ms": 29,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 28,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:20:02.032790"
+    },
+    {
+      "dispatch_ms": 2008.68028588593,
+      "intent_count": 1,
+      "intent_ids": [
+        "7dada8d4-95d1-4901-9c8f-209ed4fb364d"
+      ],
+      "sample_timings": [
+        {
+          "intent_id": "7dada8d4-95d1-4901-9c8f-209ed4fb364d",
+          "router_ms": 1708,
+          "fetch_total_ms": 29,
+          "synthesize_total_ms": null
+        }
+      ],
+      "run": 29,
+      "shape": "brainstorm",
+      "timestamp": "2026-07-24T11:20:04.564115"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+Health check failed: HTTPConnectionPool(host='queue-api-apexalgo.options.svc.cluster.local', port=80): Max retries exceeded with url: /health (Caused by NewConnectionError("HTTPConnection(host='queue-api-apexalgo.options.svc.cluster.local', port=80): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-07-24 14:23:29.414 | ERROR | app_v2:<module>:2189 - Error: Cannot connect to Queue API at http://queue-api-apexalgo.options.svc.cluster.local
+2026-07-24 14:23:29.415 | ERROR | app_v2:<module>:2190 - Traceback (most recent call last):
+    raise ConnectionError(f"Cannot connect to Queue API at {QUEUE_API_URL}")
+ConnectionError: Cannot connect to Queue API at http://queue-api-apexalgo.options.svc.cluster.local

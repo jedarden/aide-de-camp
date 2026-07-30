@@ -10,6 +10,7 @@ Reads prompts/synthesize.md per invocation (hot-reload).
 """
 
 import json
+import time
 from dataclasses import dataclass
 from enum import Enum
 from logging import getLogger
@@ -19,6 +20,7 @@ from typing import Any, Optional
 from ..components.hot_reload import get_reload_manager
 from ..escalate.llm import get_zai_client, ModelClass
 from ..fetch.commands import FetchResult, IntentType
+from ..llm.response_parser import strip_markdown_fences, ParseLLMError, parse_llm_response
 
 
 logger = getLogger(__name__)
@@ -116,7 +118,12 @@ class SynthesizeStrand:
         Returns:
             SynthesizeResult with data, summary, and urgency
         """
+        synthesize_start = time.perf_counter()
+
         client = await self._get_zai_client()
+
+        # Measure prompt construction time
+        prompt_start = time.perf_counter()
         prompt = self._load_prompt()
 
         # Splice urgency.md rules into the system prompt (hot-reloadable).
@@ -128,26 +135,55 @@ class SynthesizeStrand:
 
         # Build user message with intent spec and fetched context
         user_message = self._build_user_message(request)
+        prompt_ms = (time.perf_counter() - prompt_start) * 1000
+
+        logger.debug(
+            f"synthesize_timing phase=prompt_construction duration_ms={prompt_ms:.2f} "
+            f"intent_id={request.intent_id[:8]}"
+        )
 
         logger.info(f"Synthesizing intent {request.intent_id}")
 
         try:
+            # Measure LLM call time
+            llm_start = time.perf_counter()
             response = await client.call_simple(
                 system_prompt=system_prompt,
                 user_message=user_message,
-                model=ModelClass.SONNET.value,
-                max_tokens=4096,
-                temperature=0.5,  # Lower temperature for consistent output
+                model=ModelClass.HAIKU.value,  # Use Haiku for faster synthesis
+                max_tokens=1024,  # Reduced from 4096 - most outputs are smaller
+                temperature=0.3,  # Lower temperature for more deterministic, faster outputs
+            )
+            llm_ms = (time.perf_counter() - llm_start) * 1000
+
+            logger.debug(
+                f"synthesize_timing phase=llm_call duration_ms={llm_ms:.2f} "
+                f"intent_id={request.intent_id[:8]}"
             )
 
-            # Strip markdown code fences if present
-            raw = response.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[-1]
-                raw = raw.rsplit("```", 1)[0].strip()
+            # Measure JSON parsing time
+            parse_start = time.perf_counter()
+            # Parse JSON response using optimized centralized parser
+            # - Fast-path for clean JSON (skips fence processing when not needed)
+            # - orjson provides 2-3x faster parsing than standard json
+            # Note: Synthesize uses fallback result pattern (not corrective retry)
+            # because fetch operations are expensive and should not be discarded.
+            # See docs/error-handling-standardization.md for pattern comparison.
+            try:
+                result_data = parse_llm_response(response)
+            except ParseLLMError as e:
+                logger.error(f"Failed to parse synthesize response: {e}")
+                # Fall through to fallback result below
+                raise json.JSONDecodeError(str(e), doc="", pos=0) from e
+            parse_ms = (time.perf_counter() - parse_start) * 1000
 
-            # Parse JSON response
-            result_data = json.loads(raw)
+            logger.debug(
+                f"synthesize_timing phase=json_parse duration_ms={parse_ms:.2f} "
+                f"intent_id={request.intent_id[:8]}"
+            )
+
+            # Measure result processing time
+            process_start = time.perf_counter()
 
             # Extract fields
             data = result_data.get("data", {})
@@ -181,19 +217,44 @@ class SynthesizeStrand:
                 caveats=caveats,
             )
 
+            process_ms = (time.perf_counter() - process_start) * 1000
+            total_ms = (time.perf_counter() - synthesize_start) * 1000
+
+            logger.debug(
+                f"synthesize_timing phase=result_process duration_ms={process_ms:.2f} "
+                f"phase=total duration_ms={total_ms:.2f} "
+                f"intent_id={request.intent_id[:8]} "
+                f"data_fields={len(data)} "
+                f"urgency={urgency.value}"
+            )
+
             logger.info(
                 f"Synthesis complete for intent {request.intent_id}: "
-                f"{len(data)} data fields, urgency={urgency.value}"
+                f"{len(data)} data fields, urgency={urgency.value} ({total_ms:.0f}ms)"
             )
 
             return result
 
         except json.JSONDecodeError as e:
+            """
+            Synthesize uses fallback result pattern (not corrective retry).
+
+            Reasoning: Synthesize runs AFTER expensive fetch operations.
+            Fetch data already obtained — should never be discarded.
+            Fallback result allows displaying raw data in degraded-state UX.
+            No retry needed (would re-run expensive fetch operations).
+
+            See docs/error-handling-standardization.md for pattern comparison.
+            """
             logger.error(f"Failed to parse synthesize response as JSON: {e}")
-            # Fallback: return minimal result
+            # Fallback: return minimal result with error context
             return SynthesizeResult(
                 intent_id=request.intent_id,
-                data={"type": "error", "error": "Failed to parse synthesis response"},
+                data={
+                    "type": "error",
+                    "error": "Failed to parse synthesis response",
+                    "parse_error": str(e),  # Preserve error details for debugging
+                },
                 summary="An error occurred while processing the result.",
                 urgency=Urgency.NORMAL,
             )
