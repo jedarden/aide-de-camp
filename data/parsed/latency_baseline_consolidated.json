@@ -1,0 +1,2573 @@
+{
+  "metadata": {
+    "parser_version": "1.0.0",
+    "parsed_at": "2026-07-23T17:59:03.998716",
+    "source_bead": "adc-21k11",
+    "total_shapes": 3,
+    "shapes": {
+      "shape1": {
+        "file": "latency-baseline-shape1-20260723_170941.json",
+        "shape": "step1_multi_status",
+        "shape_description": "Multi-intent status query (pbx-web + whisper-stt)",
+        "utterance": "Has the pbx web caught up, and what's the state of whisper stt?",
+        "timestamp": "2026-07-23T17:09:41.736418",
+        "target_runs": 35,
+        "successful_runs": 35,
+        "timing_records": 106
+      },
+      "shape2": {
+        "file": "latency-baseline-shape2-20260723_171458.json",
+        "shape": "step2_lookup_logs",
+        "shape_description": "Lookup logs (whisper-stt)",
+        "utterance": "Pull up the recent logs for whisper stt.",
+        "timestamp": "2026-07-23T17:14:58.911430",
+        "target_runs": 35,
+        "successful_runs": 35,
+        "timing_records": 64
+      },
+      "shape3": {
+        "file": "latency-baseline-shape3-20260723_172011.json",
+        "shape": "step3_brainstorm",
+        "shape_description": "Brainstorm (pbx-web)",
+        "utterance": "Should pbx web keep using the static site generator, or is it time to move to a dynamic frontend? Give me the trade-offs.",
+        "timestamp": "2026-07-23T17:20:11.989120",
+        "target_runs": 35,
+        "successful_runs": 35,
+        "timing_records": 35
+      }
+    }
+  },
+  "shapes": {
+    "shape1": {
+      "metadata": {
+        "file": "latency-baseline-shape1-20260723_170941.json",
+        "shape": "step1_multi_status",
+        "shape_description": "Multi-intent status query (pbx-web + whisper-stt)",
+        "utterance": "Has the pbx web caught up, and what's the state of whisper stt?",
+        "timestamp": "2026-07-23T17:09:41.736418",
+        "target_runs": 35,
+        "successful_runs": 35,
+        "timing_records": 106
+      },
+      "analysis": {
+        "router_ms": {
+          "count": 106,
+          "p50": 2074,
+          "p95": 4301,
+          "min": 1385,
+          "max": 5284,
+          "mean": 2346.8867924528304,
+          "median": 2074.0
+        },
+        "fetch_first_source_ms": {
+          "count": 91,
+          "p50": 14,
+          "p95": 21,
+          "min": 8,
+          "max": 32,
+          "mean": 14.296703296703297,
+          "median": 14
+        },
+        "fetch_total_ms": {
+          "count": 91,
+          "p50": 37,
+          "p95": 179,
+          "min": 22,
+          "max": 200,
+          "mean": 85.34065934065934,
+          "median": 37
+        },
+        "synthesize_first_token_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "synthesize_total_ms": {
+          "count": 91,
+          "p50": 3108,
+          "p95": 4663,
+          "min": 1735,
+          "max": 5889,
+          "mean": 3140.5164835164837,
+          "median": 3108
+        },
+        "escalate_ms": {
+          "count": 15,
+          "p50": 3992,
+          "p95": 5445,
+          "min": 2965,
+          "max": 5445,
+          "mean": 4045.8,
+          "median": 3992
+        },
+        "sse_emit_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "stt_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "first_render_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        }
+      },
+      "dispatches": [
+        {
+          "iteration": 1,
+          "intent_id": "d2796d0f-1d65-4a09-b9e7-142a276e753b",
+          "created_at": 1784840748,
+          "stages": {
+            "router": 1611,
+            "fetch_first_source": 8,
+            "fetch_total": 31,
+            "synthesize_total": 2857
+          }
+        },
+        {
+          "iteration": 2,
+          "intent_id": "eab11bff-5278-4829-8dc2-900c85223c8d",
+          "created_at": 1784840751,
+          "stages": {
+            "router": 3010,
+            "fetch_first_source": 16,
+            "fetch_total": 40,
+            "synthesize_total": 1901
+          }
+        },
+        {
+          "iteration": 3,
+          "intent_id": "ee6d7f59-47b5-4fa1-aedf-c1de136d537c",
+          "created_at": 1784840753,
+          "stages": {
+            "router": 3010,
+            "fetch_first_source": 18,
+            "fetch_total": 166,
+            "synthesize_total": 3428
+          }
+        },
+        {
+          "iteration": 4,
+          "intent_id": "56fb1ef6-5411-4185-8ac2-c454fd454be1",
+          "created_at": 1784840754,
+          "stages": {
+            "router": 1495,
+            "fetch_first_source": 19,
+            "fetch_total": 43,
+            "synthesize_total": 4680
+          }
+        },
+        {
+          "iteration": 5,
+          "intent_id": "1bf5f886-083e-4e56-a9c9-d38d720277ed",
+          "created_at": 1784840758,
+          "stages": {
+            "router": 2164,
+            "fetch_first_source": 17,
+            "fetch_total": 33,
+            "synthesize_total": 2607
+          }
+        },
+        {
+          "iteration": 6,
+          "intent_id": "d83e2936-26e4-4e78-b9ae-d0bfc572bacc",
+          "created_at": 1784840759,
+          "stages": {
+            "router": 2164,
+            "fetch_first_source": 11,
+            "fetch_total": 165,
+            "synthesize_total": 3427
+          }
+        },
+        {
+          "iteration": 7,
+          "intent_id": "4be10a7a-944d-469a-9d51-e81040832878",
+          "created_at": 1784840760,
+          "stages": {
+            "router": 1651,
+            "fetch_first_source": 15,
+            "fetch_total": 27,
+            "synthesize_total": 3721
+          }
+        },
+        {
+          "iteration": 8,
+          "intent_id": "19b17ec7-e954-4d3d-aebd-c13ca2156605",
+          "created_at": 1784840765,
+          "stages": {
+            "router": 2756,
+            "fetch_first_source": 14,
+            "fetch_total": 34,
+            "synthesize_total": 2775
+          }
+        },
+        {
+          "iteration": 9,
+          "intent_id": "ad5cc712-7ede-4f86-b8bc-203b5b67aeac",
+          "created_at": 1784840767,
+          "stages": {
+            "router": 2756,
+            "fetch_first_source": 12,
+            "fetch_total": 171,
+            "synthesize_total": 4663
+          }
+        },
+        {
+          "iteration": 10,
+          "intent_id": "481d172f-90c7-4416-9eb9-a11e1093d9e4",
+          "created_at": 1784840769,
+          "stages": {
+            "router": 1834,
+            "fetch_first_source": 19,
+            "fetch_total": 33,
+            "synthesize_total": 5889
+          }
+        },
+        {
+          "iteration": 11,
+          "intent_id": "a625ddf6-5ebe-4c7b-ba76-ded677239651",
+          "created_at": 1784840773,
+          "stages": {
+            "router": 1690,
+            "fetch_first_source": 15,
+            "fetch_total": 32,
+            "synthesize_total": 2920
+          }
+        },
+        {
+          "iteration": 12,
+          "intent_id": "902fea4a-ea92-4002-9742-702695ffe46c",
+          "created_at": 1784840774,
+          "stages": {
+            "router": 1690,
+            "fetch_first_source": 11,
+            "fetch_total": 161,
+            "synthesize_total": 3902
+          }
+        },
+        {
+          "iteration": 13,
+          "intent_id": "02ab284b-deef-49c3-a8d3-d747fad5c9e7",
+          "created_at": 1784840776,
+          "stages": {
+            "router": 1385,
+            "fetch_first_source": 20,
+            "fetch_total": 32,
+            "synthesize_total": 4969
+          }
+        },
+        {
+          "iteration": 14,
+          "intent_id": "f653c8d9-36c3-4705-89ce-051e3acae3e6",
+          "created_at": 1784840778,
+          "stages": {
+            "router": 2330,
+            "fetch_first_source": 18,
+            "fetch_total": 33,
+            "synthesize_total": 1838
+          }
+        },
+        {
+          "iteration": 15,
+          "intent_id": "f8f5b302-1da4-4a95-9ba8-a5c508a7d92c",
+          "created_at": 1784840779,
+          "stages": {
+            "router": 2330,
+            "fetch_first_source": 9,
+            "fetch_total": 170,
+            "synthesize_total": 2406
+          }
+        },
+        {
+          "iteration": 16,
+          "intent_id": "e1f06f85-0af6-4dbc-a9dc-a8312412498d",
+          "created_at": 1784840782,
+          "stages": {
+            "router": 1496,
+            "fetch_first_source": 9,
+            "fetch_total": 22,
+            "synthesize_total": 4107
+          }
+        },
+        {
+          "iteration": 17,
+          "intent_id": "834b4263-5f6a-421d-a2de-df99fd8fa3b0",
+          "created_at": 1784840787,
+          "stages": {
+            "router": 5284,
+            "fetch_first_source": 9,
+            "fetch_total": 28,
+            "synthesize_total": 2134
+          }
+        },
+        {
+          "iteration": 18,
+          "intent_id": "4d50a7d3-e77c-4f9d-9aa7-777823090c6d",
+          "created_at": 1784840788,
+          "stages": {
+            "router": 2727,
+            "fetch_first_source": 10,
+            "fetch_total": 25,
+            "synthesize_total": 2868
+          }
+        },
+        {
+          "iteration": 19,
+          "intent_id": "74c52593-42a4-4b8a-9a2c-2f36eea522a3",
+          "created_at": 1784840789,
+          "stages": {
+            "router": 5284,
+            "fetch_first_source": 13,
+            "fetch_total": 178,
+            "synthesize_total": 3279
+          }
+        },
+        {
+          "iteration": 20,
+          "intent_id": "0f208b4c-7850-4149-8136-a6f5fd1f8db7",
+          "created_at": 1784840793,
+          "stages": {
+            "router": 1843,
+            "fetch_first_source": 8,
+            "fetch_total": 23,
+            "synthesize_total": 2836
+          }
+        },
+        {
+          "iteration": 21,
+          "intent_id": "3703bb4c-6669-4d11-8dae-8a15c25f1df1",
+          "created_at": 1784840795,
+          "stages": {
+            "router": 2074,
+            "fetch_first_source": 11,
+            "fetch_total": 40,
+            "synthesize_total": 3546
+          }
+        },
+        {
+          "iteration": 22,
+          "intent_id": "3d5c8c1d-e199-4516-88ee-c8355b6ab5af",
+          "created_at": 1784840796,
+          "stages": {
+            "router": 2074,
+            "fetch_first_source": 9,
+            "fetch_total": 180,
+            "synthesize_total": 4432
+          }
+        },
+        {
+          "iteration": 23,
+          "intent_id": "6d66e48e-6b27-4393-9080-76d9d6507e66",
+          "created_at": 1784840800,
+          "stages": {
+            "router": 3185,
+            "fetch_first_source": 19,
+            "fetch_total": 37,
+            "synthesize_total": 3404
+          }
+        },
+        {
+          "iteration": 24,
+          "intent_id": "103e7e32-20cf-4c52-9851-d3d48e9abf05",
+          "created_at": 1784840801,
+          "stages": {
+            "router": 2732,
+            "fetch_first_source": 19,
+            "fetch_total": 33,
+            "synthesize_total": 2054
+          }
+        },
+        {
+          "iteration": 25,
+          "intent_id": "ee72ba3f-51f5-463c-ac67-5f06efa3e06e",
+          "created_at": 1784840802,
+          "stages": {
+            "router": 2732,
+            "fetch_first_source": 9,
+            "fetch_total": 156,
+            "synthesize_total": 2447
+          }
+        },
+        {
+          "iteration": 26,
+          "intent_id": "bc208a54-0aff-4dc2-a899-3063ae0edf18",
+          "created_at": 1784840806,
+          "stages": {
+            "router": 1674,
+            "fetch_first_source": 19,
+            "fetch_total": 42,
+            "synthesize_total": 3588
+          }
+        },
+        {
+          "iteration": 27,
+          "intent_id": "1c77d339-c128-4cee-838e-398e62622710",
+          "created_at": 1784840807,
+          "stages": {
+            "router": 2777,
+            "fetch_first_source": 8,
+            "fetch_total": 29,
+            "synthesize_total": 2072
+          }
+        },
+        {
+          "iteration": 28,
+          "intent_id": "3cd79b0e-7694-4078-9428-2478b454a46c",
+          "created_at": 1784840808,
+          "stages": {
+            "router": 2777,
+            "fetch_first_source": 11,
+            "fetch_total": 161,
+            "synthesize_total": 3120
+          }
+        },
+        {
+          "iteration": 29,
+          "intent_id": "dba5f940-9b09-4e92-b042-d60464d9194e",
+          "created_at": 1784840812,
+          "stages": {
+            "router": 2060,
+            "fetch_first_source": 15,
+            "fetch_total": 28,
+            "synthesize_total": 3425
+          }
+        },
+        {
+          "iteration": 30,
+          "intent_id": "203db65c-5ae8-4bca-9d58-531a7af8eb5f",
+          "created_at": 1784840813,
+          "stages": {
+            "router": 1650,
+            "fetch_first_source": 19,
+            "fetch_total": 32,
+            "synthesize_total": 2337
+          }
+        },
+        {
+          "iteration": 31,
+          "intent_id": "548548f4-6061-4b4b-8638-ebdc4e88f8b0",
+          "created_at": 1784840814,
+          "stages": {
+            "router": 1650,
+            "fetch_first_source": 8,
+            "fetch_total": 158,
+            "synthesize_total": 3529
+          }
+        },
+        {
+          "iteration": 32,
+          "intent_id": "828700da-aace-4e19-bdda-e8d1045ace9f",
+          "created_at": 1784840819,
+          "stages": {
+            "router": 2146,
+            "fetch_first_source": 8,
+            "fetch_total": 23,
+            "synthesize_total": 3582
+          }
+        },
+        {
+          "iteration": 33,
+          "intent_id": "db5eaf80-a34e-4ad0-8b13-76afd57d2a69",
+          "created_at": 1784840820,
+          "stages": {
+            "router": 3361,
+            "fetch_first_source": 16,
+            "fetch_total": 36,
+            "synthesize_total": 1735
+          }
+        },
+        {
+          "iteration": 34,
+          "intent_id": "5778917d-0d0c-4441-9ae6-8eea31dcc638",
+          "created_at": 1784840822,
+          "stages": {
+            "router": 3361,
+            "fetch_first_source": 9,
+            "fetch_total": 154,
+            "synthesize_total": 3593
+          }
+        },
+        {
+          "iteration": 35,
+          "intent_id": "71bea47d-87a9-441a-9970-1c2c7874a1db",
+          "created_at": 1784840826,
+          "stages": {
+            "router": 2703,
+            "fetch_first_source": 19,
+            "fetch_total": 31,
+            "synthesize_total": 3900
+          }
+        },
+        {
+          "iteration": 36,
+          "intent_id": "ab93a569-d3d1-47e6-87b4-21de5cb8a15a",
+          "created_at": 1784840828,
+          "stages": {
+            "router": 2262,
+            "fetch_first_source": 18,
+            "fetch_total": 33,
+            "synthesize_total": 2737
+          }
+        },
+        {
+          "iteration": 37,
+          "intent_id": "b0c1ab1e-31c5-45d0-a9d8-26991af6c6ec",
+          "created_at": 1784840828,
+          "stages": {
+            "router": 2262,
+            "fetch_first_source": 8,
+            "fetch_total": 160,
+            "synthesize_total": 3354
+          }
+        },
+        {
+          "iteration": 38,
+          "intent_id": "dc25c4a3-42a9-46b0-811d-5a4edd855d01",
+          "created_at": 1784840833,
+          "stages": {
+            "router": 2005,
+            "fetch_first_source": 18,
+            "fetch_total": 31,
+            "synthesize_total": 4269
+          }
+        },
+        {
+          "iteration": 39,
+          "intent_id": "dc4e5c7d-43dc-46ac-aea4-f4ba7ca5bea7",
+          "created_at": 1784840834,
+          "stages": {
+            "router": 3385,
+            "fetch_first_source": 18,
+            "fetch_total": 32,
+            "synthesize_total": 2060
+          }
+        },
+        {
+          "iteration": 40,
+          "intent_id": "088a3df5-b64b-4c45-8eec-bc79162c44a9",
+          "created_at": 1784840835,
+          "stages": {
+            "router": 3385,
+            "fetch_first_source": 9,
+            "fetch_total": 161,
+            "synthesize_total": 2485
+          }
+        },
+        {
+          "iteration": 41,
+          "intent_id": "56715957-c2cb-4bd6-977b-bf62bc3a1fe0",
+          "created_at": 1784840840,
+          "stages": {
+            "router": 2483,
+            "fetch_first_source": 19,
+            "fetch_total": 34,
+            "synthesize_total": 3820
+          }
+        },
+        {
+          "iteration": 42,
+          "intent_id": "3cbf9a42-e94d-490c-af2b-aba847699c36",
+          "created_at": 1784840840,
+          "stages": {
+            "router": 2384,
+            "fetch_first_source": 8,
+            "fetch_total": 23,
+            "synthesize_total": 2268
+          }
+        },
+        {
+          "iteration": 43,
+          "intent_id": "3d971af6-4882-4e5a-8a84-92c79ba9279b",
+          "created_at": 1784840841,
+          "stages": {
+            "router": 2384,
+            "fetch_first_source": 9,
+            "fetch_total": 165,
+            "synthesize_total": 3443
+          }
+        },
+        {
+          "iteration": 44,
+          "intent_id": "479435bb-15f8-4cb9-a631-f8f51ca8f417",
+          "created_at": 1784840846,
+          "stages": {
+            "router": 1547,
+            "fetch_first_source": 18,
+            "fetch_total": 32,
+            "synthesize_total": 2558
+          }
+        },
+        {
+          "iteration": 45,
+          "intent_id": "2e99ef9d-bc93-4aeb-8941-3c1b97d1d740",
+          "created_at": 1784840846,
+          "stages": {
+            "router": 2527,
+            "fetch_first_source": 18,
+            "fetch_total": 33,
+            "synthesize_total": 3553
+          }
+        },
+        {
+          "iteration": 46,
+          "intent_id": "64379fcd-1582-470b-adc7-0f2a1aa14b29",
+          "created_at": 1784840847,
+          "stages": {
+            "router": 1547,
+            "fetch_first_source": 8,
+            "fetch_total": 164,
+            "synthesize_total": 3294
+          }
+        },
+        {
+          "iteration": 47,
+          "intent_id": "ca5a9b6b-161b-4b5b-addc-bfbd6d63c237",
+          "created_at": 1784840852,
+          "stages": {
+            "router": 1740,
+            "fetch_first_source": 19,
+            "fetch_total": 32,
+            "synthesize_total": 2372
+          }
+        },
+        {
+          "iteration": 48,
+          "intent_id": "667efbf0-ed6b-4c41-8934-302d8e586504",
+          "created_at": 1784840852,
+          "stages": {
+            "router": 1594,
+            "fetch_first_source": 14,
+            "fetch_total": 27,
+            "synthesize_total": 3634
+          }
+        },
+        {
+          "iteration": 49,
+          "intent_id": "e606baa6-a989-463c-ba67-bbede4cf9e21",
+          "created_at": 1784840853,
+          "stages": {
+            "router": 1740,
+            "fetch_first_source": 8,
+            "fetch_total": 170,
+            "synthesize_total": 3106
+          }
+        },
+        {
+          "iteration": 50,
+          "intent_id": "c6e1fe5b-13c3-407f-9060-1044df9f0a42",
+          "created_at": 1784840857,
+          "stages": {
+            "router": 1615,
+            "fetch_first_source": 19,
+            "fetch_total": 46,
+            "synthesize_total": 3065
+          }
+        },
+        {
+          "iteration": 51,
+          "intent_id": "77e4c55c-bfd6-4e8b-bfbd-18703e996f5d",
+          "created_at": 1784840858,
+          "stages": {
+            "router": 1711,
+            "fetch_first_source": 18,
+            "fetch_total": 32,
+            "synthesize_total": 2854
+          }
+        },
+        {
+          "iteration": 52,
+          "intent_id": "9a81aeab-809c-4afb-ba4d-17cc197f2c61",
+          "created_at": 1784840859,
+          "stages": {
+            "router": 1711,
+            "fetch_first_source": 9,
+            "fetch_total": 168,
+            "synthesize_total": 3532
+          }
+        },
+        {
+          "iteration": 53,
+          "intent_id": "ec608765-74fa-4fb0-bdd2-02aad7c23ff7",
+          "created_at": 1784840864,
+          "stages": {
+            "router": 2025,
+            "fetch_first_source": 13,
+            "fetch_total": 26,
+            "synthesize_total": 3559
+          }
+        },
+        {
+          "iteration": 54,
+          "intent_id": "0e17d155-87d1-4106-a786-0c021c16401d",
+          "created_at": 1784840864,
+          "stages": {
+            "router": 1738,
+            "fetch_first_source": 18,
+            "fetch_total": 35,
+            "synthesize_total": 3100
+          }
+        },
+        {
+          "iteration": 55,
+          "intent_id": "3f2c7969-40ee-4298-b9db-c8eb50a6e0b8",
+          "created_at": 1784840865,
+          "stages": {
+            "router": 1738,
+            "fetch_first_source": 12,
+            "fetch_total": 166,
+            "synthesize_total": 3751
+          }
+        },
+        {
+          "iteration": 56,
+          "intent_id": "083aca5c-cc26-4fb6-a7c6-7fc029f5faf8",
+          "created_at": 1784840870,
+          "stages": {
+            "router": 1587,
+            "fetch_first_source": 14,
+            "fetch_total": 32,
+            "synthesize_total": 3952
+          }
+        },
+        {
+          "iteration": 57,
+          "intent_id": "c795afab-e0dc-425e-a569-19fbaed96411",
+          "created_at": 1784840870,
+          "stages": {
+            "router": 1677,
+            "fetch_first_source": 13,
+            "fetch_total": 31,
+            "synthesize_total": 2680
+          }
+        },
+        {
+          "iteration": 58,
+          "intent_id": "3789268a-7ccc-4be4-b834-31be4998de40",
+          "created_at": 1784840871,
+          "stages": {
+            "router": 1677,
+            "fetch_first_source": 12,
+            "fetch_total": 162,
+            "synthesize_total": 3555
+          }
+        },
+        {
+          "iteration": 59,
+          "intent_id": "181cfb8f-1e71-42d6-a6c0-5370e0d3d1d6",
+          "created_at": 1784840876,
+          "stages": {
+            "router": 1800,
+            "fetch_first_source": 21,
+            "fetch_total": 35,
+            "synthesize_total": 3476
+          }
+        },
+        {
+          "iteration": 60,
+          "intent_id": "c6229687-11e2-45cf-9392-8a4a25478735",
+          "created_at": 1784840877,
+          "stages": {
+            "router": 2221,
+            "fetch_first_source": 11,
+            "fetch_total": 31,
+            "synthesize_total": 3090
+          }
+        },
+        {
+          "iteration": 61,
+          "intent_id": "925fee70-6631-410d-aa90-1546538fb69c",
+          "created_at": 1784840879,
+          "stages": {
+            "router": 2221,
+            "fetch_first_source": 15,
+            "fetch_total": 169,
+            "synthesize_total": 4827
+          }
+        },
+        {
+          "iteration": 62,
+          "intent_id": "3f9f0476-67a6-496b-a52d-4d87cf91ed05",
+          "created_at": 1784840882,
+          "stages": {
+            "router": 2415,
+            "escalate": 3170
+          }
+        },
+        {
+          "iteration": 63,
+          "intent_id": "805d7cbe-5e52-4110-9ec0-545cf5545a8b",
+          "created_at": 1784840884,
+          "stages": {
+            "router": 2301,
+            "fetch_first_source": 14,
+            "fetch_total": 43,
+            "synthesize_total": 2200
+          }
+        },
+        {
+          "iteration": 64,
+          "intent_id": "88d114fa-c211-4c78-b814-dfcd1172e096",
+          "created_at": 1784840884,
+          "stages": {
+            "router": 2301,
+            "fetch_first_source": 14,
+            "fetch_total": 170,
+            "synthesize_total": 2340
+          }
+        },
+        {
+          "iteration": 65,
+          "intent_id": "962724a8-4899-4187-86fd-118397ae2f36",
+          "created_at": 1784840890,
+          "stages": {
+            "router": 2167,
+            "escalate": 5445
+          }
+        },
+        {
+          "iteration": 66,
+          "intent_id": "5e96fbc4-4e9b-40c5-b374-761ce7246d03",
+          "created_at": 1784840891,
+          "stages": {
+            "router": 4301,
+            "fetch_first_source": 19,
+            "fetch_total": 34,
+            "synthesize_total": 1941
+          }
+        },
+        {
+          "iteration": 67,
+          "intent_id": "87814e93-1cdf-4c56-b5c1-51e93612c913",
+          "created_at": 1784840893,
+          "stages": {
+            "router": 4301,
+            "fetch_first_source": 9,
+            "fetch_total": 158,
+            "synthesize_total": 3994
+          }
+        },
+        {
+          "iteration": 68,
+          "intent_id": "b0a819d1-51b4-4dcf-856f-e5ce29a035c9",
+          "created_at": 1784840895,
+          "stages": {
+            "router": 2069,
+            "escalate": 2965
+          }
+        },
+        {
+          "iteration": 69,
+          "intent_id": "76f81751-7bd7-44bd-b18a-0fd7b91cf428",
+          "created_at": 1784840899,
+          "stages": {
+            "router": 2909,
+            "fetch_first_source": 19,
+            "fetch_total": 34,
+            "synthesize_total": 2046
+          }
+        },
+        {
+          "iteration": 70,
+          "intent_id": "a78c2876-2d44-49f4-a51a-35d58d51bd1a",
+          "created_at": 1784840899,
+          "stages": {
+            "router": 2909,
+            "fetch_first_source": 10,
+            "fetch_total": 165,
+            "synthesize_total": 2661
+          }
+        },
+        {
+          "iteration": 71,
+          "intent_id": "3378a7f6-e6bb-4da6-9054-426e345e9fdd",
+          "created_at": 1784840900,
+          "stages": {
+            "router": 1411,
+            "escalate": 3076
+          }
+        },
+        {
+          "iteration": 72,
+          "intent_id": "e8f77e99-a036-4e12-913a-2df3d80ecb4e",
+          "created_at": 1784840904,
+          "stages": {
+            "router": 1824,
+            "fetch_first_source": 20,
+            "fetch_total": 36,
+            "synthesize_total": 2152
+          }
+        },
+        {
+          "iteration": 73,
+          "intent_id": "98fde055-a5c3-4e96-a86e-6a4ad1a18d6f",
+          "created_at": 1784840905,
+          "stages": {
+            "router": 1824,
+            "fetch_first_source": 9,
+            "fetch_total": 165,
+            "synthesize_total": 3103
+          }
+        },
+        {
+          "iteration": 74,
+          "intent_id": "c01596a8-7529-4d12-b0c4-f1af5d7078f0",
+          "created_at": 1784840907,
+          "stages": {
+            "router": 1502,
+            "escalate": 4417
+          }
+        },
+        {
+          "iteration": 75,
+          "intent_id": "7c22f20d-5eba-40b8-9f42-1fd1ab6f18e7",
+          "created_at": 1784840910,
+          "stages": {
+            "router": 2032,
+            "fetch_first_source": 12,
+            "fetch_total": 26,
+            "synthesize_total": 1920
+          }
+        },
+        {
+          "iteration": 76,
+          "intent_id": "a7c2c4ad-41ef-4bc5-b47c-13bac4a6b5e7",
+          "created_at": 1784840911,
+          "stages": {
+            "router": 2032,
+            "fetch_first_source": 9,
+            "fetch_total": 153,
+            "synthesize_total": 3503
+          }
+        },
+        {
+          "iteration": 77,
+          "intent_id": "4f6d615d-409e-43cb-9fd6-678ddcd00cd7",
+          "created_at": 1784840914,
+          "stages": {
+            "router": 1538,
+            "escalate": 5298
+          }
+        },
+        {
+          "iteration": 78,
+          "intent_id": "6c22960f-a055-4f74-9e11-ac73e10956b6",
+          "created_at": 1784840918,
+          "stages": {
+            "router": 4550,
+            "fetch_first_source": 19,
+            "fetch_total": 37,
+            "synthesize_total": 2070
+          }
+        },
+        {
+          "iteration": 79,
+          "intent_id": "21410802-4221-4c5a-9d60-91dae2c7037a",
+          "created_at": 1784840920,
+          "stages": {
+            "router": 4550,
+            "fetch_first_source": 12,
+            "fetch_total": 168,
+            "synthesize_total": 3108
+          }
+        },
+        {
+          "iteration": 80,
+          "intent_id": "4ae7bd74-03d3-415b-9f78-72d3d6f4679b",
+          "created_at": 1784840921,
+          "stages": {
+            "router": 2014,
+            "escalate": 4235
+          }
+        },
+        {
+          "iteration": 81,
+          "intent_id": "6222c595-6319-4718-886b-aa4385add930",
+          "created_at": 1784840924,
+          "stages": {
+            "router": 1686,
+            "fetch_first_source": 14,
+            "fetch_total": 33,
+            "synthesize_total": 2044
+          }
+        },
+        {
+          "iteration": 82,
+          "intent_id": "584198e2-94b3-4f21-b907-9c0a4ff025c0",
+          "created_at": 1784840926,
+          "stages": {
+            "router": 1686,
+            "fetch_first_source": 9,
+            "fetch_total": 179,
+            "synthesize_total": 3768
+          }
+        },
+        {
+          "iteration": 83,
+          "intent_id": "b6b86275-eb6e-4dfb-a860-9e5ddb624904",
+          "created_at": 1784840927,
+          "stages": {
+            "router": 1411,
+            "escalate": 3759
+          }
+        },
+        {
+          "iteration": 84,
+          "intent_id": "7fe745e8-ae77-4c47-af25-15bfd103eac3",
+          "created_at": 1784840930,
+          "stages": {
+            "router": 1622,
+            "fetch_first_source": 19,
+            "fetch_total": 54,
+            "synthesize_total": 2191
+          }
+        },
+        {
+          "iteration": 85,
+          "intent_id": "c3756d70-f004-492d-9030-0c1f4fd7e880",
+          "created_at": 1784840932,
+          "stages": {
+            "router": 1622,
+            "fetch_first_source": 9,
+            "fetch_total": 180,
+            "synthesize_total": 3272
+          }
+        },
+        {
+          "iteration": 86,
+          "intent_id": "5185bae6-b09d-4f4b-afcc-3826ec170280",
+          "created_at": 1784840933,
+          "stages": {
+            "router": 1821,
+            "escalate": 4187
+          }
+        },
+        {
+          "iteration": 87,
+          "intent_id": "27f35a14-7505-4871-abcb-a6c3e709e428",
+          "created_at": 1784840936,
+          "stages": {
+            "router": 1584,
+            "fetch_first_source": 19,
+            "fetch_total": 37,
+            "synthesize_total": 2003
+          }
+        },
+        {
+          "iteration": 88,
+          "intent_id": "38aa0dd6-a4d5-4293-9e27-a9e31201caaf",
+          "created_at": 1784840937,
+          "stages": {
+            "router": 1584,
+            "fetch_first_source": 12,
+            "fetch_total": 164,
+            "synthesize_total": 2823
+          }
+        },
+        {
+          "iteration": 89,
+          "intent_id": "e3b026df-330a-4c06-bc7c-c2072d66c555",
+          "created_at": 1784840939,
+          "stages": {
+            "router": 1611,
+            "escalate": 3913
+          }
+        },
+        {
+          "iteration": 90,
+          "intent_id": "30344ba1-ae50-4275-87eb-79f0c6a2b175",
+          "created_at": 1784840945,
+          "stages": {
+            "router": 3847,
+            "fetch_first_source": 20,
+            "fetch_total": 35,
+            "synthesize_total": 4194
+          }
+        },
+        {
+          "iteration": 91,
+          "intent_id": "070ab79c-67e5-474a-a933-2f3447b4e4e5",
+          "created_at": 1784840946,
+          "stages": {
+            "router": 3847,
+            "fetch_first_source": 10,
+            "fetch_total": 163,
+            "synthesize_total": 4522
+          }
+        },
+        {
+          "iteration": 92,
+          "intent_id": "60302f71-c579-40ed-a9f9-4eb216118961",
+          "created_at": 1784840949,
+          "stages": {
+            "router": 3515,
+            "escalate": 5384
+          }
+        },
+        {
+          "iteration": 93,
+          "intent_id": "45d00cb7-b8b2-475e-bac3-21a22580e97b",
+          "created_at": 1784840951,
+          "stages": {
+            "router": 2585,
+            "fetch_first_source": 19,
+            "fetch_total": 33,
+            "synthesize_total": 2493
+          }
+        },
+        {
+          "iteration": 94,
+          "intent_id": "97a0d167-7585-4ff6-aa9b-ff32ecfabd31",
+          "created_at": 1784840953,
+          "stages": {
+            "router": 2585,
+            "fetch_first_source": 9,
+            "fetch_total": 159,
+            "synthesize_total": 3852
+          }
+        },
+        {
+          "iteration": 95,
+          "intent_id": "63ff9ec0-844b-4c17-8b59-820d9d2d2476",
+          "created_at": 1784840956,
+          "stages": {
+            "router": 3075,
+            "escalate": 3992
+          }
+        },
+        {
+          "iteration": 96,
+          "intent_id": "7c585d86-54b7-4c7d-91eb-8523fb1a6d03",
+          "created_at": 1784840960,
+          "stages": {
+            "router": 2491,
+            "fetch_first_source": 12,
+            "fetch_total": 166,
+            "synthesize_total": 4201
+          }
+        },
+        {
+          "iteration": 97,
+          "intent_id": "f6a0972e-6ba9-425d-be29-edbe5040c086",
+          "created_at": 1784840960,
+          "stages": {
+            "router": 2491,
+            "fetch_first_source": 10,
+            "fetch_total": 30,
+            "synthesize_total": 4362
+          }
+        },
+        {
+          "iteration": 98,
+          "intent_id": "eed4220c-1819-4677-a433-a9513283d999",
+          "created_at": 1784840965,
+          "stages": {
+            "router": 3567,
+            "escalate": 4564
+          }
+        },
+        {
+          "iteration": 99,
+          "intent_id": "4cd2c396-3dc9-4101-a9f0-6624a6717b27",
+          "created_at": 1784840967,
+          "stages": {
+            "router": 3467,
+            "fetch_first_source": 21,
+            "fetch_total": 52,
+            "synthesize_total": 2416
+          }
+        },
+        {
+          "iteration": 100,
+          "intent_id": "14b41f70-1c34-4ead-a196-96ce54ebc0ac",
+          "created_at": 1784840968,
+          "stages": {
+            "router": 3467,
+            "fetch_first_source": 22,
+            "fetch_total": 181,
+            "synthesize_total": 3112
+          }
+        },
+        {
+          "iteration": 101,
+          "intent_id": "5a0b4fb8-cfaf-4400-9cfb-68d458207565",
+          "created_at": 1784840972,
+          "stages": {
+            "router": 3554,
+            "escalate": 3090
+          }
+        },
+        {
+          "iteration": 102,
+          "intent_id": "946fc7ea-88f8-476f-a873-c80b52eceea3",
+          "created_at": 1784840973,
+          "stages": {
+            "router": 1819,
+            "fetch_first_source": 18,
+            "fetch_total": 56,
+            "synthesize_total": 2890
+          }
+        },
+        {
+          "iteration": 103,
+          "intent_id": "f7c15daf-15f9-4256-8fff-d6a04626da69",
+          "created_at": 1784840973,
+          "stages": {
+            "router": 1819,
+            "fetch_first_source": 22,
+            "fetch_total": 176,
+            "synthesize_total": 3142
+          }
+        },
+        {
+          "iteration": 104,
+          "intent_id": "c7773014-2f6d-4352-a933-c3451f8131ab",
+          "created_at": 1784840978,
+          "stages": {
+            "router": 1435,
+            "fetch_first_source": 21,
+            "fetch_total": 62,
+            "synthesize_total": 2050
+          }
+        },
+        {
+          "iteration": 105,
+          "intent_id": "d912a2e5-c753-47d6-ae65-e4dedc5bfb5c",
+          "created_at": 1784840978,
+          "stages": {
+            "router": 1762,
+            "escalate": 3192
+          }
+        },
+        {
+          "iteration": 106,
+          "intent_id": "fa78191b-ffd1-4c42-80fc-8d1fbb8ddda6",
+          "created_at": 1784840979,
+          "stages": {
+            "router": 1435,
+            "fetch_first_source": 32,
+            "fetch_total": 200,
+            "synthesize_total": 3049
+          }
+        }
+      ]
+    },
+    "shape2": {
+      "metadata": {
+        "file": "latency-baseline-shape2-20260723_171458.json",
+        "shape": "step2_lookup_logs",
+        "shape_description": "Lookup logs (whisper-stt)",
+        "utterance": "Pull up the recent logs for whisper stt.",
+        "timestamp": "2026-07-23T17:14:58.911430",
+        "target_runs": 35,
+        "successful_runs": 35,
+        "timing_records": 64
+      },
+      "analysis": {
+        "router_ms": {
+          "count": 64,
+          "p50": 1640,
+          "p95": 3298,
+          "min": 1229,
+          "max": 3774,
+          "mean": 1892.28125,
+          "median": 1640.0
+        },
+        "fetch_first_source_ms": {
+          "count": 64,
+          "p50": 16,
+          "p95": 21,
+          "min": 7,
+          "max": 21,
+          "mean": 14.421875,
+          "median": 15.5
+        },
+        "fetch_total_ms": {
+          "count": 64,
+          "p50": 51,
+          "p95": 191,
+          "min": 19,
+          "max": 222,
+          "mean": 95.859375,
+          "median": 45.0
+        },
+        "synthesize_first_token_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "synthesize_total_ms": {
+          "count": 64,
+          "p50": 3794,
+          "p95": 5364,
+          "min": 2735,
+          "max": 8192,
+          "mean": 3937.40625,
+          "median": 3787.5
+        },
+        "escalate_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "sse_emit_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "stt_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "first_render_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        }
+      },
+      "dispatches": [
+        {
+          "iteration": 1,
+          "intent_id": "0c932e4f-de14-4fd3-b823-4c6dccd8fcb2",
+          "created_at": 1784841083,
+          "stages": {
+            "router": 1309,
+            "fetch_first_source": 20,
+            "fetch_total": 169,
+            "synthesize_total": 3488
+          }
+        },
+        {
+          "iteration": 2,
+          "intent_id": "6fe921aa-4ab1-498e-b075-550750ab7f67",
+          "created_at": 1784841087,
+          "stages": {
+            "router": 2495,
+            "fetch_first_source": 19,
+            "fetch_total": 32,
+            "synthesize_total": 5364
+          }
+        },
+        {
+          "iteration": 3,
+          "intent_id": "5d7ea3de-0752-4e68-aef2-068f8847a4a5",
+          "created_at": 1784841090,
+          "stages": {
+            "router": 2047,
+            "fetch_first_source": 19,
+            "fetch_total": 161,
+            "synthesize_total": 4553
+          }
+        },
+        {
+          "iteration": 4,
+          "intent_id": "88c40948-dc49-4794-a95c-901f2dc18112",
+          "created_at": 1784841093,
+          "stages": {
+            "router": 1812,
+            "fetch_first_source": 8,
+            "fetch_total": 20,
+            "synthesize_total": 3213
+          }
+        },
+        {
+          "iteration": 5,
+          "intent_id": "bd9beaad-ef6c-492b-a3f4-9bb491307a69",
+          "created_at": 1784841099,
+          "stages": {
+            "router": 2493,
+            "fetch_first_source": 8,
+            "fetch_total": 155,
+            "synthesize_total": 4987
+          }
+        },
+        {
+          "iteration": 6,
+          "intent_id": "5f9113a5-7461-4782-aa4b-502445473e88",
+          "created_at": 1784841099,
+          "stages": {
+            "router": 2722,
+            "fetch_first_source": 13,
+            "fetch_total": 28,
+            "synthesize_total": 3257
+          }
+        },
+        {
+          "iteration": 7,
+          "intent_id": "9bb1bfce-8449-488b-91ac-f72b5fdf3320",
+          "created_at": 1784841106,
+          "stages": {
+            "router": 1671,
+            "fetch_first_source": 11,
+            "fetch_total": 173,
+            "synthesize_total": 4826
+          }
+        },
+        {
+          "iteration": 8,
+          "intent_id": "ff3c4988-ca67-45c1-9ef0-e95a74056fda",
+          "created_at": 1784841106,
+          "stages": {
+            "router": 2428,
+            "fetch_first_source": 20,
+            "fetch_total": 51,
+            "synthesize_total": 4041
+          }
+        },
+        {
+          "iteration": 9,
+          "intent_id": "9745a195-cc18-412c-b432-17cdc1576c94",
+          "created_at": 1784841112,
+          "stages": {
+            "router": 1527,
+            "fetch_first_source": 17,
+            "fetch_total": 161,
+            "synthesize_total": 3891
+          }
+        },
+        {
+          "iteration": 10,
+          "intent_id": "e43aff16-aaf5-41e2-b629-2fcd4c7363a3",
+          "created_at": 1784841113,
+          "stages": {
+            "router": 1468,
+            "fetch_first_source": 8,
+            "fetch_total": 20,
+            "synthesize_total": 4722
+          }
+        },
+        {
+          "iteration": 11,
+          "intent_id": "afbb3045-fc16-4549-ae08-e59b7cb9fe4a",
+          "created_at": 1784841118,
+          "stages": {
+            "router": 1449,
+            "fetch_first_source": 21,
+            "fetch_total": 171,
+            "synthesize_total": 3680
+          }
+        },
+        {
+          "iteration": 12,
+          "intent_id": "6694fba1-d305-4b61-8f36-930b62c96e6c",
+          "created_at": 1784841120,
+          "stages": {
+            "router": 3002,
+            "fetch_first_source": 19,
+            "fetch_total": 38,
+            "synthesize_total": 3042
+          }
+        },
+        {
+          "iteration": 13,
+          "intent_id": "01913c71-a743-4ea9-9ce6-df12bfaaa75f",
+          "created_at": 1784841128,
+          "stages": {
+            "router": 1416,
+            "fetch_first_source": 21,
+            "fetch_total": 175,
+            "synthesize_total": 8192
+          }
+        },
+        {
+          "iteration": 14,
+          "intent_id": "bc028471-f76a-48c8-a0b3-e865bfdb163d",
+          "created_at": 1784841129,
+          "stages": {
+            "router": 3336,
+            "fetch_first_source": 16,
+            "fetch_total": 28,
+            "synthesize_total": 5076
+          }
+        },
+        {
+          "iteration": 15,
+          "intent_id": "605d76f5-3bff-44b6-a300-43f1bc5fb520",
+          "created_at": 1784841136,
+          "stages": {
+            "router": 1581,
+            "fetch_first_source": 18,
+            "fetch_total": 36,
+            "synthesize_total": 5041
+          }
+        },
+        {
+          "iteration": 16,
+          "intent_id": "96ed1188-1e75-4a2e-a886-80602c5a1582",
+          "created_at": 1784841137,
+          "stages": {
+            "router": 2155,
+            "fetch_first_source": 16,
+            "fetch_total": 210,
+            "synthesize_total": 5542
+          }
+        },
+        {
+          "iteration": 17,
+          "intent_id": "5bce42bd-637e-40f6-b8b2-8fff18b10e0e",
+          "created_at": 1784841142,
+          "stages": {
+            "router": 1329,
+            "fetch_first_source": 16,
+            "fetch_total": 64,
+            "synthesize_total": 4188
+          }
+        },
+        {
+          "iteration": 18,
+          "intent_id": "a1887205-186f-4d88-8330-27c210ab49ff",
+          "created_at": 1784841144,
+          "stages": {
+            "router": 3294,
+            "fetch_first_source": 11,
+            "fetch_total": 166,
+            "synthesize_total": 3604
+          }
+        },
+        {
+          "iteration": 19,
+          "intent_id": "94672bb2-471e-4a1d-aec5-1c6a656ea7ee",
+          "created_at": 1784841149,
+          "stages": {
+            "router": 1640,
+            "fetch_first_source": 15,
+            "fetch_total": 29,
+            "synthesize_total": 4529
+          }
+        },
+        {
+          "iteration": 20,
+          "intent_id": "46ec5ac6-4c83-461b-b3da-f78afde4d9e5",
+          "created_at": 1784841152,
+          "stages": {
+            "router": 2541,
+            "fetch_first_source": 11,
+            "fetch_total": 166,
+            "synthesize_total": 4444
+          }
+        },
+        {
+          "iteration": 21,
+          "intent_id": "84995f29-da54-4237-a4a9-131476c84f0e",
+          "created_at": 1784841155,
+          "stages": {
+            "router": 2645,
+            "fetch_first_source": 8,
+            "fetch_total": 26,
+            "synthesize_total": 3185
+          }
+        },
+        {
+          "iteration": 22,
+          "intent_id": "4f52fe64-3705-4336-98ae-215af6e2cf6d",
+          "created_at": 1784841161,
+          "stages": {
+            "router": 3774,
+            "fetch_first_source": 21,
+            "fetch_total": 189,
+            "synthesize_total": 4753
+          }
+        },
+        {
+          "iteration": 23,
+          "intent_id": "5dfebbac-e5f4-4ae9-a4ca-84b1084952aa",
+          "created_at": 1784841165,
+          "stages": {
+            "router": 2842,
+            "fetch_first_source": 19,
+            "fetch_total": 30,
+            "synthesize_total": 5891
+          }
+        },
+        {
+          "iteration": 24,
+          "intent_id": "78cd1d68-b031-4ab5-a653-27d13fcd4a74",
+          "created_at": 1784841169,
+          "stages": {
+            "router": 3508,
+            "fetch_first_source": 15,
+            "fetch_total": 167,
+            "synthesize_total": 3878
+          }
+        },
+        {
+          "iteration": 25,
+          "intent_id": "fd1d0e0a-59fa-48cc-bf66-46c507ad2f59",
+          "created_at": 1784841171,
+          "stages": {
+            "router": 2504,
+            "fetch_first_source": 20,
+            "fetch_total": 33,
+            "synthesize_total": 3322
+          }
+        },
+        {
+          "iteration": 26,
+          "intent_id": "d47e82fb-f1ae-433d-a6bc-daec8522cc04",
+          "created_at": 1784841176,
+          "stages": {
+            "router": 2068,
+            "fetch_first_source": 9,
+            "fetch_total": 163,
+            "synthesize_total": 3977
+          }
+        },
+        {
+          "iteration": 27,
+          "intent_id": "f74c6568-019a-40ea-8b12-b8beeab3ec75",
+          "created_at": 1784841177,
+          "stages": {
+            "router": 1232,
+            "fetch_first_source": 18,
+            "fetch_total": 32,
+            "synthesize_total": 3867
+          }
+        },
+        {
+          "iteration": 28,
+          "intent_id": "a1f23609-64aa-4491-94ba-8d9f71540f90",
+          "created_at": 1784841182,
+          "stages": {
+            "router": 1444,
+            "fetch_first_source": 9,
+            "fetch_total": 222,
+            "synthesize_total": 3952
+          }
+        },
+        {
+          "iteration": 29,
+          "intent_id": "19320dfd-7715-4ac5-9aad-f015b52cdd86",
+          "created_at": 1784841183,
+          "stages": {
+            "router": 1848,
+            "fetch_first_source": 8,
+            "fetch_total": 20,
+            "synthesize_total": 3781
+          }
+        },
+        {
+          "iteration": 30,
+          "intent_id": "e9bdefa8-8407-4a59-9a3b-71b8ea3bfe13",
+          "created_at": 1784841188,
+          "stages": {
+            "router": 1229,
+            "fetch_first_source": 15,
+            "fetch_total": 86,
+            "synthesize_total": 3480
+          }
+        },
+        {
+          "iteration": 31,
+          "intent_id": "8c67de3d-c895-4183-b39a-6670cb15b1b7",
+          "created_at": 1784841188,
+          "stages": {
+            "router": 1714,
+            "fetch_first_source": 20,
+            "fetch_total": 182,
+            "synthesize_total": 3527
+          }
+        },
+        {
+          "iteration": 32,
+          "intent_id": "a73609fb-1038-47d3-a40c-4b778f251b62",
+          "created_at": 1784841194,
+          "stages": {
+            "router": 1421,
+            "fetch_first_source": 8,
+            "fetch_total": 19,
+            "synthesize_total": 3929
+          }
+        },
+        {
+          "iteration": 33,
+          "intent_id": "ab2e81f0-39ac-41a5-b48b-8c84f6c13852",
+          "created_at": 1784841194,
+          "stages": {
+            "router": 1338,
+            "fetch_first_source": 18,
+            "fetch_total": 165,
+            "synthesize_total": 4145
+          }
+        },
+        {
+          "iteration": 34,
+          "intent_id": "6a102bc1-0197-41b1-b864-f09c717c9447",
+          "created_at": 1784841201,
+          "stages": {
+            "router": 1500,
+            "fetch_first_source": 19,
+            "fetch_total": 32,
+            "synthesize_total": 4899
+          }
+        },
+        {
+          "iteration": 35,
+          "intent_id": "326e010a-647d-4004-9f2b-14979681bd5c",
+          "created_at": 1784841201,
+          "stages": {
+            "router": 1418,
+            "fetch_first_source": 19,
+            "fetch_total": 177,
+            "synthesize_total": 4543
+          }
+        },
+        {
+          "iteration": 36,
+          "intent_id": "8ec4c55b-c984-44f3-a9b6-9fc6580b1428",
+          "created_at": 1784841206,
+          "stages": {
+            "router": 1504,
+            "fetch_first_source": 8,
+            "fetch_total": 20,
+            "synthesize_total": 2834
+          }
+        },
+        {
+          "iteration": 37,
+          "intent_id": "6584f13e-240d-43a8-8475-58cc58ddaec0",
+          "created_at": 1784841207,
+          "stages": {
+            "router": 1640,
+            "fetch_first_source": 19,
+            "fetch_total": 172,
+            "synthesize_total": 3195
+          }
+        },
+        {
+          "iteration": 38,
+          "intent_id": "2d7bf4cd-75ff-44b8-a47f-8607126ce0ea",
+          "created_at": 1784841211,
+          "stages": {
+            "router": 1398,
+            "fetch_first_source": 9,
+            "fetch_total": 22,
+            "synthesize_total": 2735
+          }
+        },
+        {
+          "iteration": 39,
+          "intent_id": "b69f359f-e217-42c5-affa-5d4acb928507",
+          "created_at": 1784841212,
+          "stages": {
+            "router": 1749,
+            "fetch_first_source": 20,
+            "fetch_total": 182,
+            "synthesize_total": 3022
+          }
+        },
+        {
+          "iteration": 40,
+          "intent_id": "96ae87b6-9164-4331-9285-f88c95bc638f",
+          "created_at": 1784841216,
+          "stages": {
+            "router": 1561,
+            "fetch_first_source": 18,
+            "fetch_total": 31,
+            "synthesize_total": 3102
+          }
+        },
+        {
+          "iteration": 41,
+          "intent_id": "d5e1b530-8bae-40f4-833a-0e21e65561b7",
+          "created_at": 1784841219,
+          "stages": {
+            "router": 1543,
+            "fetch_first_source": 15,
+            "fetch_total": 196,
+            "synthesize_total": 4398
+          }
+        },
+        {
+          "iteration": 42,
+          "intent_id": "34a9176d-6957-4fcc-b114-28e06fa8ee96",
+          "created_at": 1784841222,
+          "stages": {
+            "router": 1734,
+            "fetch_first_source": 8,
+            "fetch_total": 20,
+            "synthesize_total": 3794
+          }
+        },
+        {
+          "iteration": 43,
+          "intent_id": "566178e7-264c-4712-9b4a-c11202b9e383",
+          "created_at": 1784841225,
+          "stages": {
+            "router": 1730,
+            "fetch_first_source": 19,
+            "fetch_total": 191,
+            "synthesize_total": 3249
+          }
+        },
+        {
+          "iteration": 44,
+          "intent_id": "74fcb3cb-5a99-442e-9651-1a9be25bf639",
+          "created_at": 1784841229,
+          "stages": {
+            "router": 2163,
+            "fetch_first_source": 19,
+            "fetch_total": 30,
+            "synthesize_total": 3891
+          }
+        },
+        {
+          "iteration": 45,
+          "intent_id": "360a9414-b416-4f77-9c11-b7716408bb75",
+          "created_at": 1784841233,
+          "stages": {
+            "router": 3298,
+            "fetch_first_source": 19,
+            "fetch_total": 178,
+            "synthesize_total": 4770
+          }
+        },
+        {
+          "iteration": 46,
+          "intent_id": "4e47b05e-96a7-4a3c-a027-e73333794e78",
+          "created_at": 1784841236,
+          "stages": {
+            "router": 1747,
+            "fetch_first_source": 8,
+            "fetch_total": 39,
+            "synthesize_total": 5068
+          }
+        },
+        {
+          "iteration": 47,
+          "intent_id": "1c04e570-402c-4f51-bc1c-0a9c3362f662",
+          "created_at": 1784841239,
+          "stages": {
+            "router": 1401,
+            "fetch_first_source": 9,
+            "fetch_total": 162,
+            "synthesize_total": 3749
+          }
+        },
+        {
+          "iteration": 48,
+          "intent_id": "871ff1e7-b151-4637-9de7-d6468611bbb3",
+          "created_at": 1784841241,
+          "stages": {
+            "router": 1319,
+            "fetch_first_source": 8,
+            "fetch_total": 23,
+            "synthesize_total": 2993
+          }
+        },
+        {
+          "iteration": 49,
+          "intent_id": "15a525a3-aafa-4d93-9f3a-e956a355a4ae",
+          "created_at": 1784841245,
+          "stages": {
+            "router": 1509,
+            "fetch_first_source": 9,
+            "fetch_total": 166,
+            "synthesize_total": 3970
+          }
+        },
+        {
+          "iteration": 50,
+          "intent_id": "c8bb8fd0-0370-4240-920c-07c0b958535d",
+          "created_at": 1784841246,
+          "stages": {
+            "router": 1500,
+            "fetch_first_source": 9,
+            "fetch_total": 20,
+            "synthesize_total": 3002
+          }
+        },
+        {
+          "iteration": 51,
+          "intent_id": "8373b110-3726-4634-8621-d08fe4ae7778",
+          "created_at": 1784841251,
+          "stages": {
+            "router": 1627,
+            "fetch_first_source": 8,
+            "fetch_total": 158,
+            "synthesize_total": 2860
+          }
+        },
+        {
+          "iteration": 52,
+          "intent_id": "02a6cdf3-3a0c-46eb-af49-a7cd6fd74ff5",
+          "created_at": 1784841252,
+          "stages": {
+            "router": 1555,
+            "fetch_first_source": 9,
+            "fetch_total": 21,
+            "synthesize_total": 3461
+          }
+        },
+        {
+          "iteration": 53,
+          "intent_id": "f0afd87e-9858-4a4d-89d9-b3f9f6270fb9",
+          "created_at": 1784841258,
+          "stages": {
+            "router": 1599,
+            "fetch_first_source": 21,
+            "fetch_total": 174,
+            "synthesize_total": 4614
+          }
+        },
+        {
+          "iteration": 54,
+          "intent_id": "ea76e799-e70e-467f-8b30-af30ccf34613",
+          "created_at": 1784841258,
+          "stages": {
+            "router": 1294,
+            "fetch_first_source": 18,
+            "fetch_total": 32,
+            "synthesize_total": 4189
+          }
+        },
+        {
+          "iteration": 55,
+          "intent_id": "bf340855-6719-4332-bdae-993e426c45d3",
+          "created_at": 1784841263,
+          "stages": {
+            "router": 1418,
+            "fetch_first_source": 7,
+            "fetch_total": 19,
+            "synthesize_total": 3690
+          }
+        },
+        {
+          "iteration": 56,
+          "intent_id": "e8a7c2d3-4689-4e65-b5b4-80caf8776a9d",
+          "created_at": 1784841263,
+          "stages": {
+            "router": 1594,
+            "fetch_first_source": 9,
+            "fetch_total": 173,
+            "synthesize_total": 3444
+          }
+        },
+        {
+          "iteration": 57,
+          "intent_id": "0bf07139-fe4e-45b6-a97f-d680882bbc5d",
+          "created_at": 1784841268,
+          "stages": {
+            "router": 1482,
+            "fetch_first_source": 19,
+            "fetch_total": 31,
+            "synthesize_total": 3046
+          }
+        },
+        {
+          "iteration": 58,
+          "intent_id": "ae25e9eb-529f-4aa2-af84-10cce3651e2c",
+          "created_at": 1784841269,
+          "stages": {
+            "router": 1513,
+            "fetch_first_source": 9,
+            "fetch_total": 157,
+            "synthesize_total": 3296
+          }
+        },
+        {
+          "iteration": 59,
+          "intent_id": "3f546f74-2574-416e-9c18-0320e66e9102",
+          "created_at": 1784841275,
+          "stages": {
+            "router": 2309,
+            "fetch_first_source": 13,
+            "fetch_total": 31,
+            "synthesize_total": 3347
+          }
+        },
+        {
+          "iteration": 60,
+          "intent_id": "17c10d42-c453-4ab6-b68a-308663464d09",
+          "created_at": 1784841275,
+          "stages": {
+            "router": 1715,
+            "fetch_first_source": 19,
+            "fetch_total": 175,
+            "synthesize_total": 3558
+          }
+        },
+        {
+          "iteration": 61,
+          "intent_id": "68fe289d-ab61-434e-8640-c72577cd2988",
+          "created_at": 1784841280,
+          "stages": {
+            "router": 1665,
+            "fetch_first_source": 19,
+            "fetch_total": 33,
+            "synthesize_total": 2932
+          }
+        },
+        {
+          "iteration": 62,
+          "intent_id": "8c36bd15-397b-4a44-9ee2-bd8f6f97a453",
+          "created_at": 1784841285,
+          "stages": {
+            "router": 1770,
+            "fetch_first_source": 20,
+            "fetch_total": 33,
+            "synthesize_total": 2865
+          }
+        },
+        {
+          "iteration": 63,
+          "intent_id": "0835717c-8dc8-4cea-9d36-fafa8c8a0424",
+          "created_at": 1784841290,
+          "stages": {
+            "router": 1305,
+            "fetch_first_source": 14,
+            "fetch_total": 30,
+            "synthesize_total": 2956
+          }
+        },
+        {
+          "iteration": 64,
+          "intent_id": "d16aea78-9f22-4cf9-8073-2ef50dd02fd0",
+          "created_at": 1784841296,
+          "stages": {
+            "router": 2264,
+            "fetch_first_source": 8,
+            "fetch_total": 20,
+            "synthesize_total": 3155
+          }
+        }
+      ]
+    },
+    "shape3": {
+      "metadata": {
+        "file": "latency-baseline-shape3-20260723_172011.json",
+        "shape": "step3_brainstorm",
+        "shape_description": "Brainstorm (pbx-web)",
+        "utterance": "Should pbx web keep using the static site generator, or is it time to move to a dynamic frontend? Give me the trade-offs.",
+        "timestamp": "2026-07-23T17:20:11.989120",
+        "target_runs": 35,
+        "successful_runs": 35,
+        "timing_records": 35
+      },
+      "analysis": {
+        "router_ms": {
+          "count": 35,
+          "p50": 1587,
+          "p95": 2527,
+          "min": 1288,
+          "max": 2761,
+          "mean": 1711.5428571428572,
+          "median": 1587
+        },
+        "fetch_first_source_ms": {
+          "count": 35,
+          "p50": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0,
+          "mean": 0,
+          "median": 0
+        },
+        "fetch_total_ms": {
+          "count": 35,
+          "p50": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0,
+          "mean": 0,
+          "median": 0
+        },
+        "synthesize_first_token_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "synthesize_total_ms": {
+          "count": 35,
+          "p50": 3984,
+          "p95": 7877,
+          "min": 2684,
+          "max": 15690,
+          "mean": 4537.685714285714,
+          "median": 3984
+        },
+        "escalate_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "sse_emit_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "stt_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        },
+        "first_render_ms": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null,
+          "mean": null,
+          "median": null
+        }
+      },
+      "dispatches": [
+        {
+          "iteration": 1,
+          "intent_id": "9b3b8696-43da-45da-bf26-4e946eb4b2bc",
+          "created_at": 1784841377,
+          "stages": {
+            "router": 1580,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3984
+          }
+        },
+        {
+          "iteration": 2,
+          "intent_id": "3cb530fe-dfbd-4844-9168-28fec35753bc",
+          "created_at": 1784841383,
+          "stages": {
+            "router": 1709,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4228
+          }
+        },
+        {
+          "iteration": 3,
+          "intent_id": "6326b9d6-1859-48f8-9a90-200322efbb33",
+          "created_at": 1784841390,
+          "stages": {
+            "router": 1580,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3941
+          }
+        },
+        {
+          "iteration": 4,
+          "intent_id": "39cb723e-1758-4c9b-b041-8b66bf46cb1c",
+          "created_at": 1784841394,
+          "stages": {
+            "router": 1288,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 2684
+          }
+        },
+        {
+          "iteration": 5,
+          "intent_id": "7bc3e1f1-53da-48c4-b738-1b1862f1c375",
+          "created_at": 1784841399,
+          "stages": {
+            "router": 1550,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 2990
+          }
+        },
+        {
+          "iteration": 6,
+          "intent_id": "d42f2ea9-d849-4c3d-8c5d-7db0feee22db",
+          "created_at": 1784841405,
+          "stages": {
+            "router": 1411,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4125
+          }
+        },
+        {
+          "iteration": 7,
+          "intent_id": "72e7c022-7ff6-4c83-b401-af5c4a55d589",
+          "created_at": 1784841411,
+          "stages": {
+            "router": 1498,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3698
+          }
+        },
+        {
+          "iteration": 8,
+          "intent_id": "5ce1cb7b-d6f6-40f6-91df-1123e0d47b3b",
+          "created_at": 1784841418,
+          "stages": {
+            "router": 2351,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3833
+          }
+        },
+        {
+          "iteration": 9,
+          "intent_id": "7c9336da-a52b-4351-850e-6f682706dcd4",
+          "created_at": 1784841426,
+          "stages": {
+            "router": 1880,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 5423
+          }
+        },
+        {
+          "iteration": 10,
+          "intent_id": "ad54e5aa-88aa-4019-a107-9256596ec9f1",
+          "created_at": 1784841432,
+          "stages": {
+            "router": 1677,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4482
+          }
+        },
+        {
+          "iteration": 11,
+          "intent_id": "96661978-24e4-432a-bf8b-1cee77aacc4b",
+          "created_at": 1784841438,
+          "stages": {
+            "router": 1532,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3428
+          }
+        },
+        {
+          "iteration": 12,
+          "intent_id": "38233582-5a35-4ce4-a76c-011b5ff7b872",
+          "created_at": 1784841445,
+          "stages": {
+            "router": 1627,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 5295
+          }
+        },
+        {
+          "iteration": 13,
+          "intent_id": "5483c7a7-9d19-4781-bdae-35251dd112f0",
+          "created_at": 1784841451,
+          "stages": {
+            "router": 1419,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3714
+          }
+        },
+        {
+          "iteration": 14,
+          "intent_id": "d1259264-cf67-41fd-8dd7-8fea2b932bef",
+          "created_at": 1784841457,
+          "stages": {
+            "router": 1717,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3590
+          }
+        },
+        {
+          "iteration": 15,
+          "intent_id": "1f1e5e16-43f8-4bc6-9b50-dfca3235555b",
+          "created_at": 1784841462,
+          "stages": {
+            "router": 1460,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3348
+          }
+        },
+        {
+          "iteration": 16,
+          "intent_id": "abc3e613-e7b6-4c0c-8bd0-617ad21fba4f",
+          "created_at": 1784841468,
+          "stages": {
+            "router": 1587,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3376
+          }
+        },
+        {
+          "iteration": 17,
+          "intent_id": "199a6dd1-681c-4e6f-82ca-0b390180d84f",
+          "created_at": 1784841474,
+          "stages": {
+            "router": 1889,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3676
+          }
+        },
+        {
+          "iteration": 18,
+          "intent_id": "3f5bcfdd-aeb7-4d58-b719-fdea22542625",
+          "created_at": 1784841480,
+          "stages": {
+            "router": 2527,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3572
+          }
+        },
+        {
+          "iteration": 19,
+          "intent_id": "65c046bf-84fd-4e27-9a6a-f84d98d63d98",
+          "created_at": 1784841498,
+          "stages": {
+            "router": 1301,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 15690
+          }
+        },
+        {
+          "iteration": 20,
+          "intent_id": "15a8c850-4636-4209-b929-7aa2cf0b4939",
+          "created_at": 1784841504,
+          "stages": {
+            "router": 1628,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3744
+          }
+        },
+        {
+          "iteration": 21,
+          "intent_id": "21eeb083-4baa-4ef1-a77e-3a0076efcf93",
+          "created_at": 1784841511,
+          "stages": {
+            "router": 1524,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4868
+          }
+        },
+        {
+          "iteration": 22,
+          "intent_id": "9cf77def-18a4-4d63-90e5-8fba809ea294",
+          "created_at": 1784841518,
+          "stages": {
+            "router": 1518,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4712
+          }
+        },
+        {
+          "iteration": 23,
+          "intent_id": "7177aba9-341e-4b1a-b50a-2eff8c70632d",
+          "created_at": 1784841527,
+          "stages": {
+            "router": 2335,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 6148
+          }
+        },
+        {
+          "iteration": 24,
+          "intent_id": "c228e209-5e90-42a4-aa98-302716d1df8a",
+          "created_at": 1784841534,
+          "stages": {
+            "router": 1667,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4643
+          }
+        },
+        {
+          "iteration": 25,
+          "intent_id": "2a28ef80-c87e-402d-a1ee-55dedfd241da",
+          "created_at": 1784841540,
+          "stages": {
+            "router": 1504,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4639
+          }
+        },
+        {
+          "iteration": 26,
+          "intent_id": "fd79fe9f-92de-4a23-b11f-68b3bd6722bf",
+          "created_at": 1784841547,
+          "stages": {
+            "router": 1571,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4266
+          }
+        },
+        {
+          "iteration": 27,
+          "intent_id": "810ae46c-7581-4d4e-a6c3-0f0db1c6d32d",
+          "created_at": 1784841553,
+          "stages": {
+            "router": 1487,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3682
+          }
+        },
+        {
+          "iteration": 28,
+          "intent_id": "0b5bb082-6e7b-44cc-b417-13254f2a5d1e",
+          "created_at": 1784841563,
+          "stages": {
+            "router": 1610,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 7877
+          }
+        },
+        {
+          "iteration": 29,
+          "intent_id": "286ada33-8334-4ca1-aa08-43057d1553df",
+          "created_at": 1784841568,
+          "stages": {
+            "router": 1458,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3608
+          }
+        },
+        {
+          "iteration": 30,
+          "intent_id": "6f3dd8fe-f8d2-4b79-803d-389934c14115",
+          "created_at": 1784841575,
+          "stages": {
+            "router": 1796,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4981
+          }
+        },
+        {
+          "iteration": 31,
+          "intent_id": "a3cdd6d9-f11b-4077-8de2-0db31723c9b9",
+          "created_at": 1784841582,
+          "stages": {
+            "router": 1842,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4170
+          }
+        },
+        {
+          "iteration": 32,
+          "intent_id": "1005fce1-5f76-4457-986c-eb0648032df7",
+          "created_at": 1784841590,
+          "stages": {
+            "router": 2761,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 5043
+          }
+        },
+        {
+          "iteration": 33,
+          "intent_id": "56925ff2-8cfe-4317-a16b-cca8ce362fa6",
+          "created_at": 1784841596,
+          "stages": {
+            "router": 1500,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3392
+          }
+        },
+        {
+          "iteration": 34,
+          "intent_id": "dc7c4128-9bf1-4a4c-bcd1-5626d7957c91",
+          "created_at": 1784841602,
+          "stages": {
+            "router": 2470,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 3617
+          }
+        },
+        {
+          "iteration": 35,
+          "intent_id": "6ce41045-ae7f-4210-82f1-b4e11c6813aa",
+          "created_at": 1784841609,
+          "stages": {
+            "router": 1650,
+            "fetch_first_source": 0,
+            "fetch_total": 0,
+            "synthesize_total": 4352
+          }
+        }
+      ]
+    }
+  },
+  "all_stages": [
+    "escalate",
+    "fetch_first_source",
+    "fetch_total",
+    "router",
+    "synthesize_total"
+  ],
+  "summary": {
+    "total_records": 205,
+    "records_by_shape": {
+      "shape1": 106,
+      "shape2": 64,
+      "shape3": 35
+    }
+  }
+}

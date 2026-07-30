@@ -1,0 +1,153 @@
+{
+  "metadata": {
+    "source_file": "/home/coding/aide-de-camp/data/parsed/latency_baseline_consolidated.json",
+    "total_shapes": 3,
+    "calculated_at": "2026-07-23T17:59:00Z"
+  },
+  "shapes": {
+    "shape1": {
+      "shape": "shape1",
+      "shape_description": "Multi-intent status query (pbx-web + whisper-stt)",
+      "total_dispatches": 106,
+      "stages": {
+        "intent_router": {
+          "p50": 2074.0,
+          "p95": 4187.5,
+          "count": 106
+        },
+        "fetch_strands": {
+          "p50": 37.0,
+          "p95": 178.5,
+          "count": 91
+        },
+        "synthesize": {
+          "p50": 3108.0,
+          "p95": 4592.5,
+          "count": 91
+        },
+        "persist": {
+          "p50": null,
+          "p95": null,
+          "count": 0,
+          "note": "Not available in data"
+        },
+        "sse_broadcast": {
+          "p50": null,
+          "p95": null,
+          "count": 0,
+          "note": "Not available in data"
+        },
+        "escalate": {
+          "p50": 3992.0,
+          "p95": 5402.3,
+          "count": 15
+        },
+        "e2e": {
+          "p50": 5553.5,
+          "p95": 8031.5,
+          "count": 106
+        }
+      }
+    },
+    "shape2": {
+      "shape": "shape2",
+      "shape_description": "Lookup logs (whisper-stt)",
+      "total_dispatches": 64,
+      "stages": {
+        "intent_router": {
+          "p50": 1640.0,
+          "p95": 3297.4,
+          "count": 64
+        },
+        "fetch_strands": {
+          "p50": 45.0,
+          "p95": 190.7,
+          "count": 64
+        },
+        "synthesize": {
+          "p50": 3787.5,
+          "p95": 5320.8,
+          "count": 64
+        },
+        "persist": {
+          "p50": null,
+          "p95": null,
+          "count": 0,
+          "note": "Not available in data"
+        },
+        "sse_broadcast": {
+          "p50": null,
+          "p95": null,
+          "count": 0,
+          "note": "Not available in data"
+        },
+        "escalate": {
+          "p50": null,
+          "p95": null,
+          "count": 0,
+          "note": "No values found"
+        },
+        "e2e": {
+          "p50": 5640.5,
+          "p95": 8427.35,
+          "count": 64
+        }
+      }
+    },
+    "shape3": {
+      "shape": "shape3",
+      "shape_description": "Brainstorm (pbx-web)",
+      "total_dispatches": 35,
+      "stages": {
+        "intent_router": {
+          "p50": 1587.0,
+          "p95": 2487.1,
+          "count": 35
+        },
+        "fetch_strands": {
+          "p50": 0.0,
+          "p95": 0.0,
+          "count": 35
+        },
+        "synthesize": {
+          "p50": 3984.0,
+          "p95": 6666.7,
+          "count": 35
+        },
+        "persist": {
+          "p50": null,
+          "p95": null,
+          "count": 0,
+          "note": "Not available in data"
+        },
+        "sse_broadcast": {
+          "p50": null,
+          "p95": null,
+          "count": 0,
+          "note": "Not available in data"
+        },
+        "escalate": {
+          "p50": null,
+          "p95": null,
+          "count": 0,
+          "note": "No values found"
+        },
+        "e2e": {
+          "p50": 5937.0,
+          "p95": 8784.2,
+          "count": 35
+        }
+      }
+    }
+  },
+  "summary": {
+    "total_dispatches_processed": 205,
+    "stages_analyzed": [
+      "intent_router",
+      "fetch_strands",
+      "synthesize",
+      "escalate",
+      "e2e"
+    ]
+  }
+}

@@ -53,13 +53,18 @@ CREATE TABLE IF NOT EXISTS component_tags (
 
 -- Component usage patterns: tracks which result types use which components
 CREATE TABLE IF NOT EXISTS component_usage_patterns (
+    result_type TEXT NOT NULL,          -- e.g., "status:ibkr-mcp", "lookup:logs:adc"
     component_id TEXT NOT NULL,
-    result_type TEXT NOT NULL,          -- e.g., "pod-status", "git-log"
+    layout_bucket TEXT NOT NULL DEFAULT 'normal',  -- 'compact' | 'normal' | 'expanded'
     match_score REAL NOT NULL,          -- How well this component fits this result type (0-1)
     sample_count INTEGER NOT NULL DEFAULT 1,
-    last_matched INTEGER NOT NULL,
-    PRIMARY KEY (component_id, result_type)
+    updated_at INTEGER NOT NULL,        -- Unix timestamp when last updated
+    PRIMARY KEY (result_type, component_id, layout_bucket)
 );
+
+-- Index for pattern selection by match_score
+CREATE INDEX IF NOT EXISTS idx_component_usage_patterns_match_score
+ON component_usage_patterns(match_score DESC);
 
 -- Template for component management
 -- Usage:

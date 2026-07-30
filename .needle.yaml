@@ -2,6 +2,12 @@ agent:
   default: claude-code-glm-4.7
 
 strands:
+  pluck:
+    exclude_labels:
+      - "intent_type=task-profile"
+      - "intent_id=test-1"
+      - "session_id=session-1"
+
   weave:
     enabled: true
     doc_patterns:

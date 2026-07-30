@@ -370,6 +370,575 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* Built-in card family (welcome, error, fallback, pending) */
+        .builtin-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .builtin-card.welcome-card {
+            border-left: 4px solid #3b82f6;
+        }
+
+        .builtin-card.error-card {
+            border-left: 4px solid #ef4444;
+        }
+
+        .builtin-card.fallback-card {
+            border-left: 4px solid #64748b;
+        }
+
+        .builtin-card.pending-card {
+            border-left: 4px solid #f59e0b;
+        }
+
+        .builtin-card.pending-card.aged {
+            border-left-color: #ef4444;
+            animation: pulse-border 2s infinite;
+        }
+
+        .builtin-card.stuck-card {
+            border-left: 4px solid #f59e0b;
+            background: #1a1a0f;
+            border: 1px solid #78350f;
+        }
+
+        .builtin-card.stuck-card:hover {
+            border-color: #92400e;
+            background: #1f1f12;
+        }
+
+        .builtin-card.failed-card {
+            border-left: 4px solid #ef4444;
+            background: #1a0f0f;
+            border: 1px solid #7f1d1d;
+        }
+
+        .builtin-card.failed-card:hover {
+            border-color: #991b1b;
+            background: #1f1212;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { border-left-color: #ef4444; }
+            50% { border-left-color: #f97316; }
+        }
+
+        .builtin-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .stuck-card .builtin-header .builtin-title {
+            color: #fcd34d;
+        }
+
+        .failed-card .builtin-header .builtin-title {
+            color: #fca5a5;
+        }
+
+        .builtin-icon {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .stuck-card .builtin-icon {
+            filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.4));
+        }
+
+        .failed-card .builtin-icon {
+            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
+        }
+
+        .builtin-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        .pending-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #334155;
+            border-top-color: #f59e0b;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .builtin-desc,
+        .error-detail,
+        .pending-utterance {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin: 0 0 12px 0;
+            line-height: 1.5;
+        }
+
+        .builtin-section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 16px 0 8px 0;
+        }
+
+        .builtin-project-list,
+        .builtin-examples,
+        .error-source-list,
+        .error-project-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .builtin-project,
+        .builtin-example,
+        .error-source,
+        .error-project {
+            font-size: 13px;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+            padding-left: 0;
+        }
+
+        .builtin-project-slug {
+            color: #f8fafc;
+            font-weight: 500;
+        }
+
+        .builtin-intents {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        /* Pending card specific */
+        .pending-progress {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 8px;
+        }
+
+        .pending-elapsed {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 8px;
+        }
+
+        .pending-aged-note {
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: #3f1f1f;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #fca5a5;
+        }
+
+        .pending-retry {
+            background: #ef4444;
+            border: none;
+            color: #f8fafc;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .pending-retry:hover {
+            background: #dc2626;
+        }
+
+        /* Error card specific */
+        .error-utterance-wrap {
+            margin: 12px 0;
+            padding: 8px 12px;
+            background: #0f1419;
+            border-radius: 6px;
+            border-left: 3px solid #64748b;
+        }
+
+        .error-utterance-label {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .error-utterance {
+            color: #f8fafc;
+            font-style: italic;
+        }
+
+        .error-source-name {
+            color: #f8fafc;
+            font-weight: 500;
+        }
+
+        .error-source-reason {
+            color: #fca5a5;
+        }
+
+        .error-raw-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin: 12px 0 4px 0;
+        }
+
+        .error-raw {
+            background: #0f1419;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 12px;
+            color: #94a3b8;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .error-projects-wrap {
+            margin: 12px 0;
+        }
+
+        .error-projects-label {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .error-project {
+            display: inline-block;
+            background: #334155;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-right: 6px;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .error-retry {
+            background: #3b82f6;
+            border: none;
+            color: #f8fafc;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+
+        .error-retry:hover {
+            background: #2563eb;
+        }
+
+        /* Stuck card specific */
+        .stuck-message {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin: 0 0 12px 0;
+        }
+
+        .stuck-reason-wrap {
+            margin: 12px 0;
+            padding: 10px 12px;
+            background: #3f2f1f;
+            border-radius: 6px;
+            border-left: 3px solid #f59e0b;
+        }
+
+        .stuck-reason-label {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .stuck-reason {
+            color: #fcd34d;
+        }
+
+        .stuck-meta {
+            font-size: 12px;
+            color: #fcd34d;
+            margin: 8px 0;
+            background: rgba(245, 158, 11, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .stuck-refusal-count,
+        .stuck-bead-id {
+            display: inline-block;
+        }
+
+        .stuck-bead-id {
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        .stuck-action-hint {
+            font-size: 13px;
+            color: #e2e8f0;
+            margin: 12px 0;
+            line-height: 1.4;
+        }
+
+        .stuck-view-bead {
+            background: #f59e0b;
+            border: none;
+            color: #1f2937;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+        }
+
+        .stuck-view-bead:hover {
+            background: #d97706;
+            box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+            transform: translateY(-1px);
+        }
+
+        /* Failed card specific */
+        .failed-message {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin: 0 0 12px 0;
+        }
+
+        .failed-reason-wrap {
+            margin: 12px 0;
+            padding: 10px 12px;
+            background: #3f1f1f;
+            border-radius: 6px;
+            border-left: 3px solid #ef4444;
+        }
+
+        .failed-reason-label {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .failed-reason {
+            color: #fca5a5;
+        }
+
+        .failed-error-type {
+            font-size: 12px;
+            color: #fca5a5;
+            margin: 8px 0;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: inline-block;
+        }
+
+        .failed-bead-id {
+            font-size: 12px;
+            color: #fca5a5;
+            font-family: 'Monaco', 'Menlo', monospace;
+            margin: 8px 0;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: inline-block;
+        }
+
+        .failed-retry {
+            background: #ef4444;
+            border: none;
+            color: #f8fafc;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+        }
+
+        .failed-retry:hover {
+            background: #dc2626;
+            box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+            transform: translateY(-1px);
+        }
+
+        /* Fallback card specific */
+        .fallback-summary {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin: 0 0 12px 0;
+        }
+
+        .fallback-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px 12px;
+        }
+
+        .fallback-key {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .fallback-val {
+            font-size: 12px;
+            color: #cbd5e1;
+            word-break: break-all;
+        }
+
+        /* Approval card specific */
+        .builtin-card.approval-card {
+            border-left: 4px solid #3b82f6;
+            background: #1a1f2f;
+            border: 1px solid #1e3a5f;
+        }
+
+        .builtin-card.approval-card:hover {
+            border-color: #2563eb;
+            background: #1f2937;
+        }
+
+        .approval-summary {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin: 0 0 12px 0;
+            line-height: 1.5;
+        }
+
+        .approval-badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #1e3a5f;
+            color: #60a5fa;
+            margin-bottom: 12px;
+        }
+
+        .approval-reason {
+            margin: 12px 0;
+            padding: 10px 12px;
+            background: #1e3a5f;
+            border-radius: 6px;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .approval-reason-label {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .approval-reason-text {
+            color: #93c5fd;
+        }
+
+        .approval-utterance {
+            margin: 12px 0;
+            padding: 8px 12px;
+            background: #0f1419;
+            border-radius: 6px;
+            border-left: 3px solid #64748b;
+        }
+
+        .approval-utterance-label {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .approval-utterance-text {
+            color: #f8fafc;
+            font-style: italic;
+        }
+
+        .approval-preview {
+            margin: 12px 0;
+        }
+
+        .approval-preview-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+
+        .approval-preview-text {
+            background: #0f1419;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 12px;
+            color: #94a3b8;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .approval-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .approval-approve,
+        .approval-reject {
+            flex: 1;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .approval-approve {
+            background: #3b82f6;
+            color: #f8fafc;
+        }
+
+        .approval-approve:hover:not(:disabled) {
+            background: #2563eb;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .approval-approve:disabled {
+            background: #1e3a5f;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .approval-reject {
+            background: #ef4444;
+            color: #f8fafc;
+        }
+
+        .approval-reject:hover:not(:disabled) {
+            background: #dc2626;
+            box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .approval-reject:disabled {
+            background: #7f1d1d;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body>
@@ -429,6 +998,10 @@
 
         let surfaceId = null;
         let eventSource = null;
+
+        // Track pending placeholders so we can find/replace them later.
+        // Key: pendingId (utterance_id), Value: placeholder HTMLElement.
+        var pendingPlaceholders = {};
 
         // Update URL with session_id for reload persistence
         if (!urlParams.get('session_id')) {
@@ -497,6 +1070,31 @@
             }
         }
 
+        // Registry project list for the first-run welcome card
+        // (config/registry.yaml → GET /api/v1/registry). DB/result independent —
+        // the welcome card renders even against an empty component store. Cached
+        // after the first fetch so the per-SSE-event reloads don't refetch it.
+        let welcomeProjects = null;
+
+        async function loadWelcomeProjects() {
+            if (welcomeProjects) return welcomeProjects;
+            try {
+                const resp = await fetch('/api/v1/registry');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    welcomeProjects = (data && data.projects) || [];
+                    return welcomeProjects;
+                }
+            } catch (error) {
+                console.error('Error loading registry for welcome card:', error);
+            }
+            // Graceful fallback: an empty list still renders the welcome card
+            // (with default example utterances), so a wedged registry endpoint
+            // never leaves the canvas bare.
+            welcomeProjects = [];
+            return welcomeProjects;
+        }
+
         async function loadTopics() {
             try {
                 const response = await fetch(`/api/v1/sessions/${sessionId}/topics`);
@@ -504,21 +1102,67 @@
 
                 const data = await response.json();
                 const container = document.getElementById('topicsContainer');
+                const cards = data.cards || [];
 
-                if (!data.cards || data.cards.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <h2>No active topics</h2>
-                            <p>Topics will appear here as you interact with ADC.</p>
-                        </div>
-                    `;
-                    return;
+                // Fresh session (zero topics): show the first-run welcome card
+                // instead of the bare empty-state. Its project list + example
+                // utterances come from the registry (never the DB), so we only
+                // need to fetch it on the zero-card branch. The welcome card is
+                // dropped — not duplicated — the moment the first real result
+                // lands: the next SSE result_created → loadTopics() reload
+                // yields a non-empty card set, so buildContainerChildren()
+                // returns topic cards only (clearing the welcome card).
+                const projects = cards.length ? [] : await loadWelcomeProjects();
+
+                // Build map of existing cards by card_id for in-place updates
+                const existingCards = new Map();
+                container.querySelectorAll('[data-card-id]').forEach(card => {
+                    const cardId = card.dataset.cardId;
+                    if (cardId) existingCards.set(cardId, card);
+                });
+
+                // Track which card_ids from the new set we've seen
+                const seenCardIds = new Set();
+
+                // Update or create cards
+                cards.forEach(cardData => {
+                    const cardId = cardData.card_id;
+                    seenCardIds.add(cardId);
+
+                    const existingCard = existingCards.get(cardId);
+                    if (existingCard) {
+                        // In-place update: replace the existing card with new content
+                        const newCard = createTopicCard(cardData);
+                        existingCard.replaceWith(newCard);
+                    } else {
+                        // Create new card
+                        const newCard = createTopicCard(cardData);
+                        container.appendChild(newCard);
+                    }
+                });
+
+                // Remove cards that are no longer in the new set (excluding welcome/error/stuck/failed cards)
+                existingCards.forEach((card, cardId) => {
+                    if (!seenCardIds.has(cardId) && !card.dataset.builtin) {
+                        card.remove();
+                    }
+                });
+
+                // Handle welcome card for empty state
+                if (cards.length === 0) {
+                    // Remove any existing welcome card
+                    const existingWelcome = container.querySelector('[data-builtin="welcome"]');
+                    if (existingWelcome) existingWelcome.remove();
+
+                    // Add welcome card
+                    const welcomeCard = createWelcomeCard(projects);
+                    container.appendChild(welcomeCard);
+                } else {
+                    // Remove welcome card if we have real cards
+                    const welcomeCard = container.querySelector('[data-builtin="welcome"]');
+                    if (welcomeCard) welcomeCard.remove();
                 }
 
-                container.innerHTML = '';
-                data.cards.forEach(cardData => {
-                    container.appendChild(createTopicCard(cardData));
-                });
             } catch (error) {
                 console.error('Error loading topics:', error);
             }
@@ -550,9 +1194,97 @@
                 showWorkloadSummary(summary);
             });
 
+            // Dispatch ack: backup path for intent_ids if the fetch response didn't
+            // include them (e.g., the response arrived before the intent was routed).
+            eventSource.addEventListener('dispatch_ack', (event) => {
+                const data = JSON.parse(event.data);
+                const utteranceId = data.utterance_id;
+                const intentIds = data.intent_ids;
+                const utterance = data.utterance;
+
+                if (!utteranceId || !intentIds || !Array.isArray(intentIds)) return;
+
+                // Check if there's an existing placeholder to split
+                const placeholder = pendingPlaceholders[utteranceId];
+                const createdAt = placeholder
+                    ? parseInt(placeholder.dataset.createdAt, 10)
+                    : Date.now();
+
+                // Split into per-thread pending cards
+                const threadCards = splitPlaceholderToThreads(utterance, createdAt, intentIds);
+
+                const container = document.getElementById('topicsContainer');
+
+                if (placeholder && placeholder.parentNode) {
+                    // Replace the placeholder with the thread cards
+                    const frag = document.createDocumentFragment();
+                    threadCards.forEach(function (c) { frag.appendChild(c); });
+                    placeholder.parentNode.replaceChild(frag, placeholder);
+                } else {
+                    // No placeholder (test scenario or race condition): prepend thread cards
+                    const frag = document.createDocumentFragment();
+                    threadCards.forEach(function (c) { frag.appendChild(c); });
+                    container.insertBefore(frag, container.firstChild);
+                }
+
+                // No longer track this placeholder
+                delete pendingPlaceholders[utteranceId];
+            });
+
+            // Per-source progress update during fetch window
+            // Backend emits fetch_progress events as each source completes
+            eventSource.addEventListener('fetch_progress', (event) => {
+                const data = JSON.parse(event.data);
+                const intentId = data.intent_id;
+                const completed = data.completed;
+                const total = data.total;
+                const sourceName = data.source_name;
+                const sourceStatus = data.source_status;
+
+                if (!intentId) {
+                    console.warn('fetch_progress: missing intent_id in event data');
+                    return;
+                }
+
+                // Find the pending thread card by intent_id (data-pending-id)
+                const threadCard = document.querySelector('[data-pending-id="' + intentId + '"]');
+                if (!threadCard) {
+                    console.warn('fetch_progress: threadCard not found for intent_id=' + intentId);
+                    return;
+                }
+                if (!threadCard.classList.contains('pending-card')) {
+                    console.warn('fetch_progress: threadCard does not have pending-card class for intent_id=' + intentId);
+                    return;
+                }
+                if (typeof _setProgress !== 'function') {
+                    console.warn('fetch_progress: _setProgress is not a function');
+                    return;
+                }
+
+                // Update progress display (e.g., '3/5 sources in')
+                _setProgress(threadCard, { completed: completed, total: total });
+
+                // Optional: Add visual indication for last completed source
+                if (sourceName && sourceStatus) {
+                    console.log('Source completed:', sourceName, 'status:', sourceStatus);
+                }
+            });
+
             eventSource.addEventListener('result_created', (event) => {
                 const result = JSON.parse(event.data);
                 console.log('New result:', result);
+
+                // Find and remove the pending card for this intent before reloading
+                const intentId = result.intent_id;
+                if (intentId) {
+                    const pendingCard = document.querySelector('[data-pending-id="' + intentId + '"]');
+                    if (pendingCard) {
+                        // Remove the pending card so it doesn't flicker when loadTopics() renders the real result
+                        pendingCard.remove();
+                        console.log('Removed pending card for intent_id:', intentId);
+                    }
+                }
+
                 loadTopics(); // Reload topics to show new result
             });
 
@@ -562,6 +1294,126 @@
                 loadTopics();
             });
 
+            // Task stuck event: render stuck card when a bead is fenced
+            eventSource.addEventListener('task_stuck', (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Task stuck:', data);
+
+                // Find and remove any pending card for this intent
+                const intentId = data.intent_id;
+                if (intentId) {
+                    const pendingCard = document.querySelector('[data-pending-id="' + intentId + '"]');
+                    if (pendingCard) {
+                        pendingCard.remove();
+                        console.log('Removed pending card for stuck intent_id:', intentId);
+                    }
+                }
+
+                // Create and prepend the stuck card
+                const stuckCard = createStuckCard(data);
+                const container = document.getElementById('topicsContainer');
+
+                // Clear loading/empty state if present
+                if (container.querySelector('.loading') || container.querySelector('.empty-state')) {
+                    container.innerHTML = '';
+                }
+
+                // Prepend stuck card (newest first)
+                container.insertBefore(stuckCard, container.firstChild);
+            });
+
+            // Task failed event: render failed card on terminal failure
+            eventSource.addEventListener('task_failed', (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Task failed:', data);
+
+                // Find and remove any pending card for this intent
+                const intentId = data.intent_id;
+                if (intentId) {
+                    const pendingCard = document.querySelector('[data-pending-id="' + intentId + '"]');
+                    if (pendingCard) {
+                        pendingCard.remove();
+                        console.log('Removed pending card for failed intent_id:', intentId);
+                    }
+                }
+
+                // Create and prepend the failed card
+                const failedCard = createFailedCard(data);
+                const container = document.getElementById('topicsContainer');
+
+                // Clear loading/empty state if present
+                if (container.querySelector('.loading') || container.querySelector('.empty-state')) {
+                    container.innerHTML = '';
+                }
+
+                // Prepend failed card (newest first)
+                container.insertBefore(failedCard, container.firstChild);
+            });
+
+            // Approval required event: render approval card for action beads
+            eventSource.addEventListener('approval_required', (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Approval required:', data);
+
+                // Find and remove any pending card for this intent
+                const intentId = data.intent_id;
+                if (intentId) {
+                    const pendingCard = document.querySelector('[data-pending-id="' + intentId + '"]');
+                    if (pendingCard) {
+                        pendingCard.remove();
+                        console.log('Removed pending card for approval_required intent_id:', intentId);
+                    }
+                }
+
+                // Create and prepend the approval card
+                const approvalCard = createApprovalCard(data);
+                const container = document.getElementById('topicsContainer');
+
+                // Clear loading/empty state if present
+                if (container.querySelector('.loading') || container.querySelector('.empty-state')) {
+                    container.innerHTML = '';
+                }
+
+                // Prepend approval card (newest first)
+                container.insertBefore(approvalCard, container.firstChild);
+            });
+
+            // Error event: render error card from degraded-state SSE error events
+            eventSource.addEventListener('error', (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Error event:', data);
+
+                // Find and remove any pending card for this intent/pending before rendering error
+                const intentId = data.intent_id;
+                const pendingId = data.pending_id;
+                let selector = null;
+                if (intentId) {
+                    selector = '[data-pending-id="' + intentId + '"]';
+                } else if (pendingId) {
+                    selector = '[data-pending-id="' + pendingId + '"]';
+                }
+
+                if (selector) {
+                    const pendingCard = document.querySelector(selector);
+                    if (pendingCard) {
+                        pendingCard.remove();
+                        console.log('Removed pending card for error event:', selector);
+                    }
+                }
+
+                // Create and prepend the error card
+                const errorCard = createErrorCard(data);
+                const container = document.getElementById('topicsContainer');
+
+                // Clear loading/empty state if present
+                if (container.querySelector('.loading') || container.querySelector('.empty-state')) {
+                    container.innerHTML = '';
+                }
+
+                // Prepend error card (newest first)
+                container.insertBefore(errorCard, container.firstChild);
+            });
+
             eventSource.addEventListener('disconnect', (event) => {
                 const data = JSON.parse(event.data);
                 console.log('Server disconnect:', data);
@@ -569,6 +1421,18 @@
                 eventSource.close();
             });
         }
+
+        // Elapsed-time ticker for pending cards
+        // Every second, update the elapsed-time footer on all pending cards
+        // and apply aged treatment if they've exceeded the 30s threshold.
+        setInterval(function () {
+            var now = Date.now();
+            var pendingCards = document.querySelectorAll('.pending-card[data-pending-id]');
+            pendingCards.forEach(function (card) {
+                tickPendingElapsed(card, now);
+                applyAgedTreatment(card, now);
+            });
+        }, 1000);
 
         // Heartbeat to keep surface alive
         setInterval(() => {
@@ -615,15 +1479,70 @@
             textarea.style.height = 'auto';
             btnSend.disabled = true;
 
+            // Generate a client-side pending ID for the placeholder. We'll swap it
+            // for the server's utterance_id when the response arrives.
+            var pendingId = 'pending-' + Date.now() + '-' + Math.random().toString(36).substr(2, 8);
+            var createdAt = Date.now();
+
+            // Create the pending placeholder NOW, before the server round-trip,
+            // so a hung server still leaves a card on canvas to age.
+            var placeholder = createPendingPlaceholderCard(utterance, createdAt, pendingId);
+            var container = document.getElementById('topicsContainer');
+
+            // Clear the empty-state/loading spinner if present
+            if (container.querySelector('.loading') || container.querySelector('.empty-state')) {
+                container.innerHTML = '';
+            }
+
+            // Prepend the placeholder (newest first)
+            container.insertBefore(placeholder, container.firstChild);
+
+            // Track it so we can find/replace it later
+            pendingPlaceholders[pendingId] = placeholder;
+
             try {
-                const resp = await fetch('/dispatch', {
+                var resp = await fetch('/dispatch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ utterance, session_id: sessionId, surface_id: surfaceId }),
+                    body: JSON.stringify({ utterance, session_id: sessionId, surface_id: surfaceId, pending_id: pendingId }),
                 });
+
                 if (!resp.ok) {
-                    const err = await resp.text();
-                    console.error('Dispatch error:', err);
+                    var errText = await resp.text();
+                    console.error('Dispatch error:', errText);
+                    // Try to parse as JSON for structured error
+                    var errData;
+                    try { errData = JSON.parse(errText); } catch (e) {}
+                    if (errData && errData.error_type) {
+                        // Replace placeholder with error card
+                        var errorCard = createErrorCard(errData);
+                        if (placeholder && placeholder.parentNode) {
+                            placeholder.parentNode.replaceChild(errorCard, placeholder);
+                        }
+                        delete pendingPlaceholders[pendingId];
+                    }
+                    return;
+                }
+
+                var data = await resp.json();
+                // Swap to the server's utterance_id for consistency
+                var utteranceId = data.utterance_id || pendingId;
+                placeholder.dataset.pendingId = utteranceId;
+
+                // Move the placeholder tracking to the new key
+                delete pendingPlaceholders[pendingId];
+                pendingPlaceholders[utteranceId] = placeholder;
+
+                // If intent_ids are present, split into per-thread pending cards
+                if (data.intent_ids && Array.isArray(data.intent_ids) && data.intent_ids.length > 0) {
+                    var threadCards = splitPlaceholderToThreads(utterance, createdAt, data.intent_ids);
+                    // Replace the placeholder with the thread cards
+                    if (placeholder && placeholder.parentNode) {
+                        var frag = document.createDocumentFragment();
+                        threadCards.forEach(function (c) { frag.appendChild(c); });
+                        placeholder.parentNode.replaceChild(frag, placeholder);
+                    }
+                    delete pendingPlaceholders[utteranceId];
                 }
             } catch (err) {
                 console.error('Dispatch failed:', err);

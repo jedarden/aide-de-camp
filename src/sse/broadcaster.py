@@ -63,9 +63,19 @@ class SSEConnection:
 
 @dataclass
 class SSEEvent:
-    """An SSE event to broadcast."""
+    """An SSE event to broadcast.
+
+    Attributes:
+        event_type: The type of SSE event (e.g., 'result_created', 'topic_updated')
+        data: The event payload data
+        rendered_html: Optional rendered HTML for canvas injection (e.g., pre-rendered card)
+        target_session_id: Optional filter to only send to connections for this session
+        target_surface_id: Optional filter to only send to this specific surface
+        exclude_surface_id: Optional filter to exclude this surface from receiving the event
+    """
     event_type: str
     data: dict
+    rendered_html: str | None = None
     target_session_id: str | None = None
     target_surface_id: str | None = None
     exclude_surface_id: str | None = None
@@ -220,7 +230,10 @@ class SSEBroadcaster:
                 connection.last_heartbeat = datetime.now().timestamp()
 
                 # Format and yield the event
-                yield self._format_sse(event.event_type, event.data)
+                payload = dict(event.data)
+                if event.rendered_html is not None:
+                    payload["rendered_html"] = event.rendered_html
+                yield self._format_sse(event.event_type, payload)
 
                 # Special case: disconnect event ends the stream
                 if event.event_type == "disconnect":
@@ -303,6 +316,12 @@ class EventType:
     INTENT_DISPATCHED = "intent_dispatched"
     INTENT_RESOLVED = "intent_resolved"
 
+    # Fetch progress events (fetch-window policy: per-source progress states)
+    FETCH_PROGRESS = "fetch_progress"
+
+    # Synthesis progress events (streaming synthesis for progressive card fill)
+    SYNTHESIS_PROGRESS = "synthesis_progress"
+
     # Topic events
     TOPIC_CREATED = "topic_created"
     TOPIC_UPDATED = "topic_updated"
@@ -316,14 +335,41 @@ class EventType:
     BEAD_CLOSED = "bead_closed"
     BEAD_FAILED = "bead_failed"
 
+    # Circuit breaker events
+    TASK_STUCK = "task_stuck"
+    TASK_FAILED = "task_failed"
+
+    # Approval events (Generated-Bead Safety)
+    APPROVAL_REQUIRED = "approval_required"
+    APPROVAL_GRANTED = "approval_granted"
+    APPROVAL_DENIED = "approval_denied"
+
+    # Degraded-state error events (see docs/plan/plan.md: Degraded-State UX)
+    ROUTER_UNAVAILABLE = "router_unavailable"
+    ALL_SOURCES_FAILED = "all_sources_failed"
+    DEGRADED_RAW_DATA = "degraded_raw_data"
+    CLARIFICATION_CARD = "clarification_card"
+    MALFORMED_RESPONSE = "malformed_response"
+
+    # Unimplemented intent events (honesty guards)
+    ACTION_DESIGN_ONLY = "action_design_only"
+    REMINDER_UNAVAILABLE = "reminder_unavailable"
+
 
 async def broadcast_result(
     result: dict,
     session_id: str,
     target_surface_id: str | None = None,
+    rendered_html: str | None = None,
 ) -> int:
     """
     Broadcast a result to relevant surfaces.
+
+    Args:
+        result: The result data payload
+        session_id: The session ID to target
+        target_surface_id: Optional specific surface to target
+        rendered_html: Optional pre-rendered HTML for canvas injection
 
     Returns the number of connections the event was sent to.
     """
@@ -331,6 +377,7 @@ async def broadcast_result(
     event = SSEEvent(
         event_type=EventType.RESULT_CREATED,
         data=result,
+        rendered_html=rendered_html,
         target_session_id=session_id,
         target_surface_id=target_surface_id,
     )
@@ -364,5 +411,80 @@ async def broadcast_workload_summary(
         data=summary,
         target_session_id=session_id,
         target_surface_id=surface_id,
+    )
+    return await broadcaster.broadcast(event)
+
+
+async def broadcast_fetch_progress(
+    intent_id: str,
+    session_id: str,
+    completed: int,
+    total: int,
+    source_name: str | None = None,
+    source_status: str | None = None,
+    target_surface_id: str | None = None,
+) -> int:
+    """
+    Broadcast fetch progress state for per-source progress streaming to pending card.
+
+    Emits '3/5 sources in' style updates as each source resolves.
+
+    Args:
+        intent_id: The intent being fetched
+        session_id: The session ID
+        completed: Number of sources completed so far
+        total: Total number of sources
+        source_name: Name of the most recently completed source (optional)
+        source_status: Status of the most recently completed source (optional)
+        target_surface_id: Optional specific surface to target
+
+    Returns:
+        Number of connections the event was sent to
+    """
+    broadcaster = get_broadcaster()
+    event = SSEEvent(
+        event_type=EventType.FETCH_PROGRESS,
+        data={
+            "intent_id": intent_id,
+            "completed": completed,
+            "total": total,
+            "source_name": source_name,
+            "source_status": source_status,
+        },
+        target_session_id=session_id,
+        target_surface_id=target_surface_id,
+    )
+    return await broadcaster.broadcast(event)
+
+
+async def broadcast_synthesis_progress(
+    intent_id: str,
+    session_id: str,
+    text_chunk: str,
+    target_surface_id: str | None = None,
+) -> int:
+    """
+    Broadcast synthesis progress for streaming synthesis (progressive card fill).
+
+    Emits text chunks as they arrive from the LLM for progressive rendering.
+
+    Args:
+        intent_id: The intent being synthesized
+        session_id: The session ID
+        text_chunk: The text chunk received from the LLM
+        target_surface_id: Optional specific surface to target
+
+    Returns:
+        Number of connections the event was sent to
+    """
+    broadcaster = get_broadcaster()
+    event = SSEEvent(
+        event_type=EventType.SYNTHESIS_PROGRESS,
+        data={
+            "intent_id": intent_id,
+            "text_chunk": text_chunk,
+        },
+        target_session_id=session_id,
+        target_surface_id=target_surface_id,
     )
     return await broadcaster.broadcast(event)

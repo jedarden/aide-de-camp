@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stuck & Failed Card Verification</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1419;
+            color: #e2e8f0;
+            line-height: 1.5;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #94a3b8;
+            margin: 32px 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        /* Built-in card family */
+        .builtin-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .builtin-card.stuck-card {
+            border-left: 4px solid #f59e0b;
+            background: #1a1a0f;
+            border: 1px solid #78350f;
+        }
+
+        .builtin-card.stuck-card:hover {
+            border-color: #92400e;
+            background: #1f1f12;
+        }
+
+        .builtin-card.failed-card {
+            border-left: 4px solid #ef4444;
+            background: #1a0f0f;
+            border: 1px solid #7f1d1d;
+        }
+
+        .builtin-card.failed-card:hover {
+            border-color: #991b1b;
+            background: #1f1212;
+        }
+
+        .builtin-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .stuck-card .builtin-header .builtin-title {
+            color: #fcd34d;
+        }
+
+        .failed-card .builtin-header .builtin-title {
+            color: #fca5a5;
+        }
+
+        .builtin-icon {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .stuck-card .builtin-icon {
+            filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.4));
+        }
+
+        .failed-card .builtin-icon {
+            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
+        }
+
+        .builtin-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        .stuck-message,
+        .failed-message {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin: 0 0 12px 0;
+        }
+
+        .stuck-reason-wrap {
+            margin: 12px 0;
+            padding: 10px 12px;
+            background: #3f2f1f;
+            border-radius: 6px;
+            border-left: 3px solid #f59e0b;
+        }
+
+        .stuck-reason-label {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .stuck-reason {
+            color: #fcd34d;
+        }
+
+        .failed-reason-wrap {
+            margin: 12px 0;
+            padding: 10px 12px;
+            background: #3f1f1f;
+            border-radius: 6px;
+            border-left: 3px solid #ef4444;
+        }
+
+        .failed-reason-label {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .failed-reason {
+            color: #fca5a5;
+        }
+
+        .stuck-meta {
+            font-size: 12px;
+            color: #fcd34d;
+            margin: 8px 0;
+            background: rgba(245, 158, 11, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .failed-error-type {
+            font-size: 12px;
+            color: #fca5a5;
+            margin: 8px 0;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: inline-block;
+        }
+
+        .failed-bead-id {
+            font-size: 12px;
+            color: #fca5a5;
+            font-family: 'Monaco', 'Menlo', monospace;
+            margin: 8px 0;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: inline-block;
+        }
+
+        .stuck-action-hint {
+            font-size: 13px;
+            color: #e2e8f0;
+            margin: 12px 0;
+            line-height: 1.4;
+        }
+
+        .stuck-view-bead {
+            background: #f59e0b;
+            border: none;
+            color: #1f2937;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+        }
+
+        .stuck-view-bead:hover {
+            background: #d97706;
+            box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .failed-retry {
+            background: #ef4444;
+            border: none;
+            color: #f8fafc;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+        }
+
+        .failed-retry:hover {
+            background: #dc2626;
+            box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .note {
+            margin-top: 40px;
+            padding: 16px;
+            background: #1e293b;
+            border-left: 4px solid #3b82f6;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .note strong {
+            color: #cbd5e1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Stuck & Failed Card Visual Verification</h1>
+
+        <h2>Stuck Card - Full Data</h2>
+        <div class="grid">
+            <div class="builtin-card stuck-card" data-builtin="stuck">
+                <div class="builtin-header">
+                    <span class="builtin-icon">🚧</span>
+                    <span class="builtin-title">Task stuck — needs your input</span>
+                </div>
+                <p class="stuck-message">This task requires manual intervention</p>
+                <div class="stuck-reason-wrap">
+                    <span class="stuck-reason-label">Reason: </span>
+                    <span class="stuck-reason">Agent refused to complete task due to missing dependencies</span>
+                </div>
+                <div class="stuck-meta">
+                    <span>Refusals: 3</span> • <span style="font-family: 'Monaco', 'Menlo', monospace;">Bead: adc-stuck-test-123</span>
+                </div>
+                <p class="stuck-action-hint">Please review the bead and update requirements</p>
+                <button class="stuck-view-bead">View bead</button>
+            </div>
+        </div>
+
+        <h2>Stuck Card - Minimal Data</h2>
+        <div class="grid">
+            <div class="builtin-card stuck-card" data-builtin="stuck">
+                <div class="builtin-header">
+                    <span class="builtin-icon">🚧</span>
+                    <span class="builtin-title">Task stuck — needs your input</span>
+                </div>
+                <div class="stuck-reason-wrap">
+                    <span class="stuck-reason-label">Reason: </span>
+                    <span class="stuck-reason">Task waiting for manual approval</span>
+                </div>
+                <button class="stuck-view-bead">View bead</button>
+            </div>
+        </div>
+
+        <h2>Failed Card - Full Data</h2>
+        <div class="grid">
+            <div class="builtin-card failed-card" data-builtin="failed">
+                <div class="builtin-header">
+                    <span class="builtin-icon">❌</span>
+                    <span class="builtin-title">Task failed</span>
+                </div>
+                <p class="failed-message">The task failed to complete due to system error</p>
+                <div class="failed-reason-wrap">
+                    <span class="failed-reason-label">Reason: </span>
+                    <span class="failed-reason">Worker process crashed: out of memory</span>
+                </div>
+                <div class="failed-error-type">Error type: worker_crash</div>
+                <div class="failed-bead-id">Bead: adc-failed-test-456</div>
+                <button class="failed-retry">Retry</button>
+            </div>
+        </div>
+
+        <h2>Failed Card - Minimal Data</h2>
+        <div class="grid">
+            <div class="builtin-card failed-card" data-builtin="failed">
+                <div class="builtin-header">
+                    <span class="builtin-icon">❌</span>
+                    <span class="builtin-title">Task failed</span>
+                </div>
+                <div class="failed-reason-wrap">
+                    <span class="failed-reason-label">Reason: </span>
+                    <span class="failed-reason">Network timeout after 30 seconds</span>
+                </div>
+                <button class="failed-retry">Retry</button>
+            </div>
+        </div>
+
+        <div class="note">
+            <strong>Verification Checklist:</strong><br>
+            ✓ Stuck cards use amber/orange warning theme (#f59e0b, #fcd34d)<br>
+            ✓ Failed cards use red error theme (#ef4444, #fca5a5)<br>
+            ✓ Visual distinction is clear and accessible<br>
+            ✓ Icons have appropriate colored glows<br>
+            ✓ Buttons have correct hover states<br>
+            ✓ Borders and backgrounds match the theme<br>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,406 @@
+{
+  "metadata": {
+    "task_id": "adc-4sphu",
+    "analysis_date": "2026-07-24",
+    "timeframe_start": "2026-06-24",
+    "timeframe_end": "2026-07-24",
+    "cluster": "ardenone-manager",
+    "namespace": "whisper-stt"
+  },
+  "summary": {
+    "service_status": "100% unavailable",
+    "primary_issue": "Storage class 'longhorn' not found",
+    "affected_pods": 2,
+    "affected_pvcs": 3,
+    "total_replicasets_30days": 31,
+    "deployment_failure_duration_days": 12,
+    "total_error_events": 108730
+  },
+  "deployments": [
+    {
+      "name": "whisper-stt",
+      "age_days": 84,
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "replicas": 1,
+      "ready": 0,
+      "available": false,
+      "progressing": false,
+      "revision": 28,
+      "generation": 29,
+      "conditions": [
+        {
+          "type": "Available",
+          "status": "False",
+          "reason": "MinimumReplicasUnavailable",
+          "message": "Deployment does not have minimum availability.",
+          "last_transition": "2026-05-01T17:40:20Z"
+        },
+        {
+          "type": "Progressing",
+          "status": "False",
+          "reason": "ProgressDeadlineExceeded",
+          "message": "ReplicaSet \"whisper-stt-847fd8d7b9\" has timed out progressing.",
+          "last_transition": "2026-07-12T17:05:24Z"
+        }
+      ],
+      "strategy": "Recreate",
+      "progress_deadline_seconds": 600
+    },
+    {
+      "name": "whisper-openai",
+      "age_days": 40,
+      "image": "fedirz/faster-whisper-server:latest-cpu",
+      "replicas": 1,
+      "ready": 0,
+      "available": false,
+      "progressing": false
+    }
+  ],
+  "pods": [
+    {
+      "name": "whisper-stt-847fd8d7b9-b8rsj",
+      "namespace": "whisper-stt",
+      "age_days": 12,
+      "status": "Pending",
+      "ready": "0/1",
+      "restarts": 0,
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "node": null,
+      "controlled_by": "ReplicaSet/whisper-stt-847fd8d7b9",
+      "conditions": [
+        {
+          "type": "PodScheduled",
+          "status": "False"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "model-cache",
+          "pvc": "whisper-model-cache",
+          "status": "unbound"
+        },
+        {
+          "name": "jobs-data",
+          "pvc": "whisper-stt-jobs",
+          "status": "unbound"
+        }
+      ]
+    },
+    {
+      "name": "whisper-openai-68966786fb-tng29",
+      "namespace": "whisper-stt",
+      "age_days": 40,
+      "status": "Pending",
+      "ready": "0/1",
+      "restarts": 0,
+      "image": "fedirz/faster-whisper-server:latest-cpu",
+      "node": null,
+      "controlled_by": "ReplicaSet/whisper-openai-68966786fb",
+      "conditions": [
+        {
+          "type": "PodScheduled",
+          "status": "False"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "model-cache",
+          "pvc": "whisper-openai-model-cache",
+          "status": "unbound"
+        }
+      ]
+    }
+  ],
+  "replicasets_30days": [
+    {
+      "name": "whisper-stt-847fd8d7b9",
+      "age_days": 12,
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "ready": 0,
+      "desired": 1,
+      "current": 1
+    },
+    {
+      "name": "whisper-stt-6c497489fb",
+      "age_days": 16,
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "ready": 0,
+      "desired": 0,
+      "current": 0
+    },
+    {
+      "name": "whisper-stt-5b8558f478",
+      "age_days": 16,
+      "image": "ronaldraygun/whisper-stt:1.8.4",
+      "ready": 0,
+      "desired": 0,
+      "current": 0
+    },
+    {
+      "name": "whisper-stt-5dbff75cbd",
+      "age_days": 16,
+      "image": "ronaldraygun/whisper-stt:1.8.2",
+      "ready": 0,
+      "desired": 0,
+      "current": 0
+    },
+    {
+      "name": "whisper-stt-6b96f4569c",
+      "age_days": 22,
+      "image": "ronaldraygun/whisper-stt:1.7.0",
+      "ready": 0,
+      "desired": 0,
+      "current": 0
+    },
+    {
+      "name": "whisper-stt-6464bdf67b",
+      "age_days": 23,
+      "image": "ronaldraygun/whisper-stt:1.6.0",
+      "ready": 0,
+      "desired": 0,
+      "current": 0
+    },
+    {
+      "name": "whisper-stt-5b884b75f4",
+      "age_days": 28,
+      "image": "ronaldraygun/whisper-stt:1.5.1",
+      "ready": 0,
+      "desired": 0,
+      "current": 0
+    },
+    {
+      "name": "whisper-stt-78bbf5f57f",
+      "age_days": 28,
+      "image": "ronaldraygun/whisper-stt:1.4.1",
+      "ready": 0,
+      "desired": 0,
+      "current": 0
+    },
+    {
+      "name": "whisper-stt-558c7cf44",
+      "age_days": 29,
+      "image": "ronaldraygun/whisper-stt:1.3.1",
+      "ready": 0,
+      "desired": 0,
+      "current": 0
+    },
+    {
+      "name": "whisper-stt-65fb7f8dd9",
+      "age_days": 29,
+      "image": "ronaldraygun/whisper-stt:1.3.0",
+      "ready": 0,
+      "desired": 0,
+      "current": 0
+    }
+  ],
+  "pvcs": [
+    {
+      "name": "whisper-model-cache",
+      "namespace": "whisper-stt",
+      "age_days": 72,
+      "status": "Pending",
+      "storage_class": "longhorn",
+      "access_modes": ["ReadWriteOnce"],
+      "capacity_requested": "10Gi",
+      "volume_mode": "Filesystem",
+      "used_by": ["whisper-stt-847fd8d7b9-b8rsj"],
+      "events_count": 35650,
+      "creation_timestamp": "2026-05-13T14:20:50Z",
+      "argocd_tracking_id": "whisper-stt:/PersistentVolumeClaim:whisper-stt/whisper-model-cache"
+    },
+    {
+      "name": "whisper-openai-model-cache",
+      "namespace": "whisper-stt",
+      "age_days": 40,
+      "status": "Pending",
+      "storage_class": "longhorn",
+      "access_modes": ["ReadWriteOnce"],
+      "capacity_requested": "10Gi",
+      "volume_mode": "Filesystem",
+      "used_by": ["whisper-openai-68966786fb-tng29"],
+      "events_count": 35650,
+      "creation_timestamp": "2026-06-14T02:11:07Z",
+      "argocd_tracking_id": "whisper-stt:/PersistentVolumeClaim:whisper-stt/whisper-openai-model-cache"
+    },
+    {
+      "name": "whisper-stt-jobs",
+      "namespace": "whisper-stt",
+      "age_days": 29,
+      "status": "Pending",
+      "storage_class": "longhorn",
+      "access_modes": ["ReadWriteOnce"],
+      "capacity_requested": "1Gi",
+      "volume_mode": "Filesystem",
+      "used_by": ["whisper-stt-847fd8d7b9-b8rsj"],
+      "events_count": 35650,
+      "creation_timestamp": "2026-06-25T14:07:41Z",
+      "argocd_tracking_id": "whisper-stt:/PersistentVolumeClaim:whisper-stt/whisper-stt-jobs"
+    }
+  ],
+  "storage_classes": {
+    "available": [
+      {
+        "name": "local-path",
+        "provisioner": "rancher.io/local-path",
+        "is_default": true,
+        "reclaim_policy": "Delete",
+        "volume_binding_mode": "WaitForFirstConsumer",
+        "allow_volume_expansion": false,
+        "age_days": 661
+      },
+      {
+        "name": "nfs-synology",
+        "provisioner": "cluster.local/synology-nfs-ardenone-manager-nfs-subdir-external-provisioner",
+        "is_default": false,
+        "reclaim_policy": "Delete",
+        "volume_binding_mode": "Immediate",
+        "allow_volume_expansion": true,
+        "age_days": 114
+      }
+    ],
+    "required": [
+      {
+        "name": "longhorn",
+        "exists": false,
+        "impact": "All PVCs stuck in Pending state"
+      }
+    ]
+  },
+  "events": [
+    {
+      "type": "Warning",
+      "reason": "FailedScheduling",
+      "object": "pod/whisper-stt-847fd8d7b9-b8rsj",
+      "message": "0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.",
+      "count": 1780,
+      "duration": "6d4h",
+      "frequency_seconds": 15
+    },
+    {
+      "type": "Warning",
+      "reason": "FailedScheduling",
+      "object": "pod/whisper-openai-68966786fb-tng29",
+      "message": "0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.",
+      "count": 1780,
+      "duration": "6d4h",
+      "frequency_seconds": 15
+    },
+    {
+      "type": "Warning",
+      "reason": "ProvisioningFailed",
+      "object": "persistentvolumeclaim/whisper-model-cache",
+      "message": "storageclass.storage.k8s.io \"longhorn\" not found",
+      "count": 35650,
+      "duration": "6d4h",
+      "frequency_seconds": 75
+    },
+    {
+      "type": "Warning",
+      "reason": "ProvisioningFailed",
+      "object": "persistentvolumeclaim/whisper-openai-model-cache",
+      "message": "storageclass.storage.k8s.io \"longhorn\" not found",
+      "count": 35650,
+      "duration": "6d4h",
+      "frequency_seconds": 75
+    },
+    {
+      "type": "Warning",
+      "reason": "ProvisioningFailed",
+      "object": "persistentvolumeclaim/whisper-stt-jobs",
+      "message": "storageclass.storage.k8s.io \"longhorn\" not found",
+      "count": 35650,
+      "duration": "6d4h",
+      "frequency_seconds": 75
+    }
+  ],
+  "timeline": [
+    {
+      "date": "2026-05-13",
+      "event": "whisper-model-cache PVC created",
+      "impact": "Stuck in Pending - storage class longhorn not found"
+    },
+    {
+      "date": "2026-06-14",
+      "event": "whisper-openai-model-cache PVC created",
+      "impact": "Stuck in Pending - storage class longhorn not found"
+    },
+    {
+      "date": "2026-06-24",
+      "event": "Analysis window start",
+      "impact": "Service already non-functional"
+    },
+    {
+      "date": "2026-06-25",
+      "event": "whisper-stt-jobs PVC created",
+      "impact": "Stuck in Pending - storage class longhorn not found"
+    },
+    {
+      "date": "2026-07-12",
+      "event": "whisper-stt-847fd8d7b9 ReplicaSet created",
+      "impact": "Pod stuck in Pending - Progress deadline exceeded"
+    },
+    {
+      "date": "2026-07-24",
+      "event": "Analysis date",
+      "impact": "Service still 100% unavailable after 12+ days"
+    }
+  ],
+  "root_cause_analysis": {
+    "primary_issue": "Storage class infrastructure gap",
+    "root_cause_chain": [
+      "whisper-stt deployment configuration expects storage class 'longhorn'",
+      "Longhorn storage provisioner is not installed on ardenone-manager cluster",
+      "PVCs cannot be provisioned without required storage class",
+      "Pods remain in Pending state, unable to be scheduled",
+      "Deployment controller gives up after 600-second progress deadline"
+    ],
+    "impact_assessment": {
+      "service_availability": "0%",
+      "deployment_duration": "12+ days continuous failure",
+      "total_error_events": 108730,
+      "affected_components": ["whisper-stt", "whisper-openai"],
+      "infrastructure_gap": "Storage class 'longhorn' missing from cluster"
+    },
+    "deployment_churn_analysis": {
+      "whisper_stt_replicasets_30_days": 10,
+      "whisper_openai_replicasets_40_days": 21,
+      "churn_frequency_days": 3,
+      "all_identical_failure": true,
+      "failure_reason": "Storage class 'longhorn' not found"
+    }
+  },
+  "infrastructure_context": {
+    "cluster": "ardenone-manager",
+    "access_method": "kubectl-proxy over Tailscale",
+    "proxy_endpoint": "http://traefik-ardenone-manager:8001",
+    "permissions": "read-only (devpod-observer namespace)",
+    "argocd_integration": "Managed via ArgoCD (tracking IDs present)",
+    "node_affinity": {
+      "preferred": "k3s-agent-minisforum (weight 100)",
+      "fallback": "k3s-lenovo-tiny (weight 90)"
+    },
+    "resource_requirements": {
+      "cpu": {"request": "1", "limit": "8"},
+      "memory": {"request": "4Gi", "limit": "8Gi"}
+    }
+  },
+  "recommendations": {
+    "immediate_actions": [
+      "Fix storage class references in whisper-stt PVCs to use 'local-path' or 'nfs-synology'",
+      "Delete and recreate PVCs with correct storage class",
+      "Restart pods once PVCs are bound"
+    ],
+    "long_term_improvements": [
+      "Implement storage class validation in deployment pipelines",
+      "Add infrastructure dependency checks before deployment",
+      "Configure alerting for PVC Pending state > 5 minutes",
+      "Document storage requirements for all services"
+    ]
+  },
+  "data_collection_notes": {
+    "argocd_api_status": "No response from https://argocd-ro-ardenone-manager-ts.ardenone.com:8444",
+    "alternative_data_source": "Kubernetes API annotations with ArgoCD tracking IDs",
+    "cluster_access": "Successful via kubectl-proxy over Tailscale",
+    "data_quality": "Complete - all Kubernetes objects retrieved successfully"
+  }
+}

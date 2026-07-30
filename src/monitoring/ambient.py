@@ -17,9 +17,12 @@ import yaml
 from aiohttp import ClientSession
 from aiosqlite import connect
 
-from ..session.store import get_store
-from ..fetch.orchestrator import get_fetch_strand
+from ..session.store import SessionStore, get_store
+from ..fetch.orchestrator import get_fetch_strand, execute_fetch, FetchRequest
 from ..fetch.commands import FetchContext, FetchSource, IntentType
+from ..sse.broadcaster import get_broadcaster, SSEEvent, broadcast_result
+from ..render.hot_path import derive_result_type, get_renderer
+from .config_loader import get_monitoring_config_loader
 
 
 logger = getLogger(__name__)
@@ -27,15 +30,18 @@ logger = getLogger(__name__)
 MONITORING_CONFIG_PATH = Path("/home/coding/aide-de-camp/config/monitoring.yaml")
 SESSION_DB_PATH = Path("/home/coding/aide-de-camp/data/session.db")
 
-# Mapping of intent types to fetch sources
-INTENT_TYPE_TO_FETCH = {
-    "status": FetchSource.KUBECTL_PODS,
-    "pod_status": FetchSource.KUBECTL_PODS,
-    "deployment_status": FetchSource.KUBECTL_DEPLOYMENTS,
-    "argocd": FetchSource.ARGOCD_APP,
-    "ci": FetchSource.CI_STATUS,
-    "git": FetchSource.GIT_LOG,
-    "beads": FetchSource.BEAD_LIST,
+# Default TTL for topic context cache (10 minutes)
+TOPIC_CONTEXT_TTL_SECONDS = 600
+
+# Mapping of monitoring intent types to fetch IntentTypes
+INTENT_TYPE_MAPPING = {
+    "status": IntentType.STATUS,
+    "pod_status": IntentType.STATUS,
+    "deployment_status": IntentType.ACTION,
+    "argocd": IntentType.STATUS,
+    "ci": IntentType.STATUS,
+    "git": IntentType.STATUS,
+    "beads": IntentType.STATUS,
 }
 
 
@@ -79,14 +85,24 @@ class AmbientMonitor:
     Runs as a background task with configurable check intervals.
     """
 
-    def __init__(self, config_path: Path = MONITORING_CONFIG_PATH):
+    def __init__(
+        self,
+        config_path: Path = MONITORING_CONFIG_PATH,
+        session_store: Optional[SessionStore] = None,
+    ):
         self.config_path = config_path
         self.config: Optional[MonitoringConfig] = None
-        self.last_state: dict[str, Any] = {}  # topic_id -> last known state
         self.running = False
         self.tasks: list[asyncio.Task] = []
         self._http_client: Optional[ClientSession] = None
         self._fetch_strand = get_fetch_strand()
+        # Use provided store or get default
+        self._store = session_store or get_store()
+        # Create config loader instance (not singleton) to respect config_path
+        from .config_loader import ConfigLoader
+        self._config_loader = ConfigLoader(config_path=config_path, default_tick_interval_seconds=300)
+        self._ticker_task: Optional[asyncio.Task] = None
+        self._last_tick_config_hash: Optional[int] = None
 
     async def _get_http_client(self) -> ClientSession:
         """Get or create HTTP client."""
@@ -95,10 +111,11 @@ class AmbientMonitor:
         return self._http_client
 
     async def load_config(self) -> MonitoringConfig:
-        """Load monitoring configuration from YAML file."""
-        logger.info(f"Loading monitoring config from {self.config_path}")
-        with open(self.config_path, "r") as f:
-            data = yaml.safe_load(f)
+        """Load monitoring configuration from YAML file (with hot-reload cache)."""
+        logger.info(f"Loading monitoring config from {self.config_path} (via hot-reload cache)")
+
+        # Use config loader which handles mtime checking and caching
+        data = await self._config_loader.get_config()
 
         # Parse active topics
         active_topics = []
@@ -149,55 +166,57 @@ class AmbientMonitor:
         """
         Check the current state of a topic.
 
-        Uses the fetch strand to get current state for the topic.
+        Uses the fetch orchestrator with the full command matrix to get current state.
         """
-        # Map intent_type to fetch_source
-        fetch_source = INTENT_TYPE_TO_FETCH.get(rule.intent_type, FetchSource.KUBECTL_PODS)
+        # Map monitoring intent_type to fetch IntentType
+        intent_type = INTENT_TYPE_MAPPING.get(rule.intent_type, IntentType.STATUS)
 
         # Build fetch context
-        context = FetchContext(project_slug=rule.project_slug)
-        if rule.project_slug:
-            context.namespace = rule.project_slug.replace("-", "")
-            context.repo_path = f"/home/coding/{rule.project_slug}"
-            context.app_name = rule.project_slug
-            context.deployment = rule.project_slug
+        context = FetchContext(
+            project_slug=rule.project_slug,
+            namespace=rule.project_slug.replace("-", "") if rule.project_slug else None,
+            repo_path=f"/home/coding/{rule.project_slug}" if rule.project_slug else None,
+            app_name=rule.project_slug,
+            deployment=rule.project_slug,
+        )
 
-        # Execute fetch using the appropriate strand method
+        # Create fetch request
+        request = FetchRequest(
+            intent_type=intent_type,
+            context=context,
+            intent_id=f"monitoring-{rule.topic_id}",
+            session_id="monitoring",
+        )
+
+        # Execute fetch using the orchestrator (uses full fetch command matrix)
         try:
-            if fetch_source == FetchSource.KUBECTL_PODS:
-                data = await self._fetch_strand._fetch_kubectl_pods(context)
-            elif fetch_source == FetchSource.KUBECTL_DEPLOYMENTS:
-                data = await self._fetch_strand._fetch_kubectl_deployments(context)
-            elif fetch_source == FetchSource.ARGOCD_APP:
-                data = await self._fetch_strand._fetch_argocd_app(context)
-            elif fetch_source == FetchSource.CI_STATUS:
-                data = await self._fetch_strand._fetch_ci_status(context)
-            elif fetch_source == FetchSource.GIT_LOG:
-                data = await self._fetch_strand._fetch_git_log(context)
-            elif fetch_source == FetchSource.BEAD_LIST:
-                data = await self._fetch_strand._fetch_bead_list(context)
-            else:
-                logger.warning(f"Unknown fetch source: {fetch_source}")
+            fetch_result = await execute_fetch(request)
+
+            # Extract successful source data
+            successful_data = fetch_result.get_successful_data()
+
+            if not successful_data:
+                logger.warning(f"No successful sources for {rule.topic_id}")
                 return None
 
-            if data and "error" not in data:
-                state_data = {
-                    "project_slug": rule.project_slug,
-                    "intent_type": rule.intent_type,
-                    **data,
-                }
+            # Build state data from all successful sources
+            state_data = {
+                "project_slug": rule.project_slug,
+                "intent_type": rule.intent_type,
+                "sources": list(successful_data.keys()),
+                **{k: v for source in successful_data for k, v in successful_data[source].items()},
+            }
 
-                # Apply filters if specified
-                if rule.filters:
-                    if not self._passes_filters(state_data, rule.filters):
-                        # Filter means we don't report this state
-                        logger.debug(f"State for {rule.topic_id} filtered by {rule.filters}")
-                        return None
+            # Apply filters if specified
+            if rule.filters:
+                if not self._passes_filters(state_data, rule.filters):
+                    # Filter means we don't report this state
+                    logger.debug(f"State for {rule.topic_id} filtered by {rule.filters}")
+                    return None
 
-                return state_data
-            else:
-                logger.warning(f"Fetch failed for {rule.topic_id}: {data.get('error', 'Unknown error') if data else 'No data returned'}")
-                return None
+            logger.debug(f"Fetched state for {rule.topic_id} from {len(successful_data)} sources")
+            return state_data
+
         except Exception as e:
             logger.error(f"Error checking state for {rule.topic_id}: {e}", exc_info=True)
             return None
@@ -269,98 +288,171 @@ class AmbientMonitor:
                 return None
         return value
 
+    async def _get_topic_context_cache(self, topic_id: str) -> Optional[dict]:
+        """Get cached context data for a topic from topic_context_cache table."""
+        cached = await self._store.get_topic_context(topic_id)
+        if cached:
+            return cached.get("context")
+        return None
+
+    async def _update_topic_context_cache(
+        self,
+        topic_id: str,
+        context_data: dict,
+        ttl_seconds: int = TOPIC_CONTEXT_TTL_SECONDS,
+    ) -> None:
+        """Store context data in topic_context_cache table."""
+        await self._store.set_topic_context(
+            topic_id=topic_id,
+            context_data=context_data,
+            ttl_seconds=ttl_seconds,
+        )
+
     async def detect_state_change(
         self,
         rule: MonitoringRule,
         current_state: dict,
-    ) -> bool:
+    ) -> tuple[bool, dict]:
         """
         Detect if the state has changed since last check.
 
-        Compares current state with last known state for the topic.
-        Returns True if significant change detected.
+        Reads from topic_context_cache to get previous state.
+        Returns (has_change, changes_dict) where changes_dict tracks what changed.
+
+        The changes_dict includes:
+        - 'changed_fields': list of field names that changed
+        - 'diff': full diff between previous and current state
+        - 'is_first': True if this is the first check (no previous state)
         """
-        topic_key = f"{rule.project_slug}:{rule.intent_type}"
+        # Get cached context from database
+        cached_context = await self._get_topic_context_cache(rule.topic_id)
 
-        if topic_key not in self.last_state:
-            # First check - store state and don't notify
-            self.last_state[topic_key] = current_state
-            return False
+        if cached_context is None:
+            # First check - no previous state in cache yet
+            # Store current state as baseline and don't notify
+            await self._update_topic_context_cache(rule.topic_id, current_state)
+            return False, {
+                "is_first": True,
+                "changed_fields": [],
+                "diff": {},
+            }
 
-        last_state = self.last_state[topic_key]
+        # Compute diff between previous and current state
+        diff = self._compute_diff(cached_context, current_state)
+        changed_fields = list(diff.keys())
 
         # Check for state changes based on notification threshold
         if rule.notification_threshold == "any_change":
             # Any field change triggers notification
-            return current_state != last_state
+            has_change = len(changed_fields) > 0
         elif rule.notification_threshold == "state_change":
             # Only notify if specific state fields change
             # For status intents, check if phase, status, or health changed
-            state_fields = ["phase", "status", "health", "ready", "sync_status"]
-            return any(
-                current_state.get(field) != last_state.get(field)
-                for field in state_fields
-            )
+            state_fields = ["phase", "status", "health", "ready", "sync_status", "sync_status"]
+            significant_changes = [f for f in changed_fields if f in state_fields]
+            has_change = len(significant_changes) > 0
+        else:
+            has_change = False
 
-        return False
+        return has_change, {
+            "is_first": False,
+            "changed_fields": changed_fields,
+            "diff": diff,
+        }
 
     async def push_monitoring_result(
         self,
         rule: MonitoringRule,
         current_state: dict,
+        changes_dict: dict,
         session_id: str,
     ) -> None:
         """
         Push a monitoring result to the active surface.
 
-        Creates a result in the session store and pushes to appropriate surface.
+        Creates a result in the session store with intent_id=NULL (system-originated).
+        Reads previous state from topic_context_cache and updates it after writing result.
         """
-        store = get_store()
-
         # Find or create topic for this monitoring rule
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await self._store.find_or_create_topic(
             label=rule.topic_id,
             session_id=session_id,
             topic_type="project",
             project_slugs=[rule.project_slug] if rule.project_slug else None,
         )
 
-        # Create a monitoring intent
-        intent_id = await store.create_intent(
-            utterance_id=f"monitoring-{datetime.now(timezone.utc).isoformat()}",
-            session_id=session_id,
-            project_slug=rule.project_slug,
-            intent_type=rule.intent_type,
-        )
-
-        # Create result with diff info if available
-        topic_key = f"{rule.project_slug}:{rule.intent_type}"
-        previous_state = self.last_state.get(topic_key, {})
+        # Get previous state from cache
+        previous_state = await self._get_topic_context_cache(rule.topic_id)
 
         result_data = {
             "monitoring": True,
             "current_state": current_state,
-            "previous_state": previous_state if previous_state else None,
+            "previous_state": previous_state,
+            "changed_fields": changes_dict.get("changed_fields", []),
+            "diff": changes_dict.get("diff", {}),
+            "is_first_check": changes_dict.get("is_first", False),
             "rule_filters": rule.filters,
+            "notification_threshold": rule.notification_threshold,
+            "triggered_rules": changes_dict.get("triggered_rules", []),
         }
 
-        # Add diff if we have previous state
-        if previous_state:
-            result_data["diff"] = self._compute_diff(previous_state, current_state)
+        # Derive result_type from monitoring intent type per plan §10
+        result_type = derive_result_type(intent_type="monitoring", project_slug=rule.project_slug)
 
-        result_id = await store.create_result(
-            intent_id=intent_id,
+        # Write result with intent_id=NULL (system-originated, no utterance behind it)
+        result_id = await self._store.create_result(
+            intent_id=None,  # NULL for monitoring-originated results
             topic_id=topic_id,
             session_id=session_id,
-            summary=self._generate_summary(rule, current_state, previous_state),
+            summary=self._generate_summary(rule, current_state, previous_state, changes_dict),
             data=result_data,
+            urgency=rule.urgency,
+            result_type=result_type,
+        )
+
+        # Render monitoring card via hot-path selector (deterministic, no LLM)
+        renderer = get_renderer()
+        summary_text = self._generate_summary(rule, current_state, previous_state, changes_dict)
+        render_outcome = renderer.render(
+            result_id=result_id,
+            result_type=result_type,
+            result_data=result_data,
+            summary=summary_text,
             urgency=rule.urgency,
         )
 
-        logger.info(f"Created monitoring result {result_id} for topic {rule.topic_id}")
+        # Update result's card_fallback flag
+        await self._store.update_result_card_fallback(result_id, render_outcome.card_fallback)
 
-        # Update last state
-        self.last_state[topic_key] = current_state
+        logger.info(f"Created monitoring result {result_id} for topic {rule.topic_id} (intent_id=NULL)")
+
+        # Fire SSE event for canvas update
+        # Build result dict for broadcast
+        result_for_broadcast = {
+            "id": result_id,
+            "intent_id": None,
+            "topic_id": topic_id,
+            "session_id": session_id,
+            "summary": summary_text,
+            "data": result_data,
+            "urgency": rule.urgency,
+            "result_type": result_type,
+            "card_fallback": render_outcome.card_fallback,
+            "rendered_html": render_outcome.rendered_html,
+            "component_id": render_outcome.component_id,
+            "created_at": int(datetime.now(timezone.utc).timestamp()),
+        }
+
+        # Broadcast to all surfaces in the session
+        await broadcast_result(
+            result=result_for_broadcast,
+            session_id=session_id,
+        )
+
+        logger.info(f"Broadcast SSE event for monitoring result {result_id}")
+
+        # Update topic context cache with current state
+        await self._update_topic_context_cache(rule.topic_id, current_state)
 
     def _compute_diff(self, previous: dict, current: dict) -> dict:
         """Compute diff between previous and current state."""
@@ -383,25 +475,122 @@ class AmbientMonitor:
         rule: MonitoringRule,
         current_state: dict,
         previous_state: Optional[dict],
+        changes_dict: dict,
     ) -> str:
         """Generate a summary for the monitoring result."""
-        if previous_state is None:
+        if changes_dict.get("is_first"):
             return f"Initial state check for {rule.topic_id}"
 
+        changed_fields = changes_dict.get("changed_fields", [])
+        diff = changes_dict.get("diff", {})
+
         # Check for specific state changes
-        if "phase" in current_state:
-            curr_phase = current_state["phase"]
-            prev_phase = previous_state.get("phase")
-            if curr_phase != prev_phase:
-                return f"{rule.topic_id} phase changed from {prev_phase} to {curr_phase}"
+        if "phase" in diff:
+            prev_phase = diff["phase"].get("from")
+            curr_phase = diff["phase"].get("to")
+            return f"{rule.topic_id} phase changed from {prev_phase} to {curr_phase}"
 
-        if "sync_status" in current_state:
-            curr_sync = current_state["sync_status"]
-            prev_sync = previous_state.get("sync_status")
-            if curr_sync != prev_sync:
-                return f"{rule.topic_id} sync status changed from {prev_sync} to {curr_sync}"
+        if "sync_status" in diff:
+            prev_sync = diff["sync_status"].get("from")
+            curr_sync = diff["sync_status"].get("to")
+            return f"{rule.topic_id} sync status changed from {prev_sync} to {curr_sync}"
 
-        return f"{rule.topic_id} state has changed"
+        if "health_status" in diff:
+            prev_health = diff["health_status"].get("from")
+            curr_health = diff["health_status"].get("to")
+            return f"{rule.topic_id} health status changed from {prev_health} to {curr_health}"
+
+        if changed_fields:
+            return f"{rule.topic_id} changed: {', '.join(changed_fields[:3])}" + ("..." if len(changed_fields) > 3 else "")
+
+        return f"{rule.topic_id} state updated"
+
+    def evaluate_exception_rules(
+        self,
+        changes_dict: dict,
+        project_slug: str,
+        rules: list[ExceptionRule],
+    ) -> list[dict]:
+        """
+        Evaluate exception rules against state changes.
+
+        Returns list of triggered rule outputs with project_slug, urgency, and exception type.
+        Rules fire only when matching state changes occur in the diff.
+        No firing when no relevant state changes.
+        """
+        if not changes_dict.get("changed_fields"):
+            return []
+
+        diff = changes_dict.get("diff", {})
+        triggered_rules = []
+
+        for rule in rules:
+            # Check if rule applies to this project
+            if rule.project_slug and rule.project_slug != project_slug:
+                continue
+
+            # Evaluate rule condition against diff
+            if self._rule_condition_matches(rule.condition, diff):
+                triggered_rules.append({
+                    "project_slug": project_slug,
+                    "urgency": rule.urgency,
+                    "exception_type": rule.name,
+                    "condition": rule.condition,
+                    "message": rule.message,
+                })
+                logger.info(f"Exception rule '{rule.name}' fired for {project_slug}: {rule.condition}")
+
+        return triggered_rules
+
+    def _rule_condition_matches(self, condition: str, diff: dict) -> bool:
+        """
+        Check if a rule condition matches the diff.
+
+        Conditions are simple field comparisons against the diff.
+        Examples:
+        - "phase==Failed" -> true if phase changed to Failed
+        - "restarts>5" -> true if restarts changed to value > 5
+        - "sync_status==OutOfSync" -> true if sync_status changed to OutOfSync
+        """
+        import re
+
+        # Parse condition
+        match = re.match(r'(\w+)(==|!=|>=|<=|>|<)(.+)', condition)
+        if not match:
+            logger.warning(f"Invalid rule condition: {condition}")
+            return False
+
+        field, op, expected_value = match.groups()
+
+        # Check if this field changed
+        if field not in diff:
+            return False
+
+        # Get the new value (what it changed "to")
+        new_value = diff[field].get("to")
+
+        if new_value is None:
+            return False
+
+        # Evaluate condition
+        try:
+            if op == "==":
+                return str(new_value) == expected_value
+            elif op == "!=":
+                return str(new_value) != expected_value
+            elif op == ">":
+                return float(new_value) > float(expected_value)
+            elif op == "<":
+                return float(new_value) < float(expected_value)
+            elif op == ">=":
+                return float(new_value) >= float(expected_value)
+            elif op == "<=":
+                return float(new_value) <= float(expected_value)
+        except (ValueError, TypeError):
+            logger.warning(f"Rule condition evaluation failed: {condition} with value {new_value}")
+            return False
+
+        return False
 
     async def monitor_topic(self, rule: MonitoringRule) -> None:
         """
@@ -417,20 +606,32 @@ class AmbientMonitor:
 
         while self.running:
             try:
-                # Check current state
+                # Check current state (uses fetch command matrix)
                 current_state = await self.check_topic_state(rule)
 
                 if current_state:
-                    # Detect change
-                    has_change = await self.detect_state_change(rule, current_state)
+                    # Detect change and get changes dict
+                    has_change, changes_dict = await self.detect_state_change(rule, current_state)
 
                     if has_change:
-                        logger.info(f"State change detected for {rule.topic_id}")
-                        await self.push_monitoring_result(rule, current_state, session_id)
+                        logger.info(f"State change detected for {rule.topic_id}: {changes_dict.get('changed_fields', [])}")
+
+                        # Evaluate exception rules if configured
+                        if self.config and self.config.exceptions:
+                            triggered_rules = self.evaluate_exception_rules(
+                                changes_dict=changes_dict,
+                                project_slug=rule.project_slug,
+                                rules=self.config.exceptions,
+                            )
+                            if triggered_rules:
+                                logger.info(f"Triggered {len(triggered_rules)} exception rules for {rule.topic_id}")
+                                # Add triggered rules to result data
+                                changes_dict["triggered_rules"] = triggered_rules
+
+                        await self.push_monitoring_result(rule, current_state, changes_dict, session_id)
                     else:
-                        # Update last state even if no change (keeps us synced)
-                        topic_key = f"{rule.project_slug}:{rule.intent_type}"
-                        self.last_state[topic_key] = current_state
+                        # Update cache even if no change (keeps it fresh)
+                        await self._update_topic_context_cache(rule.topic_id, current_state)
 
                 # Wait for next check
                 await asyncio.sleep(rule.check_interval)
@@ -455,7 +656,51 @@ class AmbientMonitor:
             task = asyncio.create_task(self.monitor_topic(rule))
             self.tasks.append(task)
 
-        logger.info(f"Started {len(self.tasks)} topic monitors")
+        # Start the ticker task for config hot-reload
+        self._ticker_task = asyncio.create_task(self._config_ticker())
+        self.tasks.append(self._ticker_task)
+
+        logger.info(f"Started {len(self.tasks)} topic monitors (including config ticker)")
+
+    async def _config_ticker(self) -> None:
+        """
+        Config hot-reload ticker.
+
+        Periodically checks if the config file has changed (via mtime) and reloads if needed.
+        Runs on the tick_interval_seconds from the config.
+        """
+        logger.info("Config ticker started")
+
+        while self.running:
+            try:
+                # Get current tick interval (may have changed from config)
+                tick_interval = await self._config_loader.get_tick_interval_seconds()
+                logger.debug(f"Config ticker: checking for changes (interval: {tick_interval}s)")
+
+                # Get current config (auto-reloads if mtime changed)
+                current_config = await self._config_loader.get_config()
+
+                # Create a simple hash of the active topics to detect structural changes
+                import json
+                current_hash = hash(json.dumps(current_config.get("monitoring", {}).get("active_topics", []), sort_keys=True))
+
+                if self._last_tick_config_hash != current_hash:
+                    logger.info("Config structure changed, reloading monitors")
+                    await self.reload_config()
+                    self._last_tick_config_hash = current_hash
+                else:
+                    logger.debug("Config structure unchanged, no reload needed")
+
+                # Wait for next tick
+                await asyncio.sleep(tick_interval)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in config ticker: {e}", exc_info=True)
+                await asyncio.sleep(tick_interval)
+
+        logger.info("Config ticker stopped")
 
     async def stop(self) -> None:
         """Stop ambient monitoring."""
@@ -470,6 +715,7 @@ class AmbientMonitor:
         await asyncio.gather(*self.tasks, return_exceptions=True)
 
         self.tasks.clear()
+        self._ticker_task = None
 
         # Close HTTP client
         if self._http_client:
@@ -478,16 +724,17 @@ class AmbientMonitor:
         logger.info("Ambient monitoring stopped")
 
     async def reload_config(self) -> None:
-        """Reload monitoring configuration."""
+        """Reload monitoring configuration and restart topic monitors."""
         logger.info("Reloading monitoring configuration")
 
-        old_tasks = self.tasks
-        self.tasks = []
+        # Separate ticker task from monitor tasks
+        monitor_tasks = [t for t in self.tasks if t != self._ticker_task]
+        self.tasks = [self._ticker_task] if self._ticker_task else []
 
-        # Cancel old monitors
-        for task in old_tasks:
+        # Cancel old monitor tasks (but not the ticker)
+        for task in monitor_tasks:
             task.cancel()
-        await asyncio.gather(*old_tasks, return_exceptions=True)
+        await asyncio.gather(*monitor_tasks, return_exceptions=True)
 
         # Load new config and restart monitors
         config = await self.load_config()

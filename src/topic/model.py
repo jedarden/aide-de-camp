@@ -47,13 +47,21 @@ class Topic:
 class TopicCard:
     """A topic card for the canvas - includes staleness info."""
     topic: Topic
+    result_type: str  # Distinct card type within topic (e.g., 'status:ibkr-mcp', 'lookup:logs:options-pipeline')
     latest_result: Optional[dict] = None
     staleness_seconds: int = 0
     staleness_level: str = "fresh"  # 'fresh', 'stale', 'very_stale'
 
+    @property
+    def card_id(self) -> str:
+        """Unique identifier for this card (topic_id + result_type)."""
+        return f"{self.topic.id}::{self.result_type}"
+
     def to_dict(self) -> dict:
         return {
+            "card_id": self.card_id,
             "topic": self.topic.to_dict(),
+            "result_type": self.result_type,
             "latest_result": self.latest_result,
             "staleness": {
                 "seconds": self.staleness_seconds,
@@ -78,17 +86,30 @@ class TopicManager:
         session_id: str,
         topic_type: str = "adhoc",
         project_slugs: list[str] | None = None,
+        scope: str = "session",
     ) -> Topic:
         """
         Find an existing topic or create a new one.
 
-        Topics are matched by label within a session.
+        For cross-session topics (scope='cross-session'), finds by label regardless of session.
+        For session-scoped topics (scope='session'), finds by label within the current session.
+
+        Args:
+            label: Topic label
+            session_id: Current session ID
+            topic_type: Topic type ('project', 'research', 'personal', 'exception', 'compound', 'adhoc')
+            project_slugs: List of project slugs
+            scope: Topic scope ('session', 'cross-session', 'global')
+
+        Returns:
+            Topic object
         """
         topic_id, created = await self.store.find_or_create_topic(
             label=label,
             session_id=session_id,
             topic_type=topic_type,
             project_slugs=project_slugs,
+            scope=scope,
         )
 
         # Fetch full topic data - get from active topics
@@ -109,14 +130,14 @@ class TopicManager:
                 result_count=topic_data.get("result_count", 0),
             )
 
-        # Fallback to basic topic
+        # Fallback to basic topic (shouldn't normally reach here)
         return Topic(
             id=topic_id,
             label=label,
             type=topic_type,
             project_slugs=project_slugs or [],
-            scope="session",
-            session_id=session_id,
+            scope=scope,
+            session_id=None if scope == "cross-session" else session_id,
             created_at=int(datetime.now().timestamp()),
             last_active=int(datetime.now().timestamp()),
         )
@@ -124,13 +145,29 @@ class TopicManager:
     async def get_active_topic_cards(self, session_id: str) -> list[TopicCard]:
         """
         Get all active topic cards for a session, with staleness info.
+
+        Returns one card per (topic, result_type) pair, enabling granular
+        canvas rendering where different result_types on the same topic
+        coexist (e.g., status + brainstorm cards).
         """
-        topics = await self.store.get_active_topics(session_id)
-        cards = []
+        # Get latest result for each (topic_id, result_type) pair
+        results_by_type = await self.store.get_latest_results_by_type(session_id)
+
+        # Fetch topics for context
+        topics_data = {t["id"]: t for t in await self.store.get_active_topics(session_id)}
 
         now = int(datetime.now().timestamp())
+        cards = []
 
-        for topic_data in topics:
+        for result in results_by_type:
+            topic_id = result["topic_id"]
+            result_type = result["result_type"]
+
+            # Skip if topic not found (shouldn't happen with FK constraints)
+            if topic_id not in topics_data:
+                continue
+
+            topic_data = topics_data[topic_id]
             topic = Topic(
                 id=topic_data["id"],
                 label=topic_data["label"],
@@ -144,10 +181,8 @@ class TopicManager:
                 result_count=topic_data.get("result_count", 0),
             )
 
-            # Get latest result
-            latest_result = await self.store.get_latest_result_for_topic(topic.id)
-            if latest_result:
-                latest_result["data"] = json.loads(latest_result["data"])
+            # Parse result data
+            result["data"] = json.loads(result["data"])
 
             # Calculate staleness
             staleness_seconds = now - topic.last_active
@@ -155,7 +190,8 @@ class TopicManager:
 
             cards.append(TopicCard(
                 topic=topic,
-                latest_result=latest_result,
+                result_type=result_type,
+                latest_result=result,
                 staleness_seconds=staleness_seconds,
                 staleness_level=staleness_level,
             ))
@@ -184,6 +220,15 @@ class TopicManager:
         Create or find a topic from an intent.
 
         Infers topic label from project_slug or creates ad hoc topic.
+        Project topics are created as cross-session (scope='cross-session', session_id=NULL).
+        Ad hoc topics are session-scoped (scope='session', session_id set).
+
+        Args:
+            intent: Intent dict with project_slug and intent_type
+            session_id: Current session ID
+
+        Returns:
+            Topic object
         """
         project_slug = intent.get("project_slug")
         intent_type = intent.get("intent_type", "unknown")
@@ -192,17 +237,20 @@ class TopicManager:
             label = project_slug.replace("-", " ").title()
             topic_type = "project"
             project_slugs = [project_slug]
+            scope = "cross-session"  # Project topics are cross-session
         else:
             # Create ad hoc topic from intent type
             label = f"{intent_type.title()} Task"
             topic_type = "adhoc"
             project_slugs = []
+            scope = "session"  # Ad hoc topics are session-scoped
 
         return await self.find_or_create_topic(
             label=label,
             session_id=session_id,
             topic_type=topic_type,
             project_slugs=project_slugs,
+            scope=scope,
         )
 
     async def link_intent_to_topic(

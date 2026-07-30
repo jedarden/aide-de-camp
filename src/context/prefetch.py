@@ -164,9 +164,23 @@ class SpeculativePrefetcher:
                 if status_data and "error" not in status_data:
                     result[project_slug] = status_data
 
-                # Fetch ArgoCD status if available
-                context_app = FetchContext(project_slug=project_slug, app_name=project_slug)
-                argocd_data = await self._fetch_strand._fetch_argocd_app(context_app)
+                # Fetch ArgoCD status if available (endpoint resolved from the
+                # project's cluster via config/clusters.yaml — bead adc-1ejh; a
+                # cluster with no consumable read-only proxy is skipped, never
+                # queried on the wrong instance).
+                from ..fetch.clusters import ArgocdEndpointUnresolvable
+                from ..registry import get_project
+
+                cfg = get_project(project_slug) if project_slug else None
+                context_app = FetchContext(
+                    project_slug=project_slug,
+                    app_name=(cfg.get("argocd_app") if cfg else None) or project_slug,
+                    cluster=cfg.get("cluster") if cfg else None,
+                )
+                try:
+                    argocd_data = await self._fetch_strand._fetch_argocd_app(context_app)
+                except ArgocdEndpointUnresolvable:
+                    argocd_data = None
                 if argocd_data and "error" not in argocd_data:
                     if project_slug not in result:
                         result[project_slug] = {}

@@ -1,0 +1,326 @@
+{
+  "timestamp": "2026-07-24T07:11:00.026844",
+  "num_requests": 20,
+  "results": [
+    {
+      "utterance": "check status of aide-de-camp",
+      "session_id": "baseline-test-1784891414550",
+      "success": true,
+      "total_e2e_ms": 1113.5158194229007,
+      "response": {
+        "utterance_id": "5207ede2-e4ec-4954-9132-f6b8d221681f",
+        "session_id": "baseline-test-1784891414550",
+        "intent_count": 1,
+        "intent_ids": [
+          "83bb0ee6-97a4-4e65-ae49-23fbf51de444"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "what's the current state of the project",
+      "session_id": "baseline-test-1784891416370",
+      "success": true,
+      "total_e2e_ms": 1340.1437569409609,
+      "response": {
+        "utterance_id": "bec53a12-592c-4ed3-882e-71d385a18422",
+        "session_id": "baseline-test-1784891416370",
+        "intent_count": 1,
+        "intent_ids": [
+          "80438721-dc48-43f8-ad16-5f129b22f40b"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "show me logs for aide-de-camp",
+      "session_id": "baseline-test-1784891418416",
+      "success": true,
+      "total_e2e_ms": 1699.472177773714,
+      "response": {
+        "utterance_id": "0535f5fd-38ac-4ce6-9eda-4fb6a08bd5d9",
+        "session_id": "baseline-test-1784891418416",
+        "intent_count": 1,
+        "intent_ids": [
+          "1440ae7d-5bda-4d77-8724-8a833b3e1b29"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "what are the recent commits",
+      "session_id": "baseline-test-1784891420821",
+      "success": true,
+      "total_e2e_ms": 1417.9326994344592,
+      "response": {
+        "utterance_id": "a4f6898b-353f-4d4c-a477-5aea6ed31ea1",
+        "session_id": "baseline-test-1784891420821",
+        "intent_count": 1,
+        "intent_ids": [
+          "9cc51775-b3bb-4ab6-a7a2-4acd6c6588a8"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "check if there are any issues",
+      "session_id": "baseline-test-1784891422944",
+      "success": true,
+      "total_e2e_ms": 1195.2722175046802,
+      "response": {
+        "utterance_id": "27c1ff29-a2b8-4587-93f9-df9a70649af8",
+        "session_id": "baseline-test-1784891422944",
+        "intent_count": 1,
+        "intent_ids": [
+          "9e24779f-59c1-49dd-8c25-c478cc3bfdd8"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "list the current topics",
+      "session_id": "baseline-test-1784891424845",
+      "success": true,
+      "total_e2e_ms": 1896.5913131833076,
+      "response": {
+        "utterance_id": "33bb911e-fbb9-4ce0-a372-4aac52a59be9",
+        "session_id": "baseline-test-1784891424845",
+        "intent_count": 1,
+        "intent_ids": [
+          "266f1d94-a99f-445d-b732-81b9e776cd42"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "show me project documentation",
+      "session_id": "baseline-test-1784891427447",
+      "success": true,
+      "total_e2e_ms": 2804.912080988288,
+      "response": {
+        "utterance_id": "f8cd1a2e-bfec-4981-a665-e5918013ac0e",
+        "session_id": "baseline-test-1784891427447",
+        "intent_count": 1,
+        "intent_ids": [
+          "198623df-d29c-4367-9521-0bf67e7566aa"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "what's the deployment status",
+      "session_id": "baseline-test-1784891430960",
+      "success": true,
+      "total_e2e_ms": 1303.669985383749,
+      "response": {
+        "utterance_id": "98b2a29d-68e3-4081-bf7c-9c923cb4ba6c",
+        "session_id": "baseline-test-1784891430960",
+        "intent_count": 1,
+        "intent_ids": [
+          "40b44957-7638-4140-87d3-8d27f010e20b"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "check status of aide-de-camp",
+      "session_id": "baseline-test-1784891432969",
+      "success": true,
+      "total_e2e_ms": 2260.187848471105,
+      "response": {
+        "utterance_id": "901af750-2c02-4cac-bb9a-a904af3e2646",
+        "session_id": "baseline-test-1784891432969",
+        "intent_count": 1,
+        "intent_ids": [
+          "20e65679-a28d-4f6c-acc5-5bbb35f6df1d"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "what's the current state of the project",
+      "session_id": "baseline-test-1784891435936",
+      "success": true,
+      "total_e2e_ms": 1076.7707079648972,
+      "response": {
+        "utterance_id": "20c3e905-b469-4c2b-9c18-04a9060b3dab",
+        "session_id": "baseline-test-1784891435936",
+        "intent_count": 1,
+        "intent_ids": [
+          "a9847a01-30ac-440d-a03b-8ed2cae77774"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "show me logs for aide-de-camp",
+      "session_id": "baseline-test-1784891437715",
+      "success": true,
+      "total_e2e_ms": 1398.1535211205482,
+      "response": {
+        "utterance_id": "a41cae8f-7d65-461c-933b-f939eea4fc94",
+        "session_id": "baseline-test-1784891437715",
+        "intent_count": 1,
+        "intent_ids": [
+          "8a7ab365-2e17-4702-b46d-438d2c51d3e3"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "what are the recent commits",
+      "session_id": "baseline-test-1784891439820",
+      "success": true,
+      "total_e2e_ms": 1573.1037855148315,
+      "response": {
+        "utterance_id": "4db27fcf-4b1c-40c2-a481-b5e4ddfa3641",
+        "session_id": "baseline-test-1784891439820",
+        "intent_count": 1,
+        "intent_ids": [
+          "d7c92c25-7f11-4b5c-b58e-a13304eb6ea8"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "check if there are any issues",
+      "session_id": "baseline-test-1784891442098",
+      "success": true,
+      "total_e2e_ms": 1231.8756645545363,
+      "response": {
+        "utterance_id": "425f3146-34e1-49e7-94ea-16bd4a37793e",
+        "session_id": "baseline-test-1784891442098",
+        "intent_count": 1,
+        "intent_ids": [
+          "62ab53c6-fe83-432c-ad9a-6062536cd0c2"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "list the current topics",
+      "session_id": "baseline-test-1784891444033",
+      "success": true,
+      "total_e2e_ms": 1369.625330902636,
+      "response": {
+        "utterance_id": "85958c2c-b369-42a2-bafd-9a88e1d435f5",
+        "session_id": "baseline-test-1784891444033",
+        "intent_count": 1,
+        "intent_ids": [
+          "cfa2261d-33d6-4700-aba7-d64d62931ea2"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "show me project documentation",
+      "session_id": "baseline-test-1784891446105",
+      "success": true,
+      "total_e2e_ms": 1707.082356326282,
+      "response": {
+        "utterance_id": "5d3180d2-cf23-43ab-84bd-37bec79c9420",
+        "session_id": "baseline-test-1784891446105",
+        "intent_count": 1,
+        "intent_ids": [
+          "857c8d1e-e21a-418b-943f-22d51b8f059b"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "what's the deployment status",
+      "session_id": "baseline-test-1784891448514",
+      "success": true,
+      "total_e2e_ms": 1945.3830569982529,
+      "response": {
+        "utterance_id": "57e6687d-2fb6-487e-9fd6-c50c4802a2ac",
+        "session_id": "baseline-test-1784891448514",
+        "intent_count": 1,
+        "intent_ids": [
+          "d330c86c-dbf4-4dc0-8ad9-1ded1e2b6052"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "check status of aide-de-camp",
+      "session_id": "baseline-test-1784891451162",
+      "success": true,
+      "total_e2e_ms": 2062.8475546836853,
+      "response": {
+        "utterance_id": "17b3dc36-300c-4bb2-8be1-e468fffa6a62",
+        "session_id": "baseline-test-1784891451162",
+        "intent_count": 1,
+        "intent_ids": [
+          "08d3a350-4684-4d16-b729-72e92f91946f"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "what's the current state of the project",
+      "session_id": "baseline-test-1784891453928",
+      "success": true,
+      "total_e2e_ms": 1715.6205317005515,
+      "response": {
+        "utterance_id": "f447e957-c72d-4c5f-9103-40f227f49e95",
+        "session_id": "baseline-test-1784891453928",
+        "intent_count": 1,
+        "intent_ids": [
+          "6ab11964-ddbe-4dd1-a77f-bd6b413987ea"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "show me logs for aide-de-camp",
+      "session_id": "baseline-test-1784891456346",
+      "success": true,
+      "total_e2e_ms": 1168.0944422259927,
+      "response": {
+        "utterance_id": "5c848e32-a42f-4a7f-ba28-d0e757b65d7e",
+        "session_id": "baseline-test-1784891456346",
+        "intent_count": 1,
+        "intent_ids": [
+          "f579c673-fb1b-4e6d-891b-fade6e15778d"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    },
+    {
+      "utterance": "what are the recent commits",
+      "session_id": "baseline-test-1784891458217",
+      "success": true,
+      "total_e2e_ms": 1107.342429459095,
+      "response": {
+        "utterance_id": "b08f6470-8465-46de-b7e8-eca1299537fb",
+        "session_id": "baseline-test-1784891458217",
+        "intent_count": 1,
+        "intent_ids": [
+          "d78ce6d6-be52-461b-a79f-92515dd4a272"
+        ],
+        "status": "dispatched",
+        "message": "Dispatched 1 intents for parallel processing"
+      }
+    }
+  ]
+}

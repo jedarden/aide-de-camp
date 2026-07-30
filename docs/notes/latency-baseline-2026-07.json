@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-07-24T08:45:29.437910",
+  "runs_per_shape": 30,
+  "shapes": [
+    {
+      "name": "multi_status",
+      "utterance": "Has the pbx web caught up, and what's the state of whisper stt?",
+      "expected_intents": 2,
+      "runs": 28,
+      "failures": 2,
+      "latency_ms": {
+        "p50": 3276,
+        "p95": 7763,
+        "min": 1534,
+        "max": 7763,
+        "mean": 3538,
+        "median": 3276
+      }
+    },
+    {
+      "name": "lookup_logs",
+      "utterance": "Pull up the recent logs for whisper stt.",
+      "expected_intents": 1,
+      "runs": 28,
+      "failures": 2,
+      "latency_ms": {
+        "p50": 2501,
+        "p95": 6909,
+        "min": 1204,
+        "max": 6909,
+        "mean": 2905,
+        "median": 2501
+      }
+    },
+    {
+      "name": "brainstorm",
+      "utterance": "Should pbx web keep using the static site generator, or is it time to move to a dynamic frontend? Give me the trade-offs.",
+      "expected_intents": 1,
+      "runs": 28,
+      "failures": 2,
+      "latency_ms": {
+        "p50": 2950,
+        "p95": 7839,
+        "min": 1381,
+        "max": 7839,
+        "mean": 3239,
+        "median": 2950
+      }
+    }
+  ]
+}

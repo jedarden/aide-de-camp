@@ -1,0 +1,9 @@
+{
+  "name": "adc-canvas-browser-runner",
+  "private": true,
+  "description": "Node Playwright driver launched (via subprocess) by the Python pytest canvas browser suite. Kept here, isolated from the Python venv, because Python Playwright is broken on this NixOS host (greenlet C-ext cannot load libstdc++.so.6). Node Playwright + the shared chromium-1228 in ~/.cache/ms-playwright works.",
+  "version": "0.0.0",
+  "dependencies": {
+    "playwright": "1.61.1"
+  }
+}

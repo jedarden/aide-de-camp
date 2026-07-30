@@ -386,3 +386,247 @@ def config_cmd(
         print(f"  Session ID: {f'{session_id[:8]}...' if session_id else 'Not set'}\n")
 
     return 0
+
+
+async def rehearsal(
+    server: str,
+    inject_slow_step: Optional[int],
+) -> int:
+    """
+    Run Phase 5 demo rehearsal.
+
+    Executes the golden path demo script, validates smooth criteria,
+    and files defect beads on violations.
+
+    Args:
+        server: ADC server URL
+        inject_slow_step: Inject a slow step at given step number (for testing)
+
+    Returns:
+        Exit code (0 for success, non-zero for error)
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    # Path to rehearsal script
+    repo_dir = Path(__file__).parent.parent.parent
+    rehearsal_script = repo_dir / "scripts" / "rehearsal.py"
+
+    if not rehearsal_script.exists():
+        print(f"❌ Rehearsal script not found: {rehearsal_script}", file=sys.stderr)
+        return 1
+
+    # Build command
+    cmd = [sys.executable, str(rehearsal_script), "--server", server]
+    if inject_slow_step:
+        cmd.extend(["--inject-slow-step", str(inject_slow_step)])
+
+    print(f"🎬 Running rehearsal: {rehearsal_script}")
+    print(f"📋 Server: {server}\n")
+
+    # Run rehearsal script
+    result = subprocess.run(cmd, cwd=repo_dir)
+
+    return result.returncode
+
+
+def freeze_cmd(toggle: bool) -> int:
+    """
+    Manage self-modification freeze state.
+
+    View or toggle the freeze protection that blocks self-modification writes.
+
+    Args:
+        toggle: If True, toggle freeze state (create or remove sentinel file)
+
+    Returns:
+        Exit code (0 for success, non-zero for error)
+    """
+    from src.freeze import get_status, set_frozen
+
+    if toggle:
+        # Get current state before toggling
+        current = get_status()
+        new_state = not current["frozen"]
+        set_frozen(new_state)
+
+        if new_state:
+            print("✓ Self-modification frozen (created data/FREEZE)")
+            print("  To unfreeze, run: adc freeze --toggle")
+        else:
+            print("✓ Self-modification unfrozen (removed data/FREEZE)")
+        return 0
+
+    # Show current status
+    status = get_status()
+
+    print("\n🔒 Self-Modification Freeze Status\n")
+
+    if status["frozen"]:
+        print(f"  Status: 🔴 FROZEN")
+        print(f"  Reason: {status['reason']}\n")
+        print("  Self-modification writes are blocked.")
+        print("  To unfreeze:")
+        print("    - If env var: unset ADC_SELFMOD_FREEZE")
+        print("    - If sentinel: adc freeze --toggle\n")
+    else:
+        print(f"  Status: 🟢 UNFROZEN\n")
+        print("  Self-modification writes are enabled.")
+        print("  To freeze: adc freeze --toggle\n")
+
+    return 0
+
+
+def restore_artifacts_cmd(commits: int = 1, dry_run: bool = False) -> int:
+    """
+    Restore artifacts from git history by reverting self-mod commits.
+
+    Reverts the specified number of self-modification commits, automatically
+    clearing any freeze state before reverting. Self-mod commits are identified
+    by their commit message pattern: 'auto: self-mod write to ...'
+
+    Args:
+        commits: Number of self-mod commits to revert (default: 1)
+        dry_run: If True, show what would be reverted without making changes
+
+    Returns:
+        Exit code (0 for success, non-zero for error)
+    """
+    import subprocess
+    from pathlib import Path
+
+    from src.freeze import set_frozen, check_frozen
+
+    print("\n🔄 Artifact Restore\n")
+
+    # Check current freeze state
+    status = check_frozen()
+    was_frozen = status.is_frozen
+
+    if was_frozen:
+        print(f"🔓 Unfreezing before restore (was: {status.reason})")
+        set_frozen(False)
+        print("✓ Unfrozen\n")
+
+    # Get the repo root
+    repo_root = Path("/home/coding/aide-de-camp")
+
+    try:
+        # Find self-mod commits
+        # Git log command to find commits matching the pattern
+        # Format: %h for short hash, %s for subject
+        result = subprocess.run(
+            ['git', 'log', '--oneline', '-n', str(commits * 2)],  # Get extra to filter
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10
+        )
+
+        if result.returncode != 0:
+            print(f"❌ Failed to get git log: {result.stderr}", file=sys.stderr)
+            return 1
+
+        # Parse commits to find self-mod ones
+        all_commits = []
+        for line in result.stdout.strip().split('\n'):
+            if not line:
+                continue
+            parts = line.split(' ', 1)
+            if len(parts) == 2:
+                short_hash, subject = parts
+                if 'auto: self-mod write to' in subject:
+                    all_commits.append((short_hash, subject))
+
+        # Limit to requested number
+        self_mod_commits = all_commits[:commits]
+
+        if not self_mod_commits:
+            print("ℹ️  No self-modification commits found to revert.")
+            if was_frozen:
+                print("🔓 Re-freezing (restore state)")
+                set_frozen(True)
+            return 0
+
+        print(f"Found {len(self_mod_commits)} self-mod commit(s) to revert:\n")
+        for i, (short_hash, subject) in enumerate(self_mod_commits, 1):
+            print(f"  {i}. {short_hash} - {subject}")
+
+        if dry_run:
+            print("\n🏁 Dry run complete - no changes made.")
+            if was_frozen:
+                print("🔓 Re-freezing (restore state)")
+                set_frozen(True)
+            return 0
+
+        print("\n🔄 Reverting commits...")
+
+        # Revert each commit in reverse order (oldest first)
+        for short_hash, _ in reversed(self_mod_commits):
+            print(f"  Reverting {short_hash}...", end=" ")
+            result = subprocess.run(
+                ['git', 'revert', '--no-commit', short_hash],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                print(f"❌")
+                print(f"    Failed: {result.stderr}", file=sys.stderr)
+                # Abort the revert on failure
+                subprocess.run(['git', 'revert', '--abort'], cwd=repo_root, capture_output=True)
+                if was_frozen:
+                    print("🔓 Re-freezing (restore state)")
+                    set_frozen(True)
+                return 1
+
+            print("✓")
+
+        # Commit the revert
+        print("\n💾 Committing revert...", end=" ")
+        result = subprocess.run(
+            ['git', 'commit', '-m', f"adc restore-artifacts: revert {len(self_mod_commits)} self-mod commit(s)"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10
+        )
+
+        if result.returncode != 0:
+            print(f"❌")
+            print(f"    Failed to commit: {result.stderr}", file=sys.stderr)
+            if was_frozen:
+                print("🔓 Re-freezing (restore state)")
+                set_frozen(True)
+            return 1
+
+        print("✓")
+        print(f"\n✅ Successfully reverted {len(self_mod_commits)} self-mod commit(s)")
+        print("   Artifacts restored to previous version.")
+
+        # Re-freeze if it was frozen before
+        if was_frozen:
+            print("\n🔓 Re-freezing (restore state)")
+            set_frozen(True)
+            print("✓ Re-frozen")
+
+        return 0
+
+    except subprocess.TimeoutExpired:
+        print("❌ Git command timed out", file=sys.stderr)
+        if was_frozen:
+            print("🔓 Re-freezing (restore state)")
+            set_frozen(True)
+        return 1
+    except Exception as e:
+        print(f"❌ Restore failed: {e}", file=sys.stderr)
+        if was_frozen:
+            print("🔓 Re-freezing (restore state)")
+            set_frozen(True)
+        return 1

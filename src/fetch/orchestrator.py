@@ -25,16 +25,15 @@ from .commands import (
     FetchSource,
     IntentType,
     KUBECTL_PROXIES,
+    get_effective_timeout,
     get_fetch_commands,
     get_required_sources,
     SourceResult,
 )
+from .clusters import ArgocdEndpointUnresolvable, resolve_argocd_endpoint
 
 
 logger = getLogger(__name__)
-
-# ArgoCD read-only proxy endpoint
-ARGOCD_RO_PROXY = "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444"
 
 # Type alias for the streaming callback
 # Called when a source completes: (source, result) -> None
@@ -87,10 +86,20 @@ class FetchStrand:
             FetchResult with coverage information
         """
         start_time = time.time()
+        fetch_start_perf = time.perf_counter()
 
         # Get fetch commands for this intent type
+        setup_start = time.perf_counter()
         command_specs = get_fetch_commands(request.intent_type)
         required_sources = get_required_sources(request.intent_type)
+        setup_ms = (time.perf_counter() - setup_start) * 1000
+
+        logger.debug(
+            f"fetch_timing phase=setup duration_ms={setup_ms:.2f} "
+            f"intent_id={request.intent_id[:8]} "
+            f"intent_type={request.intent_type.value} "
+            f"sources_count={len(command_specs)}"
+        )
 
         logger.info(
             f"Fetching {len(command_specs)} sources for intent {request.intent_id} "
@@ -104,9 +113,16 @@ class FetchStrand:
                 self._execute_source(spec, request.context),
                 name=f"fetch_{spec.source.value}_{request.intent_id[:8]}",
             )
-            tasks.append((spec.source, spec.required, spec.timeout_seconds, task))
+            # Get effective timeout from config file or spec default
+            effective_timeout = get_effective_timeout(spec, request.context.project_slug)
+            tasks.append((spec.source, spec.required, effective_timeout, task))
 
-        # Wait for all tasks to complete (with per-task timeout)
+        # Wait for all tasks to complete with per-source timeout enforcement
+        # We use asyncio.wait with ALL_COMPLETED to detect window close:
+        # - All tasks run concurrently
+        # - Each task is wrapped to handle its own timeout
+        # - As tasks complete, we process them immediately
+        # - Window closes when ALL tasks reach terminal state (success/timeout/error)
         sources = {}
         succeeded = []
         timed_out = []
@@ -114,55 +130,83 @@ class FetchStrand:
         skipped = []
         caveats = []
 
-        for source, required, timeout, task in tasks:
+        # Wrap each task with its timeout and error handling
+        # This allows true concurrent waiting with per-source timeouts
+        async def execute_with_timeout(
+            source: FetchSource,
+            required: bool,
+            timeout: int | float,
+            task: asyncio.Task
+        ) -> tuple[FetchSource, bool, SourceResult]:
+            """Execute a task with timeout, returning (source, required, result)."""
             try:
                 result = await asyncio.wait_for(task, timeout=timeout)
-
-                if on_partial_result:
-                    # Stream partial result as it arrives
-                    on_partial_result(source, result)
-
-                sources[source] = result
-
-                if result.status == "success":
-                    succeeded.append(source)
-                elif result.status == "timeout":
-                    timed_out.append(source)
-                    caveats.append(f"{source.value} timed out")
-                elif result.status == "error":
-                    failed.append(source)
-                    if required:
-                        caveats.append(f"Required source {source.value} failed: {result.error}")
-                    else:
-                        caveats.append(f"Optional source {source.value} failed: {result.error}")
-
+                return source, required, result
             except asyncio.TimeoutError:
                 logger.warning(f"Source {source.value} timed out after {timeout}s")
-                sources[source] = SourceResult(
+                result = SourceResult(
                     source=source,
                     status="timeout",
                     data={},
                     error=f"Timed out after {timeout}s",
                     duration_ms=int(timeout * 1000),
                 )
-                timed_out.append(source)
-                if required:
-                    caveats.append(f"Required source {source.value} timed out")
-
+                return source, required, result
             except Exception as e:
                 logger.error(f"Error fetching {source.value}: {e}", exc_info=True)
-                sources[source] = SourceResult(
+                result = SourceResult(
                     source=source,
                     status="error",
                     data={},
                     error=str(e),
                     duration_ms=0,
                 )
+                return source, required, result
+
+        # Create wrapped tasks for concurrent execution
+        wrapped_tasks = [
+            execute_with_timeout(source, required, timeout, task)
+            for source, required, timeout, task in tasks
+        ]
+
+        # Wait for all wrapped tasks to complete concurrently
+        # This is the WINDOW CLOSE detection: we wait until ALL tasks finish
+        completed_results = await asyncio.gather(*wrapped_tasks)
+
+        # Process results as they arrive (maintaining completion order)
+        for source, required, result in completed_results:
+            # Stream partial result immediately (progressive window fill)
+            if on_partial_result:
+                on_partial_result(source, result)
+
+            # Log per-source timing at DEBUG level
+            logger.debug(
+                f"fetch_timing phase=source_complete "
+                f"source={source.value} "
+                f"status={result.status} "
+                f"duration_ms={result.duration_ms} "
+                f"intent_id={request.intent_id[:8]}"
+            )
+
+            sources[source] = result
+
+            if result.status == "success":
+                succeeded.append(source)
+                # Check if the source data contains a caveat (e.g., fallback path with narrower scope)
+                if isinstance(result.data, dict) and "caveat" in result.data:
+                    caveats.append(result.data["caveat"])
+            elif result.status == "timeout":
+                timed_out.append(source)
+                caveats.append(f"{source.value} timed out")
+            elif result.status == "error":
                 failed.append(source)
                 if required:
-                    caveats.append(f"Required source {source.value} crashed: {e}")
+                    caveats.append(f"Required source {source.value} failed: {result.error}")
+                else:
+                    caveats.append(f"Optional source {source.value} failed: {result.error}")
 
         # Build coverage report
+        coverage_start = time.perf_counter()
         coverage = FetchCoverage(
             total_sources=len(command_specs),
             succeeded=succeeded,
@@ -170,8 +214,19 @@ class FetchStrand:
             failed=failed,
             skipped=skipped,
         )
+        coverage_ms = (time.perf_counter() - coverage_start) * 1000
 
-        total_duration_ms = int((time.time() - start_time) * 1000)
+        total_duration_ms = int((time.perf_counter() - fetch_start_perf) * 1000)
+
+        # Log overall fetch timing breakdown at DEBUG level
+        logger.debug(
+            f"fetch_timing phase=coverage duration_ms={coverage_ms:.2f} "
+            f"phase=total duration_ms={total_duration_ms} "
+            f"intent_id={request.intent_id[:8]} "
+            f"succeeded={len(succeeded)} "
+            f"timed_out={len(timed_out)} "
+            f"failed={len(failed)}"
+        )
 
         result = FetchResult(
             intent_id=request.intent_id,
@@ -185,8 +240,18 @@ class FetchStrand:
         logger.info(
             f"Fetch complete for intent {request.intent_id}: "
             f"{len(succeeded)}/{coverage.total_sources} succeeded, "
-            f"{len(timed_out)} timed out, {len(failed)} failed"
+            f"{len(timed_out)} timed out, {len(failed)} failed ({total_duration_ms}ms)"
         )
+
+        # Detect if ALL sources failed - this is a terminal failure condition
+        # The caller (intent router) should broadcast all_sources_failed event
+        if len(succeeded) == 0 and coverage.total_sources > 0:
+            logger.error(
+                f"All fetch sources failed for intent {request.intent_id}: "
+                f"{len(failed)} failed, {len(timed_out)} timed out"
+            )
+            # Mark result with terminal failure flag
+            result.terminal_failure = "all_sources_failed"
 
         return result
 
@@ -366,13 +431,33 @@ class FetchStrand:
             return {"error": str(e), "workflows": []}
 
     async def _fetch_argocd_app(self, context: FetchContext) -> dict:
-        """Fetch ArgoCD application status."""
-        proxy = ARGOCD_RO_PROXY
-        app_name = context.app_name or context.project_slug
+        """Fetch ArgoCD application status.
 
+        The ArgoCD endpoint is resolved from the project's ``cluster`` via
+        config/clusters.yaml (see src/fetch/clusters.py): there is no single
+        ArgoCD API, and querying the wrong instance returns not-found —
+        indistinguishable from "app doesn't exist". An unmapped cluster, or one
+        mapped to an ``access`` mode the strand cannot satisfy (it holds no
+        ArgoCD credentials, so only ``read-only-proxy`` is consumable), raises
+        ``ArgocdEndpointUnresolvable`` *before* any HTTP call.
+
+        The exception is raised outside the httpx try/except so the resolution
+        ``reason`` propagates cleanly: ``_execute_source`` buckets it as a
+        failed source and the fetch loop emits a ``fetch_coverage`` caveat
+        carrying the reason. Never a silent wrong-instance query.
+        """
+        app_name = context.app_name or context.project_slug
         if not app_name:
             return {"error": "No application name specified"}
 
+        resolution = resolve_argocd_endpoint(context.cluster)
+        if not resolution.satisfiable:
+            raise ArgocdEndpointUnresolvable(
+                resolution.reason or "ArgoCD endpoint unresolvable",
+                cluster=context.cluster,
+            )
+
+        proxy = resolution.argocd_api
         try:
             async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
                 resp = await client.get(
@@ -531,12 +616,20 @@ class FetchStrand:
             return {"error": str(e), "changed_files": []}
 
     async def _fetch_bead_list(self, context: FetchContext) -> dict:
-        """Fetch bead list from the repo's .beads/ workspace (local or remote)."""
+        """
+        Fetch bead list from the appropriate workspace.
+
+        Per plan Beads-Workspace Scoping:
+        - Primary path: run `bf list --status open` (NO --project filter) inside the
+          project's repo_path checkout when it has a .beads/ workspace
+        - Fallback (no repo_path/.beads): list from the adc workspace filtered
+          --project {slug}, with a fetch_coverage caveat naming the narrower scope
+        """
         repo_path = context.repo_path
         project_slug = context.project_slug
 
-        if not repo_path:
-            return {"error": "No repo path resolved for this project"}
+        # ADC workspace for fallback path (all aide-de-camp-originated beads live here)
+        adc_workspace = "/home/coding/aide-de-camp"
 
         try:
             if context.ssh_target:
@@ -548,15 +641,105 @@ class FetchStrand:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
+
+                stdout, stderr = await proc.communicate()
+
+                if proc.returncode == 0:
+                    import json as _json
+                    try:
+                        beads = _json.loads(stdout.decode())
+                    except Exception:
+                        beads = []
+                    return {
+                        "project": project_slug,
+                        "repo": context.display_path if hasattr(context, "display_path") else repo_path,
+                        "host": context.host_alias,
+                        "beads": beads,
+                        "count": len(beads) if isinstance(beads, list) else 0,
+                        "scope": "project_workspace",  # Primary path
+                    }
+                else:
+                    error_output = stderr.decode().strip() or stdout.decode().strip()
+                    if "no beads workspace" in error_output or "No such file" in error_output:
+                        # Fallback path: no local .beads workspace at remote
+                        # Use adc workspace with --project filter
+                        return await self._fetch_bead_list_from_adc(project_slug, repo_path, context, remote_ssh=context.ssh_target)
+                    return {"error": error_output or "bf list returned non-zero"}
             else:
+                # Local: check for .beads workspace first
                 from pathlib import Path as _Path
-                if not (_Path(repo_path) / ".beads" / "issues.jsonl").exists():
-                    return {"error": f"No .beads workspace at {repo_path}"}
+
+                if repo_path and (_Path(repo_path) / ".beads" / "issues.jsonl").exists():
+                    # Primary path: project has its own .beads/ workspace
+                    # Run bf list without --project filter (a project's own workspace
+                    # doesn't tag its beads with the aide-de-camp slug)
+                    proc = await asyncio.create_subprocess_exec(
+                        "bf", "list", "--status=open", "--limit=50",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        cwd=repo_path,
+                    )
+
+                    stdout, stderr = await proc.communicate()
+
+                    if proc.returncode == 0:
+                        import json as _json
+                        try:
+                            beads = _json.loads(stdout.decode())
+                        except Exception:
+                            beads = []
+                        return {
+                            "project": project_slug,
+                            "repo": repo_path,
+                            "beads": beads,
+                            "count": len(beads) if isinstance(beads, list) else 0,
+                            "scope": "project_workspace",  # Primary path
+                        }
+                    else:
+                        return {"error": stderr.decode().strip() or "bf list returned non-zero"}
+                else:
+                    # Fallback path: no local .beads workspace or no repo_path
+                    # Use adc workspace with --project filter
+                    return await self._fetch_bead_list_from_adc(project_slug, repo_path, context)
+
+        except FileNotFoundError:
+            return {"error": "bf CLI not found in PATH"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _fetch_bead_list_from_adc(
+        self, project_slug: str | None, repo_path: str | None, context: FetchContext, remote_ssh: str | None = None
+    ) -> dict:
+        """
+        Fetch bead list from adc workspace with --project filter (fallback path).
+
+        Per plan Beads-Workspace Scoping fallback:
+        "showing aide-de-camp-originated beads only" with caveat about narrower scope.
+
+        Returns beads filtered by --project {slug} from adc workspace.
+        """
+        adc_workspace = "/home/coding/aide-de-camp"
+
+        if not project_slug:
+            return {"error": "No project_slug for fallback bead list"}
+
+        try:
+            if remote_ssh:
+                # Remote fallback: run bf list from adc workspace via SSH
                 proc = await asyncio.create_subprocess_exec(
-                    "bf", "list", "--status=open", "--limit=50",
+                    "ssh", "-o", "ConnectTimeout=8", "-o", "BatchMode=yes",
+                    remote_ssh,
+                    f"cd {adc_workspace} && bf list --project={project_slug} --status=open --limit=50",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=repo_path,
+                )
+            else:
+                # Local fallback: run bf list from adc workspace
+                proc = await asyncio.create_subprocess_exec(
+                    "bf", "list", f"--project={project_slug}", "--status=open", "--limit=50",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=adc_workspace,
                 )
 
             stdout, stderr = await proc.communicate()
@@ -569,10 +752,11 @@ class FetchStrand:
                     beads = []
                 return {
                     "project": project_slug,
-                    "repo": context.display_path if hasattr(context, "display_path") else repo_path,
-                    "host": context.host_alias,
+                    "repo": repo_path,
                     "beads": beads,
                     "count": len(beads) if isinstance(beads, list) else 0,
+                    "scope": "adc_workspace_filtered",  # Fallback path
+                    "caveat": f"No local beads workspace for {project_slug}; showing aide-de-camp-originated beads only",
                 }
             else:
                 return {"error": stderr.decode().strip() or "bf list returned non-zero"}

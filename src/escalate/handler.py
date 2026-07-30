@@ -19,18 +19,24 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Optional
 
+import aiosqlite
 import httpx
 
 from ..components.hot_reload import get_reload_manager
+from ..render.hot_path import derive_result_type
 from ..session.store import get_store
 from .llm import get_zai_client, LLMRequest, ModelClass
 from .commands import get_kubectl_executor, CommandExecutionError
+from ..bead_validation import get_validator, ValidationResult, ValidationError, ValidationRetryExhaustedError
+from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
 
 
 logger = getLogger(__name__)
 
 # Project workspace for beads (where bf CLI operates)
-BEADS_WORKSPACE = Path.home() / ".beads"
+# Per plan Beads-Workspace Scoping: all aide-de-camp-originated beads live in
+# the aide-de-camp repo's own workspace, tagged --project {slug}
+BEADS_WORKSPACE = Path("/home/coding/aide-de-camp")
 
 # Escalate prompt path
 ESCALATE_PROMPT_PATH = Path("/home/coding/aide-de-camp/prompts/escalate/task-profile.md")
@@ -119,6 +125,20 @@ class EscalateError(Exception):
 class BeadCreationError(EscalateError):
     """Bead creation failed."""
     pass
+
+
+class BeadApprovalRequired(EscalateError):
+    """Bead requires user approval before creation.
+
+    Raised when validation passes but requires user approval.
+    The approval card details are carried in the exception.
+    """
+
+    def __init__(self, approval_card: dict, bead_body: str, bead_type: str):
+        self.approval_card = approval_card
+        self.bead_body = bead_body
+        self.bead_type = bead_type
+        super().__init__("Bead requires user approval")
 
 
 class EscalateHandler:
@@ -520,8 +540,15 @@ class EscalateHandler:
                 if value is not None:
                     cmd.extend(["--label", f"{key}={value}"])
 
+            # Add --project flag if project_slug is available
+            # Per plan Beads-Workspace Scoping: all aide-de-camp-originated beads
+            # are tagged with their target project as the --project field
+            if request.project_slug:
+                cmd.extend(["--project", request.project_slug])
+
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
+                cwd=BEADS_WORKSPACE,  # Run from aide-de-camp workspace
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -591,8 +618,15 @@ class EscalateHandler:
                 if value is not None:
                     cmd.extend(["--label", f"{key}={value}"])
 
+            # Add --project flag if project_slug is available
+            # Per plan Beads-Workspace Scoping: all aide-de-camp-originated beads
+            # are tagged with their target project as the --project field
+            if request.project_slug:
+                cmd.extend(["--project", request.project_slug])
+
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
+                cwd=BEADS_WORKSPACE,  # Run from aide-de-camp workspace
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -617,6 +651,45 @@ class EscalateHandler:
         except Exception as e:
             logger.error(f"Failed to create bead: {e}")
             raise BeadCreationError(f"Failed to create bead: {e}") from e
+
+    async def _create_bead_watch(
+        self,
+        bead_ref: str,
+        project_slug: str | None,
+        intent_type: str,
+    ) -> None:
+        """Create bead_watch row for circuit breaker tracking.
+
+        Plan §10 The Async Path: watcher tracks open beads for refusals/SLA.
+        SLA defaults by intent_type, with per-project sla_hours override.
+
+        Args:
+            bead_ref: The bead ID to watch
+            project_slug: Project slug for SLA override lookup
+            intent_type: Intent type for default SLA lookup
+        """
+        from ..registry import get_project
+
+        sla_hours = None
+
+        # Check for per-project SLA override
+        if project_slug:
+            project = get_project(project_slug)
+            if project:
+                sla_hours = project.get("sla_hours")
+                if sla_hours is not None:
+                    logger.info(
+                        f"Using per-project SLA override for {project_slug}: "
+                        f"{sla_hours} hours"
+                    )
+
+        store = await self._get_store()
+        await store.create_bead_watch(
+            bead_ref=bead_ref,
+            sla_hours=sla_hours,
+            intent_type=intent_type,
+        )
+        logger.debug(f"Created bead_watch row for {bead_ref}")
 
     def _generate_bead_title(self, request: EscalateRequest) -> str:
         """Generate a bead title from the request."""
@@ -676,6 +749,232 @@ class EscalateHandler:
         logger.warning(f"Unexpected bf create output format: {output}")
         return output
 
+    async def _validate_and_prepare_approval(
+        self,
+        request: EscalateRequest,
+        bead_body: str,
+        bead_type: str,
+    ) -> tuple[ValidationResult, str | None]:
+        """
+        Validate bead body and prepare for approval if needed.
+
+        Args:
+            request: The escalate request
+            bead_body: The formulated bead body
+            bead_type: The bead type
+
+        Returns:
+            (validation_result, reformulated_bead_body_or_None)
+
+        Raises:
+            BeadApprovalRequired: When bead requires approval (carries approval card)
+            ValidationRetryExhaustedError: When validation fails after re-formulation
+        """
+        validator = get_validator()
+
+        # Initial validation
+        result = validator.validate_bead_body(bead_body, bead_type)
+
+        if result.is_valid and not result.requires_approval:
+            logger.info(f"Validation passed for intent {request.intent_id} (no approval required)")
+            return result, None
+
+        if result.requires_approval:
+            logger.info(f"Validation passed but approval required for intent {request.intent_id}: {result.approval_requirement.reason}")
+            # Build approval card
+            approval_card = self._build_approval_card(
+                request=request,
+                bead_body=bead_body,
+                bead_type=bead_type,
+                validation_result=result,
+            )
+            raise BeadApprovalRequired(approval_card, bead_body, bead_type)
+
+        # Validation failed - check re-formulation count before attempting
+        store = await self._get_store()
+        reformulation_count = await store.get_reformulation_count(request.session_id)
+        MAX_REFORMULATION_ATTEMPTS = 3  # Maximum 3 attempts per session
+
+        if reformulation_count >= MAX_REFORMULATION_ATTEMPTS:
+            logger.error(
+                f"Session {request.session_id} has exceeded re-formulation attempt limit "
+                f"({reformulation_count}/{MAX_REFORMULATION_ATTEMPTS})"
+            )
+            raise ValidationRetryExhaustedError(
+                result.violations,
+                f"Re-formulation attempt limit exceeded ({MAX_REFORMULATION_ATTEMPTS} attempts per session). "
+                "Please clarify your request or provide more specific details.",
+            )
+
+        # Increment re-formulation count
+        new_count = await store.increment_reformulation_count(request.session_id)
+        logger.info(f"Attempt re-formulation for intent {request.intent_id} (session attempt {new_count}/{MAX_REFORMULATION_ATTEMPTS})")
+        logger.warning(f"Validation failed for intent {request.intent_id}, attempting re-formulation")
+        logger.info(f"Reformulation hint: {result.reformulation_hint}")
+
+        try:
+            # Re-formulate with failure reason
+            reformulated_body = await self._reformulate_with_failure_reason(
+                request=request,
+                original_body=bead_body,
+                validation_result=result,
+            )
+
+            # Validate the reformulated body
+            new_result = validator.validate_bead_body(reformulated_body, bead_type)
+
+            if not new_result.is_valid:
+                # Re-formulation still failed
+                logger.error(f"Re-formulation still failed for intent {request.intent_id}")
+                raise ValidationRetryExhaustedError(
+                    new_result.violations,
+                    f"Validation failed after re-formulation: {len(new_result.violations)} violations remain",
+                )
+
+            if new_result.requires_approval:
+                logger.info(f"Re-formulated body requires approval")
+                approval_card = self._build_approval_card(
+                    request=request,
+                    bead_body=reformulated_body,
+                    bead_type=bead_type,
+                    validation_result=new_result,
+                )
+                raise BeadApprovalRequired(approval_card, reformulated_body, bead_type)
+
+            logger.info(f"Re-formulated body passed validation")
+            return new_result, reformulated_body
+
+        except Exception as e:
+            logger.error(f"Re-formulation failed for intent {request.intent_id}: {e}")
+            raise ValidationRetryExhaustedError(
+                result.violations,
+                f"Re-formulation failed: {str(e)}",
+            )
+
+    async def _reformulate_with_failure_reason(
+        self,
+        request: EscalateRequest,
+        original_body: str,
+        validation_result: ValidationResult,
+    ) -> str:
+        """
+        Re-formulate bead body with validation failure reason.
+
+        Args:
+            request: The escalate request
+            original_body: The original bead body
+            validation_result: The validation result with violations
+
+        Returns:
+            Reformulated bead body
+        """
+        client = await self._get_zai_client()
+        system_prompt = load_escalate_prompt()
+
+        # Build failure message
+        failure_message = "The previous bead body failed validation:\n\n"
+        for violation in validation_result.violations:
+            failure_message += f"- {violation.message}\n"
+        if validation_result.reformulation_hint:
+            failure_message += f"\nHint: {validation_result.reformulation_hint}"
+
+        # Build user message
+        user_message = f"""Original intent: {request.utterance}
+
+{failure_message}
+
+Please re-formulate the bead body to address these validation errors.
+Output ONLY the revised bead body as markdown.
+"""
+
+        logger.info(f"Requesting re-formulation for intent {request.intent_id}")
+
+        try:
+            reformulated = await client.call_simple(
+                system_prompt=system_prompt,
+                user_message=user_message,
+                model=ModelClass.SONNET.value,
+                max_tokens=4096,
+                temperature=0.7,
+            )
+
+            logger.info(f"Re-formulated bead body for intent {request.intent_id}: {len(reformulated)} chars")
+            return reformulated
+
+        except Exception as e:
+            logger.error(f"Failed to re-formulate bead body: {e}")
+            raise
+
+    def _build_approval_card(
+        self,
+        request: EscalateRequest,
+        bead_body: str,
+        bead_type: str,
+        validation_result: ValidationResult,
+    ) -> dict:
+        """
+        Build an approval card for the surface.
+
+        The approval card shows the bead body and asks for user approval.
+        """
+        title = self._generate_bead_title(request)
+
+        return {
+            "type": "approval",
+            "id": f"approval-{request.intent_id}",
+            "intent_id": request.intent_id,
+            "title": title,
+            "summary": f"Review before creating: {request.utterance[:100]}",
+            "status": "awaiting_approval",
+            "urgency": request.metadata.get("urgency", "normal"),
+            "created_at": int(datetime.now(timezone.utc).timestamp()),
+            "bead_body": bead_body,
+            "bead_type": bead_type,
+            "validation_result": validation_result.to_dict(),
+            "metadata": {
+                "project_slug": request.project_slug,
+                "topic_id": request.topic_id,
+                "session_id": request.session_id,
+                "utterance": request.utterance,
+            },
+        }
+
+    def _build_approval_narration(
+        self,
+        request: EscalateRequest,
+        bead_type: str,
+        validation_result: dict,
+    ) -> str:
+        """
+        Build an approval narration for voice mode.
+
+        Creates a spoken message explaining why approval is needed.
+        """
+        bead_type_friendly = bead_type.replace("_", " ")
+
+        # Start with the core message
+        narration_parts = [
+            f"I need your approval before I can create this {bead_type_friendly} bead.",
+        ]
+
+        # Add the reason if available
+        if validation_result and validation_result.get("approval_requirement"):
+            approval_req = validation_result["approval_requirement"]
+            reason = approval_req.get("reason", "")
+            if reason:
+                narration_parts.append(f"Reason: {reason}")
+
+        # Add the request summary
+        utterance_preview = request.utterance[:100]
+        if len(request.utterance) > 100:
+            utterance_preview += "..."
+        narration_parts.append(f"Request: {utterance_preview}")
+
+        # Add instructions
+        narration_parts.append("Please approve or reject this request on the canvas.")
+
+        return " ".join(narration_parts)
+
     def build_pending_card(
         self,
         request: EscalateRequest,
@@ -705,6 +1004,44 @@ class EscalateHandler:
             },
         }
 
+    def build_clarification_card(
+        self,
+        request: EscalateRequest,
+        original_bead_body: str,
+        violations: list,
+    ) -> dict:
+        """
+        Build a clarification card for the surface.
+
+        The clarification card shows the user that the intent needs
+        clarification due to validation failures after re-formulation.
+        """
+        title = self._generate_bead_title(request)
+
+        # Format violations for display
+        violation_messages = []
+        for v in violations:
+            violation_messages.append(f"- {v.message}")
+
+        return {
+            "type": "clarification",
+            "id": f"clarification-{request.intent_id}",
+            "intent_id": request.intent_id,
+            "title": title,
+            "summary": f"Needs clarification: {request.utterance[:100]}",
+            "status": "needs_clarification",
+            "urgency": request.metadata.get("urgency", "normal"),
+            "created_at": int(datetime.now(timezone.utc).timestamp()),
+            "original_utterance": request.utterance,
+            "original_bead_body": original_bead_body,
+            "violations": violation_messages,
+            "metadata": {
+                "project_slug": request.project_slug,
+                "topic_id": request.topic_id,
+                "session_id": request.session_id,
+            },
+        }
+
     async def escalate_intent(self, request: EscalateRequest) -> EscalateResult:
         """
         Escalate an intent to a bead.
@@ -713,13 +1050,14 @@ class EscalateHandler:
         1. Load exceptions.yaml to determine bead type from escalation_targets
         2. Evaluate auto-approve rules from exceptions.yaml
         3. If auto-approved: execute directly and return result
-        4. Otherwise: formulate bead body via LLM, create bead, return pending-card spec
+        4. Otherwise: formulate bead body via LLM, validate, create bead (or approval card), return result
 
         Args:
             request: The escalate request
 
         Returns:
             EscalateResult with bead ID and pending card (if bead created)
+            or approval card (if approval required)
             or execution result (if auto-approved)
         """
         logger.info(f"Escalating intent {request.intent_id}")
@@ -760,14 +1098,36 @@ class EscalateHandler:
             # Step 4: Formulate bead body
             bead_body = await self.formulate_bead_body(request)
 
+            # Step 4.5: Validate and prepare for approval (NEW)
+            validation_result, reformulated_body = await self._validate_and_prepare_approval(
+                request=request,
+                bead_body=bead_body,
+                bead_type=bead_type,
+            )
+
+            # Use reformulated body if provided, otherwise original
+            final_body = reformulated_body or bead_body
+
             # Step 5: Create bead with determined type
-            bead_id = await self._create_bead_with_type(request, bead_body, bead_type)
+            bead_id = await self._create_bead_with_type(request, final_body, bead_type)
+
+            # Step 5.5: Create bead_watch row for circuit breaker tracking
+            # (plan §10 The Async Path: watcher tracks open beads for refusals/SLA)
+            await self._create_bead_watch(
+                bead_ref=bead_id,
+                project_slug=request.project_slug,
+                intent_type=request.intent_type,
+            )
+
+            # Reset re-formulation count on successful bead creation
+            store = await self._get_store()
+            await store.reset_reformulation_count(request.session_id)
+            logger.info(f"Reset reformulation_count for session {request.session_id} after successful bead creation")
 
             # Step 6: Build pending card
             pending_card = self.build_pending_card(request, bead_id, bead_type)
 
             # Update intent in store with bead reference
-            store = await self._get_store()
             await store.update_intent_status(
                 intent_id=request.intent_id,
                 status="dispatched",
@@ -782,6 +1142,109 @@ class EscalateHandler:
                 status="created",
             )
 
+        except BeadApprovalRequired as e:
+            # Approval required - store pending approval and broadcast approval event
+            logger.info(f"Approval required for intent {request.intent_id}")
+
+            # Update intent status
+            store = await self._get_store()
+            await store.update_intent_status(
+                intent_id=request.intent_id,
+                status="awaiting_approval",
+            )
+
+            # Store pending approval in database
+            approval_id = await store.create_pending_approval(
+                intent_id=request.intent_id,
+                session_id=request.session_id,
+                bead_body=e.bead_body,
+                bead_type=e.bead_type,
+                validation_result=e.approval_card.get("validation_result", {}),
+                utterance=request.utterance,
+                project_slug=request.project_slug,
+                topic_id=request.topic_id,
+            )
+            logger.info(f"Stored pending approval {approval_id} for intent {request.intent_id}")
+
+            # Add approval_id to approval card for reference
+            e.approval_card["approval_id"] = approval_id
+
+            # Build approval narration for voice mode
+            approval_narration = self._build_approval_narration(
+                request=request,
+                bead_type=e.bead_type,
+                validation_result=e.approval_card.get("validation_result", {}),
+            )
+
+            # Broadcast approval_required event to canvas
+            broadcaster = get_broadcaster()
+            await broadcaster.broadcast(
+                SSEEvent(
+                    event_type=EventType.APPROVAL_REQUIRED,
+                    data={
+                        "intent_id": request.intent_id,
+                        "session_id": request.session_id,
+                        "approval_id": approval_id,
+                        "approval_card": e.approval_card,
+                        "bead_body": e.bead_body,
+                        "bead_type": e.bead_type,
+                        "utterance": request.utterance,
+                        "narration": approval_narration,  # For voice mode
+                    },
+                    target_session_id=request.session_id,
+                )
+            )
+            logger.info(f"Broadcast approval_required event for intent {request.intent_id}")
+
+            return EscalateResult(
+                bead_id="",  # No bead created yet
+                intent_id=request.intent_id,
+                pending_card=e.approval_card,
+                status="awaiting_approval",
+            )
+        except ValidationRetryExhaustedError as e:
+            # Re-formulation failed - return clarification card
+            logger.warning(f"Re-formulation exhausted for intent {request.intent_id}: {e}")
+
+            # Update intent status
+            store = await self._get_store()
+            await store.update_intent_status(
+                intent_id=request.intent_id,
+                status="needs_clarification",
+            )
+
+            # Build clarification card
+            # We need to get the original bead body that was formulated before validation
+            # Since we don't have the original bead body at this point, we use the utterance
+            clarification_card = self.build_clarification_card(
+                request=request,
+                original_bead_body=request.utterance,  # Fallback to utterance
+                violations=e.original_violations,
+            )
+
+            # Broadcast clarification_card event to canvas
+            broadcaster = get_broadcaster()
+            await broadcaster.broadcast(
+                SSEEvent(
+                    event_type=EventType.CLARIFICATION_CARD,
+                    data={
+                        "intent_id": request.intent_id,
+                        "session_id": request.session_id,
+                        "clarification_card": clarification_card,
+                        "violations": [v.to_dict() if hasattr(v, 'to_dict') else {"message": str(v)} for v in e.original_violations],
+                        "utterance": request.utterance,
+                    },
+                    target_session_id=request.session_id,
+                )
+            )
+            logger.info(f"Broadcast clarification_card event for intent {request.intent_id}")
+
+            return EscalateResult(
+                bead_id="",  # No bead created
+                intent_id=request.intent_id,
+                pending_card=clarification_card,
+                status="needs_clarification",
+            )
         except EscalateError:
             raise
         except Exception as e:
@@ -813,3 +1276,145 @@ async def escalate_intent(request: EscalateRequest) -> EscalateResult:
     """
     handler = get_escalate_handler()
     return await handler.escalate_intent(request)
+
+
+async def handle_terminal_failure(
+    intent_id: str,
+    session_id: str,
+    topic_id: str | None,
+    failure_reason: str,
+    error_type: str = "unknown",
+    bead_ref: str | None = None,
+) -> None:
+    """
+    Handle a terminal failure for an intent.
+
+    Plan §10 The Async Path: terminal failure handling.
+    - Sets intents.status = 'failed'
+    - Stores failure reason in bead_watch.last_refusal_reason (if bead exists)
+    - Creates failed card in session store
+    - Broadcasts task_failed SSE event
+
+    Args:
+        intent_id: The intent that failed
+        session_id: The session ID
+        topic_id: The topic ID (optional)
+        failure_reason: Human-readable failure reason
+        error_type: Type of error (e.g., "worker_crash", "invalid_input")
+        bead_ref: Associated bead reference (optional)
+    """
+    from ..session.store import get_store as get_session_store
+    from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
+
+    store = get_session_store()
+
+    logger.info(f"Handling terminal failure for intent {intent_id}: {failure_reason}")
+
+    # Step 1: Update intent status to 'failed'
+    await store.update_intent_status(intent_id, "failed")
+    logger.info(f"Set intent {intent_id} to failed status")
+
+    # Step 2: Store failure reason in bead_watch if bead exists
+    if bead_ref:
+        try:
+            await store.update_bead_watch_refusal(
+                bead_ref=bead_ref,
+                refusal_reason=failure_reason,
+                comment_index=-1,  # No comment index for terminal failures
+                refusal_count_add=1,
+            )
+            logger.info(f"Stored failure reason for bead {bead_ref}")
+        except Exception as e:
+            logger.warning(f"Failed to update bead_watch for {bead_ref}: {e}")
+
+    # Step 3: Create or find topic for failed card
+    # Fetch intent once for both topic creation and result_type derivation
+    intent = None
+    try:
+        intent = await store.get_intent(intent_id)
+    except Exception as e:
+        logger.warning(f"Failed to fetch intent for result_type derivation: {e}")
+
+    final_topic_id = topic_id
+    if not final_topic_id and intent:
+        utterance_id = intent.get("utterance_id")
+        if utterance_id:
+            # Get utterance to create label
+            try:
+                async with aiosqlite.connect(store.db_path) as db:
+                    db.row_factory = aiosqlite.Row
+                    async with db.execute(
+                        "SELECT raw_text FROM utterances WHERE id = ?",
+                        (utterance_id,)
+                    ) as cursor:
+                        utterance_row = await cursor.fetchone()
+                        if utterance_row:
+                            utterance_text = utterance_row["raw_text"][:80]
+                            final_topic_id, _ = await store.find_or_create_topic(
+                                label=f"Failed: {utterance_text}",
+                                session_id=session_id,
+                                topic_type="exception",
+                            )
+            except Exception as e:
+                logger.warning(f"Failed to create topic for failed card: {e}")
+
+    # Step 4: Link intent to topic and create failed card
+    if final_topic_id:
+        try:
+            # Link intent to topic (many-to-many)
+            await store.link_intent_to_topic(intent_id, final_topic_id)
+
+            # Update intent's primary topic_id field
+            await store.update_intent_topic(intent_id, final_topic_id)
+
+            # Create failed result card
+            summary = f"Task Failed: {error_type.replace('_', ' ').title()}"
+            data = {
+                "bead_ref": bead_ref,
+                "failure_reason": failure_reason,
+                "error_type": error_type,
+                "message": f"Task failed: {failure_reason}",
+                "action_hint": "This task encountered a terminal error and cannot proceed. Review the error details and retry if applicable.",
+            }
+
+            # Derive result_type from intent data
+            result_type = derive_result_type(
+                intent_type=intent.get("intent_type") if intent else None,
+                project_slug=intent.get("project_slug") if intent else None,
+                lookup_kind=intent.get("lookup_kind") if intent else None,
+            )
+
+            result_id = await store.create_result(
+                intent_id=intent_id,
+                topic_id=final_topic_id,
+                session_id=session_id,
+                summary=summary,
+                data=data,
+                urgency="high",
+                result_type=result_type,
+            )
+
+            logger.info(f"Created failed card {result_id} for intent {intent_id}")
+        except Exception as e:
+            logger.warning(f"Failed to create failed card for intent {intent_id}: {e}")
+
+    # Step 5: Broadcast task_failed event via SSE
+    broadcaster = get_broadcaster()
+    await broadcaster.broadcast(
+        SSEEvent(
+            event_type=EventType.TASK_FAILED,
+            data={
+                "bead_id": bead_ref,
+                "intent_id": intent_id,
+                "session_id": session_id,
+                "topic_id": final_topic_id,
+                "failure_reason": failure_reason,
+                "error_type": error_type,
+                "message": f"Task failed: {failure_reason}",
+                "timestamp": int(datetime.now(timezone.utc).timestamp()),
+            },
+            target_session_id=session_id,
+        )
+    )
+
+    logger.info(f"Broadcast task_failed event for intent {intent_id}")
