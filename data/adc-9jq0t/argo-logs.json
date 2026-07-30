@@ -1,0 +1,68 @@
+{
+  "query_period": {
+    "start_date": "2026-06-24",
+    "end_date": "2026-07-24",
+    "days": 30
+  },
+  "cluster_info": {
+    "cluster": "iad-ci",
+    "namespace": "argo-workflows",
+    "kubeconfig": "/home/coding/.kube/iad-ci.kubeconfig"
+  },
+  "argo_retention_policy": {
+    "seconds_after_success": 1800,
+    "seconds_after_failure": 7200,
+    "seconds_after_completion": 3600,
+    "description": "Workflows are deleted 30 minutes after success, 2 hours after failure"
+  },
+  "available_workflow_templates": [
+    {
+      "name": "pbx-web-build",
+      "age_days": 58,
+      "target_service": "pbx-web",
+      "git_repo": "jedarden/nixos-asterisk",
+      "container_path": "pbx-web",
+      "docker_image": "ronaldraygun/pbx-web"
+    },
+    {
+      "name": "whisper-stt-build",
+      "age_days": 58,
+      "target_service": "whisper-stt",
+      "git_repo": "jedarden/nixos-asterisk",
+      "container_path": "whisper-stt",
+      "docker_image": "ronaldraygun/whisper-stt"
+    }
+  ],
+  "pbx_web_build_workflows": {
+    "total_runs_found": 0,
+    "workflow_runs": [],
+    "note": "Workflow template exists but no executions found in available data"
+  },
+  "whisper_stt_build_workflows": {
+    "total_runs_found": 0,
+    "workflow_runs": [],
+    "note": "Workflow template exists but no executions found in available data"
+  },
+  "active_workflow_templates_found": [
+    "commitgraph-build",
+    "mobile-gaming-ci",
+    "sun-sim-build",
+    "vista-build",
+    "website-build"
+  ],
+  "data_limitations": {
+    "oldest_workflow_found": "2026-07-16T04:00:00Z",
+    "total_workflows_in_namespace": 75,
+    "historic_data_availability": "Limited to ~8 days due to aggressive retention policy",
+    "missing_data_reason": "Argo Workflows TTL deletes completed workflows after 30 minutes (success) to 2 hours (failure)"
+  },
+  "conclusions": [
+    "pbx-web-build and whisper-stt-build workflow templates are defined (58 days old) but have never been executed",
+    "The workflow templates exist in declarative-config and are deployed to the cluster",
+    "No GitHub webhooks, cron triggers, or manual executions have triggered these workflows in the available data window",
+    "Historical workflow data is limited to 8 days due to Argo's aggressive retention policy (30 minutes to 2 hours)",
+    "Other workflow templates are actively executing, but pbx-web-build and whisper-stt-build are not among them"
+  ],
+  "generated_at": "2026-07-24T00:00:00Z",
+  "data_source": "kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig get workflows -n argo-workflows"
+}

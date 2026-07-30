@@ -102,9 +102,27 @@ class ContextWarmer:
         return result if result and "error" not in result else None
 
     async def fetch_argocd_status(self, project_slug: str) -> Optional[dict]:
-        """Fetch ArgoCD status for a project."""
-        context = FetchContext(project_slug=project_slug, app_name=project_slug)
-        result = await self._fetch_strand._fetch_argocd_app(context)
+        """Fetch ArgoCD status for a project.
+
+        The endpoint is resolved from the project's cluster via
+        config/clusters.yaml (bead adc-1ejh); a cluster with no consumable
+        read-only proxy yields no ArgoCD data rather than querying the wrong
+        instance.
+        """
+        from ..fetch.clusters import ArgocdEndpointUnresolvable
+        from ..registry import get_project
+
+        cfg = get_project(project_slug) if project_slug else None
+        context = FetchContext(
+            project_slug=project_slug,
+            app_name=(cfg.get("argocd_app") if cfg else None) or project_slug,
+            cluster=cfg.get("cluster") if cfg else None,
+        )
+        try:
+            result = await self._fetch_strand._fetch_argocd_app(context)
+        except ArgocdEndpointUnresolvable as e:
+            logger.info(f"No ArgoCD data for {project_slug}: {e.reason}")
+            return None
         return result if result and "error" not in result else None
 
     async def fetch_git_log(self, project_slug: str) -> Optional[dict]:

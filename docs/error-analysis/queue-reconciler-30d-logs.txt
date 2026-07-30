@@ -1,0 +1,73 @@
+2026-07-24 11:20:48,774 INFO Reconciler starting, interval=14400s
+2026-07-24 11:20:48,774 INFO Starting reconciliation...
+2026-07-24 11:20:50,195 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | TTFB: 0.083 ms
+2026-07-24 11:20:50,195 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | read() without TTFB: 271.364 ms
+2026-07-24 11:20:50,195 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | hash total: 3.580 ms
+2026-07-24 11:20:50,195 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | write() total: 0.989 ms
+2026-07-24 11:20:50,195 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | overhead: 0.379 ms
+2026-07-24 11:20:50,196 INFO download stats | <_io.BytesIO object at 0x7194345e3240>[writer] | TTFB: 0.158 ms
+2026-07-24 11:20:50,196 INFO download stats | <_io.BytesIO object at 0x7194345e3240>[writer] | read() without TTFB: 276.149 ms
+2026-07-24 11:20:50,196 INFO download stats | <_io.BytesIO object at 0x7194345e3240>[writer] | seek total: 0.123 ms
+2026-07-24 11:20:50,196 INFO download stats | <_io.BytesIO object at 0x7194345e3240>[writer] | write() total: 1.254 ms
+2026-07-24 11:20:50,196 INFO download stats | <_io.BytesIO object at 0x7194345e3240>[writer] | overhead: 0.304 ms
+2026-07-24 11:20:50,197 INFO download stats | <_io.BytesIO object at 0x7194345e3240> | finish_hash total: 0.009 ms
+2026-07-24 11:20:50,202 INFO Loaded 1346 input dates from input_data/file_list.json (skipped 48 zero-byte, 34 non-canonical)
+2026-07-24 11:20:50,450 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | TTFB: 0.054 ms
+2026-07-24 11:20:50,450 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | read() without TTFB: 36.080 ms
+2026-07-24 11:20:50,450 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | hash total: 2.271 ms
+2026-07-24 11:20:50,450 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | write() total: 0.746 ms
+2026-07-24 11:20:50,450 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | overhead: 0.294 ms
+2026-07-24 11:20:50,450 INFO download stats | <_io.BytesIO object at 0x7194345e3560>[writer] | TTFB: 0.549 ms
+2026-07-24 11:20:50,450 INFO download stats | <_io.BytesIO object at 0x7194345e3560>[writer] | read() without TTFB: 38.919 ms
+2026-07-24 11:20:50,451 INFO download stats | <_io.BytesIO object at 0x7194345e3560>[writer] | seek total: 0.139 ms
+2026-07-24 11:20:50,451 INFO download stats | <_io.BytesIO object at 0x7194345e3560>[writer] | write() total: 0.367 ms
+2026-07-24 11:20:50,451 INFO download stats | <_io.BytesIO object at 0x7194345e3560>[writer] | overhead: 0.218 ms
+2026-07-24 11:20:50,451 INFO download stats | <_io.BytesIO object at 0x7194345e3560> | finish_hash total: 0.007 ms
+2026-07-24 11:20:50,455 INFO Loaded 1344 enriched dates from greeks_enriched_v2/file_list.json
+2026-07-24 11:20:50,651 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | TTFB: 0.042 ms
+2026-07-24 11:20:50,651 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | read() without TTFB: 32.581 ms
+2026-07-24 11:20:50,652 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | hash total: 2.409 ms
+2026-07-24 11:20:50,652 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | write() total: 0.803 ms
+2026-07-24 11:20:50,652 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/input_data/file_list.json[0:353084] | overhead: 0.349 ms
+2026-07-24 11:20:50,652 INFO download stats | <_io.BytesIO object at 0x7194345e3c90>[writer] | TTFB: 0.819 ms
+2026-07-24 11:20:50,652 INFO download stats | <_io.BytesIO object at 0x7194345e3c90>[writer] | read() without TTFB: 35.780 ms
+2026-07-24 11:20:50,652 INFO download stats | <_io.BytesIO object at 0x7194345e3c90>[writer] | seek total: 0.098 ms
+2026-07-24 11:20:50,652 INFO download stats | <_io.BytesIO object at 0x7194345e3c90>[writer] | write() total: 0.242 ms
+2026-07-24 11:20:50,653 INFO download stats | <_io.BytesIO object at 0x7194345e3c90>[writer] | overhead: 0.198 ms
+2026-07-24 11:20:50,653 INFO download stats | <_io.BytesIO object at 0x7194345e3c90> | finish_hash total: 0.050 ms
+2026-07-24 11:20:51,404 INFO input_data/file_list.json is up to date (1428 entries)
+2026-07-24 11:20:51,600 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | TTFB: 0.050 ms
+2026-07-24 11:20:51,600 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | read() without TTFB: 28.342 ms
+2026-07-24 11:20:51,600 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | hash total: 2.330 ms
+2026-07-24 11:20:51,600 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | write() total: 1.010 ms
+2026-07-24 11:20:51,600 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/file_list.json[0:340034] | overhead: 0.335 ms
+2026-07-24 11:20:51,600 INFO download stats | <_io.BytesIO object at 0x71943462c860>[writer] | TTFB: 0.378 ms
+2026-07-24 11:20:51,600 INFO download stats | <_io.BytesIO object at 0x71943462c860>[writer] | read() without TTFB: 31.937 ms
+2026-07-24 11:20:51,600 INFO download stats | <_io.BytesIO object at 0x71943462c860>[writer] | seek total: 0.094 ms
+2026-07-24 11:20:51,601 INFO download stats | <_io.BytesIO object at 0x71943462c860>[writer] | write() total: 0.261 ms
+2026-07-24 11:20:51,601 INFO download stats | <_io.BytesIO object at 0x71943462c860>[writer] | overhead: 0.223 ms
+2026-07-24 11:20:51,601 INFO download stats | <_io.BytesIO object at 0x71943462c860> | finish_hash total: 0.005 ms
+/app/reconciler.py:318: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "last_modified": datetime.utcnow().strftime("%Y%m%d%H%M%S"),
+2026-07-24 11:20:52,189 INFO Adding 3 new files to greeks_enriched_v2/file_list.json (total: 1347)
+2026-07-24 11:20:52,838 INFO Updated greeks_enriched_v2/file_list.json with 1347 entries
+2026-07-24 11:20:53,174 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/manifest.json[0:21591] | TTFB: 0.053 ms
+2026-07-24 11:20:53,174 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/manifest.json[0:21591] | read() without TTFB: 0.183 ms
+2026-07-24 11:20:53,174 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/manifest.json[0:21591] | hash total: 0.261 ms
+2026-07-24 11:20:53,174 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/manifest.json[0:21591] | write() total: 0.064 ms
+2026-07-24 11:20:53,174 INFO download stats | https://f002.backblazeb2.com/file/historical-option-data/greeks_enriched_v2/manifest.json[0:21591] | overhead: 0.041 ms
+2026-07-24 11:20:53,175 INFO download stats | <_io.BytesIO object at 0x7194345e3740>[writer] | TTFB: 0.588 ms
+2026-07-24 11:20:53,175 INFO download stats | <_io.BytesIO object at 0x7194345e3740>[writer] | read() without TTFB: 0.626 ms
+2026-07-24 11:20:53,175 INFO download stats | <_io.BytesIO object at 0x7194345e3740>[writer] | seek total: 0.008 ms
+2026-07-24 11:20:53,175 INFO download stats | <_io.BytesIO object at 0x7194345e3740>[writer] | write() total: 0.050 ms
+2026-07-24 11:20:53,175 INFO download stats | <_io.BytesIO object at 0x7194345e3740>[writer] | overhead: 0.023 ms
+2026-07-24 11:20:53,175 INFO download stats | <_io.BytesIO object at 0x7194345e3740> | finish_hash total: 0.005 ms
+2026-07-24 11:20:53,175 INFO Loaded manifest: 1344 completed, 0 failed
+2026-07-24 11:20:53,180 INFO Needs processing: 2 dates (input=1346, enriched=1344, failed=0)
+2026-07-24 11:20:53,190 INFO Queue stats: pending=0 processing=0 failed=0
+2026-07-24 11:20:53,190 INFO Queue is low, rebuilding from source of truth...
+2026-07-24 11:20:53,196 INFO Added 2 jobs to queue
+2026-07-24 11:20:53,201 INFO Final stats: pending=2 processing=0
+2026-07-24 11:20:53,201 INFO Reconciliation complete
+2026-07-24 11:20:53,201 INFO Reconciliation complete
+2026-07-24 11:20:53,201 INFO Sleeping 14400s before restart...
