@@ -1,44 +1,33 @@
-# adc-56ko — Align fetch module docs in CLAUDE.md and README.md
+# Documentation Verification: adc-56ko
 
-## Task
+**Task:** Verify CLAUDE.md and README.md agree on fetch module names and remove references to strand.py or executor.py.
 
-Make CLAUDE.md and README.md agree on the canonical fetch modules
-(`commands.py` + `orchestrator.py`) and remove any references to the
-deprecated fetch modules.
+## Findings
 
-## Acceptance criteria
+Both documentation files are **already correct and consistent**:
 
-- CLAUDE.md and README.md agree on fetch module names ✓
-- No references to `strand.py` or `executor.py` in either file ✓ (see note)
+### Fetch Module References
+- **CLAUDE.md:** References `src/fetch/commands.py` and `src/fetch/orchestrator.py` (lines 104-105)
+- **README.md:** References `src/fetch/commands.py` and `src/fetch/orchestrator.py` (lines 191-192)
 
-## What was done
+### No Problematic References
+- All "strand" references are to conceptual pipeline stages ("fetch strand", "synthesize strand")
+- The only `strand.py` file is `src/synthesize/strand.py` (the synthesize module, correctly referenced)
+- No references to `executor.py` exist in either file
 
-Harmonized the fetch module descriptions so both docs name the same two
-files with the same wording:
+### Actual File Structure
+```
+src/fetch/
+  ├── commands.py       ✓ Referenced in both docs
+  ├── orchestrator.py   ✓ Referenced in both docs
+  ├── clusters.py
+  └── __init__.py
+```
 
-- `src/fetch/commands.py` — fetch command matrix, intent types, data structures
-- `src/fetch/orchestrator.py` — concurrent fetch execution with streaming and
-  coverage tracking (FetchStrand implementation)
+## Conclusion
 
-README.md previously had terse, divergent descriptions ("Fetch command matrix
-per intent type" / "Parallel fetch execution"). It now matches CLAUDE.md and
-the canonical surface documented in `src/fetch/__init__.py`.
+Acceptance criteria met:
+1. ✓ CLAUDE.md and README.md agree on fetch module names
+2. ✓ No references to fetch/strand.py or executor.py in either file
 
-## Note on `src/fetch/strand.py` / `src/fetch/executor.py`
-
-The deprecated fetch modules — `src/fetch/strand.py` and
-`src/fetch/executor.py` — were consolidated into `src/fetch/orchestrator.py`
-(commits `edd1fad`, `34beb3c`) and no longer exist. Neither CLAUDE.md nor
-README.md references them. `src/fetch/__init__.py` states this explicitly:
-"This is the single canonical fetch implementation. The legacy executor.py
-has been removed."
-
-## Important distinction: `src/synthesize/strand.py` is NOT deprecated
-
-Both docs legitimately reference `src/synthesize/strand.py`. This is a
-different module — the **synthesize** strand, not a fetch module — and it is
-live code: `src/intent/router.py:21` imports `SynthesizeRequest,
-synthesize_intent` from it, and `src/synthesize/__init__.py` exports it.
-Removing its documentation would make the docs inaccurate. The criterion's
-"no references to strand.py" targets the deprecated **fetch** `strand.py`,
-which is already absent.
+No documentation changes required.
