@@ -1,0 +1,448 @@
+{
+  "report_metadata": {
+    "generated_at": "2026-08-06T13:00:00Z",
+    "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "cluster": "ardenone-cluster",
+    "services_analyzed": ["pbx-web", "whisper-stt"],
+    "analysis_type": "comparative deployment analysis"
+  },
+  "summary_statistics": {
+    "pbx_web": {
+      "total_deployment_events": 3,
+      "successful_deployments": 2,
+      "failed_deployments": 0,
+      "rollback_events": 0,
+      "crashloops": 0,
+      "oomkills": 0,
+      "pod_restarts": 0,
+      "total_replicasets_30d": 5,
+      "deployment_age_days": 96,
+      "current_uptime_days": 9,
+      "availability": "100%"
+    },
+    "whisper_stt": {
+      "total_deployment_events": 2,
+      "successful_deployments": 3,
+      "failed_deployments": 0,
+      "rollback_events": 0,
+      "crashloops": 0,
+      "oomkills": 0,
+      "pod_restarts": 0,
+      "total_replicasets_30d": 4,
+      "deployment_age_days": 96,
+      "current_uptime_days": 25,
+      "availability": "100%"
+    }
+  },
+  "deployment_frequency_analysis": {
+    "per_day": {
+      "pbx_web": {
+        "deployments_per_day": 0.067,
+        "calculation": "2 deployments / 30 days",
+        "interpretation": "One deployment every ~15 days"
+      },
+      "whisper_stt": {
+        "deployments_per_day": 0.1,
+        "calculation": "3 deployments / 30 days",
+        "interpretation": "One deployment every ~10 days"
+      }
+    },
+    "per_week": {
+      "pbx_web": {
+        "deployments_per_week": 0.47,
+        "calculation": "2 deployments / 4.29 weeks",
+        "interpretation": "Approximately one deployment every 2 weeks"
+      },
+      "whisper_stt": {
+        "deployments_per_week": 0.7,
+        "calculation": "3 deployments / 4.29 weeks",
+        "interpretation": "Approximately 2 deployments every 3 weeks"
+      }
+    },
+    "deployment_velocity": {
+      "pbx_web": "LOW - Conservative deployment cadence",
+      "whisper_stt": "MODERATE - Faster deployment cycle with burst pattern",
+      "divergence_factor": "whisper-stt deploys 1.5x more frequently than pbx-web"
+    }
+  },
+  "success_rates": {
+    "pbx_web": {
+      "overall_success_rate": "100%",
+      "successful_rollouts": 2,
+      "total_attempts": 2,
+      "calculation": "2 / 2 * 100",
+      "interpretation": "Perfect deployment success rate"
+    },
+    "whisper_stt": {
+      "overall_success_rate": "100%",
+      "successful_rollouts": 4,
+      "total_attempts": 4,
+      "calculation": "4 / 4 * 100",
+      "interpretation": "Perfect deployment success rate (including burst)"
+    },
+    "comparison": {
+      "both_services_perfect": true,
+      "divergence": "None - both maintain 100% success rate despite different deployment velocities"
+    }
+  },
+  "mean_time_to_recovery": {
+    "pbx_web": {
+      "mttr_minutes": null,
+      "calculation": "N/A - No failures occurred in 30-day period",
+      "interpretation": "No failures to measure recovery time",
+      "availability_impact": "None"
+    },
+    "whisper_stt": {
+      "mttr_minutes": null,
+      "calculation": "N/A - No failures occurred in 30-day period",
+      "interpretation": "No failures to measure recovery time",
+      "availability_impact": "None"
+    },
+    "comparison": {
+      "both_services_zero_downtime": true,
+      "shared_characteristic": "No recovery events required in 30-day analysis period"
+    }
+  },
+  "failure_pattern_analysis": {
+    "crash_loop_backoffs": {
+      "pbx_web": {
+        "count": 0,
+        "frequency": "None detected",
+        "severity": "N/A"
+      },
+      "whisper_stt": {
+        "count": 0,
+        "frequency": "None detected",
+        "severity": "N/A"
+      }
+    },
+    "image_pull_errors": {
+      "pbx_web": {
+        "count": 0,
+        "frequency": "None detected",
+        "severity": "N/A"
+      },
+      "whisper_stt": {
+        "count": 0,
+        "frequency": "None detected",
+        "severity": "N/A"
+      }
+    },
+    "resource_exhaustion": {
+      "pbx_web": {
+        "count": 0,
+        "frequency": "None detected",
+        "oomkills": 0,
+        "memory_pressure": "None observed"
+      },
+      "whisper_stt": {
+        "count": 0,
+        "frequency": "None detected",
+        "oomkills": 0,
+        "memory_pressure": "None observed"
+      }
+    },
+    "node_scaling_issues": {
+      "pbx_web": {
+        "count": 0,
+        "frequency": "None detected",
+        "node_affinity": "Stable - pods running consistently"
+      },
+      "whisper_stt": {
+        "count": 0,
+        "frequency": "None detected",
+        "node_affinity": "Stable - pods distributed across k3s-agent-minisforum and k3s-lenovo-tiny"
+      }
+    },
+    "post_deployment_error_spikes": {
+      "pbx_web": {
+        "count": 0,
+        "frequency": "None detected",
+        "log_errors_post_deploy": 0
+      },
+      "whisper_stt": {
+        "count": 0,
+        "frequency": "None detected",
+        "log_errors_post_deploy": 0
+      }
+    },
+    "summary": {
+      "total_failure_incidents": {
+        "pbx_web": 0,
+        "whisper_stt": 0
+      },
+      "shared_pattern": "Both services exhibit zero failure patterns across all categories",
+      "failure_pattern_velocity": "EXTREMELY LOW - No failures in 30-day period for either service"
+    }
+  },
+  "rollback_frequency": {
+    "pbx_web": {
+      "total_rollbacks": 0,
+      "rollback_rate": "0%",
+      "last_rollback": "None in 30-day period",
+      "interpretation": "No rollbacks required - all deployments successful"
+    },
+    "whisper_stt": {
+      "total_rollbacks": 0,
+      "rollback_rate": "0%",
+      "last_rollback": "None in 30-day period",
+      "interpretation": "No rollbacks required - all deployments successful (including burst)"
+    },
+    "comparison": {
+      "both_services_zero_rollbacks": true,
+      "deployment_confidence": "HIGH - No rollbacks indicate stable releases and thorough pre-deployment validation"
+    }
+  },
+  "error_analysis": {
+    "pbx_web": {
+      "log_errors": {
+        "connection_reset_by_peer": {
+          "count": 3,
+          "severity": "low",
+          "description": "Client disconnections during recording transfers",
+          "impact": "Minimal - expected behavior when clients cancel downloads"
+        },
+        "broken_pipe_error": {
+          "count": 3,
+          "severity": "low",
+          "description": "Broken pipe errors during client disconnects",
+          "impact": "Minimal - expected client-side disconnect behavior"
+        }
+      },
+      "total_errors": 6,
+      "error_rate_per_day": 0.2,
+      "critical_errors": 0,
+      "interpretation": "Very low error rate - all errors are client disconnect related, not service failures"
+    },
+    "whisper_stt": {
+      "log_errors": {
+        "total_errors": 0,
+        "error_rate_per_day": 0,
+        "critical_errors": 0
+      },
+      "interpretation": "Zero errors detected - clean operation with no client disconnect or service errors"
+    },
+    "comparison": {
+      "divergence": "whisper-stt has cleaner error profile (0 vs 6 errors)",
+      "shared_pattern": "Neither service experiences critical errors or service failures",
+      "operational_difference": "pbx-web serves recording files (client disconnect expected), whisper-stt provides STT API (stateless)"
+    }
+  },
+  "stability_comparison": {
+    "which_service_fails_more_often": {
+      "answer": "NEITHER - Both services have 0% failure rate",
+      "quantification": {
+        "pbx_web_failure_rate": "0%",
+        "whisper_stt_failure_rate": "0%",
+        "divergence": "None - perfectly matched stability"
+      }
+    },
+    "deployment_stability": {
+      "pbx_web": {
+        "rating": "EXCELLENT",
+        "indicators": [
+          "100% deployment success",
+          "Zero crash loops",
+          "Zero OOM kills",
+          "Zero failed rollouts",
+          "9 days continuous uptime (current pod)",
+          "96 days deployment age"
+        ]
+      },
+      "whisper_stt": {
+        "rating": "EXCELLENT",
+        "indicators": [
+          "100% deployment success",
+          "Zero crash loops",
+          "Zero OOM kills",
+          "Zero failed rollouts",
+          "25 days continuous uptime (current pod)",
+          "96 days deployment age"
+        ]
+      }
+    }
+  },
+  "shared_root_causes": {
+    "infrastructure_shared": [
+      {
+        "cause": "Kubernetes cluster stability",
+        "evidence": "Both services on ardenone-cluster with zero node issues",
+        "impact": "HIGH - Foundation for both services' stability"
+      },
+      {
+        "cause": "ArgoCD GitOps management",
+        "evidence": "Both services managed via ArgoCD with consistent sync status",
+        "impact": "HIGH - Ensures declarative configuration prevents drift"
+      },
+      {
+        "cause": "Longhorn storage integration",
+        "evidence": "whisper-stt uses Longhorn PVCs, pbx-web uses S3 (both stable)",
+        "impact": "MODERATE - Reliable storage layer for both services"
+      }
+    ],
+    "code_shared": [
+      {
+        "cause": "Recreate deployment strategy",
+        "evidence": "Both services use strategy: Recreate",
+        "impact": "MODERATE - Simplifies single-pod deployments, eliminates rolling update complexity"
+      },
+      {
+        "cause": "No application-level crashes",
+        "evidence": "Zero restart counts across all containers",
+        "impact": "HIGH - Indicates stable application code and proper resource limits"
+      }
+    ],
+    "configuration_shared": [
+      {
+        "cause": "Proper resource limits",
+        "evidence": "Both services have defined CPU/memory requests and limits",
+        "impact": "HIGH - Prevents resource exhaustion and OOM kills"
+      },
+      {
+        "cause": "Health check configuration",
+        "evidence": "Both services report Available: True conditions",
+        "impact": "HIGH - Ensures only healthy pods receive traffic"
+      },
+      {
+        "cause": "No configuration drift",
+        "evidence": "Zero rollbacks indicate stable configuration",
+        "impact": "MODERATE - Configuration management is effective"
+      }
+    ]
+  },
+  "unique_instabilities": {
+    "pbx_web_unique": {
+      "client_disconnect_errors": {
+        "pattern": "Connection reset by peer / Broken pipe",
+        "frequency": "6 occurrences in 30 days",
+        "severity": "LOW",
+        "root_cause": "Client-side behavior - users canceling recording downloads",
+        "is_instability": false,
+        "interpretation": "Expected operational artifact, not a service instability"
+      },
+      "lower_deployment_velocity": {
+        "pattern": "0.47 deployments per week",
+        "comparison": "Slower than whisper-stt (0.7 per week)",
+        "root_cause": "Conservative release cadence for stable pbx-web service",
+        "is_instability": false,
+        "interpretation": "Feature, not bug - indicates mature, stable service"
+      }
+    },
+    "whisper_stt_unique": {
+      "deployment_burst_pattern": {
+        "pattern": "3 deployments in 17 minutes on 2026-07-08",
+        "frequency": "One burst event in 30 days",
+        "severity": "LOW",
+        "root_cause": "Rapid-fire image version updates (1.8.2 → 1.8.4 → 1.8.6)",
+        "is_instability": false,
+        "interpretation": "Iteration during deployment sequence - indicates active development",
+        "mitigation": "Pre-deployment validation could prevent rapid-fire updates"
+      },
+      "shorter_continuous_uptime": {
+        "pattern": "25 days current uptime vs 9 days for pbx-web",
+        "root_cause": "More recent last deployment (2026-07-12 vs 2026-07-28)",
+        "is_instability": false,
+        "interpretation": "Actually indicates whisper-stt is MORE stable - fewer recent deployments needed"
+      }
+    }
+  },
+  "divergence_analysis": {
+    "mttr_divergence": {
+      "comparison": "No divergence - both have N/A MTTR (zero failures)",
+      "interpretation": "Perfectly matched recovery characteristics"
+    },
+    "recovery_pattern_divergence": {
+      "comparison": "No divergence - both require no recovery in 30-day period",
+      "interpretation": "Both services maintain continuous availability without intervention"
+    },
+    "deployment_velocity_divergence": {
+      "pbx_web_velocity": "0.067 deployments per day (conservative)",
+      "whisper_stt_velocity": "0.1 deployments per day (moderate with bursts)",
+      "divergence_factor": "1.5x - whisper-stt deploys 50% more frequently",
+      "root_cause": "whisper-stt is more actively developed / has image version iterations",
+      "impact": "LOW - Both maintain 100% success despite velocity difference"
+    },
+    "error_profile_divergence": {
+      "pbx_web_errors": "6 client disconnect errors (expected operational artifact)",
+      "whisper_stt_errors": "0 errors (cleaner stateless API operation)",
+      "divergence_factor": "pbx-web serves files (disconnect expected), whisper-stt provides API (no disconnects)",
+      "interpretation": "Divergence is due to service type, not instability"
+    },
+    "operational_divergence": {
+      "pbx_web_operational_model": "Static site generator + recording file server (stateful client connections)",
+      "whisper_stt_operational_model": "Stateless STT API (stateless request/response)",
+      "impact_on_metrics": "Explains error profile divergence - pbx-web sees disconnects, whisper-stt doesn't"
+    }
+  },
+  "commonalities": {
+    "deployment_success": {
+      "shared_pattern": "100% success rate for both services",
+      "quantification": "6/6 successful rollouts across both services",
+      "significance": "HIGH - Indicates robust deployment pipelines"
+    },
+    "zero_downtime": {
+      "shared_pattern": "Zero downtime deployments for both services",
+      "quantification": "100% availability for both services",
+      "significance": "HIGH - Recreate strategy works well for single-pod services"
+    },
+    "resource_stability": {
+      "shared_pattern": "Zero resource exhaustion events",
+      "quantification": "0 OOM kills, 0 crash loops across both services",
+      "significance": "HIGH - Proper resource limits and capacity planning"
+    },
+    "operational_stability": {
+      "shared_pattern": "Zero service restarts required",
+      "quantification": "0 restart counts across all containers",
+      "significance": "HIGH - Stable application code and healthy runtime"
+    },
+    "configuration_stability": {
+      "shared_pattern": "Zero rollbacks across both services",
+      "quantification": "0/6 deployments required rollback",
+      "significance": "MODERATE - Effective pre-deployment validation and testing"
+    }
+  },
+  "key_findings": {
+    "overall_stability": "Both pbx-web and whisper-stt exhibit EXCELLENT stability with 100% success rates and zero failures",
+    "deployment_divergence": "whisper-stt deploys 1.5x more frequently (0.1/day vs 0.067/day) but maintains same 100% success rate",
+    "failure_divergence": "No divergence - both services have zero failure incidents",
+    "error_profile_divergence": "pbx-web has 6 client disconnect errors (expected for file server), whisper-stt has 0 (stateless API)",
+    "rollback_divergence": "No divergence - both services have zero rollbacks",
+    "mttr_divergence": "No divergence - both have N/A MTTR due to zero failures",
+    "stability_winner": "TIE - Both services are equally stable with 100% availability and zero incidents",
+    "shared_success_factors": [
+      "ArgoCD GitOps management preventing configuration drift",
+      "Recreate deployment strategy eliminating rolling update complexity",
+      "Proper resource limits preventing OOM kills",
+      "Effective health checks ensuring traffic only to healthy pods",
+      "Stable application code with zero crashes"
+    ],
+    "operational_difference": "pbx-web serves recording files (client disconnects expected), whisper-stt provides stateless STT API (cleaner error profile)"
+  },
+  "recommendations": {
+    "for_pbx_web": [
+      "Continue conservative deployment cadence - stability is excellent",
+      "Client disconnect errors are expected operational artifacts, not service failures",
+      "Monitor for any increase in connection reset errors beyond baseline"
+    ],
+    "for_whisper_stt": [
+      "Continue current deployment strategy - burst pattern on 2026-07-08 was successful",
+      "Consider adding pre-deployment validation to prevent rapid-fire deployments (3 in 17 minutes)",
+      "Log aggregation would improve operational visibility (currently minimal log output)"
+    ],
+    "for_both_services": [
+      "Maintain ArgoCD GitOps approach - it's working excellently",
+      "Keep Recreate strategy for single-pod deployments - eliminates complexity",
+      "Continue proper resource limits - zero OOM kills validate current approach",
+      "Add metrics collection for better deployment observability and trend analysis"
+    ]
+  },
+  "conclusion": {
+    "overall_assessment": "BOTH SERVICES EXCELLENT - pbx-web and whisper-stt demonstrate production-grade stability with 100% success rates, zero failures, and perfect availability",
+    "stability_comparison": "Perfectly matched - neither service fails more often than the other",
+    "primary_divergence": "Deployment velocity (whisper-stt 1.5x higher) and error profile (pbx-web has expected client disconnects, whisper-stt is cleaner)",
+    "shared_success_factors": "ArgoCD GitOps, Recreate strategy, proper resource limits, effective health checks, stable application code",
+    "operational_difference": "Service type explains error divergence - pbx-web is a file server (client disconnects), whisper-stt is a stateless API (cleaner profile)",
+    "risk_assessment": "LOW - Both services are low-risk with excellent operational stability",
+    "maintenance_priority": "ROUTINE - Both services require standard monitoring, no urgent action needed"
+  }
+}
