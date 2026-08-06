@@ -667,3 +667,267 @@ class TestRealWorldData:
         is_valid, error = validate_deployment_data(data)
         assert is_valid is True
         assert error is None
+
+
+class TestValidateRequiredFields:
+    """Test the validate_required_fields function specifically."""
+
+    def test_all_required_fields_present_returns_true_empty_string(self):
+        """Test that data with all required fields returns (True, '')."""
+        data = {
+            "service": "pbx-web",
+            "period_days": 30,
+            "total_deployments": 10,
+            "successful_deployments": 8,
+            "failed_deployments": 2,
+            "success_rate": 80.0,
+            "failure_rate": 20.0,
+            "deployment_frequency_per_day": 0.33,
+            "mean_time_between_deployments_hours": 72.0,
+            "deployment_names": ["pbx-web"],
+            "first_deployment": "2026-07-01T00:00:00Z",
+            "last_deployment": "2026-07-30T23:59:59Z"
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is True
+        assert error == ""
+
+    def test_missing_single_field_returns_false_with_error(self):
+        """Test that missing a single required field returns (False, error_message)."""
+        data = {
+            "service": "pbx-web",
+            "period_days": 30,
+            "total_deployments": 10,
+            "successful_deployments": 8,
+            "failed_deployments": 2,
+            "success_rate": 80.0,
+            "failure_rate": 20.0,
+            "deployment_frequency_per_day": 0.33,
+            "mean_time_between_deployments_hours": 72.0,
+            "deployment_names": ["pbx-web"],
+            "first_deployment": "2026-07-01T00:00:00Z"
+            # Missing: last_deployment
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is False
+        assert "Missing required field" in error
+        assert "last_deployment" in error
+        assert error != ""
+
+    def test_missing_multiple_fields_returns_false_with_clear_error(self):
+        """Test that missing multiple fields returns clear error listing all missing."""
+        data = {
+            "service": "pbx-web"
+            # Missing: all other required fields
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is False
+        assert "Missing required fields" in error
+        assert error != ""
+        # Should list multiple missing fields
+        missing_count = error.count(",") + 1
+        assert missing_count >= 10  # At least 10 fields missing
+
+    def test_missing_service_field_specific_error(self):
+        """Test that missing 'service' field gives specific error."""
+        data = {
+            "period_days": 30,
+            "total_deployments": 10
+            # Missing: service and other fields
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is False
+        assert "service" in error.lower()
+
+    def test_non_dict_input_returns_type_error(self):
+        """Test that non-dictionary input returns type error."""
+        is_valid, error = validate_required_fields("not a dict")
+        assert is_valid is False
+        assert "must be a dictionary" in error
+        assert error != ""
+
+    def test_list_input_returns_type_error(self):
+        """Test that list input returns type error."""
+        is_valid, error = validate_required_fields([])
+        assert is_valid is False
+        assert "must be a dictionary" in error
+
+    def test_none_input_returns_type_error(self):
+        """Test that None input returns type error."""
+        is_valid, error = validate_required_fields(None)
+        assert is_valid is False
+        assert "must be a dictionary" in error
+
+    def test_services_collection_valid_returns_true_empty_string(self):
+        """Test that valid services collection returns (True, '')."""
+        data = {
+            "services": {
+                "pbx-web": {
+                    "service": "pbx-web",
+                    "period_days": 30,
+                    "total_deployments": 10,
+                    "successful_deployments": 8,
+                    "failed_deployments": 2,
+                    "success_rate": 80.0,
+                    "failure_rate": 20.0,
+                    "deployment_frequency_per_day": 0.33,
+                    "mean_time_between_deployments_hours": 72.0,
+                    "deployment_names": ["pbx-web"],
+                    "first_deployment": "2026-07-01T00:00:00Z",
+                    "last_deployment": "2026-07-30T23:59:59Z"
+                },
+                "whisper-stt": {
+                    "service": "whisper-stt",
+                    "period_days": 30,
+                    "total_deployments": 4,
+                    "successful_deployments": 1,
+                    "failed_deployments": 3,
+                    "success_rate": 25.0,
+                    "failure_rate": 75.0,
+                    "deployment_frequency_per_day": 0.133,
+                    "mean_time_between_deployments_hours": 168.0,
+                    "deployment_names": ["whisper-stt"],
+                    "first_deployment": "2026-07-08T03:26:44Z",
+                    "last_deployment": "2026-07-12T16:54:57Z"
+                }
+            }
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is True
+        assert error == ""
+
+    def test_services_collection_missing_field_returns_error_with_service_name(self):
+        """Test that services collection with missing field returns error with service context."""
+        data = {
+            "services": {
+                "pbx-web": {
+                    "service": "pbx-web"
+                    # Missing all other required fields
+                }
+            }
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is False
+        assert "pbx-web" in error  # Service name should be in error
+        assert "Missing required fields" in error
+
+    def test_services_collection_not_dict_returns_error(self):
+        """Test that services collection as non-dict returns error."""
+        data = {
+            "services": ["not", "a", "dict"]
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is False
+        assert "must be a dictionary" in error
+
+    def test_empty_dict_returns_false_with_missing_fields_error(self):
+        """Test that empty dictionary returns False with missing fields error."""
+        is_valid, error = validate_required_fields({})
+        assert is_valid is False
+        assert "Missing required fields" in error
+        assert error != ""
+
+    def test_extra_fields_do_not_affect_validation(self):
+        """Test that extra fields not in schema are ignored."""
+        data = {
+            "service": "pbx-web",
+            "period_days": 30,
+            "total_deployments": 10,
+            "successful_deployments": 8,
+            "failed_deployments": 2,
+            "success_rate": 80.0,
+            "failure_rate": 20.0,
+            "deployment_frequency_per_day": 0.33,
+            "mean_time_between_deployments_hours": 72.0,
+            "deployment_names": ["pbx-web"],
+            "first_deployment": "2026-07-01T00:00:00Z",
+            "last_deployment": "2026-07-30T23:59:59Z",
+            "extra_field": "should be ignored",
+            "another_extra": 12345,
+            "yet_another": ["extra", "data"]
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is True
+        assert error == ""
+
+    def test_incorrect_data_types_still_pass_field_presence_check(self):
+        """Test that incorrect data types pass field presence check (only checks presence)."""
+        data = {
+            "service": "pbx-web",
+            "period_days": "30",  # Should be int, but field presence check passes
+            "total_deployments": "10",  # Should be int
+            "successful_deployments": "8",  # Should be int
+            "failed_deployments": "2",  # Should be int
+            "success_rate": "80.0",  # Should be float
+            "failure_rate": "20.0",  # Should be float
+            "deployment_frequency_per_day": "0.33",  # Should be float
+            "mean_time_between_deployments_hours": "72.0",  # Should be float
+            "deployment_names": "not-a-list",  # Should be list, but field exists
+            "first_deployment": "2026-07-01T00:00:00Z",
+            "last_deployment": "2026-07-30T23:59:59Z"
+        }
+        # Field presence check should pass (all fields exist)
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is True
+        assert error == ""
+
+    def test_specific_field_error_messages_are_clear(self):
+        """Test that specific missing field error messages are clear and actionable."""
+        # Test missing service field specifically
+        data = {
+            "period_days": 30,
+            "total_deployments": 10,
+            "successful_deployments": 8,
+            "failed_deployments": 2,
+            "success_rate": 80.0,
+            "failure_rate": 20.0,
+            "deployment_frequency_per_day": 0.33,
+            "mean_time_between_deployments_hours": 72.0,
+            "deployment_names": ["pbx-web"],
+            "first_deployment": "2026-07-01T00:00:00Z",
+            "last_deployment": "2026-07-30T23:59:59Z"
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is False
+        assert "service" in error.lower()
+        assert "missing" in error.lower()
+
+    def test_realistic_pbx_web_data_passes(self):
+        """Test with realistic pbx-web deployment data."""
+        data = {
+            "service": "pbx-web",
+            "period_days": 30,
+            "total_deployments": 12,
+            "successful_deployments": 11,
+            "failed_deployments": 1,
+            "success_rate": 91.67,
+            "failure_rate": 8.33,
+            "deployment_frequency_per_day": 0.4,
+            "mean_time_between_deployments_hours": 60.0,
+            "deployment_names": ["pbx-web", "pbx-web-v2"],
+            "first_deployment": "2026-07-01T10:15:00Z",
+            "last_deployment": "2026-07-30T18:45:00Z"
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is True
+        assert error == ""
+
+    def test_realistic_whisper_stt_data_passes(self):
+        """Test with realistic whisper-stt deployment data."""
+        data = {
+            "service": "whisper-stt",
+            "period_days": 30,
+            "total_deployments": 4,
+            "successful_deployments": 1,
+            "failed_deployments": 3,
+            "success_rate": 25.0,
+            "failure_rate": 75.0,
+            "deployment_frequency_per_day": 0.133,
+            "mean_time_between_deployments_hours": 168.0,
+            "deployment_names": ["whisper-stt"],
+            "first_deployment": "2026-07-08T03:26:44Z",
+            "last_deployment": "2026-07-12T16:54:57Z"
+        }
+        is_valid, error = validate_required_fields(data)
+        assert is_valid is True
+        assert error == ""
