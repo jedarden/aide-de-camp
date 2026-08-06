@@ -9,6 +9,7 @@ Takes raw data from fetch sources and produces:
 Reads prompts/synthesize.md per invocation (hot-reload).
 """
 
+import asyncio
 import json
 import time
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ..components.hot_reload import get_reload_manager
+from ..concurrency import get_concurrency_limiter
 from ..escalate.llm import get_zai_client, ModelClass
 from ..fetch.commands import FetchResult, IntentType
 from ..llm.response_parser import strip_markdown_fences, ParseLLMError, parse_llm_response
@@ -147,13 +149,18 @@ class SynthesizeStrand:
         try:
             # Measure LLM call time
             llm_start = time.perf_counter()
-            response = await client.call_simple(
-                system_prompt=system_prompt,
-                user_message=user_message,
-                model=ModelClass.HAIKU.value,  # Use Haiku for faster synthesis
-                max_tokens=1024,  # Reduced from 4096 - most outputs are smaller
-                temperature=0.3,  # Lower temperature for more deterministic, faster outputs
-            )
+
+            # Acquire concurrency slot before making LLM call
+            # This bounds the number of concurrent synthesize calls to the ZAI proxy
+            limiter = get_concurrency_limiter()
+            async with limiter:
+                response = await client.call_simple(
+                    system_prompt=system_prompt,
+                    user_message=user_message,
+                    model=ModelClass.HAIKU.value,  # Use Haiku for faster synthesis
+                    max_tokens=1024,  # Reduced from 4096 - most outputs are smaller
+                    temperature=0.3,  # Lower temperature for more deterministic, faster outputs
+                )
             llm_ms = (time.perf_counter() - llm_start) * 1000
 
             logger.debug(
