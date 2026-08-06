@@ -761,7 +761,7 @@ aide-de-camp is a **live web application**, not a static site. The FastAPI serve
 
 **Status: LIVE** ✅ — running server confirmed 2026-07-20 (ADR-1 audit)
 
-The server runs as a process on the Hetzner server itself, not in k8s:
+**This is Phase 0: local-only deployment.** The server runs as a process on the Hetzner server itself, not in k8s:
 - NEEDLE workers and the aide-de-camp server share the same filesystem
 - Self-modification agent writes directly to `prompts/` and `config/` — hot-reload works without any coordination
 - Exposed via Tailscale (the server is already on the mesh); no ingress config needed
