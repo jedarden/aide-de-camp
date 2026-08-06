@@ -1,0 +1,109 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T16:52:54.389190",
+    "task_id": "adc-1efr9",
+    "description": "Deployment interval statistics and service comparison",
+    "time_period_days": 30
+  },
+  "pbx_web": {
+    "service_name": "pbx-web",
+    "namespace": "pbx-web",
+    "cluster": "ardenone-cluster",
+    "interval_statistics": {
+      "total_deployments": 5,
+      "intervals_hours": [
+        0.17,
+        33.11,
+        302.52,
+        23.5
+      ],
+      "min_interval_hours": 0.17,
+      "max_interval_hours": 302.52,
+      "median_interval_hours": 28.31,
+      "mean_interval_hours": 89.83,
+      "stddev_interval_hours": 142.47,
+      "iqr_interval_hours": 229.17,
+      "coefficient_of_variation": 1.59,
+      "first_deployment": "2026-07-13T18:07:55+00:00",
+      "last_deployment": "2026-07-28T17:26:12+00:00"
+    }
+  },
+  "whisper_stt": {
+    "service_name": "whisper-stt",
+    "namespace": "whisper-stt",
+    "cluster": "ardenone-cluster",
+    "interval_statistics": {
+      "total_deployments": 4,
+      "intervals_hours": [
+        0.11,
+        0.18,
+        109.45
+      ],
+      "min_interval_hours": 0.11,
+      "max_interval_hours": 109.45,
+      "median_interval_hours": 0.18,
+      "mean_interval_hours": 36.58,
+      "stddev_interval_hours": 63.11,
+      "iqr_interval_hours": null,
+      "coefficient_of_variation": 1.73,
+      "first_deployment": "2026-07-08T03:09:35+00:00",
+      "last_deployment": "2026-07-12T16:53:42+00:00"
+    }
+  },
+  "comparison": {
+    "interval_statistics_table": {
+      "pbx_web": {
+        "total_deployments": 5,
+        "min_interval_hours": 0.17,
+        "max_interval_hours": 302.52,
+        "median_interval_hours": 28.31,
+        "mean_interval_hours": 89.83,
+        "stddev_interval_hours": 142.47,
+        "coefficient_of_variation": 1.59
+      },
+      "whisper_stt": {
+        "total_deployments": 4,
+        "min_interval_hours": 0.11,
+        "max_interval_hours": 109.45,
+        "median_interval_hours": 0.18,
+        "mean_interval_hours": 36.58,
+        "stddev_interval_hours": 63.11,
+        "coefficient_of_variation": 1.73
+      }
+    },
+    "consistency_analysis": {
+      "more_consistent_service": "pbx-web",
+      "reason": "pbx-web has lower coefficient of variation (1.59 vs 1.73)",
+      "pbx_web_cv": 1.59,
+      "whisper_stt_cv": 1.73
+    },
+    "frequency_comparison": {
+      "more_frequent_service": "whisper-stt",
+      "pbx_web_mean_hours": 89.83,
+      "whisper_stt_mean_hours": 36.58,
+      "difference_hours": 53.25
+    },
+    "insights": [
+      {
+        "type": "consistency",
+        "summary": "Pbx-Web has more consistent deployment cadence",
+        "detail": "pbx-web has lower coefficient of variation (1.59 vs 1.73)"
+      },
+      {
+        "type": "frequency",
+        "summary": "Whisper-Stt deploys more frequently on average",
+        "detail": "Mean interval: 89.83h (pbx-web) vs 36.58h (whisper-stt)"
+      },
+      {
+        "type": "variance",
+        "summary": "Interval variance comparison",
+        "detail": "Standard deviation: 142.47h (pbx-web) vs 63.11h (whisper-stt)"
+      },
+      {
+        "type": "range",
+        "summary": "Deployment interval ranges",
+        "detail": "Range (max-min): 302.35h (pbx-web) vs 109.34h (whisper-stt)"
+      }
+    ]
+  }
+}
