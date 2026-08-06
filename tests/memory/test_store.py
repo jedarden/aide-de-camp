@@ -201,7 +201,7 @@ class TestMemoryStoreLoad:
         """Malformed fact entries are skipped, valid ones loaded."""
         session_id = "session-mixed-facts"
 
-        memory_dir = tmp_path / "memory"
+        memory_dir = tmp_path
         memory_dir.mkdir(parents=True, exist_ok=True)
 
         import hashlib
@@ -256,7 +256,7 @@ class TestMemoryStoreLoad:
         """Empty facts list loads correctly."""
         session_id = "empty-facts-session"
 
-        memory_dir = tmp_path / "memory"
+        memory_dir = tmp_path
         memory_dir.mkdir(parents=True, exist_ok=True)
 
         import hashlib
@@ -276,7 +276,7 @@ class TestMemoryStoreLoad:
         """load() doesn't modify fact timestamps - save() does."""
         session_id = "timestamp-session"
 
-        memory_dir = tmp_path / "memory"
+        memory_dir = tmp_path
         memory_dir.mkdir(parents=True, exist_ok=True)
 
         import hashlib
