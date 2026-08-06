@@ -1,0 +1,245 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T14:25:00.000000",
+    "comparison_period": "30-day window (2026-07-08 to 2026-07-28)",
+    "input_file": "deployment-data-normalized.json",
+    "services_compared": ["pbx-web", "whisper-stt"]
+  },
+  "deployment_frequency": {
+    "pbx-web": {
+      "total_deployments": 5,
+      "deployment_days": 4,
+      "unique_dates": [
+        "2026-07-13",
+        "2026-07-15",
+        "2026-07-27",
+        "2026-07-28"
+      ],
+      "average_deployments_per_day": 1.25,
+      "peak_deployment_day": "2026-07-13 (2 deployments)",
+      "deployment_span_days": 16,
+      "deployment_frequency": "moderate (every ~3 days)",
+      "deployments": {
+        "by_week": {
+          "week_of_2026-07-07": 2,
+          "week_of_2026-07-14": 1,
+          "week_of_2026-07-21": 1,
+          "week_of_2026-07-28": 1
+        }
+      }
+    },
+    "whisper-stt": {
+      "total_deployments": 4,
+      "deployment_days": 2,
+      "unique_dates": [
+        "2026-07-08",
+        "2026-07-12"
+      ],
+      "average_deployments_per_day": 2.0,
+      "peak_deployment_day": "2026-07-08 (3 deployments)",
+      "deployment_span_days": 5,
+      "deployment_frequency": "burst (4 deployments in 5 days, then idle)",
+      "deployments": {
+        "by_week": {
+          "week_of_2026-07-07": 4,
+          "week_of_2026-07-14": 0,
+          "week_of_2026-07-21": 0,
+          "week_of_2026-07-28": 0
+        }
+      }
+    }
+  },
+  "success_rates": {
+    "pbx-web": {
+      "overall_success_rate": "100%",
+      "successful_deployments": 5,
+      "failed_deployments": 0,
+      "rollback_events": 0,
+      "successful_deployment_rate": "100%",
+      "weekly_success_rates": {
+        "week_of_2026-07-07": "100% (2/2)",
+        "week_of_2026-07-14": "100% (1/1)",
+        "week_of_2026-07-21": "100% (1/1)",
+        "week_of_2026-07-28": "100% (1/1)"
+      },
+      "trend": "consistent (100% every week)",
+      "deployment_stability": "high",
+      "uptime_percentage": "100%",
+      "zero_downtime_deployment": true
+    },
+    "whisper-stt": {
+      "overall_success_rate": "100%",
+      "successful_deployments": 4,
+      "failed_deployments": 0,
+      "rollback_events": 0,
+      "successful_deployment_rate": "100%",
+      "weekly_success_rates": {
+        "week_of_2026-07-07": "100% (4/4)",
+        "week_of_2026-07-14": "0 deployments",
+        "week_of_2026-07-21": "0 deployments",
+        "week_of_2026-07-28": "0 deployments"
+      },
+      "trend": "consistent (100% of active deployment weeks)",
+      "deployment_stability": "high",
+      "uptime_percentage": "100%",
+      "zero_downtime_deployment": true
+    }
+  },
+  "failure_type_distribution": {
+    "pbx-web": {
+      "total_failures": 0,
+      "failure_types": {
+        "image_pull_error": 0,
+        "crash_loop_backoff": 0,
+        "oom_killed": 0,
+        "readiness_probe_failed": 0,
+        "liveness_probe_failed": 0,
+        "configuration_error": 0,
+        "resource_limit_exceeded": 0,
+        "network_timeout": 0
+      },
+      "percentage_breakdown": {
+        "image_pull_error": "0%",
+        "crash_loop_backoff": "0%",
+        "oom_killed": "0%",
+        "readiness_probe_failed": "0%",
+        "liveness_probe_failed": "0%",
+        "configuration_error": "0%",
+        "resource_limit_exceeded": "0%",
+        "network_timeout": "0%"
+      },
+      "summary": "No failures recorded - perfect deployment record"
+    },
+    "whisper-stt": {
+      "total_failures": 0,
+      "failure_types": {
+        "image_pull_error": 0,
+        "crash_loop_backoff": 0,
+        "oom_killed": 0,
+        "readiness_probe_failed": 0,
+        "liveness_probe_failed": 0,
+        "configuration_error": 0,
+        "resource_limit_exceeded": 0,
+        "network_timeout": 0
+      "percentage_breakdown": {
+        "image_pull_error": "0%",
+        "crash_loop_backoff": "0%",
+        "oom_killed": "0%",
+        "readiness_probe_failed": "0%",
+        "liveness_probe_failed": "0%",
+        "configuration_error": "0%",
+        "resource_limit_exceeded": "0%",
+        "network_timeout": "0%"
+      },
+      "summary": "No failures recorded - perfect deployment record"
+    }
+  },
+  "comparison_table": {
+    "deployment_frequency": {
+      "pbx-web": "5 deployments over 16 days (every ~3 days)",
+      "whisper-stt": "4 deployments over 5 days (burst pattern)",
+      "winner": "pbx-web (more consistent deployment cadence)",
+      "analysis": "pbx-web shows steadier deployment rhythm; whisper-stt has burst deployment pattern followed by extended idle period"
+    },
+    "deployment_volume": {
+      "pbx-web": "5 total deployments",
+      "whisper-stt": "4 total deployments",
+      "winner": "pbx-web (higher volume)",
+      "difference": "1 more deployment (25% more activity)"
+    },
+    "success_rate": {
+      "pbx-web": "100%",
+      "whisper-stt": "100%",
+      "winner": "tie (both perfect)",
+      "analysis": "Both services achieved 100% success rate with zero failures"
+    },
+    "deployment_stability": {
+      "pbx-web": "high",
+      "whisper-stt": "high",
+      "winner": "tie",
+      "analysis": "Both services rated as high stability"
+    },
+    "uptime": {
+      "pbx-web": "100%",
+      "whisper-stt": "100%",
+      "winner": "tie (both perfect)",
+      "analysis": "Both services maintained 100% uptime"
+    },
+    "zero_downtime_deployment": {
+      "pbx-web": true,
+      "whisper-stt": true,
+      "winner": "tie",
+      "analysis": "Both services achieved zero-downtime deployments"
+    },
+    "pod_health": {
+      "pbx-web": {
+        "total_pods": 3,
+        "running_pods": 3,
+        "total_restarts": 0,
+        "crashloops": 0,
+        "oomkills": 0
+      },
+      "whisper-stt": {
+        "total_pods": 2,
+        "running_pods": 2,
+        "total_restarts": 0,
+        "crashloops": 0,
+        "oomkills": 0
+      },
+      "winner": "tie (both perfectly healthy)",
+      "analysis": "No pod restarts, crashes, or OOM kills on either service"
+    },
+    "incidents": {
+      "pbx-web": {
+        "total_incidents": 0,
+        "critical_incidents": 0,
+        "warning_incidents": 0
+      },
+      "whisper-stt": {
+        "total_incidents": 0,
+        "critical_incidents": 0,
+        "warning_incidents": 0
+      },
+      "winner": "tie (both zero incidents)",
+      "analysis": "No incidents recorded for either service"
+    },
+    "log_errors": {
+      "pbx-web": 6,
+      "whisper-stt": 0,
+      "winner": "whisper-stt (cleaner logs)",
+      "analysis": "whisper-stt has cleaner logs with zero errors; pbx-web shows 6 log errors despite successful deployments"
+    },
+    "deployment_span": {
+      "pbx-web": "16 days (2026-07-13 to 2026-07-28)",
+      "whisper-stt": "5 days (2026-07-08 to 2026-07-12)",
+      "winner": "pbx-web (longer active period)",
+      "analysis": "pbx-web has more recent activity; whisper-stt has not deployed since 2026-07-12 (16+ days stale)"
+    },
+    "last_deployment": {
+      "pbx-web": "2026-07-28 (9 days ago)",
+      "whisper-stt": "2026-07-12 (25 days ago)",
+      "winner": "pbx-web (more recent)",
+      "analysis": "pbx-web has more recent deployment activity; whisper-stt may need attention"
+    }
+  },
+  "summary": {
+    "overall_winner": "pbx-web",
+    "key_findings": [
+      "Both services achieved perfect 100% success rates with zero failures",
+      "Both services maintained 100% uptime and zero-downtime deployments",
+      "pbx-web has more consistent deployment cadence over longer period",
+      "whisper-stt shows burst deployment pattern followed by extended idle period",
+      "whisper-stt has cleaner logs (0 errors vs 6 for pbx-web)",
+      "whisper-stt has not deployed in 25+ days - may require attention",
+      "Both services show high deployment stability with zero incidents"
+    ],
+    "deployment_patterns": {
+      "pbx-web": "Steady, consistent deployment rhythm - suggests regular updates and active maintenance",
+      "whisper-stt": "Burst deployment pattern - suggests batched feature releases followed by stable period"
+    },
+    "risk_assessment": {
+      "pbx-web": "Low risk - active maintenance, perfect success rate, minor log errors",
+      "whisper-stt": "Low risk for stability, but deployment staleness (25+ days) may indicate neglect or stable-but-frozen service"
+    }
+  }
+}
