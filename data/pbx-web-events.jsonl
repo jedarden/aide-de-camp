@@ -1,0 +1,2 @@
+{"type":"Warning","reason":"ClusterIPNotAllocated","object":"Service/pbx-rebuild-egress","message":"Cluster IP [IPv4]: 10.43.94.154 is not allocated; repairing","lastTimestamp":null,"firstTimestamp":null}
+{"type":"Warning","reason":"deprecatedAnnotation","object":"Service/pbx-web","message":"Service uses deprecated annotation metallb.universe.tf/allow-shared-ip","lastTimestamp":"2026-08-06T21:31:01Z","firstTimestamp":"2026-05-01T14:28:10Z"}

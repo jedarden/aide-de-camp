@@ -1,0 +1,3 @@
+LAST SEEN   TYPE      REASON                  OBJECT                       MESSAGE
+22m         Warning   ClusterIPNotAllocated   service/pbx-rebuild-egress   Cluster IP [IPv4]: 10.43.94.154 is not allocated; repairing
+46m         Warning   deprecatedAnnotation    service/pbx-web              Service uses deprecated annotation metallb.universe.tf/allow-shared-ip
