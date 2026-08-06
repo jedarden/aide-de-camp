@@ -17,51 +17,33 @@ This schema defines the structure for `pod-logs-index.jsonl`, which documents al
 | `log_file_path` | string | Yes | Relative path to log file from research directory root |
 | `analysis_file_path` | string or null | Yes | Relative path to analysis file, or `null` if analysis doesn't exist |
 | `log_size_bytes` | integer | Yes | Size of log file in bytes |
-| `detected_patterns` | object | Yes | Pattern detection results from analysis |
+| `detected_patterns` | array of strings | Yes | List of pattern types detected (startup, oom_kill, error, performance) |
 | `key_timestamps` | object | Yes | Important timestamps extracted from logs |
 | `collection_date` | string (ISO 8601) | Yes | When this log entry was collected |
+| `log_line_count` | integer | Yes | Number of lines in log file |
+| `restart_count` | integer | Yes | Number of pod restarts |
+| `pod_phase` | string or null | Yes | Pod phase (Running, Pending, Succeeded, Failed, Unknown) |
+| `container_image` | string or null | Yes | Container image reference |
+| `node_name` | string or null | Yes | Kubernetes node where pod ran |
 
 ### Nested Objects
 
 #### detected_patterns
 
-Pattern detection results extracted directly from analysis files. Each pattern contains raw detection data:
+Array of pattern type strings detected in the log analysis. Only pattern types with `count > 0` in the analysis file are included.
 
-```json
-{
-  "startup": {
-    "count": 0,
-    "timestamps": [],
-    "samples": []
-  },
-  "oom_kill": {
-    "count": 0,
-    "timestamps": [],
-    "samples": []
-  },
-  "error": {
-    "count": 0,
-    "timestamps": [],
-    "samples": []
-  },
-  "performance": {
-    "count": 0,
-    "timestamps": [],
-    "samples": []
-  }
-}
-```
+**Allowed pattern types:**
+- `"startup"` - Application startup and initialization events
+- `"oom_kill"` - Out of memory kill events  
+- `"error"` - Error messages and exceptions
+- `"performance"` - Performance-related events (slow queries, timeouts, etc.)
 
-**Pattern Fields:**
-- `count`: integer - Number of occurrences detected
-- `timestamps`: array of strings - Timestamp strings for each detected occurrence (format varies)
-- `samples`: array of strings - Sample log lines showing the pattern in context
+**Examples:**
+- `["startup", "error"]` - Both startup and error patterns detected
+- `["oom_kill"]` - Only OOM killer events detected
+- `[]` - No patterns detected (empty array)
 
-**Pattern Types:**
-- `startup`: Application startup and initialization events
-- `oom_kill`: Out of memory kill events
-- `error`: Error messages and exceptions
-- `performance`: Performance-related events (slow queries, timeouts, etc.)
+**Data source:** Populated from corresponding `-analysis.json` file by checking which pattern categories have non-zero counts.
 
 #### key_timestamps
 
@@ -172,10 +154,10 @@ Important temporal boundaries for the log:
   "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous-analysis.json",
   "log_size_bytes": 1500,
   "detected_patterns": {
-    "startup": {"count": 1, "has_evidence": true, "first_occurrence": "2026-07-25T08:00:05Z", "last_occurrence": "2026-07-25T08:00:10Z"},
-    "oom_kill": {"count": 1, "has_evidence": true, "first_occurrence": "2026-07-28T14:30:00Z", "last_occurrence": "2026-07-28T14:30:00Z"},
-    "error": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null},
-    "performance": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null}
+    "startup": {"count": 1, "timestamps": ["2026-07-25T08:00:05Z"], "samples": ["Starting application..."]},
+    "oom_kill": {"count": 1, "timestamps": ["2026-07-28T14:30:00Z"], "samples": ["Kill process due to OOM"]},
+    "error": {"count": 0, "timestamps": [], "samples": []},
+    "performance": {"count": 0, "timestamps": [], "samples": []}
   },
   "key_timestamps": {
     "first_log_entry": "2026-07-25T08:00:05Z",
@@ -191,21 +173,20 @@ Important temporal boundaries for the log:
 ### 1. Missing Analysis File
 When no analysis file exists:
 - Set `analysis_file_path` to `null`
-- Set all pattern counts to 0 and `has_evidence` to `false`
-- Set all pattern timestamps to `null`
+- Set all pattern counts to 0 with empty `timestamps` and `samples` arrays
 - Set `key_timestamps.analysis_date` to `null`
 
 ### 2. Empty Log Files
 When log file size is 0 bytes:
 - Set `log_size_bytes` to 0
-- Set all pattern detections to empty/default values
+- Set all pattern detections to empty/default values (count 0, empty arrays)
 - Set `key_timestamps.first_log_entry` and `last_log_entry` to `null`
 
 ### 3. Missing Timestamps
 When log parsing fails to extract timestamps:
 - Set `first_log_entry` and `last_log_entry` to `null`
-- Set pattern `first_occurrence` and `last_occurrence` to `null` even if `count > 0`
-- Preserve `count` and `has_evidence` values
+- Set pattern `timestamps` arrays to empty even if `count > 0`
+- Preserve `count` values but leave `timestamps` and `samples` as empty arrays
 
 ### 4. Pod Still Running
 When pod has not been deleted:
