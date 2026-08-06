@@ -1,0 +1,12 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "metadata": {
+    "resourceVersion": ""
+  },
+  "items": [],
+  "note": "No whisper-stt-build workflow runs found in the last 30 days (or ever). The workflow template exists but has never been executed.",
+  "query_date": "2026-08-06",
+  "template_exists": true,
+  "template_age_days": 71
+}
