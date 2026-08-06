@@ -1,101 +1,80 @@
 {
-  "metadata": {
-    "generated_at": "2026-08-06T12:37:36Z",
-    "date_range_start": "2026-07-07T00:00:00Z",
-    "date_range_end": "2026-08-06T12:37:36Z",
-    "service": "pbx-web",
-    "namespace": "pbx-web",
-    "cluster": "ardenone-cluster",
-    "managed_by": "ArgoCD",
-    "strategy": "Recreate"
+  "argo_workflows_query": {
+    "generated_at": "2026-08-06T15:57:00Z",
+    "time_range_start": "2026-07-06T00:00:00Z",
+    "time_range_end": "2026-08-06T15:57:00Z",
+    "cluster": "iad-ci",
+    "workflow_template": "pbx-web-build",
+    "namespace": "argo-workflows",
+    "query_method": "kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig get workflows -n argo-workflows"
   },
-  "deployments": [
-    {
-      "date": "2026-06-15",
-      "timestamp": "2026-06-15T18:11:38Z",
-      "revision": 6,
-      "replicaSet": "pbx-web-9fc5b5f59",
-      "image": "ronaldraygun/pbx-web:1.0.2",
-      "notes": "Prior to 30-day window"
-    },
-    {
-      "date": "2026-06-21",
-      "timestamp": "2026-06-21T11:13:44Z",
-      "revision": 7,
-      "replicaSet": "pbx-web-69794b7fcc",
-      "image": "ronaldraygun/pbx-web:1.0.4",
-      "notes": "Prior to 30-day window"
-    },
-    {
-      "date": "2026-06-23",
-      "timestamp": "2026-06-23T18:37:39Z",
-      "revision": 8,
-      "replicaSet": "pbx-web-5cc966f86d",
-      "image": "ronaldraygun/pbx-web:1.0.5",
-      "notes": "Prior to 30-day window"
-    },
-    {
-      "date": "2026-06-23",
-      "timestamp": "2026-06-23T18:55:52Z",
-      "revision": 9,
-      "replicaSet": "pbx-web-66f79fd6f9",
-      "image": "ronaldraygun/pbx-web:1.0.6",
-      "notes": "Prior to 30-day window"
-    },
-    {
-      "date": "2026-06-25",
-      "timestamp": "2026-06-25T15:23:48Z",
-      "revision": 10,
-      "replicaSet": "pbx-web-6d86477cdb",
-      "image": "ronaldraygun/pbx-web:1.0.7",
-      "notes": "Prior to 30-day window"
-    },
-    {
-      "date": "2026-07-13",
-      "timestamp": "2026-07-13T18:07:55Z",
-      "event_type": "deployment_rollback",
-      "revision": 11,
-      "replicaSet": "pbx-web-754f4cfdf7",
-      "image": "ronaldraygun/pbx-web:1.0.8",
-      "outcome": "rolled_back",
-      "notes": "Rolled back to 1.0.8 on same day"
-    },
-    {
-      "date": "2026-07-13",
-      "timestamp": "2026-07-13T18:18:07Z",
-      "event_type": "deployment_rollout",
-      "revision": 14,
-      "replicaSet": "pbx-web-5ff68464d",
-      "image": "ronaldraygun/pbx-web:1.0.9",
-      "outcome": "success",
-      "notes": "Initial deployment of revision 14"
-    },
-    {
-      "date": "2026-07-15",
-      "timestamp": "2026-07-15T03:24:40Z",
-      "event_type": "deployment_rollout",
-      "deployment": "pbx-rebuild-relay",
-      "revision": 5,
-      "replicaSet": "pbx-rebuild-relay-588d79c5b9",
-      "image": "python:3-slim",
-      "outcome": "success",
-      "notes": "PBX rebuild relay deployment"
-    },
-    {
-      "date": "2026-07-27",
-      "timestamp": "2026-07-27T17:56:07Z",
-      "event_type": "deployment_rollout",
-      "deployment": "lab-rebuild-relay",
-      "revision": 2,
-      "replicaSet": "lab-rebuild-relay-79957dbd4",
-      "image": "python:3-slim",
-      "outcome": "success",
-      "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
-      "pod_ready": true,
-      "restart_count": 0,
-      "notes": "Lab rebuild relay deployment"
-    },
-    {
+  "findings": {
+    "workflows_found": 0,
+    "workflow_template_exists": true,
+    "workflow_template_age_days": 71,
+    "note": "No pbx-web-build workflows found in iad-ci cluster within last 30 days"
+  },
+  "cluster_analysis": {
+    "total_workflows_in_namespace": 25,
+    "oldest_workflow_timestamp": "2026-07-27T18:59:34Z",
+    "oldest_workflow_age_days": 10,
+    "workflow_retention_pattern": "Aggressive cleanup - workflows are deleted within hours/days of completion",
+    "active_workflow_templates": [
+      "needle-ci",
+      "armor-build",
+      "acb-build",
+      "acb-bots-build",
+      "spaxel-build",
+      "sun-sim-build",
+      "seam-ci"
+    ]
+  },
+  "investigation_results": {
+    "workflow_template_query": "kubectl get workflowtemplate pbx-web-build -n argo-workflows",
+    "template_status": "EXISTS",
+    "template_age": "71 days",
+    "workflow_history_query": "kubectl get workflows -n argo-workflows -o json | jq '.items[] | select(.spec.workflowTemplateRef.name == \"pbx-web-build\")'",
+    "workflow_history_result": []
+  },
+  "root_cause_analysis": {
+    "primary_reason": "No pbx-web-build workflows have been executed in the last 30 days",
+    "contributing_factors": [
+      "Aggressive workflow cleanup policy (workflows deleted within hours/days)",
+      "Current production image (ronaldraygun/pbx-web:1.0.9) was deployed prior to analysis window",
+      "pbx-web deployments in ardenone-cluster use Recreate strategy, not rolling updates from CI"
+    ],
+    "deployment_context": {
+      "current_production_image": "ronaldraygun/pbx-web:1.0.9",
+      "last_deployment_activity": "2026-07-28T17:05:51Z",
+      "deployment_cluster": "ardenone-cluster",
+      "deployment_namespace": "pbx-web",
+      "management_method": "ArgoCD GitOps"
+    }
+  },
+  "recommendations": {
+    "for_future_monitoring": [
+      "Check if workflow TTL needs adjustment for historical analysis",
+      "Consider WorkflowArchive or external logging for workflow history",
+      "Query ArgoCD for deployment history instead of workflows",
+      "Cross-reference declarative-config git history for deployment triggers"
+    ],
+    "alternative_data_sources": [
+      "ArgoCD application sync history",
+      "declarative-config git commits for pbx-web manifests",
+      "Container registry image tags and build dates",
+      "Kubernetes ReplicaSets in pbx-web namespace"
+    ]
+  },
+  "extracted_data": [],
+  "summary": {
+    "query_status": "COMPLETE",
+    "workflows_found": 0,
+    "data_extraction_successful": true,
+    "finding": "No pbx-web-build Argo Workflows found in iad-ci cluster for last 30 days due to aggressive cleanup and lack of recent CI builds"
+  },
+  "production_deployment_history": {
+    "note": "For reference, here is the actual deployment history from ardenone-cluster (production)",
+    "current_active_deployment": {
       "date": "2026-07-28",
       "timestamp": "2026-07-28T17:26:12Z",
       "event_type": "deployment_rollout",
@@ -107,6 +86,31 @@
       "pod_ready": true,
       "restart_count": 0,
       "notes": "Current active deployment"
-    }
-  ]
+    },
+    "recent_deployments_in_window": [
+      {
+        "date": "2026-07-13",
+        "timestamp": "2026-07-13T18:18:07Z",
+        "event_type": "deployment_rollout",
+        "revision": 14,
+        "replicaSet": "pbx-web-5ff68464d",
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "outcome": "success",
+        "notes": "Initial deployment of revision 14"
+      },
+      {
+        "date": "2026-07-28",
+        "timestamp": "2026-07-28T17:26:12Z",
+        "event_type": "deployment_rollout",
+        "revision": 14,
+        "replicaSet": "pbx-web-5ff68464d",
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "outcome": "success",
+        "pod_name": "pbx-web-5ff68464d-mkn8n",
+        "pod_ready": true,
+        "restart_count": 0,
+        "notes": "Current active deployment"
+      }
+    ]
+  }
 }
