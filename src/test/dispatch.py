@@ -277,8 +277,8 @@ async def generate_synthetic_result(request: SyntheticResultRequest) -> Syntheti
     urgency = request.test_data.get("urgency", "normal") if request.test_data else "normal"
     result_type = request.test_data.get("result_type", "status") if request.test_data else "status"
 
-    # Create result record
-    await store.create_result(
+    # Create result record and capture actual result_id
+    result_id_created = await store.create_result(
         intent_id=intent_id_created,
         topic_id=topic_id_created,
         session_id=session_id,
@@ -304,14 +304,14 @@ async def generate_synthetic_result(request: SyntheticResultRequest) -> Syntheti
             )
         )
 
-    logger.info(f"[TEST] Generated synthetic result {result_id} for session {session_id}")
+    logger.info(f"[TEST] Generated synthetic result {result_id_created} for session {session_id}")
 
     return SyntheticResultResponse(
         utterance_id=utterance_id,
         session_id=session_id,
         intent_id=intent_id_created,
         topic_id=topic_id_created,
-        result_id=result_id,
+        result_id=result_id_created,
         status="resolved",
         summary=synthetic_summary,
         data=synthetic_data,
