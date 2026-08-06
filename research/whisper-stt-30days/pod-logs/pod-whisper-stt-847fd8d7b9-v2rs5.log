@@ -1,1 +1,1 @@
-error: error from server (NotFound): namespaces "whisper-stt" not found in namespace "whisper-stt"
+error: the server doesn't have a resource type "whisper-stt"
