@@ -1,0 +1,62 @@
+"""
+Action Execution Model - deterministic step runner for action workflows.
+
+This module provides the executor that interprets and runs workflow steps
+defined in project registry entries. All actions execute through GitOps
+mutation patterns (declarative-config edits) or read-only status checks.
+"""
+
+from .executor import ActionExecutor, get_action_executor
+from .models import (
+    ActionResult,
+    ExecutionContext,
+    Step,
+    StepResult,
+    StepStatus,
+)
+from .registry import (
+    get_workflow_definition,
+    list_workflows,
+    reload_registry,
+    validate_all_workflows,
+    WorkflowValidationError,
+)
+from .steps import (
+    execute_argocd_apps_step,
+    execute_argocd_sync_status_step,
+    execute_ci_status_step,
+    execute_deployment_info_step,
+    execute_git_log_step,
+    execute_gitops_commit_step,
+    execute_image_tag_step,
+    execute_open_beads_step,
+    execute_pod_status_step,
+)
+
+__all__ = [
+    # Executor
+    "ActionExecutor",
+    "get_action_executor",
+    # Models
+    "ActionResult",
+    "ExecutionContext",
+    "Step",
+    "StepResult",
+    "StepStatus",
+    # Registry
+    "get_workflow_definition",
+    "list_workflows",
+    "reload_registry",
+    "validate_all_workflows",
+    "WorkflowValidationError",
+    # Step executors
+    "execute_argocd_apps_step",
+    "execute_argocd_sync_status_step",
+    "execute_ci_status_step",
+    "execute_deployment_info_step",
+    "execute_git_log_step",
+    "execute_gitops_commit_step",
+    "execute_image_tag_step",
+    "execute_open_beads_step",
+    "execute_pod_status_step",
+]

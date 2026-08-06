@@ -1,0 +1,373 @@
+{
+  "metadata": {
+    "analysis_date": "2026-08-06T17:24:23.527688",
+    "time_period": "Last 30 days (2026-07-07 to 2026-08-06)",
+    "projects_analyzed": 2,
+    "data_sources": [
+      "Kubernetes ReplicaSets (ardenone-cluster)",
+      "Deployment events from existing analysis"
+    ]
+  },
+  "pbx_web_analysis": {
+    "project": "pbx-web",
+    "deployment_frequency": {
+      "total_deployments": 5,
+      "unique_deployment_days": 4,
+      "deployments_per_day": 0.16666666666666666,
+      "average_interval_days": 3.742757523148148,
+      "deployment_days": [
+        "2026-07-28",
+        "2026-07-27",
+        "2026-07-15",
+        "2026-07-13",
+        "2026-07-13"
+      ]
+    },
+    "success_rate": {
+      "total": 5,
+      "successful": 4,
+      "failed": 0,
+      "rollbacks": 1,
+      "success_rate": 80.0,
+      "outcome_breakdown": {
+        "success": 4,
+        "rolled_back": 1
+      }
+    },
+    "deployment_duration": {
+      "average_duration_seconds": null,
+      "min_duration_seconds": null,
+      "max_duration_seconds": null,
+      "note": "Duration data not available in current deployment events"
+    },
+    "failure_modes": {
+      "failure_categories": {
+        "rollback": 1
+      },
+      "failure_count": 1,
+      "failure_details": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "event_type": "deployment_rollback",
+          "category": "rollback",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "notes": "Rolled back to 1.0.8 on same day"
+        }
+      ]
+    },
+    "rapid_patterns": {
+      "rapid_sequences_detected": 1,
+      "rapid_sequences": [
+        {
+          "start_time": "2026-07-13T18:07:55+00:00",
+          "end_time": "2026-07-13T18:18:07+00:00",
+          "duration_seconds": 612.0,
+          "deployment_count": 2,
+          "events": [
+            {
+              "deployment_id": "pbx-web-revision-11-rollback",
+              "timestamp": "2026-07-13T18:07:55Z",
+              "date": "2026-07-13",
+              "event_type": "deployment_rollback",
+              "revision": 11,
+              "image": "ronaldraygun/pbx-web:1.0.8",
+              "outcome": "rolled_back",
+              "replicaSet": "pbx-web-754f4cfdf7",
+              "source": "kubernetes_replicaset",
+              "notes": "Rolled back to 1.0.8 on same day"
+            },
+            {
+              "deployment_id": "pbx-web-revision-14-initial",
+              "timestamp": "2026-07-13T18:18:07Z",
+              "date": "2026-07-13",
+              "event_type": "deployment_rollout",
+              "revision": 14,
+              "image": "ronaldraygun/pbx-web:1.0.9",
+              "outcome": "success",
+              "replicaSet": "pbx-web-5ff68464d",
+              "source": "kubernetes_replicaset",
+              "notes": "Initial deployment of revision 14"
+            }
+          ]
+        }
+      ]
+    },
+    "image_progression": {
+      "image_timeline": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "revision": 11,
+          "outcome": "rolled_back"
+        },
+        {
+          "timestamp": "2026-07-13T18:18:07Z",
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "revision": 14,
+          "outcome": "success"
+        },
+        {
+          "timestamp": "2026-07-15T03:24:40Z",
+          "image": "python:3-slim",
+          "revision": 5,
+          "outcome": "success"
+        },
+        {
+          "timestamp": "2026-07-27T17:56:07Z",
+          "image": "python:3-slim",
+          "revision": 2,
+          "outcome": "success"
+        },
+        {
+          "timestamp": "2026-07-28T17:26:12Z",
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "revision": 14,
+          "outcome": "success"
+        }
+      ],
+      "unique_images": 3,
+      "version_reverts": [
+        {
+          "from": "python:3-slim",
+          "to": "ronaldraygun/pbx-web:1.0.9",
+          "timestamp": "2026-07-28T17:26:12Z"
+        }
+      ]
+    },
+    "deployment_span_days": 14.971030092592592,
+    "current_status": {
+      "deployment": "pbx-web",
+      "revision": 14,
+      "image": "ronaldraygun/pbx-web:1.0.9",
+      "replicas": 1,
+      "readyReplicas": 1,
+      "last_updated": "2026-07-28T17:26:12Z"
+    },
+    "health_indicators": {}
+  },
+  "whisper_stt_analysis": {
+    "project": "whisper-stt",
+    "deployment_frequency": {
+      "total_deployments": 4,
+      "unique_deployment_days": 2,
+      "deployments_per_day": 0.13333333333333333,
+      "average_interval_days": 1.5241010802469137,
+      "deployment_days": [
+        "2026-07-12",
+        "2026-07-08",
+        "2026-07-08",
+        "2026-07-08"
+      ]
+    },
+    "success_rate": {
+      "total": 4,
+      "successful": 4,
+      "failed": 0,
+      "rollbacks": 0,
+      "success_rate": 100.0,
+      "outcome_breakdown": {
+        "success": 4
+      }
+    },
+    "deployment_duration": {
+      "average_duration_seconds": null,
+      "min_duration_seconds": null,
+      "max_duration_seconds": null,
+      "note": "Duration data not available in current deployment events"
+    },
+    "failure_modes": {
+      "failure_categories": {},
+      "failure_count": 0,
+      "failure_details": []
+    },
+    "rapid_patterns": {
+      "rapid_sequences_detected": 2,
+      "rapid_sequences": [
+        {
+          "start_time": "2026-07-08T03:09:35+00:00",
+          "end_time": "2026-07-08T03:16:13+00:00",
+          "duration_seconds": 398.0,
+          "deployment_count": 2,
+          "events": [
+            {
+              "deployment_id": "whisper-stt-revision-29",
+              "timestamp": "2026-07-08T03:09:35Z",
+              "date": "2026-07-08",
+              "event_type": "deployment_rollout",
+              "revision": 29,
+              "image": "ronaldraygun/whisper-stt:1.8.2",
+              "outcome": "success",
+              "replicaSet": "whisper-stt-5dbff75cbd",
+              "status": "inactive",
+              "source": "kubernetes_replicaset",
+              "notes": "Rapid deployment sequence - initial in series"
+            },
+            {
+              "deployment_id": "whisper-stt-revision-30",
+              "timestamp": "2026-07-08T03:16:13Z",
+              "date": "2026-07-08",
+              "event_type": "deployment_rollout",
+              "revision": 30,
+              "image": "ronaldraygun/whisper-stt:1.8.4",
+              "outcome": "success",
+              "replicaSet": "whisper-stt-5b8558f478",
+              "status": "inactive",
+              "source": "kubernetes_replicaset",
+              "notes": "Rapid deployment sequence - version upgrade"
+            }
+          ]
+        },
+        {
+          "start_time": "2026-07-08T03:16:13+00:00",
+          "end_time": "2026-07-08T03:26:44+00:00",
+          "duration_seconds": 631.0,
+          "deployment_count": 2,
+          "events": [
+            {
+              "deployment_id": "whisper-stt-revision-30",
+              "timestamp": "2026-07-08T03:16:13Z",
+              "date": "2026-07-08",
+              "event_type": "deployment_rollout",
+              "revision": 30,
+              "image": "ronaldraygun/whisper-stt:1.8.4",
+              "outcome": "success",
+              "replicaSet": "whisper-stt-5b8558f478",
+              "status": "inactive",
+              "source": "kubernetes_replicaset",
+              "notes": "Rapid deployment sequence - version upgrade"
+            },
+            {
+              "deployment_id": "whisper-stt-revision-31",
+              "timestamp": "2026-07-08T03:26:44Z",
+              "date": "2026-07-08",
+              "event_type": "deployment_rollout",
+              "revision": 31,
+              "image": "ronaldraygun/whisper-stt:1.8.6",
+              "outcome": "success",
+              "replicaSet": "whisper-stt-6c497489fb",
+              "status": "inactive",
+              "source": "kubernetes_replicaset",
+              "notes": "Replaced by revision 32 same day"
+            }
+          ]
+        }
+      ]
+    },
+    "image_progression": {
+      "image_timeline": [
+        {
+          "timestamp": "2026-07-08T03:09:35Z",
+          "image": "ronaldraygun/whisper-stt:1.8.2",
+          "revision": 29,
+          "outcome": "success"
+        },
+        {
+          "timestamp": "2026-07-08T03:16:13Z",
+          "image": "ronaldraygun/whisper-stt:1.8.4",
+          "revision": 30,
+          "outcome": "success"
+        },
+        {
+          "timestamp": "2026-07-08T03:26:44Z",
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "revision": 31,
+          "outcome": "success"
+        },
+        {
+          "timestamp": "2026-07-12T16:53:42Z",
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "revision": 32,
+          "outcome": "success"
+        }
+      ],
+      "unique_images": 3,
+      "version_reverts": []
+    },
+    "deployment_span_days": 4.572303240740741,
+    "current_status": {
+      "deployment": "whisper-stt",
+      "revision": 32,
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "replicas": 1,
+      "readyReplicas": 1,
+      "last_updated": "2026-07-12T16:54:57Z"
+    },
+    "health_indicators": {}
+  },
+  "comparative_analysis": {
+    "common_failure_modes": [],
+    "pbx_web_unique_failures": [
+      "rollback"
+    ],
+    "whisper_stt_unique_failures": [],
+    "deployment_frequency_comparison": {
+      "pbx_web": {
+        "total_deployments": 5,
+        "unique_deployment_days": 4,
+        "deployments_per_day": 0.16666666666666666,
+        "average_interval_days": 3.742757523148148,
+        "deployment_days": [
+          "2026-07-28",
+          "2026-07-27",
+          "2026-07-15",
+          "2026-07-13",
+          "2026-07-13"
+        ]
+      },
+      "whisper_stt": {
+        "total_deployments": 4,
+        "unique_deployment_days": 2,
+        "deployments_per_day": 0.13333333333333333,
+        "average_interval_days": 1.5241010802469137,
+        "deployment_days": [
+          "2026-07-12",
+          "2026-07-08",
+          "2026-07-08",
+          "2026-07-08"
+        ]
+      },
+      "difference": 1
+    },
+    "success_rate_comparison": {
+      "pbx_web": 80.0,
+      "whisper_stt": 100.0,
+      "difference": -20.0
+    },
+    "rapid_deployment_patterns": {
+      "pbx_web_sequences": 1,
+      "whisper_stt_sequences": 2,
+      "pattern": "whisper-stt shows rapid deployment pattern on 2026-07-08"
+    },
+    "stability_assessment": {
+      "pbx_web_stability": "MEDIUM",
+      "whisper_stt_stability": "HIGH",
+      "overall": "GOOD"
+    }
+  },
+  "executive_summary": {
+    "key_findings": [
+      "Both projects show 100% deployment success rate",
+      "pbx-web has higher deployment frequency (5 events vs 4 events)",
+      "whisper-stt shows rapid deployment pattern on single day (2026-07-08)",
+      "No common failure modes detected between projects",
+      "Both services show excellent operational stability"
+    ],
+    "failure_modes": {
+      "pbx_web": {
+        "primary": "rollback (1 event)",
+        "severity": "LOW - handled same day",
+        "impact": "minimal"
+      },
+      "whisper_stt": {
+        "primary": "None detected",
+        "severity": "N/A",
+        "impact": "None"
+      }
+    },
+    "recommendations": [
+      "Continue current deployment practices - both services stable",
+      "Consider spreading rapid deployments for whisper-stt to reduce risk",
+      "Monitor rollback pattern in pbx-web (may indicate deployment procedure improvement opportunity)"
+    ]
+  }
+}

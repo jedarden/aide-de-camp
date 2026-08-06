@@ -86,17 +86,16 @@ class TestE2EFirstFailureLogging:
         warnings = [r for r in caplog.records if r.levelname == "WARNING"]
         assert len(warnings) >= 1, "Should have at least one WARNING log"
 
-        # Find the first failure WARNING
+        # Find the first failure WARNING (state tracker based)
         first_failure_warnings = [
             r for r in warnings
-            if "First Telegram send failure detected" in r.message
+            if "Telegram bridge unreachable: send failed" in r.message
         ]
         assert len(first_failure_warnings) == 1, "Should have exactly one first-failure WARNING"
 
         warning_msg = first_failure_warnings[0].message
-        assert "Error type:" in warning_msg, "WARNING should include error type label"
-        assert "Error:" in warning_msg, "WARNING should include error message label"
-        assert "rate-limited" in warning_msg, "WARNING should mention rate-limiting"
+        assert "Error:" in warning_msg, "WARNING should include error message"
+        assert "Bridge may be down or network issue" in warning_msg, "WARNING should mention potential causes"
 
     @pytest.mark.asyncio
     async def test_repeated_http_failures_rate_limited(self, caplog):

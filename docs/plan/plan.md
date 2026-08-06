@@ -670,6 +670,7 @@ aide-de-camp/
 ├── src/
 │   ├── main.py              ← FastAPI app entry point
 │   ├── registry.py          ← project registry loader
+│   ├── action/              ← action execution strand (NOT BUILT — design-only)
 │   ├── agents/              ← agent implementations
 │   │   ├── self_modification.py  ← self-improvement agent
 │   │   └── ui_regen.py          ← UI-regen agent
@@ -701,15 +702,20 @@ aide-de-camp/
 │   │   └── orchestrator.py      ← FetchStrand: concurrent fetch execution, streaming, coverage tracking
 │   ├── intent/              ← intent router (LLM classification)
 │   │   ├── router.py            ← intent segmentation and routing
-│   │   └── deterministic_router.py ← fast-path deterministic routing (70-80% of requests)
+│   │   ├── deterministic_router.py ← fast-path deterministic routing (70-80% of requests)
+│   │   └── ...
 │   ├── instrument/           ← timing instrumentation (DispatchTimings, latency budget)
+│   │   └── timings.py           ← DispatchTimings class
 │   ├── llm/                 ← LLM client wrappers (ZAI proxy integration, timing breakdown)
+│   │   ├── client.py             ← ZAI proxy client with timeout variants
+│   │   └── response_parser.py   ← LLM response parsing with fence stripping
 │   ├── memory/              ← memory store and extraction (supporting store for cross-session context; not yet surfaced by any component — Future Work)
 │   │   ├── store.py             ← memory persistence
 │   │   └── extraction.py        ← memory extraction from results
 │   ├── monitoring/          ← ambient monitoring
 │   │   └── ambient.py           ← ambient monitoring rules
 │   ├── persistence/         ← persistence layer abstractions (DB connections, repository pattern)
+│   │   └── deployment_persistence.py ← deployment data persistence
 │   ├── realtime/            ← OpenAI Realtime API voice session
 │   │   ├── session.py           ← voice session handler
 │   │   ├── batching.py          ← result batching for narration
@@ -734,7 +740,7 @@ aide-de-camp/
 │   ├── test/                ← test-harness endpoints (bypass Web Speech API for e2e tests)
 │   ├── topic/               ← topic model
 │   │   └── model.py             ← topic operations
-│   ├── validation/          ├── validation utilities (bead body validation, safety checks)
+│   ├── validation/          ← validation utilities (bead body validation, safety checks)
 │   ├── watcher/             ← bead watcher daemon
 │   │   └── daemon.py            ← NEEDLE bead watcher
 │   ├── canvas/              ← web frontend (SSE consumer, card renderer)
@@ -1139,7 +1145,7 @@ aide-de-camp adds a routing and rendering layer on top of existing infrastructur
 - **kubectl proxies** — fetch strand uses existing kubectl proxy access per cluster.
 - **ArgoCD** — fetch strand reads ArgoCD application state via the endpoint mapped to the project's `cluster` in `config/clusters.yaml`: the no-auth read-only proxy `argocd-ro-ardenone-manager-ts.ardenone.com:8444` for ardenone-cluster apps (ArgoCD on ardenone-manager); apexalgo-iad and the other iad-* Spot clusters are managed by rs-manager's ArgoCD, which has no equivalent read-only proxy today (must-fix before the demo — see the Phase 5 known-issues register).
 
-Net-new code: the codebase measures approximately **35,000 lines** of Python across 104 files. That is a size figure, not a completeness figure — the count includes stubbed paths (ADR-1's Telegram fallback methods, which log a warning and return `False`, count the same as working code). For an honest completeness picture, use the per-phase statuses in Implementation Phases (verified-in-tests vs. verified-live) plus a stub sweep of `src/`, not line or module counts. See the File System Layout section for the module breakdown.
+Net-new code: the codebase measures approximately **37,000 lines** of Python across ~104 files under src/. That is a size figure, not a completeness figure — the count includes stubbed paths (ADR-1's Telegram fallback methods, which log a warning and return `False`, count the same as working code). For an honest completeness picture, use the per-phase statuses in Implementation Phases (verified-in-tests vs. verified-live) plus a stub sweep of `src/`, not line or module counts. See the File System Layout section for the module breakdown.
 
 ---
 

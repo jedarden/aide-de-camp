@@ -440,21 +440,32 @@ class TelegramFallback:
             # First failure after startup — WARNING with error type + message.
             # This is the single per-startup "umbrella" WARNING (adc-hyqc); it
             # also records + seeds this failure type's dedup window.
-            self._has_logged_first_failure = True
-            self._has_failed_since_startup = True  # adc-2r8hh: mark that a failure occurred
-            self._first_failure_timestamp = now
-            self._seen_failure_types.add(error_type)
-            # Start the rate-limit window from now
-            self._last_repeated_log_timestamp = now
-            self._failures_since_last_log = 0
-            logger.warning(
-                f"Telegram bridge unreachable: send failed. "
-                f"Error type: {error_type}. Error: {message}. "
-                f"Subsequent failures of the same type are rate-limited (one "
-                f"DEBUG summary per {self._failure_log_interval_seconds:g}s); "
-                f"a different failure type is logged independently."
-            )
-            return True
+            # Skip if state tracker already logged this failure streak
+            if not self._state_tracker._last_failure_logged:
+                self._has_logged_first_failure = True
+                self._has_failed_since_startup = True  # adc-2r8hh: mark that a failure occurred
+                self._first_failure_timestamp = now
+                self._seen_failure_types.add(error_type)
+                # Start the rate-limit window from now
+                self._last_repeated_log_timestamp = now
+                self._failures_since_last_log = 0
+                logger.warning(
+                    f"Telegram bridge unreachable: send failed. "
+                    f"Error type: {error_type}. Error: {message}. "
+                    f"Subsequent failures of the same type are rate-limited (one "
+                    f"DEBUG summary per {self._failure_log_interval_seconds:g}s); "
+                    f"a different failure type is logged independently."
+                )
+                return True
+            else:
+                # State tracker already logged, just mark startup flags without duplicate WARNING
+                self._has_logged_first_failure = True
+                self._has_failed_since_startup = True
+                self._first_failure_timestamp = now
+                self._seen_failure_types.add(error_type)
+                self._last_repeated_log_timestamp = now
+                self._failures_since_last_log = 0
+                return True
 
         if is_new_failure_type:
             # A DIFFERENT failure type appeared during an ongoing outage. Log it
