@@ -1,0 +1,88 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T22:56:28.820259Z",
+    "pattern_categories": [
+      "ImagePullBackOff",
+      "CrashLoopBackOff",
+      "OOMKilled",
+      "Probe_failure",
+      "Dependency_timeout",
+      "Other"
+    ],
+    "total_failures_classified": 1,
+    "source_data": "parsed-data.json"
+  },
+  "pattern_definitions": [
+    {
+      "name": "ImagePullBackOff",
+      "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
+      "severity": "high",
+      "patterns_count": 6,
+      "keywords_count": 7
+    },
+    {
+      "name": "CrashLoopBackOff",
+      "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
+      "severity": "critical",
+      "patterns_count": 5,
+      "keywords_count": 7
+    },
+    {
+      "name": "OOMKilled",
+      "description": "Container killed due to memory exhaustion (resource limits exceeded)",
+      "severity": "high",
+      "patterns_count": 5,
+      "keywords_count": 6
+    },
+    {
+      "name": "Probe_failure",
+      "description": "Readiness or liveness probe failures (health check issues)",
+      "severity": "medium",
+      "patterns_count": 6,
+      "keywords_count": 6
+    },
+    {
+      "name": "Dependency_timeout",
+      "description": "Deployment timeout due to dependency unavailability",
+      "severity": "medium",
+      "patterns_count": 6,
+      "keywords_count": 7
+    },
+    {
+      "name": "Other",
+      "description": "Other failure patterns not matching standard categories",
+      "severity": "unknown",
+      "patterns_count": 5,
+      "keywords_count": 6
+    }
+  ],
+  "classified_failures": [
+    {
+      "date": "2026-07-13",
+      "timestamp": "2026-07-13T18:07:55Z",
+      "event_type": "deployment_rollback",
+      "revision": 11,
+      "replicaSet": "pbx-web-754f4cfdf7",
+      "image": "ronaldraygun/pbx-web:1.0.8",
+      "outcome": "rolled_back",
+      "notes": "Rolled back to 1.0.8 on same day",
+      "source_file": "pbx-web-deployment-data-30days.json",
+      "service": "pbx-web",
+      "failure_context": "deployment_rollback",
+      "pattern_type": "Other",
+      "pattern_severity": "unknown",
+      "pattern_description": "Other failure patterns not matching standard categories"
+    }
+  ],
+  "summary": {
+    "by_pattern_type": {
+      "Other": 1
+    },
+    "by_service": {
+      "pbx-web": 1
+    },
+    "by_severity": {
+      "unknown": 1
+    }
+  }
+}
