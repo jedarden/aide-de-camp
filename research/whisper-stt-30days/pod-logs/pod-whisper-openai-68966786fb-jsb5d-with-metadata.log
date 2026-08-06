@@ -1,3 +1,11 @@
+# Log metadata
+# Pod: whisper-openai-68966786fb-jsb5d
+# Namespace: whisper-stt
+# Cluster: ardenone-cluster
+# Fetched at: 2026-08-06T10:46:44-04:00
+# Previous logs flag: not used (pod may not have restarts)
+# ---
+
 Defaulted container "whisper-openai" out of: whisper-openai, model-download (init)
 INFO:     10.42.2.1:43574 - "GET /health HTTP/1.1" 200 OK
 INFO:     10.42.2.1:43590 - "GET /health HTTP/1.1" 200 OK
@@ -90198,3 +90206,7 @@ INFO:     10.42.2.1:41368 - "GET /health HTTP/1.1" 200 OK
 INFO:     10.42.2.1:44040 - "GET /health HTTP/1.1" 200 OK
 INFO:     10.42.2.1:44260 - "GET /health HTTP/1.1" 200 OK
 INFO:     10.42.2.1:44270 - "GET /health HTTP/1.1" 200 OK
+INFO:     10.42.2.1:47336 - "GET /health HTTP/1.1" 200 OK
+INFO:     10.42.2.1:43738 - "GET /health HTTP/1.1" 200 OK
+INFO:     10.42.2.1:48872 - "GET /health HTTP/1.1" 200 OK
+INFO:     10.42.2.1:48888 - "GET /health HTTP/1.1" 200 OK

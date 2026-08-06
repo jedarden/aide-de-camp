@@ -1,0 +1,178 @@
+[
+  {
+    "name": "whisper-openai-55bb9fb46f",
+    "creation": "2026-06-14T04:11:57Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "20"
+  },
+  {
+    "name": "whisper-openai-685c49f459",
+    "creation": "2026-06-14T03:53:06Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "16"
+  },
+  {
+    "name": "whisper-openai-6885fc878b",
+    "creation": "2026-06-14T04:52:13Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "23"
+  },
+  {
+    "name": "whisper-openai-68966786fb",
+    "creation": "2026-06-14T04:55:48Z",
+    "replicas": 1,
+    "available": 1,
+    "ready": 1,
+    "revision": "24"
+  },
+  {
+    "name": "whisper-openai-6b75db654f",
+    "creation": "2026-06-14T04:48:36Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "22"
+  },
+  {
+    "name": "whisper-openai-745d9c487d",
+    "creation": "2026-06-14T04:06:40Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "19"
+  },
+  {
+    "name": "whisper-openai-7548956b49",
+    "creation": "2026-06-14T03:56:31Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "17"
+  },
+  {
+    "name": "whisper-openai-7558965d58",
+    "creation": "2026-06-14T03:50:27Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "15"
+  },
+  {
+    "name": "whisper-openai-7b756c458",
+    "creation": "2026-06-14T04:01:11Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "18"
+  },
+  {
+    "name": "whisper-openai-7ccf9f655b",
+    "creation": "2026-06-14T03:44:24Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "14"
+  },
+  {
+    "name": "whisper-openai-85b44d79b4",
+    "creation": "2026-06-14T04:27:44Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "21"
+  },
+  {
+    "name": "whisper-stt-558c7cf44",
+    "creation": "2026-06-25T14:10:16Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "24"
+  },
+  {
+    "name": "whisper-stt-5b8558f478",
+    "creation": "2026-07-08T03:16:13Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "30"
+  },
+  {
+    "name": "whisper-stt-5b884b75f4",
+    "creation": "2026-06-26T16:33:34Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "26"
+  },
+  {
+    "name": "whisper-stt-5dbff75cbd",
+    "creation": "2026-07-08T03:09:35Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "29"
+  },
+  {
+    "name": "whisper-stt-6464bdf67b",
+    "creation": "2026-07-01T19:46:33Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "27"
+  },
+  {
+    "name": "whisper-stt-65fb7f8dd9",
+    "creation": "2026-06-25T14:08:07Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "23"
+  },
+  {
+    "name": "whisper-stt-6b96f4569c",
+    "creation": "2026-07-02T02:20:33Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "28"
+  },
+  {
+    "name": "whisper-stt-6c497489fb",
+    "creation": "2026-07-08T03:26:44Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "31"
+  },
+  {
+    "name": "whisper-stt-75c848b8d6",
+    "creation": "2026-06-24T20:55:36Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "22"
+  },
+  {
+    "name": "whisper-stt-78bbf5f57f",
+    "creation": "2026-06-26T12:42:03Z",
+    "replicas": 0,
+    "available": 0,
+    "ready": 0,
+    "revision": "25"
+  },
+  {
+    "name": "whisper-stt-847fd8d7b9",
+    "creation": "2026-07-12T16:53:42Z",
+    "replicas": 1,
+    "available": 1,
+    "ready": 1,
+    "revision": "32"
+  }
+]
