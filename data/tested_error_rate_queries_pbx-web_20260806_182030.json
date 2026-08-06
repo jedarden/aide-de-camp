@@ -1,0 +1,132 @@
+{
+  "service": "pbx-web",
+  "time_range": {
+    "start": "2026-07-07T00:00:00Z",
+    "end": "2026-08-06T23:59:59Z",
+    "days": 30
+  },
+  "queries": {
+    "http_error_rates": {
+      "http_5xx_errors": 0,
+      "http_4xx_errors": 2,
+      "http_total_requests": 33129,
+      "http_5xx_error_rate": 0.0,
+      "http_4xx_error_rate": 6.037006852002777e-05,
+      "data_sources": [
+        "pbx-web-current-nginx.log"
+      ],
+      "log_files_analyzed": 1
+    },
+    "application_error_rates": {
+      "total_pods_analyzed": 8,
+      "pods_with_errors": 1,
+      "pods_without_errors": 7,
+      "total_error_count": 5,
+      "error_rate_per_pod": 0.625,
+      "error_rate_per_day": 0.16666666666666666,
+      "pods_with_error_details": [
+        {
+          "pod": "pod-pbx-web-5ff68464d-mkn8n-2026-08-06",
+          "errors": 5
+        }
+      ]
+    },
+    "oom_kill_rates": {
+      "total_pods_analyzed": 8,
+      "pods_with_oom_kills": 0,
+      "total_oom_kill_count": 0,
+      "oom_kill_rate_per_pod": 0.0,
+      "oom_kill_rate_per_day": 0.0,
+      "pods_affected_details": []
+    },
+    "deployment_error_rates": {
+      "total_deployments": 0,
+      "successful_deployments": 0,
+      "failed_deployments": 0,
+      "deployment_error_rate": 0.0,
+      "deployment_success_rate": 0.0,
+      "deployment_times": [],
+      "timing_stats": {}
+    },
+    "overall_error_rates": {
+      "total_errors_all_sources": 7,
+      "error_rate_per_day": 0.23333333333333334,
+      "weighted_error_score": 9.0,
+      "weighted_error_rate_per_day": 0.3,
+      "error_breakdown": {
+        "http_5xx_errors": 0,
+        "http_4xx_errors": 2,
+        "app_errors": 5,
+        "oom_kills": 0,
+        "deployment_failures": 0
+      },
+      "component_metrics": {
+        "http": {
+          "http_5xx_errors": 0,
+          "http_4xx_errors": 2,
+          "http_total_requests": 33129,
+          "http_5xx_error_rate": 0.0,
+          "http_4xx_error_rate": 6.037006852002777e-05,
+          "data_sources": [
+            "pbx-web-current-nginx.log"
+          ],
+          "log_files_analyzed": 1
+        },
+        "application": {
+          "total_pods_analyzed": 8,
+          "pods_with_errors": 1,
+          "pods_without_errors": 7,
+          "total_error_count": 5,
+          "error_rate_per_pod": 0.625,
+          "error_rate_per_day": 0.16666666666666666,
+          "pods_with_error_details": [
+            {
+              "pod": "pod-pbx-web-5ff68464d-mkn8n-2026-08-06",
+              "errors": 5
+            }
+          ]
+        },
+        "oom": {
+          "total_pods_analyzed": 8,
+          "pods_with_oom_kills": 0,
+          "total_oom_kill_count": 0,
+          "oom_kill_rate_per_pod": 0.0,
+          "oom_kill_rate_per_day": 0.0,
+          "pods_affected_details": []
+        },
+        "deployment": {
+          "total_deployments": 0,
+          "successful_deployments": 0,
+          "failed_deployments": 0,
+          "deployment_error_rate": 0.0,
+          "deployment_success_rate": 0.0,
+          "deployment_times": [],
+          "timing_stats": {}
+        }
+      }
+    }
+  },
+  "test_results": {
+    "http_error_rates": {
+      "passed": true,
+      "message": "http_error_rates: \u2713 Returns actual data (4 positive values)"
+    },
+    "application_error_rates": {
+      "passed": true,
+      "message": "application_error_rates: \u2713 Returns actual data (6 positive values)"
+    },
+    "oom_kill_rates": {
+      "passed": true,
+      "message": "oom_kill_rates: \u2713 Returns actual data (1 positive values)"
+    },
+    "deployment_error_rates": {
+      "passed": false,
+      "message": "deployment_error_rates: All metric values are zero - no data collected"
+    },
+    "overall_error_rates": {
+      "passed": true,
+      "message": "overall_error_rates: \u2713 Returns actual data (4 positive values)"
+    }
+  },
+  "query_timestamp": "2026-08-06T18:20:30.529748"
+}
