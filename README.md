@@ -8,7 +8,7 @@ CLI alias: `adc`
 
 ## How It Works
 
-1. **Intent routing** — a single fast LLM call segments your utterance into typed intent threads, each tagged with a project, an intent type (`status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`), and an urgency level (`critical`, `high`, `normal`, `low`).
+1. **Intent routing** — a single fast LLM call segments your utterance into typed intent threads, each tagged with a project, an intent type (`status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`, `stuck`), and an urgency level (`critical`, `high`, `normal`, `low`).
 
 2. **Parallel dispatch** — all threads run concurrently. A compound utterance touching five projects takes as long as the slowest single agent, not their sum.
 
