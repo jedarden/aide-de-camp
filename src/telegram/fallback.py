@@ -229,7 +229,15 @@ class TelegramFallback:
 
 
     async def check_telegram_available(self) -> bool:
-        """Check if Telegram Bot API is available."""
+        """Check if Telegram Bot API (bridge) is available.
+
+        Uses the getMe endpoint to verify bot token validity and bridge
+        reachability. Timeout is set to 2.5 seconds to avoid blocking
+        application startup.
+
+        Returns:
+            True if the bridge is reachable, False otherwise.
+        """
         if self.bot_token is None:
             self._set_reachable(False)
             return False
@@ -240,7 +248,7 @@ class TelegramFallback:
                 # https://core.telegram.org/bots/api#getme
                 response = await client.get(
                     f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/getMe",
-                    timeout=5.0,
+                    timeout=2.5,
                 )
                 is_available = response.status_code == 200
                 self._set_reachable(is_available)
