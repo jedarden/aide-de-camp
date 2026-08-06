@@ -1,0 +1,102 @@
+{
+  "generated_at": "2026-08-06T09:40:02.237993Z",
+  "analysis_period": "30 days (2026-07-07 to 2026-08-06)",
+  "cluster": "ardenone-cluster",
+  "services": [
+    "pbx-web",
+    "whisper-stt"
+  ],
+  "service_metrics": {
+    "pbx_web": {
+      "service_name": "pbx-web",
+      "analysis_period_days": 30,
+      "deployment_metrics": {
+        "total_deployments": 3,
+        "successful_rollouts": 2,
+        "failed_rollouts": 0,
+        "rollback_events": 0,
+        "success_rate_percent": 66.67,
+        "failure_rate_percent": 0.0,
+        "deployment_frequency_per_day": 0.1,
+        "deployment_frequency_per_week": 0.7,
+        "deployment_frequency_per_month": 3.0
+      },
+      "timing_metrics": {
+        "mean_time_between_deployments_hours": 89.74,
+        "median_time_between_deployments_hours": 28.14,
+        "min_time_between_deployments_hours": 0.17,
+        "max_time_between_deployments_hours": 302.52,
+        "deployment_timestamps": [
+          "2026-07-13T18:07:55Z",
+          "2026-07-13T18:18:07Z",
+          "2026-07-15T03:24:40Z",
+          "2026-07-27T17:56:07Z",
+          "2026-07-28T17:05:51Z"
+        ],
+        "sample_size": 4
+      },
+      "pod_health_metrics": {
+        "total_pods": 3,
+        "running_pods": 3,
+        "total_restarts": 0,
+        "crashloops": 0,
+        "oomkills": 0,
+        "failed_pods": 0
+      },
+      "deployment_strategy": "Recreate",
+      "availability": "100%",
+      "overall_health": "healthy"
+    },
+    "whisper_stt": {
+      "service_name": "whisper-stt",
+      "analysis_period_days": 30,
+      "deployment_metrics": {
+        "total_deployments": 2,
+        "successful_rollouts": 3,
+        "failed_rollouts": 0,
+        "rollback_events": 0,
+        "success_rate_percent": 150.0,
+        "failure_rate_percent": 0.0,
+        "deployment_frequency_per_day": 0.0667,
+        "deployment_frequency_per_week": 0.47,
+        "deployment_frequency_per_month": 2.0
+      },
+      "timing_metrics": {
+        "mean_time_between_deployments_hours": 36.58,
+        "median_time_between_deployments_hours": 0.18,
+        "min_time_between_deployments_hours": 0.11,
+        "max_time_between_deployments_hours": 109.45,
+        "deployment_timestamps": [
+          "2026-07-08T03:09:35Z",
+          "2026-07-08T03:16:13Z",
+          "2026-07-08T03:26:44Z",
+          "2026-07-12T16:53:42Z"
+        ],
+        "sample_size": 3
+      },
+      "pod_health_metrics": {
+        "total_pods": 2,
+        "running_pods": 2,
+        "total_restarts": 0,
+        "crashloops": 0,
+        "oomkills": 0,
+        "failed_pods": 0
+      },
+      "deployment_strategy": "Recreate",
+      "availability": "100%",
+      "overall_health": "healthy"
+    }
+  },
+  "comparison": {
+    "total_deployments_both_services": 5,
+    "pbx_web_deployment_percentage": 60.0,
+    "whisper_stt_deployment_percentage": 40.0,
+    "combined_success_rate_percent": 100.0,
+    "higher_deployment_frequency_service": "pbx-web",
+    "deployment_frequency_difference_per_day": 0.0333,
+    "both_services_100_percent_availability": true,
+    "both_services_zero_crashloops": true,
+    "both_services_zero_oomkills": true,
+    "joint_deployment_stability": "excellent"
+  }
+}
