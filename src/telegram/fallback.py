@@ -86,6 +86,7 @@ class TelegramFallback:
         # First-failure record: flat instance vars on the singleton, per-startup,
         # no persistence. Exactly one WARNING is emitted per process startup.
         self._has_logged_first_failure: bool = False
+        self._has_failed_since_startup: bool = False  # adc-2r8hh: simple failure flag
         self._failure_count: int = 0
         self._first_failure_timestamp: Optional[datetime] = None  # set-once
         self._last_failure_timestamp: Optional[datetime] = None  # updated every failure
@@ -280,6 +281,8 @@ class TelegramFallback:
               last determined, via the startup probe or a reactive send)
             - failure_count: int
             - has_logged_first_failure: bool
+            - has_failed_since_startup: bool (adc-2r8hh: flag tracking if any
+              failure occurred since service start)
             - first_failure_timestamp: ISO-8601 string or None
             - last_failure_timestamp: ISO-8601 string or None
             - failure_log_interval_seconds: float (configured rate-limit window)
@@ -297,6 +300,7 @@ class TelegramFallback:
             if self._last_check_time else None,
             "failure_count": self._failure_count,
             "has_logged_first_failure": self._has_logged_first_failure,
+            "has_failed_since_startup": self._has_failed_since_startup,
             "first_failure_timestamp": self._first_failure_timestamp.isoformat()
             if self._first_failure_timestamp else None,
             "last_failure_timestamp": self._last_failure_timestamp.isoformat()
@@ -392,6 +396,7 @@ class TelegramFallback:
             # This is the single per-startup "umbrella" WARNING (adc-hyqc); it
             # also records + seeds this failure type's dedup window.
             self._has_logged_first_failure = True
+            self._has_failed_since_startup = True  # adc-2r8hh: mark that a failure occurred
             self._first_failure_timestamp = now
             self._seen_failure_types.add(error_type)
             # Seed the rate-limit window so the WARNING is not immediately
@@ -452,6 +457,7 @@ class TelegramFallback:
         """
         async with self._first_failure_lock:
             self._has_logged_first_failure = False
+            self._has_failed_since_startup = False  # adc-2r8hh: reset the failure flag
             self._first_failure_timestamp = None
             self._last_repeated_log_timestamp = None
             self._failures_since_last_log = 0
