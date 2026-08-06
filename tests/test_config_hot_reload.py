@@ -1,4 +1,221 @@
-"""Test fixtures and utilities for config hot reload functionality."""
+"""
+Test fixtures and utilities for config hot reload functionality.
+
+RESEARCH SUMMARY: Existing Test Patterns and Dispatch Infrastructure
+=====================================================================
+
+This document summarizes the existing test patterns in the aide-de-camp codebase,
+specifically focusing on dispatch infrastructure, routing verification, and
+hot-reload testing patterns. This research supports implementation of the
+hot-reload test for fetch.yaml configuration (bead adc-26h75).
+
+TEST STRUCTURE PATTERNS
+======================
+
+1. Class-Based Organization
+   --------------------------
+   Tests are organized into logical classes with descriptive names that group
+   related functionality:
+
+   ```python
+   class TestRouterPromptReadPerCall:
+       # Tests for per-call prompt loading
+
+   class TestBuildSystemPrompt:
+       # Tests for system prompt assembly
+
+   class TestRouterMdReachesLLM:
+       # End-to-end tests for prompt reaching LLM
+   ```
+
+2. Fixture Usage
+   --------------
+   Heavy use of pytest fixtures for setup/teardown:
+
+   - Temporary file fixtures: Use `NamedTemporaryFile` or `tmp_path` for
+     throwaway config files that auto-cleanup
+   - Mock fixtures: Create AsyncMock instances for ZAI client, stores
+   - Integration fixtures: Set up router with mocks pre-wired
+
+3. Async Testing
+   --------------
+   All routing/dispatch tests use `@pytest.mark.asyncio`:
+
+   ```python
+   @pytest.mark.asyncio
+   async def test_routing_changes_with_prompt_edit_without_restart(
+       self, router, mock_zai_client, temp_router_md
+   ):
+       # Test code here
+   ```
+
+HOT-RELOAD TESTING PATTERNS
+============================
+
+From `tests/test_router_prompt_hotreload.py` and `tests/test_monitoring_config_hotreload.py`:
+
+1. File Modification Detection Test Pattern
+   ------------------------------------------
+   ```python
+   # Step 1: Load initial state
+   first = router._load_router_prompt()
+   assert "ORIGINAL" in first
+
+   # Step 2: Modify file
+   Path(temp_router_md).write_text(EDITED_CONTENT)
+
+   # Step 3: Force reload or wait for throttle interval
+   router._reload_manager.force_reload("router")
+   # OR: await asyncio.sleep(1.5)  # Wait for hot-reload throttle
+
+   # Step 4: Verify new content loaded
+   second = router._load_router_prompt()
+   assert "EDITED" in second
+   ```
+
+2. Routing Behavior Change Verification
+   -------------------------------------
+   Tests verify not just content changes, but behavioral changes:
+
+   ```python
+   # Initial dispatch with original prompt
+   classifications1 = await router.classify_utterance("check pods", session_id)
+   assert classifications1[0].intent_type.value == "status"
+
+   # Edit prompt to change routing rules
+   Path(temp_router_md).write_text(ACTION_BIASED_PROMPT)
+   router._reload_manager.force_reload("router")
+   router._clear_cache()  # Clear classification cache
+
+   # Same utterance now routes differently
+   classifications2 = await router.classify_utterance("check pods", session_id)
+   assert classifications2[0].intent_type.value == "action"
+   ```
+
+3. Throttle Interval Handling
+   ---------------------------
+   Hot-reload uses throttling to avoid excessive file reads. Tests handle this:
+
+   - Use `force_reload()` method to bypass throttle in tests
+   - OR explicitly wait for throttle interval: `await asyncio.sleep(1.5)`
+
+ROUTING VERIFICATION
+====================
+
+From `tests/test_router_prompt_hotreload.py`:
+
+1. LLM Call Capture
+   ----------------
+   Mock ZAI client to capture system prompts sent to LLM:
+
+   ```python
+   captured = {}
+
+   async def capture(system_prompt, user_message, **kwargs):
+       captured["system_prompt"] = system_prompt
+       return _intent_response()
+
+   mock_zai_client.call_simple = capture
+   router._router_zai_client = mock_zai_client
+
+   await router.classify_utterance("test", session_id)
+
+   # Verify prompt content
+   assert "EXPECTED_MARKER" in captured["system_prompt"]
+   ```
+
+2. Deterministic Router Bypass
+   -----------------------------
+   For testing LLM path only, deterministic router is disabled:
+
+   ```python
+   def patch_deterministic_router():
+       # Mock fast-path router to always return failure
+       mock_router.route_utterance.return_value = FastPathResult(
+           success=False,
+           intents=[],
+           confidence=0.0,
+           reasoning="LLM path forced for test"
+       )
+   ```
+
+HELPER FUNCTIONS FOR CONFIG MODIFICATION
+=========================================
+
+From `tests/test_config_hot_reload.py` (this file):
+
+1. `load_registry_config(registry_path=None)`
+   -------------------------------------------
+   Loads and parses YAML registry config file:
+   - Returns dictionary with parsed YAML
+   - Defaults to `config/registry.yaml` if no path provided
+   - Raises `FileNotFoundError` if file doesn't exist
+
+2. `modify_registry_alias(old_alias, new_alias, registry_path=None)`
+   -----------------------------------------------------------------
+   Modifies aliases in registry while preserving YAML structure:
+   - Updates both `global_aliases` and project `aliases` arrays
+   - Uses `yaml.dump()` with `sort_keys=False` to preserve structure
+   - Raises `ValueError` if alias not found
+
+3. `backup_registry` fixture
+   --------------------------
+   Ensures tests are idempotent:
+   - Backs up `config/registry.yaml` before test
+   - Restores original content after test (even if test fails)
+   - Uses `yield` pattern for guaranteed cleanup
+
+FETCH COMMAND ROUTING LOGIC
+============================
+
+From `src/fetch/commands.py`:
+
+1. Fetch Configuration Loading
+   -----------------------------
+   Configuration uses mtime-based caching:
+   - Global cache: `_fetch_config_cache` and `_fetch_config_mtime`
+   - `_load_fetch_config()` checks file modification time
+   - Returns cached config if file unchanged
+   - Reloads from disk if mtime differs
+
+2. Timeout Resolution Priority
+   ----------------------------
+   `get_effective_timeout(spec, project_slug)` uses priority order:
+   1. Project-specific timeout_ms from config file (if set)
+   2. Global timeout_ms from config file (if set)
+   3. timeout_seconds from spec (default)
+   4. No timeout (infinity) if none set
+
+3. Hot-Reload Integration Points
+   -------------------------------
+   The hot-reload for fetch.yaml should hook into:
+   - `_load_fetch_config()` - already checks mtime and reloads
+   - `_fetch_config_cache` and `_fetch_config_mtime` - cache variables
+   - `get_source_timeout_ms()` - entry point for timeout lookup
+
+KEY PATTERNS TO APPLY IN HOT-RELOAD TEST
+=========================================
+
+Based on existing patterns, the fetch.yaml hot-reload test should:
+
+1. Use a temporary config file fixture (like `temp_config_file` in monitoring tests)
+2. Test initial load, cache hit, and file modification detection
+3. Verify timeout changes take effect without restart
+4. Use both global and project-specific timeout overrides
+5. Test priority order (project-specific > global > spec default)
+6. Verify cache invalidation works correctly
+7. Test concurrent access patterns
+8. Include error handling tests (missing file, invalid YAML)
+
+REFERENCES
+==========
+
+- `tests/test_router_prompt_hotreload.py` - Router prompt hot-reload patterns
+- `tests/test_monitoring_config_hotreload.py` - Monitoring config hot-reload patterns
+- `tests/test_config_hot_reload.py` - Config modification helpers (this file)
+- `tests/test_dispatch_timings.py` - Dispatch infrastructure test patterns
+- `src/fetch/commands.py` - Fetch command matrix and config loading
+"""
 
 import pathlib
 import shutil
