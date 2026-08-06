@@ -481,14 +481,18 @@ async def test_registry_hot_reload(backup_registry):
     4. Test modified state (re-dispatch)
     5. Verify changes took effect
     """
+    from src.intent.router import get_router, clear_router_cache
+    from src.environment.discovery import get_registry
+    from unittest.mock import AsyncMock, MagicMock
+    import json
+
     # Step 1: Load initial registry configuration
     initial_config = load_registry_config()
     assert initial_config is not None
     assert "projects" in initial_config
     assert "aide-de-camp" in initial_config["projects"]
 
-    # Step 2: Test initial state (dispatch)
-    # Verify initial aliases exist
+    # Verify initial aliases exist in config
     adc_project = initial_config["projects"]["aide-de-camp"]
     assert "adc" in adc_project["aliases"]
     assert "aide-de-camp" in adc_project["aliases"]
@@ -497,20 +501,122 @@ async def test_registry_hot_reload(backup_registry):
     assert "prod" in initial_config["global_aliases"]
     assert initial_config["global_aliases"]["prod"] == "options-pipeline"
 
+    # Step 2: Test initial state (dispatch with actual routing)
+    # Use a test utterance that references the aide-de-camp project via alias
+    test_utterance = "check the status of adc project"
+    test_session_id = "test-session-hot-reload"
+
+    # Mock the ZAI client to return a classification with aide-de-camp project
+    # This simulates what the LLM would return for this utterance
+    mock_zai_response = json.dumps([{
+        "intent_type": "status",
+        "project_slug": "aide-de-camp",  # LLM returns full slug
+        "urgency": "normal",
+        "utterance_fragment": "check the status of adc project",
+        "confidence": 0.95,
+        "reasoning": "status check for aide-de-camp project",
+    }])
+
+    # Get router and mock ZAI client
+    router = get_router()
+    clear_router_cache()  # Ensure clean state for test
+
+    # Mock the deterministic router to always return failure (force LLM path)
+    # This ensures we test the actual routing behavior, not fast-path bypass
+    from unittest.mock import patch
+    mock_det_router = MagicMock()
+    mock_det_router.route_utterance.return_value = MagicMock(
+        success=False,
+        intents=[],
+        confidence=0.0,
+        reasoning="LLM path forced for test"
+    )
+    mock_det_router.get_stats.return_value = {"hit_rate": 0.0, "total": 0, "hits": 0}
+
+    # Mock the ZAI client
+    mock_client = AsyncMock()
+    mock_client.call_simple = AsyncMock(return_value={
+        "content": mock_zai_response,
+        "timing_network_ms": 100,
+        "timing_inference_ms": 500,
+    })
+    router._router_zai_client = mock_client
+    router._zai_client = mock_client
+
+    # Perform initial dispatch (with deterministic router mocked)
+    with patch('src.intent.deterministic_router.get_deterministic_router', return_value=mock_det_router):
+        initial_classifications, initial_timing = await router.classify_utterance(
+            utterance=test_utterance,
+            session_id=test_session_id
+        )
+
+    # Verify initial routing
+    assert len(initial_classifications) == 1
+    initial_classification = initial_classifications[0]
+    assert initial_classification.intent_type.value == "status"
+    assert initial_classification.project_slug == "aide-de-camp"
+    assert initial_classification.confidence == 0.95
+
+    # Verify the registry resolution worked
+    # The registry should resolve "aide-de-camp" to the actual project path
+    registry = get_registry()
+    if registry:
+        aide_de_camp_entry = registry.lookup("aide-de-camp")
+        assert aide_de_camp_entry is not None, "aide-de-camp should be in registry"
+        assert aide_de_camp_entry.slug == "aide-de-camp"
+
     # Step 3: Modify registry configuration
-    # Modify a project alias to test hot-reload
+    # Modify the "adc" alias to test hot-reload behavior
     modify_registry_alias("adc", "test-alias-reloaded")
 
-    # Step 4: Test modified state (re-dispatch)
-    # Reload the configuration to simulate hot-reload
-    reloaded_config = load_registry_config()
+    # Force reload the registry to simulate hot-reload
+    # In production, this would happen automatically via mtime checking or background refresh
+    from src.environment.discovery import refresh_registry
+    await refresh_registry()
 
-    # Step 5: Verify changes took effect
+    # Step 4: Test modified state (re-dispatch)
+    # Reload config to verify alias change
+    reloaded_config = load_registry_config()
     adc_project_reloaded = reloaded_config["projects"]["aide-de-camp"]
     assert "test-alias-reloaded" in adc_project_reloaded["aliases"]
     assert "adc" not in adc_project_reloaded["aliases"]
 
-    # Verify other data was preserved
+    # Re-dispatch the same utterance with fresh registry
+    router2 = get_router()
+    clear_router_cache()  # Ensure clean state for second dispatch
+
+    # Mock the ZAI client again for second call
+    mock_client2 = AsyncMock()
+    mock_client2.call_simple = AsyncMock(return_value={
+        "content": mock_zai_response,
+        "timing_network_ms": 100,
+        "timing_inference_ms": 500,
+    })
+    router2._router_zai_client = mock_client2
+    router2._zai_client = mock_client2
+
+    # Perform re-dispatch (with deterministic router mocked)
+    with patch('src.intent.deterministic_router.get_deterministic_router', return_value=mock_det_router):
+        reloaded_classifications, reloaded_timing = await router2.classify_utterance(
+            utterance=test_utterance,
+            session_id=test_session_id
+        )
+
+    # Step 5: Verify changes took effect
+    # The classification should still work (same project_slug from LLM)
+    assert len(reloaded_classifications) == 1
+    reloaded_classification = reloaded_classifications[0]
+    assert reloaded_classification.intent_type.value == "status"
+    assert reloaded_classification.project_slug == "aide-de-camp"
+
+    # Verify the registry still resolves the project correctly
+    registry2 = get_registry()
+    if registry2:
+        aide_de_camp_entry2 = registry2.lookup("aide-de-camp")
+        assert aide_de_camp_entry2 is not None, "aide-de-camp should still resolve"
+        assert aide_de_camp_entry2.slug == "aide-de-camp"
+
+    # Verify other data was preserved in the config
     assert len(reloaded_config["projects"]) == len(initial_config["projects"])
     assert "declarative-config" in reloaded_config["projects"]
     assert "global_aliases" in reloaded_config
