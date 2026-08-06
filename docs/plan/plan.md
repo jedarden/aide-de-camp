@@ -400,44 +400,47 @@ Quota exhaustion on the ZAI proxy presents identically to the proxy being down �
 ```sql
 sessions (
   id          TEXT PRIMARY KEY,
-  created_at  INTEGER,
-  last_active INTEGER,
-  primary_surface_id TEXT
+  created_at  INTEGER NOT NULL,
+  last_active INTEGER NOT NULL,
+  primary_surface_id TEXT,
+  reformulation_count INTEGER DEFAULT 0  -- tracks re-formulation attempts per session to prevent infinite loops
 )
 
 surfaces (
   id              TEXT PRIMARY KEY,
-  session_id      TEXT,
-  type            TEXT,  -- 'canvas' | 'telegram' | 'audio'
-  state           TEXT,  -- 'active' | 'idle' | 'disconnected'
-  always_available INTEGER DEFAULT 0,  -- 1 for Telegram (⚠ aspirational: Telegram delivery non-functional; ADR-1 removes session-bound Telegram surfaces)
-  last_seen       INTEGER
+  session_id      TEXT NOT NULL,
+  type            TEXT NOT NULL CHECK(type IN ('canvas', 'telegram', 'audio')),
+  state           TEXT NOT NULL CHECK(state IN ('active', 'idle', 'disconnected')) DEFAULT 'active',
+  always_available INTEGER DEFAULT 0 CHECK(always_available IN (0, 1)),  -- 1 for Telegram (⚠ aspirational: Telegram delivery non-functional; ADR-1 removes session-bound Telegram surfaces)
+  last_seen       INTEGER NOT NULL
 )
 
 utterances (
   id          TEXT PRIMARY KEY,
-  session_id  TEXT,
-  raw_text    TEXT,
-  created_at  INTEGER
+  session_id  TEXT NOT NULL,
+  raw_text    TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  router_timing_breakdown TEXT  -- JSON: detailed timing breakdown from intent router (prompt_ms, proxy_ms, parse_ms, process_ms, total_ms)
 )
 
 intents (
   id           TEXT PRIMARY KEY,
-  utterance_id TEXT,
-  session_id   TEXT,
+  utterance_id TEXT NOT NULL,
+  session_id   TEXT NOT NULL,
   topic_id     TEXT,  -- primary topic, authoritative and always set; see intent_topics
   project_slug TEXT,
-  intent_type  TEXT,
+  intent_type  TEXT NOT NULL,
   lookup_kind  TEXT,  -- lookup intents only: 'logs' | 'config' | 'docs' (router-emitted; see Intent Router). NULL otherwise
-  status       TEXT,  -- 'pending' | 'dispatched' | 'resolved' | 'stuck' | 'failed' | 'cancelled'
+  status       TEXT NOT NULL CHECK(status IN ('pending', 'dispatched', 'resolved', 'cancelled', 'stuck', 'failed')) DEFAULT 'pending',
   bead_ref     TEXT,  -- set for task-profile intents
-  created_at   INTEGER,
+  created_at   INTEGER NOT NULL,
   resolved_at  INTEGER
 )
 
 dispatch_timings (
   intent_id                 TEXT PRIMARY KEY,
   router_ms                 INTEGER,  -- shared across intents from the same utterance
+  json_parse_ms             INTEGER,  -- JSON parsing time separately from router_ms for precise latency analysis
   fetch_first_source_ms     INTEGER,
   fetch_total_ms            INTEGER,
   synthesize_first_token_ms INTEGER,
@@ -446,7 +449,7 @@ dispatch_timings (
   sse_emit_ms               INTEGER,
   stt_ms                    INTEGER,  -- client-reported; null when unavailable
   first_render_ms           INTEGER,  -- client-reported; null when unavailable
-  created_at                INTEGER
+  created_at                INTEGER NOT NULL
 )
 
 results (
@@ -461,12 +464,13 @@ results (
                      -- "monitoring:{project_slug}" for monitoring-originated rows.
                      -- The hot-path component lookup keys on this column, no LLM
                      -- (see UI-Regen Agent / component_usage_patterns)
-  topic_id    TEXT,
-  session_id  TEXT,
-  summary     TEXT,
-  data        TEXT,  -- JSON
-  urgency     TEXT,  -- 'critical' | 'high' | 'normal' | 'low'
-  created_at  INTEGER,
+  card_fallback INTEGER NOT NULL DEFAULT 0 CHECK(card_fallback IN (0, 1)),  -- 1 when no component matched this result_type (or below threshold): the client renders the built-in generic fallback card
+  topic_id    TEXT NOT NULL,
+  session_id  TEXT NOT NULL,
+  summary     TEXT NOT NULL,
+  data        TEXT NOT NULL,  -- JSON
+  urgency     TEXT NOT NULL CHECK(urgency IN ('critical', 'high', 'normal', 'low')) DEFAULT 'normal',
+  created_at  INTEGER NOT NULL,
   surfaced_at INTEGER,
   acked_at    INTEGER,
   previous_result_id TEXT,  -- prior result of the SAME result_type on the same topic
@@ -482,33 +486,33 @@ results (
 
 topics (
   id           TEXT PRIMARY KEY,
-  label        TEXT,
-  type         TEXT,  -- 'project' | 'research' | 'personal' | 'exception' | 'compound'
+  label        TEXT NOT NULL,
+  type         TEXT NOT NULL CHECK(type IN ('project', 'research', 'personal', 'exception', 'compound')) DEFAULT 'adhoc',
   project_slugs TEXT,  -- JSON array
-  scope        TEXT,  -- 'session' | 'cross-session' | 'global'
-  session_id   TEXT,  -- null for cross-session/global
-  created_at   INTEGER,
-  last_active  INTEGER,
+  scope        TEXT NOT NULL CHECK(scope IN ('session', 'cross-session', 'global')) DEFAULT 'session',
+  session_id   TEXT,
+  created_at   INTEGER NOT NULL,
+  last_active  INTEGER NOT NULL,
   archived_at  INTEGER
 )
 
 topic_context_cache (
   topic_id     TEXT PRIMARY KEY,
-  context_data TEXT,  -- JSON: pre-fetched context (kubectl, git, beads results)
-  fetched_at  INTEGER,
-  expires_at  INTEGER
+  context_data TEXT NOT NULL,  -- JSON: pre-fetched context (kubectl, git, beads results)
+  fetched_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL
 )
 
 feedback_signals (
   signal_id    TEXT PRIMARY KEY,
-  signal_type  TEXT,
-  session_id   TEXT,
+  signal_type  TEXT NOT NULL,
+  session_id   TEXT NOT NULL,
   result_id    TEXT,
   topic_id     TEXT,
-  timestamp    INTEGER,
-  data         TEXT,  -- JSON: signal-specific data
+  timestamp    INTEGER NOT NULL,
+  data         TEXT NOT NULL,  -- JSON: signal-specific data
   surface_type TEXT,
-  processed    INTEGER,  -- 0 or 1
+  processed    INTEGER DEFAULT 0 CHECK(processed IN (0, 1)),
   processed_at INTEGER
 )
 
@@ -550,25 +554,26 @@ card_cache (
 -- primary topic (always set, authoritative); this table never replaces it,
 -- it only holds the extra topics a compound intent also belongs to.
 intent_topics (
-  intent_id TEXT,
-  topic_id  TEXT,
-  PRIMARY KEY (intent_id, topic_id)
+  intent_id TEXT NOT NULL,
+  topic_id  TEXT NOT NULL,
+  PRIMARY KEY (intent_id, topic_id),
+  FOREIGN KEY (intent_id) REFERENCES intents(id) ON DELETE CASCADE,
+  FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
 )
 
 -- Watcher-owned: circuit-breaker and SLA state per tracked bead.
 -- Persisted here (not in watcher memory) so refusal counts and SLA
 -- flags survive watcher restarts. See The Async Path and Bead Watcher.
 bead_watch (
-  bead_ref            TEXT PRIMARY KEY,
-  intent_id           TEXT,
-  refusal_count       INTEGER DEFAULT 0,
-  last_refusal_reason TEXT,
-  last_refusal_at     INTEGER,
-  comment_high_water  TEXT,     -- newest comment id/timestamp already parsed
-  sla_deadline        INTEGER,  -- set at bead creation: intent-type default or registry sla_hours
-  sla_flagged_at      INTEGER,
-  fenced_at           INTEGER,
-  created_at          INTEGER
+  bead_ref           TEXT PRIMARY KEY,  -- References bead ID (intents.bead_ref)
+  refusal_count      INTEGER NOT NULL DEFAULT 0,  -- Number of REFUSED: comments seen
+  last_refusal_reason TEXT,  -- Most recent refusal reason
+  last_refusal_at    INTEGER,  -- Timestamp of most recent refusal
+  comment_high_water INTEGER NOT NULL DEFAULT -1,  -- Latest comment index processed (-1 = none)
+  sla_deadline       INTEGER NOT NULL,  -- Unix timestamp when SLA expires
+  sla_flagged_at     INTEGER,  -- Timestamp when SLA was flagged (NULL if not flagged)
+  fenced_at          INTEGER,  -- Timestamp when bead was fenced to status=blocked (NULL if not fenced)
+  created_at         INTEGER NOT NULL  -- When this watch row was created
 )
 ```
 
