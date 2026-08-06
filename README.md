@@ -144,6 +144,7 @@ adc --help
 | `ADC_TELEGRAM_BOT_TOKEN` | Telegram bot token for direct Bot API integration — required for Telegram fallback notifications | _(none; Telegram disabled without it)_ |
 | `ADC_TELEGRAM_CHAT_ID` | Telegram chat ID for the fallback notification destination | _(none; Telegram disabled without it)_ |
 | `ADC_WHISPER_STT_URL` | Whisper STT service URL for browser speech-to-text fallback | `https://whisper.ardenone.com` |
+| `ADC_SYNTHESIZE_CONCURRENCY_LIMIT` | Maximum concurrent synthesize LLM calls to the ZAI proxy | `8` |
 
 The LLM backend for intent routing and synthesis is configured via the `ZAI_PROXY_URL` environment variable. All LLM calls route through the ZAI proxy.
 

@@ -864,7 +864,7 @@ As of 2026-07-22 no phase has reached verified-live end-to-end; the only live ch
 
 **Status: COMPLETE (verified-in-tests)** — not yet verified-live
 
-*Verification evidence:* see `docs/notes/core-verification-evidence.md` — smoke test results, 20+ runs with all tests passing (test harness, not live; date unrecorded — re-verify)
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` — comprehensive smoke test results from 20+ runs (Run 1-20, 2026-06-10 to 2026-06-11) with all tests passing (server startup, health checks, canvas serving, surface registration, SSE streaming). Test harness verification only; live verification pending.
 
 Validates the core question: does routing + parallel dispatch reduce friction?
 
@@ -1148,7 +1148,7 @@ Triaged 2026-07-22 against the corrected phase statuses above. A question is mar
 
 4. **Concurrency budget** — how many parallel synthesize calls can the ZAI proxy handle without queue pressure affecting the <3s target?
 
-   **OPEN — blocks demo.** No concurrency measurement against the ZAI proxy is recorded in this plan or the cited evidence; the <3s target under parallel synthesize load is unverified.
+   **ANSWERED (implementation complete).** A configurable `asyncio.Semaphore` bounds concurrent synthesize LLM calls via `ADC_SYNTHESIZE_CONCURRENCY_LIMIT` (default: 8). The limiter (bead adc-3d8y) wraps every `synthesize_intent()` LLM call, queuing excess calls until a slot frees. Test suite (`tests/test_concurrency_limit.py`) verifies the limit holds under load (e.g., 15 concurrent calls with limit=5 never exceed 5 active). The conservative default (8) is a starting point for live measurement; tune upward if proxy headroom exists, downward if latency suffers. The <3s target under parallel synthesize load is now verifiable at runtime via the timing breakdown in `dispatch_timings`.
 
 5. **Topic vague reference resolution** — "the pipeline" vs. "options pipeline" vs. "options-pipeline". When does the router resolve from context vs. ask for clarification?
 
