@@ -582,54 +582,57 @@ bead_watch (
 ```sql
 components (
   id            TEXT PRIMARY KEY,
-  name          TEXT,
-  description   TEXT,
-  html_template TEXT,
-  version       INTEGER,
-  created_at    INTEGER,
-  last_used     INTEGER,
-  usage_count   INTEGER
+  name          TEXT NOT NULL,                  -- e.g., "pod-status", "git-log-summary"
+  description   TEXT,                           -- What result types this component handles
+  html_template TEXT NOT NULL,                 -- The HTML/CSS template (parameterized)
+  version       INTEGER NOT NULL DEFAULT 1,     -- Current version number
+  created_at    INTEGER NOT NULL,               -- Unix timestamp
+  last_used     INTEGER,                       -- Unix timestamp
+  usage_count   INTEGER NOT NULL DEFAULT 0
 )
 
 component_versions (
-  component_id  TEXT,
-  version       INTEGER,
-  html_template TEXT,
-  created_at    INTEGER,
-  change_note   TEXT,
+  component_id  TEXT NOT NULL,
+  version       INTEGER NOT NULL,
+  html_template TEXT NOT NULL,
+  created_at    INTEGER NOT NULL,
+  change_note   TEXT,                           -- Why this version was created
   PRIMARY KEY (component_id, version)
 )
 
 card_cache (
-  result_id         TEXT,
-  component_id      TEXT,
-  component_version INTEGER,
-  layout_bucket     TEXT,  -- 'compact' | 'normal' | 'expanded'
-  rendered_html     TEXT,
-  created_at        INTEGER,
+  result_id         TEXT NOT NULL,
+  component_id      TEXT NOT NULL,
+  component_version INTEGER NOT NULL,
+  layout_bucket     TEXT NOT NULL,             -- 'compact' | 'normal' | 'expanded'
+  rendered_html     TEXT NOT NULL,
+  created_at        INTEGER NOT NULL,
   PRIMARY KEY (result_id, component_id, layout_bucket)
 )
 
 component_tags (
-  component_id TEXT,
-  tag TEXT,
+  component_id TEXT NOT NULL,
+  tag          TEXT NOT NULL,
   PRIMARY KEY (component_id, tag)
 )
 
 component_usage_patterns (
-  component_id TEXT,
-  result_type TEXT,  -- thread-level key matching results.result_type, e.g.
-                     -- "status:pbx-web", "lookup:logs:whisper-stt",
-                     -- "lookup:config:whisper-stt" (lookup keys carry lookup_kind,
-                     -- so log-lookup and config-lookup components select
-                     -- independently) — never per-source ("pod-status")
-                     -- granularity; a thread's sources aggregate into one card
-  match_score REAL,  -- 0-1
-  sample_count INTEGER,
-  last_matched INTEGER,
-  PRIMARY KEY (component_id, result_type)
+  result_type  TEXT NOT NULL,                   -- e.g., "status:pbx-web", "lookup:logs:whisper-stt"
+  component_id TEXT NOT NULL,
+  layout_bucket TEXT NOT NULL DEFAULT 'normal',-- 'compact' | 'normal' | 'expanded'
+  match_score  REAL NOT NULL,                   -- How well this component fits (0-1)
+  sample_count INTEGER NOT NULL DEFAULT 1,
+  updated_at   INTEGER NOT NULL,               -- Unix timestamp when last updated
+  PRIMARY KEY (result_type, component_id, layout_bucket)
 )
 ```
+
+**Table relationships:**
+- `components.version` → current version; history in `component_versions`
+- `component_tags.component_id` → references `components.id`
+- `component_usage_patterns.component_id` → references `components.id`
+- `card_cache.component_id` → references `components.id`
+- `card_cache.component_version` → references `component_versions.version` for that component
 
 **Built-in generic fallback card.** The hot-path selector (see The Hot Path / UI-Regen Agent) is a deterministic lookup: highest `match_score` in `component_usage_patterns` for the result's `result_type`, no LLM. When no component matches — a first-ever result shape, or nothing above threshold — the card does not come from this DB at all: the served frontend ships a generic fallback card (key/value grid over `result.data` plus the `summary` line, all values HTML-escaped per the render-path escaping contract — see UI-Regen Agent) as part of `src/canvas/`, and the server flags the result so the client uses it. Novel shapes therefore always render something legible even with zero library rows; the UI-regen agent later promotes recurring fallback shapes into real components. `card_cache` rows are written only for real component renders.
 
