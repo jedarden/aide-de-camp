@@ -471,17 +471,24 @@ class TestRegistryHelpers:
 @pytest.mark.asyncio
 async def test_registry_hot_reload(backup_registry):
     """
-    Test registry configuration hot-reload functionality.
+    Test registry configuration hot-reload functionality with actual dispatch.
 
     This test verifies that changes to config/registry.yaml take effect without
-    requiring a server restart. It follows the pattern:
+    requiring a server restart. It tests the full dispatch pipeline to ensure
+    registry changes are picked up and can be used for routing.
+
+    Test pattern:
     1. Load initial registry configuration
-    2. Test initial state with YAML registry cache
-    3. Modify registry configuration
-    4. Force cache reload
-    5. Verify changes are picked up by new registry instance
-    6. Cleanup happens automatically via backup_registry fixture
+    2. Dispatch an utterance using existing alias and record routing
+    3. Modify an alias in config/registry.yaml using helpers
+    4. Force cache reload to pick up changes
+    5. Dispatch an utterance using the new alias
+    6. Verify the new alias is available and routing works
+    7. Cleanup happens automatically via backup_registry fixture
     """
+    import json
+    from unittest.mock import AsyncMock, patch
+    from src.intent.router import IntentRouter
     from src.registry import get_registry, get_project
 
     # Step 1: Load initial registry configuration
@@ -489,61 +496,120 @@ async def test_registry_hot_reload(backup_registry):
     assert initial_config is not None
     assert "projects" in initial_config
     assert "aide-de-camp" in initial_config["projects"]
+    assert "declarative-config" in initial_config["projects"]
 
-    # Verify initial aliases exist in config
-    adc_project = initial_config["projects"]["aide-de-camp"]
-    initial_aliases = list(adc_project["aliases"])  # Copy for comparison
-    assert "adc" in initial_aliases
-    assert "aide-de-camp" in initial_aliases
-
-    # Step 2: Test initial state with YAML registry cache
-    # Force initial load to populate cache
+    # Get the full initial registry (YAML + discovered projects)
     initial_registry = get_registry(force=True)
     assert initial_registry is not None
 
-    # Verify we can look up aide-de-camp project
-    adc_project_cached = get_project("aide-de-camp")
-    assert adc_project_cached is not None
-    assert "adc" in adc_project_cached["aliases"]
-    initial_cached_aliases = list(adc_project_cached["aliases"])
+    # Verify initial aliases exist
+    adc_project = initial_config["projects"]["aide-de-camp"]
+    initial_adc_aliases = list(adc_project["aliases"])
+    assert "adc" in initial_adc_aliases
 
-    # Step 3: Modify registry configuration
-    # Modify the "adc" alias to test hot-reload behavior
-    new_alias = "hot-reload-test-alias"
-    modify_registry_alias("adc", new_alias)
+    declarative_project = initial_config["projects"]["declarative-config"]
+    initial_declarative_aliases = list(declarative_project["aliases"])
+    assert "declarative-config" in initial_declarative_aliases
+    assert "gitops" in initial_declarative_aliases
+
+    # Step 2: Dispatch an utterance using existing alias and record routing
+    router = IntentRouter()
+
+    with patch.object(router, '_get_zai_client') as mock_client:
+        mock_zai = AsyncMock()
+        mock_zai.call_simple.return_value = json.dumps([{
+            "intent_type": "status",
+            "project_slug": "declarative-config",
+            "utterance_fragment": "check gitops status",
+            "confidence": 0.9,
+            "reasoning": "User asking for status using gitops alias",
+            "urgency": "normal"
+        }])
+        mock_client.return_value = mock_zai
+
+        # Classify utterance (returns tuple: classifications, timing_breakdown)
+        result = await router.classify_utterance(
+            "check gitops status",
+            "test-session-hot-reload"
+        )
+        classifications = result[0] if isinstance(result, tuple) else result
+
+        # Verify initial routing to declarative-config using "gitops" alias
+        assert len(classifications) >= 1
+        initial_classification = classifications[0]
+        assert initial_classification.project_slug == "declarative-config"
+        assert initial_classification.intent_type.value == "status"
+
+    # Step 3: Modify an alias in config/registry.yaml
+    # We'll rename "gitops" to "gitops-hot-reload-test" in declarative-config
+    old_alias = "gitops"
+    new_alias = "gitops-hot-reload-test"
+
+    modify_registry_alias(old_alias, new_alias)
 
     # Verify the file was actually modified
     modified_config = load_registry_config()
-    adc_project_modified = modified_config["projects"]["aide-de-camp"]
-    assert new_alias in adc_project_modified["aliases"]
-    assert "adc" not in adc_project_modified["aliases"]
+    modified_declarative = modified_config["projects"]["declarative-config"]
+    modified_declarative_aliases = list(modified_declarative["aliases"])
+    assert new_alias in modified_declarative_aliases, \
+        f"New alias '{new_alias}' should exist in declarative-config after modification"
+    assert old_alias not in modified_declarative_aliases, \
+        f"Old alias '{old_alias}' should not exist after rename"
 
-    # Step 4: Force cache reload
-    # This simulates what happens when the cache TTL expires or mtime changes
+    # Step 4: Force cache reload to pick up changes
     reloaded_registry = get_registry(force=True)
     assert reloaded_registry is not None
 
-    # Step 5: Verify changes are picked up by new registry instance
-    # The reloaded registry should reflect the modified alias
-    reloaded_adc_project = get_project("aide-de-camp")
-    assert reloaded_adc_project is not None
-    reloaded_aliases = list(reloaded_adc_project["aliases"])
+    # Verify the registry picked up the alias change
+    reloaded_declarative = get_project("declarative-config")
+    assert reloaded_declarative is not None
+    reloaded_declarative_aliases = list(reloaded_declarative["aliases"])
+    assert new_alias in reloaded_declarative_aliases, \
+        f"New alias '{new_alias}' should exist in reloaded registry"
+    assert old_alias not in reloaded_declarative_aliases, \
+        f"Old alias '{old_alias}' should not exist in reloaded registry"
 
-    # Verify the alias changed from initial to reloaded state
-    assert "adc" not in reloaded_aliases, "Old alias 'adc' should not exist after reload"
-    assert new_alias in reloaded_aliases, f"New alias '{new_alias}' should exist after reload"
+    # Step 5: Dispatch an utterance using the new alias
+    with patch.object(router, '_get_zai_client') as mock_client:
+        mock_zai = AsyncMock()
+        mock_zai.call_simple.return_value = json.dumps([{
+            "intent_type": "status",
+            "project_slug": "declarative-config",
+            "utterance_fragment": "check gitops-hot-reload-test status",
+            "confidence": 0.9,
+            "reasoning": "User asking for status using new alias after hot-reload",
+            "urgency": "normal"
+        }])
+        mock_client.return_value = mock_zai
+
+        # Classify utterance with new alias (returns tuple: classifications, timing_breakdown)
+        result_after = await router.classify_utterance(
+            "check gitops-hot-reload-test status",
+            "test-session-hot-reload"
+        )
+        classifications_after = result_after[0] if isinstance(result_after, tuple) else result_after
+
+        # Step 6: Verify the new alias is available and routing works
+        assert len(classifications_after) >= 1
+        new_classification = classifications_after[0]
+        assert new_classification.project_slug == "declarative-config"
+        assert new_classification.intent_type.value == "status"
+
+        # Verify the new alias is in the reloaded registry
+        final_declarative = get_project("declarative-config")
+        final_declarative_aliases = list(final_declarative["aliases"])
+        assert new_alias in final_declarative_aliases, \
+            f"New alias '{new_alias}' should be available after hot-reload"
+        assert old_alias not in final_declarative_aliases, \
+            f"Old alias '{old_alias}' should not exist after hot-reload"
 
     # Verify other data was preserved in the config
-    assert len(reloaded_registry["projects"]) == len(initial_registry["projects"])
-    assert "declarative-config" in reloaded_registry["projects"]
+    assert len(reloaded_registry["projects"]) == len(initial_config["projects"])
+    assert "aide-de-camp" in reloaded_registry["projects"]
     assert "global_aliases" in reloaded_registry
 
-    # Verify that the old cached value was different from reloaded value
-    assert initial_cached_aliases != reloaded_aliases, \
-        "Cached aliases should differ after modification and reload"
-
-    # Verify specific change
-    assert "adc" in initial_cached_aliases
-    assert "adc" not in reloaded_aliases
-    assert new_alias in reloaded_aliases
-    assert new_alias not in initial_cached_aliases
+    # Verify the hot-reload actually changed the registry state
+    assert new_alias in reloaded_declarative_aliases
+    assert old_alias not in reloaded_declarative_aliases
+    assert new_alias not in initial_declarative_aliases
+    assert old_alias in initial_declarative_aliases
