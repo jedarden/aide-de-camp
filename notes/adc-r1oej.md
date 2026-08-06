@@ -1,53 +1,50 @@
 # Kubectl Field Selector Date Filtering Test
 
-**Task:** Test kubectl field selector syntax for filtering workflows by creation date
+## Task
+Test kubectl field selector syntax for filtering workflows by creation date.
 
-## Test Results
+## Findings
+
+**Result: FAILED** - kubectl field selectors DO NOT support date comparisons on `metadata.creationTimestamp`
+
+### Test Results
+
+1. **Primary test** - filtering by creationTimestamp:
+   ```bash
+   kubectl get workflows -n argo-workflows --field-selector=metadata.creationTimestamp>=2026-07-07T13:46:42-04:00
+   ```
+   **Error:** `invalid selector: 'metadata.creationTimestamp'; can't understand 'metadata.creationTimestamp'`
+
+2. **Control test** - filtering by name:
+   ```bash
+   kubectl get workflows -n argo-workflows --field-selector=metadata.name=test-workflow
+   ```
+   **Result:** SUCCESS - field selectors work for other metadata fields
 
 ### Conclusion
-**kubectl field selectors do NOT support creationTimestamp filtering on Argo Workflows custom resources.**
 
-### Tests Performed
+The kubectl field selector mechanism does not support `metadata.creationTimestamp` for date-based filtering, even though it supports other metadata fields like `metadata.name`. This is a fundamental limitation of the Kubernetes API server's field selector implementation for custom resources like Argo Workflows.
 
-1. **metadata.creationTimestamp>=DATE** ❌
-   - Error: `invalid selector: 'metadata.creationTimestamp'; can't understand 'metadata.creationTimestamp'`
-   
-2. **creationTimestamp>=DATE** (without metadata prefix) ❌
-   - Error: Silent failure with exit code 1
-   
-3. **status.phase=Succeeded** ❌
-   - Error: `field label not supported: status.phase`
-   
-4. **metadata.name!=nonexistent** ✅
-   - Works! Basic metadata.name field selectors are supported
+### Recommended Alternatives
 
-### Root Cause
-The Argo Workflow CRD (`argoproj.io/v1alpha1`) does not expose `creationTimestamp` as a queryable field selector. Field selectors on custom resources are limited to a subset of metadata fields defined by the CRD schema.
+Since field selectors cannot be used for date filtering, the recommended approaches are:
 
-## Alternative Approaches
-
-Since field selectors don't work, we need alternative methods to filter workflows by age:
-
-1. **Client-side filtering with jq**
+1. **jq-based JSON parsing:**
    ```bash
-   kubectl get workflows -n argo-workflows -o json | \
-     jq --arg date "$(date -d '30 days ago' -Iseconds)" \
-       '.items[] | select(.metadata.creationTimestamp < $date)'
+   kubectl get workflows -o json | jq '.items[] | select(.metadata.creationTimestamp < "30-days-ago")'
    ```
 
-2. **Direct JSONPath filtering**
+2. **Client-side filtering** in scripts with date libraries
+
+3. **Sort-based approaches:**
    ```bash
-   kubectl get workflows -n argo-workflows -o jsonpath='{.items[?(@.metadata.creationTimestamp < "2026-07-07T13:36:48-04:00")].metadata.name}'
+   kubectl get workflows --sort-by=.metadata.creationTimestamp
    ```
 
-3. **Custom Python script** (most reliable for complex date arithmetic)
-
-4. **Argo Workflow API** (if available) with time-based queries
-
-## Test Data
-- Test date: `2026-07-07T13:36:48-04:00` (30 days ago from 2026-08-06)
+### Test Environment
 - Cluster: iad-ci
-- Kubernetes client version: v1.29.6
-- Full results: `~/scratch/kubectl-field-selector-test.json`
+- Namespace: argo-workflows
+- Total workflows: 16
+- Test date: 2026-08-06
 
-**Bead:** adc-r1oej
+Full results saved to: `~/scratch/kubectl-field-selector-test.json`
