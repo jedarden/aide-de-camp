@@ -1,1 +1,0 @@
-Error from server (BadRequest): previous terminated container "whisper-stt" in pod "whisper-stt-847fd8d7b9-v2rs5" not found

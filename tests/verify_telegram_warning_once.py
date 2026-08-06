@@ -33,6 +33,8 @@ class LogCapture:
         """Set up log capture."""
         self.handler = logging.Handler()
         self.handler.emit = lambda record: self.logs.append(record)
+        # Set logger level to DEBUG so all messages are captured
+        logging.getLogger('telegram.fallback').setLevel(logging.DEBUG)
         logging.getLogger('telegram.fallback').addHandler(self.handler)
 
     def teardown(self):
