@@ -1,0 +1,280 @@
+{
+  "service": "whisper-stt",
+  "collection_date": "2026-08-06",
+  "period": "30_days",
+  "data_sources": [
+    "kubernetes_replicasets_api",
+    "kubernetes_events_api",
+    "argo_workflows_api"
+  ],
+  "query_parameters": {
+    "namespace": "whisper-stt",
+    "field_selector": "metadata.namespace=whisper-stt",
+    "since": "30 days"
+  },
+  "deployments": {
+    "whisper-stt": {
+      "current_status": "healthy",
+      "current_revision": 32,
+      "current_image": "ronaldraygun/whisper-stt:1.8.6",
+      "strategy": "Recreate",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "deployment_events": [
+        {
+          "revision": 32,
+          "replicaset": "whisper-stt-847fd8d7b9",
+          "timestamp": "2026-07-12T16:53:42Z",
+          "age_days": 24,
+          "status": "active",
+          "replicas": 1,
+          "available": 1,
+          "ready": 1,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 31,
+          "replicaset": "whisper-stt-6c497489fb",
+          "timestamp": "2026-07-08T03:26:44Z",
+          "age_days": 29,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 30,
+          "replicaset": "whisper-stt-5b8558f478",
+          "timestamp": "2026-07-08T03:16:13Z",
+          "age_days": 29,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 29,
+          "replicaset": "whisper-stt-5dbff75cbd",
+          "timestamp": "2026-07-08T03:09:35Z",
+          "age_days": 29,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 28,
+          "replicaset": "whisper-stt-6b96f4569c",
+          "timestamp": "2026-07-02T02:20:33Z",
+          "age_days": 35,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 27,
+          "replicaset": "whisper-stt-6464bdf67b",
+          "timestamp": "2026-07-01T19:46:33Z",
+          "age_days": 36,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 26,
+          "replicaset": "whisper-stt-5b884b75f4",
+          "timestamp": "2026-06-26T16:33:34Z",
+          "age_days": 41,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 25,
+          "replicaset": "whisper-stt-78bbf5f57f",
+          "timestamp": "2026-06-26T12:42:03Z",
+          "age_days": 41,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 24,
+          "replicaset": "whisper-stt-558c7cf44",
+          "timestamp": "2026-06-25T14:10:16Z",
+          "age_days": 42,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 23,
+          "replicaset": "whisper-stt-65fb7f8dd9",
+          "timestamp": "2026-06-25T14:08:07Z",
+          "age_days": 42,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        }
+      ]
+    },
+    "whisper-openai": {
+      "current_status": "healthy",
+      "current_revision": 24,
+      "current_image": "fedirz/faster-whisper-server:latest-cpu",
+      "strategy": "RollingUpdate",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "deployment_events": [
+        {
+          "revision": 24,
+          "replicaset": "whisper-openai-68966786fb",
+          "timestamp": "2026-06-14T04:55:48Z",
+          "age_days": 53,
+          "status": "active",
+          "replicas": 1,
+          "available": 1,
+          "ready": 1,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 23,
+          "replicaset": "whisper-openai-6885fc878b",
+          "timestamp": "2026-06-14T04:52:13Z",
+          "age_days": 53,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 22,
+          "replicaset": "whisper-openai-6b75db654f",
+          "timestamp": "2026-06-14T04:48:36Z",
+          "age_days": 53,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 21,
+          "replicaset": "whisper-openai-85b44d79b4",
+          "timestamp": "2026-06-14T04:27:44Z",
+          "age_days": 53,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 20,
+          "replicaset": "whisper-openai-55bb9fb46f",
+          "timestamp": "2026-06-14T04:11:57Z",
+          "age_days": 53,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        }
+      ]
+    }
+  },
+  "argo_workflows": {
+    "workflow_template": "whisper-stt-build",
+    "executions_last_30_days": 0,
+    "status": "no_executions_found",
+    "note": "No workflow executions found in the 30-day period. The workflow template exists but appears to not have been executed during this window, or executions have been cleaned up by retention policy."
+  },
+  "infrastructure_context": {
+    "cluster": "ardenone-cluster",
+    "namespace": "whisper-stt",
+    "storage_classes": ["longhorn", "longhorn-ha", "nfs-synology"],
+    "pvcs": [
+      {
+        "name": "whisper-model-cache",
+        "capacity": "10Gi",
+        "status": "Bound",
+        "age_days": 85
+      },
+      {
+        "name": "whisper-openai-model-cache",
+        "capacity": "10Gi",
+        "status": "Bound",
+        "age_days": 53
+      },
+      {
+        "name": "whisper-stt-jobs",
+        "capacity": "1Gi",
+        "status": "Bound",
+        "age_days": 42
+      }
+    ]
+  },
+  "deployment_patterns": {
+    "whisper-stt": {
+      "total_revisions_30_days": 10,
+      "deployment_frequency": "high",
+      "last_deployment": "2026-07-12T16:53:42Z",
+      "days_since_last_deployment": 24,
+      "strategy": "Recreate",
+      "typical_duration_range": "unknown - pod logs needed"
+    },
+    "whisper-openai": {
+      "total_revisions_30_days": 5,
+      "deployment_frequency": "medium",
+      "last_deployment": "2026-06-14T04:55:48Z",
+      "days_since_last_deployment": 53,
+      "strategy": "RollingUpdate",
+      "typical_duration_range": "unknown - pod logs needed"
+    }
+  },
+  "missing_metrics": [
+    "pod_startup_times",
+    "container_pull_durations",
+    "health_check_latency",
+    "rollback_events",
+    "deployment_failure_reasons"
+  ],
+  "next_steps": [
+    "Extract pod logs for deployment duration metrics",
+    "Query Kubernetes events for ScalingReplicaSet and FailedCreate events",
+    "Check Argo Workflows for build pipeline execution history"
+  ]
+}
