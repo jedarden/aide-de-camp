@@ -275,6 +275,49 @@ async def health_check():
     return response
 
 
+@app.post("/test")
+async def test_endpoint(request: dict):
+    """
+    Test endpoint that accepts utterance and session_id.
+
+    Mirrors the /dispatch interface for basic testing and verification.
+    Returns a test response with timestamp and received data.
+
+    Request body:
+    {
+        "utterance": "test utterance here",
+        "session_id": "optional-session-id"
+    }
+
+    Returns:
+    {
+        "status": "test",
+        "timestamp": "2024-01-01T12:00:00Z",
+        "received": {
+            "utterance": "...",
+            "session_id": "..."
+        },
+        "message": "Test endpoint received data successfully"
+    }
+    """
+    from datetime import datetime
+
+    utterance = request.get("utterance", "")
+    session_id = request.get("session_id", "")
+
+    logger.info(f"[TEST] Received test request - utterance: {utterance[:100]}..., session_id: {session_id}")
+
+    return {
+        "status": "test",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "received": {
+            "utterance": utterance,
+            "session_id": session_id,
+        },
+        "message": "Test endpoint received data successfully",
+    }
+
+
 @app.get("/")
 async def serve_canvas():
     """
@@ -2159,6 +2202,27 @@ async def api_v1_telegram_status():
         return JSONResponse(
             status_code=500,
             content={"error": f"Failed to get Telegram status: {str(e)}"}
+        )
+
+
+@app.get("/api/v1/status/telegram_bridge")
+async def api_v1_telegram_bridge_status():
+    """Get Telegram bridge reachability status.
+
+    Returns the current reachability state of the Telegram Bot API bridge,
+    including availability status, last check time, and failure tracking.
+    Integrates with the reachability state from startup checks and ongoing
+    send operations.
+    """
+    try:
+        telegram_fallback = get_telegram_fallback()
+        status = telegram_fallback.get_status()
+        return status
+    except Exception as e:
+        logger.error(f"Error getting Telegram bridge status: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to get Telegram bridge status: {str(e)}"}
         )
 
 
