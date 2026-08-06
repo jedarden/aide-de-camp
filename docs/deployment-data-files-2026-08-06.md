@@ -6,14 +6,17 @@ This document tracks the validated 30-day deployment data files for comparison a
 
 ## File Locations
 
-### whisper-stt Deployment Data
-- **Path**: `/home/coding/aide-de-camp/whisper-stt-deployment-data-30days.json`
+### whisper-stt Deployment Data (Latest - Validated)
+- **Path**: `/home/coding/aide-de-camp/whisper-stt-deployments-30d.json`
 - **Cluster**: ardenone-cluster
 - **Namespace**: whisper-stt
 - **Service**: whisper-stt, whisper-openai
 - **Coverage**: 2026-07-07 to 2026-08-06 (30 days)
 - **Validation**: ✓ Passed - All required fields present, well-formed JSON, 30-day coverage verified
-- **Generated**: 2026-08-06T09:07:50Z
+- **Generated**: 2026-08-06T12:03:32Z
+- **Schema**: WhisperSTTDeploymentSchema (whisper_stt_deployment_schema.py)
+- **Validator**: validate_whisper_stt_deployment.py
+- **Deployments**: 2 total, 2 successful, 0 failed
 
 ### pbx-web Deployment Data
 - **Path**: `/home/coding/aide-de-camp/pbx-web-deployment-data-30days.json`
