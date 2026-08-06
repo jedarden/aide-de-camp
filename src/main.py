@@ -222,6 +222,52 @@ async def get_store():
     return _store
 
 
+@app.post("/api/v1/test/dispatch")
+async def test_dispatch(request: dict):
+    """
+    Test dispatch endpoint matching /dispatch signature without SSE broadcast.
+
+    Accepts same request body as /dispatch (utterance, session_id, surface_id, utterance_id).
+    Returns a basic JSON response for testing the endpoint structure.
+
+    Request body:
+    {
+        "utterance": "test utterance here",
+        "session_id": "optional-session-id",
+        "surface_id": "optional-surface-id",
+        "utterance_id": "optional-utterance-id"
+    }
+
+    Returns:
+    {
+        "status": "test",
+        "utterance_id": "...",
+        "session_id": "...",
+        "intent_count": 0,
+        "intent_ids": [],
+        "message": "Test dispatch endpoint"
+    }
+    """
+    from datetime import datetime
+    import uuid
+
+    utterance = request.get("utterance", "")
+    utterance_id = request.get("utterance_id") or str(uuid.uuid4())
+    session_id = request.get("session_id") or str(uuid.uuid4())
+    surface_id = request.get("surface_id", "")
+
+    logger.info(f"[TEST_DISPATCH] utterance: {utterance[:100]}..., session_id: {session_id}, surface_id: {surface_id}")
+
+    return {
+        "status": "test",
+        "utterance_id": utterance_id,
+        "session_id": session_id,
+        "intent_count": 0,
+        "intent_ids": [],
+        "message": "Test dispatch endpoint - no SSE broadcast",
+    }
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint.

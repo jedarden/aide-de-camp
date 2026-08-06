@@ -1,0 +1,61 @@
+{
+  "name": "pbx-web-765bb76db8",
+  "creationTimestamp": "2026-07-28T17:05:51Z",
+  "annotations": {
+    "argocd.argoproj.io/tracking-id": "pbx-web-ns-ardenone-cluster:apps/Deployment:pbx-web/pbx-web",
+    "deployment.kubernetes.io/desired-replicas": "1",
+    "deployment.kubernetes.io/max-replicas": "1",
+    "deployment.kubernetes.io/revision": "13",
+    "secret.reloader.stakater.com/reload": "pbx-web-auth,garage-pbx-creds"
+  },
+  "image": "ronaldraygun/pbx-web:1.0.9",
+  "replicas": 0,
+  "status": {
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "replicas": 0
+  },
+  "conditions": []
+}
+{
+  "name": "pbx-web-5ff68464d",
+  "creationTimestamp": "2026-07-13T18:18:07Z",
+  "annotations": {
+    "argocd.argoproj.io/tracking-id": "pbx-web-ns-ardenone-cluster:apps/Deployment:pbx-web/pbx-web",
+    "deployment.kubernetes.io/desired-replicas": "1",
+    "deployment.kubernetes.io/max-replicas": "1",
+    "deployment.kubernetes.io/revision": "14",
+    "deployment.kubernetes.io/revision-history": "12",
+    "secret.reloader.stakater.com/reload": "pbx-web-auth,garage-pbx-creds"
+  },
+  "image": "ronaldraygun/pbx-web:1.0.9",
+  "replicas": 1,
+  "status": {
+    "availableReplicas": 1,
+    "readyReplicas": 1,
+    "updatedReplicas": 0,
+    "replicas": 1
+  },
+  "conditions": []
+}
+{
+  "name": "pbx-web-754f4cfdf7",
+  "creationTimestamp": "2026-07-13T18:07:55Z",
+  "annotations": {
+    "argocd.argoproj.io/tracking-id": "pbx-web-ns-ardenone-cluster:apps/Deployment:pbx-web/pbx-web",
+    "deployment.kubernetes.io/desired-replicas": "1",
+    "deployment.kubernetes.io/max-replicas": "1",
+    "deployment.kubernetes.io/revision": "11",
+    "secret.reloader.stakater.com/reload": "pbx-web-auth,garage-pbx-creds"
+  },
+  "image": "ronaldraygun/pbx-web:1.0.8",
+  "replicas": 0,
+  "status": {
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "replicas": 0
+  },
+  "conditions": []
+}
