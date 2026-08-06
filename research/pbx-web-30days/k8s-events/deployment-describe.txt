@@ -1,0 +1,84 @@
+Name:               pbx-web
+Namespace:          pbx-web
+CreationTimestamp:  Fri, 01 May 2026 10:28:11 -0400
+Labels:             app.kubernetes.io/component=web
+                    app.kubernetes.io/name=pbx-web
+Annotations:        argocd.argoproj.io/tracking-id: pbx-web-ns-ardenone-cluster:apps/Deployment:pbx-web/pbx-web
+                    deployment.kubernetes.io/revision: 14
+                    secret.reloader.stakater.com/reload: pbx-web-auth,garage-pbx-creds
+Selector:           app=pbx-web
+Replicas:           1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:       Recreate
+MinReadySeconds:    0
+Pod Template:
+  Labels:       app=pbx-web
+                app.kubernetes.io/component=web
+                app.kubernetes.io/name=pbx-web
+  Annotations:  kubectl.kubernetes.io/restartedAt: 2026-06-15T18:10:00Z
+  Containers:
+   site-generator:
+    Image:      ronaldraygun/pbx-web:1.0.9
+    Port:       9000/TCP (rebuild)
+    Host Port:  0/TCP (rebuild)
+    Limits:
+      cpu:     500m
+      memory:  512Mi
+    Requests:
+      cpu:      10m
+      memory:   128Mi
+    Liveness:   http-get http://:9000/health delay=10s timeout=5s period=30s #success=1 #failure=3
+    Readiness:  http-get http://:9000/health delay=5s timeout=5s period=10s #success=1 #failure=3
+    Environment:
+      S3_ENDPOINT:        http://garage.garage-operator.svc.cluster.local:3900
+      S3_BUCKET:          recordings
+      S3_ACCESS_KEY:      <set to the key 'access-key' in secret 'garage-pbx-creds'>  Optional: false
+      S3_SECRET_KEY:      <set to the key 'secret-key' in secret 'garage-pbx-creds'>  Optional: false
+      REBUILD_API_TOKEN:  <set to the key 'api-token' in secret 'pbx-web-auth'>       Optional: false
+      PYTHONUNBUFFERED:   1
+    Mounts:
+      /var/www/calls from www (rw)
+   nginx:
+    Image:      nginx:alpine
+    Port:       80/TCP (http)
+    Host Port:  0/TCP (http)
+    Limits:
+      cpu:     100m
+      memory:  128Mi
+    Requests:
+      cpu:        5m
+      memory:     32Mi
+    Liveness:     http-get http://:80/ delay=10s timeout=1s period=30s #success=1 #failure=3
+    Readiness:    http-get http://:80/ delay=3s timeout=1s period=10s #success=1 #failure=3
+    Environment:  <none>
+    Mounts:
+      /etc/nginx/conf.d from nginx-conf (rw)
+      /var/cache/nginx from nginx-cache (rw)
+      /var/run from nginx-run (rw)
+      /var/www/calls from www (rw)
+  Volumes:
+   www:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     
+    SizeLimit:  <unset>
+   nginx-conf:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      pbx-web-nginx-conf
+    Optional:  false
+   nginx-cache:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     Memory
+    SizeLimit:  16Mi
+   nginx-run:
+    Type:          EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:        Memory
+    SizeLimit:     8Mi
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Progressing    True    NewReplicaSetAvailable
+  Available      True    MinimumReplicasAvailable
+OldReplicaSets:  pbx-web-5488fd45c8 (0/0 replicas created), pbx-web-5cc44d5c4c (0/0 replicas created), pbx-web-85858b7dd4 (0/0 replicas created), pbx-web-9fc5b5f59 (0/0 replicas created), pbx-web-69794b7fcc (0/0 replicas created), pbx-web-5cc966f86d (0/0 replicas created), pbx-web-66f79fd6f9 (0/0 replicas created), pbx-web-6d86477cdb (0/0 replicas created), pbx-web-754f4cfdf7 (0/0 replicas created), pbx-web-765bb76db8 (0/0 replicas created)
+NewReplicaSet:   pbx-web-5ff68464d (1/1 replicas created)
+Events:          <none>

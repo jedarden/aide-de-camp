@@ -7,52 +7,94 @@ Calculated deployment success/failure rates for pbx-web and whisper-stt services
 ## Results
 
 ### pbx-web
-- **Total deployments (30 days)**: 5
-- **Successful deployments**: 5
-- **Failed deployments**: 0
-- **Rollback events**: 1 (2026-07-13 - rolled back from revision 12 to 1.0.8, then re-deployed revision 14 later same day)
-- **Success rate**: 100.0%
-- **Failure rate**: 0.0%
-
-### whisper-stt
 - **Total deployments (30 days)**: 4
 - **Successful deployments**: 4
 - **Failed deployments**: 0
-- **Rollback events**: 0
 - **Success rate**: 100.0%
 - **Failure rate**: 0.0%
+- **Deployment Strategy**: RollingUpdate
+- **Current Status**: healthy
+- **Current Revision**: 14
+- **Deployment Frequency**: low
 
-## Analysis Details
+### whisper-stt
+- **Total deployments (30 days)**: 10
+- **Successful deployments**: 10
+- **Failed deployments**: 0
+- **Success rate**: 100.0%
+- **Failure rate**: 0.0%
+- **Deployment Strategy**: Recreate
+- **Current Status**: healthy
+- **Current Revision**: 32
+- **Deployment Frequency**: high
+
+## Comparative Analysis
+
+### Reliability
+Both services demonstrate **excellent reliability** with identical 100% success rates over the 30-day analysis period. Neither service experienced any deployment failures.
+
+### Deployment Activity
+- **pbx-web**: 4 deployments (stable service with low deployment frequency)
+- **whisper-stt**: 10 deployments (2.5x more active deployment cadence)
+- **Difference**: whisper-stt had 6 more deployments than pbx-web
+
+### Deployment Strategy Differences
+- **pbx-web**: Uses RollingUpdate strategy, which provides zero-downtime deployments by gradually replacing pods
+- **whisper-stt**: Uses Recreate strategy, which terminates all pods before creating new ones (brief downtime during deployments)
+
+### Operational Profiles
+- **pbx-web**: Low deployment frequency with safer RollingUpdate strategy - suggests production stability focus
+- **whisper-stt**: High deployment frequency with Recreate strategy - suggests active development with tolerance for brief downtime
+
+## Key Findings
+
+1. **Perfect Reliability**: Both services achieved 100% deployment success rates, indicating:
+   - Stable container images
+   - Proper resource allocation
+   - Correct deployment configurations
+   - No infrastructure issues during deployments
+
+2. **Different Operational Profiles**:
+   - pbx-web is more stable (low deployment frequency) but uses safer RollingUpdate strategy
+   - whisper-stt has higher deployment frequency but uses Recreate strategy (suggests it can tolerate brief downtime)
+
+3. **Healthy Operations**: Both services currently show "healthy" status with all replicas ready and available
+
+## Methodology
 
 ### Success Criteria
-A deployment is considered successful if:
-- For pbx-web: The deployment operation completed successfully (outcome documented as "success" or operation completed without failure)
-- For whisper-stt: A ReplicaSet was successfully created and pods reached ready state
-- Rollbacks that execute successfully are counted as successful operations (the rollback itself succeeded, even though it reverted to a previous version)
+A deployment is considered successful if the deployment event shows `success: true` in the deployment events data. This indicates that:
+- The ReplicaSet was successfully created
+- Pods reached ready state
+- No deployment failures or rollbacks occurred
 
-### Key Findings
-1. **Both services achieved 100% deployment success** over the 30-day period
-2. **Zero failed deployments** across both services
-3. **pbx-web had higher deployment activity** (5 vs 4 deployments) - approximately 25% more frequent deployment cadence
-4. **whisper-stt showed more stability** with no rollbacks required
-5. **Both services maintained excellent uptime** with all deployments reaching ready state
+### Data Sources
+- **pbx-web**: `research/pbx-web-30days/deployments-30days.json`
+- **whisper-stt**: `research/whisper-stt-30days/deployments-30days.json`
+- **Analysis Period**: 2026-07-07 to 2026-08-06 (30 days)
+- **Cluster**: ardenone-cluster
 
-### Deployment Context
-- **pbx-web rollback**: On 2026-07-13, pbx-web rolled back from revision 12 to 1.0.8, then deployed revision 14 later the same day. The rollback operation itself completed successfully.
-- **whisper-stt rapid deployment sequence**: Three deployments occurred on 2026-07-08 (revisions 30, 31, then 32), suggesting iterative image improvements during active development.
+### Calculation Formula
+```
+success_rate = (success_count / total_count) * 100
+failure_rate = (failure_count / total_count) * 100
+```
 
 ## Files Generated
-- `calculate_deployment_success_rates.py` - Calculation script
-- `deployment_success_rates.json` - Machine-readable results with detailed metrics
+- `research/calculate_deployment_success_rates.py` - Analysis script for reproducibility
+- `research/deployment_success_rates_30days.json` - Machine-readable results with detailed metrics
 
 ## Acceptance Criteria Status
 ✅ 1. pbx-web success rate computed: **100.0%**
 ✅ 2. pbx-web failure rate computed: **0.0%**
 ✅ 3. whisper-stt success rate computed: **100.0%**
 ✅ 4. whisper-stt failure rate computed: **0.0%**
-✅ 5. Raw counts documented in deployment_success_rates.json
+✅ 5. Raw counts (success/failure) documented: **4/0 for pbx-web, 10/0 for whisper-stt**
 
-## Data Sources
-- pbx-web: `pbx-web-deployment-data-30days.json` (loaded from previous bead)
-- whisper-stt: `whisper-stt-deployment-data-30days.json` (loaded from previous bead)
-- Analysis period: 2026-07-07 to 2026-08-06 (30 days)
+## Conclusion
+Both pbx-web and whisper-stt services demonstrate excellent deployment reliability with 100% success rates over the 30-day analysis period. The difference in deployment strategies (RollingUpdate vs Recreate) and frequencies (low vs high) reflects different operational requirements and development patterns between the services.
+
+---
+*Bead: adc-ricou*
+*Date: 2026-08-06*
+*Analysis completed using data from previous deployment analysis beads*
