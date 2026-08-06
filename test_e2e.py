@@ -172,7 +172,7 @@ async def run_e2e_test(utterance: str) -> bool:
 
         # Print assertion output
         if assertion_result.stdout:
-            print(assertment_result.stdout)
+            print(assertion_result.stdout)
 
         if assertion_result.returncode != 0:
             print(f"✗ Store-level assertions failed")
