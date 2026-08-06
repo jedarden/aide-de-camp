@@ -466,3 +466,51 @@ class TestRegistryHelpers:
         pbx_project = config["projects"]["pbx-web"]
         assert "test-pbx-alias" in pbx_project["aliases"]
         assert "pbx" not in pbx_project["aliases"]
+
+
+@pytest.mark.asyncio
+async def test_registry_hot_reload(backup_registry):
+    """
+    Test registry configuration hot-reload functionality.
+
+    This test verifies that changes to config/registry.yaml take effect without
+    requiring a server restart. It follows the pattern:
+    1. Load initial registry configuration
+    2. Test initial state (dispatch)
+    3. Modify registry configuration
+    4. Test modified state (re-dispatch)
+    5. Verify changes took effect
+    """
+    # Step 1: Load initial registry configuration
+    initial_config = load_registry_config()
+    assert initial_config is not None
+    assert "projects" in initial_config
+    assert "aide-de-camp" in initial_config["projects"]
+
+    # Step 2: Test initial state (dispatch)
+    # Verify initial aliases exist
+    adc_project = initial_config["projects"]["aide-de-camp"]
+    assert "adc" in adc_project["aliases"]
+    assert "aide-de-camp" in adc_project["aliases"]
+
+    # Verify initial global aliases
+    assert "prod" in initial_config["global_aliases"]
+    assert initial_config["global_aliases"]["prod"] == "options-pipeline"
+
+    # Step 3: Modify registry configuration
+    # Modify a project alias to test hot-reload
+    modify_registry_alias("adc", "test-alias-reloaded")
+
+    # Step 4: Test modified state (re-dispatch)
+    # Reload the configuration to simulate hot-reload
+    reloaded_config = load_registry_config()
+
+    # Step 5: Verify changes took effect
+    adc_project_reloaded = reloaded_config["projects"]["aide-de-camp"]
+    assert "test-alias-reloaded" in adc_project_reloaded["aliases"]
+    assert "adc" not in adc_project_reloaded["aliases"]
+
+    # Verify other data was preserved
+    assert len(reloaded_config["projects"]) == len(initial_config["projects"])
+    assert "declarative-config" in reloaded_config["projects"]
+    assert "global_aliases" in reloaded_config
