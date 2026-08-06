@@ -242,7 +242,7 @@ async def generate_synthetic_result(request: SyntheticResultRequest) -> Syntheti
     # Create intent record
     project_slug = request.test_data.get("project_slug") if request.test_data else None
     intent_type = request.test_data.get("intent_type", "status") if request.test_data else "status"
-    await store.create_intent(
+    intent_id_created = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug=project_slug,
