@@ -1,0 +1,40 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "count": 374,
+            "eventTime": null,
+            "firstTimestamp": "2026-05-27T07:12:24Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "name": "pbx-web",
+                "namespace": "pbx-web",
+                "resourceVersion": "148668318",
+                "uid": "ee224610-36de-48b3-9d09-67aa0b660ac6"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-08-06T14:12:33Z",
+            "message": "announcing from node \"k3s-server-a\" with protocol \"layer2\"",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T14:12:33Z",
+                "name": "pbx-web.18b35aa57d34e1a0",
+                "namespace": "pbx-web",
+                "resourceVersion": "214081120",
+                "uid": "7b7bcca7-d140-4ba9-a835-bb6d71b598de"
+            },
+            "reason": "nodeAssigned",
+            "reportingComponent": "metallb-speaker",
+            "reportingInstance": "",
+            "source": {
+                "component": "metallb-speaker"
+            },
+            "type": "Normal"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

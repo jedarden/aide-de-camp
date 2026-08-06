@@ -1,0 +1,40 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "count": 366,
+            "eventTime": null,
+            "firstTimestamp": "2026-05-27T07:12:24Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "name": "whisper-stt",
+                "namespace": "whisper-stt",
+                "resourceVersion": "149051705",
+                "uid": "5dedabc5-3fc8-4f79-915f-a0bbabb91ce5"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-08-06T14:12:27Z",
+            "message": "announcing from node \"k3s-server-a\" with protocol \"layer2\"",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T14:12:27Z",
+                "name": "whisper-stt.18b35aa57d30e484",
+                "namespace": "whisper-stt",
+                "resourceVersion": "214080956",
+                "uid": "ea1dcc5f-ded3-4508-80b5-075fbe530d33"
+            },
+            "reason": "nodeAssigned",
+            "reportingComponent": "metallb-speaker",
+            "reportingInstance": "",
+            "source": {
+                "component": "metallb-speaker"
+            },
+            "type": "Normal"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
