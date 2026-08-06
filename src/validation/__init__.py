@@ -10,6 +10,7 @@ from src.validation.deployment_data import (
     validate_deployment_data_simple,
     validate_deployment_record,
     validate_timestamp,
+    validate_required_fields,
 )
 
 from src.validation.completeness import (
@@ -25,6 +26,7 @@ __all__ = [
     "validate_deployment_data_simple",
     "validate_deployment_record",
     "validate_timestamp",
+    "validate_required_fields",
     "validate_json_wellformedness",
     "validate_json_file_wellformedness",
     "validate_30day_completeness",
