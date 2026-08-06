@@ -1,0 +1,299 @@
+{
+  "metadata": {
+    "service": "pbx-web",
+    "namespace": "pbx-web",
+    "cluster": "ardenone-cluster",
+    "data_collected_at": "2026-08-06T12:37:36Z",
+    "time_period": {
+      "start": "2026-07-07T00:00:00Z",
+      "end": "2026-08-06T12:37:36Z",
+      "description": "Last 30 days"
+    },
+    "managed_by": "ArgoCD",
+    "strategy": "Recreate"
+  },
+  "current_status": {
+    "deployment_name": "pbx-web",
+    "current_revision": 14,
+    "current_image": "ronaldraygun/pbx-web:1.0.9",
+    "generation": 36,
+    "replicas": 1,
+    "readyReplicas": 1,
+    "updatedReplicas": 1,
+    "availableReplicas": 1,
+    "current_pod": "pbx-web-5ff68464d-mkn8n",
+    "pod_created_at": "2026-07-28T17:26:12Z",
+    "conditions": [
+      {
+        "type": "Progressing",
+        "status": "True",
+        "reason": "NewReplicaSetAvailable",
+        "message": "ReplicaSet \"pbx-web-765bb76db8\" has successfully progressed.",
+        "lastTransitionTime": "2026-05-01T20:57:27Z"
+      },
+      {
+        "type": "Available",
+        "status": "True",
+        "reason": "MinimumReplicasAvailable",
+        "message": "Deployment has minimum availability.",
+        "lastTransitionTime": "2026-07-28T17:26:24Z"
+      }
+    ]
+  },
+  "deployment_events_last_30_days": [
+    {
+      "date": "2026-07-28",
+      "timestamp": "2026-07-28T17:26:12Z",
+      "event_type": "deployment_rollout",
+      "revision": 14,
+      "replicaSet": "pbx-web-5ff68464d",
+      "image": "ronaldraygun/pbx-web:1.0.9",
+      "outcome": "success",
+      "pod_name": "pbx-web-5ff68464d-mkn8n",
+      "pod_ready": true,
+      "restart_count": 0,
+      "notes": "Current active deployment"
+    },
+    {
+      "date": "2026-07-27",
+      "timestamp": "2026-07-27T17:56:07Z",
+      "event_type": "deployment_rollout",
+      "deployment": "lab-rebuild-relay",
+      "revision": 2,
+      "replicaSet": "lab-rebuild-relay-79957dbd4",
+      "image": "python:3-slim",
+      "outcome": "success",
+      "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
+      "pod_ready": true,
+      "restart_count": 0,
+      "notes": "Lab rebuild relay deployment"
+    },
+    {
+      "date": "2026-07-15",
+      "timestamp": "2026-07-15T03:24:40Z",
+      "event_type": "deployment_rollout",
+      "deployment": "pbx-rebuild-relay",
+      "revision": 5,
+      "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+      "image": "python:3-slim",
+      "outcome": "success",
+      "notes": "PBX rebuild relay deployment"
+    },
+    {
+      "date": "2026-07-13",
+      "timestamp": "2026-07-13T18:18:07Z",
+      "event_type": "deployment_rollout",
+      "revision": 14,
+      "replicaSet": "pbx-web-5ff68464d",
+      "image": "ronaldraygun/pbx-web:1.0.9",
+      "outcome": "success",
+      "notes": "Initial deployment of revision 14"
+    },
+    {
+      "date": "2026-07-13",
+      "timestamp": "2026-07-13T18:07:55Z",
+      "event_type": "deployment_rollback",
+      "revision": 11,
+      "replicaSet": "pbx-web-754f4cfdf7",
+      "image": "ronaldraygun/pbx-web:1.0.8",
+      "outcome": "rolled_back",
+      "notes": "Rolled back to 1.0.8 on same day"
+    }
+  ],
+  "historical_deployments_beyond_30_days": [
+    {
+      "date": "2026-06-25",
+      "timestamp": "2026-06-25T15:23:48Z",
+      "revision": 10,
+      "replicaSet": "pbx-web-6d86477cdb",
+      "image": "ronaldraygun/pbx-web:1.0.7",
+      "notes": "Prior to 30-day window"
+    },
+    {
+      "date": "2026-06-23",
+      "timestamp": "2026-06-23T18:55:52Z",
+      "revision": 9,
+      "replicaSet": "pbx-web-66f79fd6f9",
+      "image": "ronaldraygun/pbx-web:1.0.6",
+      "notes": "Prior to 30-day window"
+    },
+    {
+      "date": "2026-06-23",
+      "timestamp": "2026-06-23T18:37:39Z",
+      "revision": 8,
+      "replicaSet": "pbx-web-5cc966f86d",
+      "image": "ronaldraygun/pbx-web:1.0.5",
+      "notes": "Prior to 30-day window"
+    },
+    {
+      "date": "2026-06-21",
+      "timestamp": "2026-06-21T11:13:44Z",
+      "revision": 7,
+      "replicaSet": "pbx-web-69794b7fcc",
+      "image": "ronaldraygun/pbx-web:1.0.4",
+      "notes": "Prior to 30-day window"
+    },
+    {
+      "date": "2026-06-15",
+      "timestamp": "2026-06-15T18:11:38Z",
+      "revision": 6,
+      "replicaSet": "pbx-web-9fc5b5f59",
+      "image": "ronaldraygun/pbx-web:1.0.2",
+      "notes": "Prior to 30-day window"
+    }
+  ],
+  "deployment_metrics": {
+    "total_deployments_last_30_days": 5,
+    "successful_deployments": 5,
+    "failed_deployments": 0,
+    "deployment_frequency_days": 6,
+    "unique_images_deployed": 3,
+    "images_used_last_30_days": [
+      "ronaldraygun/pbx-web:1.0.9",
+      "ronaldraygun/pbx-web:1.0.8",
+      "python:3-slim"
+    ],
+    "current_uptime_days": 9,
+    "last_deployment": "2026-07-28T17:26:12Z",
+    "days_since_last_deployment": 9
+  },
+  "pod_health": {
+    "current_pod": {
+      "name": "pbx-web-5ff68464d-mkn8n",
+      "created_at": "2026-07-28T17:26:12Z",
+      "phase": "Running",
+      "ready": true,
+      "restart_count": 0,
+      "uptime_days": 9,
+      "containers": [
+        {
+          "name": "nginx",
+          "image": "localhost:7439/nginx:alpine",
+          "ready": true,
+          "restartCount": 0,
+          "running_since": "2026-07-28T17:26:13Z"
+        },
+        {
+          "name": "site-generator",
+          "image": "docker.io/ronaldraygun/pbx-web:1.0.9",
+          "ready": true,
+          "restartCount": 0,
+          "running_since": "2026-07-28T17:26:13Z"
+        }
+      ]
+    },
+    "health_indicators": {
+      "no_crashes": true,
+      "no_restart_loops": true,
+      "no_image_pull_errors": true,
+      "liveness_probes_passing": true,
+      "readiness_probes_passing": true
+    }
+  },
+  "operational_logs_sample": {
+    "recent_activity": "Pagefind search index rebuilding",
+    "last_rebuild": "2026-08-05T21:46:11.870571Z",
+    "rebuild_frequency": "triggered by bucket signature changes",
+    "search_index_stats": {
+      "indexed_pages": 197,
+      "indexed_words": 7592,
+      "languages": 1,
+      "build_time_avg_seconds": 2.0
+    },
+    "log_health": "normal - no errors or warnings in recent logs"
+  },
+  "infrastructure_details": {
+    "resource_limits": {
+      "site_generator": {
+        "cpu_limit": "500m",
+        "memory_limit": "512Mi",
+        "cpu_request": "10m",
+        "memory_request": "128Mi"
+      },
+      "nginx": {
+        "cpu_limit": "100m",
+        "memory_limit": "128Mi",
+        "cpu_request": "5m",
+        "memory_request": "32Mi"
+      }
+    },
+    "volumes": [
+      {
+        "name": "www",
+        "type": "emptyDir",
+        "purpose": "shared content between containers"
+      },
+      {
+        "name": "nginx-conf",
+        "type": "configMap",
+        "configMap": "pbx-web-nginx-conf"
+      },
+      {
+        "name": "nginx-cache",
+        "type": "emptyDir",
+        "medium": "Memory",
+        "sizeLimit": "16Mi"
+      },
+      {
+        "name": "nginx-run",
+        "type": "emptyDir",
+        "medium": "Memory",
+        "sizeLimit": "8Mi"
+      }
+    ],
+    "environment_variables": {
+      "S3_ENDPOINT": "http://garage.garage-operator.svc.cluster.local:3900",
+      "S3_BUCKET": "recordings",
+      "PYTHONUNBUFFERED": "1"
+    },
+    "secrets_used": [
+      "garage-pbx-creds",
+      "pbx-web-auth"
+    ],
+    "liveness_probes": {
+      "site_generator": {
+        "path": "/health",
+        "port": 9000,
+        "initialDelaySeconds": 10,
+        "periodSeconds": 30,
+        "timeoutSeconds": 5,
+        "failureThreshold": 3
+      },
+      "nginx": {
+        "path": "/",
+        "port": 80,
+        "initialDelaySeconds": 10,
+        "periodSeconds": 30,
+        "timeoutSeconds": 1,
+        "failureThreshold": 3
+      }
+    },
+    "readiness_probes": {
+      "site_generator": {
+        "path": "/health",
+        "port": 9000,
+        "initialDelaySeconds": 5,
+        "periodSeconds": 10,
+        "timeoutSeconds": 5,
+        "failureThreshold": 3
+      },
+      "nginx": {
+        "path": "/",
+        "port": 80,
+        "initialDelaySeconds": 3,
+        "periodSeconds": 10,
+        "timeoutSeconds": 1,
+        "failureThreshold": 3
+      }
+    }
+  },
+  "summary": {
+    "overall_health": "excellent",
+    "deployment_stability": "stable",
+    "uptime": "9 days continuous",
+    "issues_last_30_days": 0,
+    "rollbacks_last_30_days": 1,
+    "deployment_success_rate": "100%",
+    "recommendation": "Service is healthy with stable deployment pattern. Active rebuild relay infrastructure supports content updates."
+  }
+}
