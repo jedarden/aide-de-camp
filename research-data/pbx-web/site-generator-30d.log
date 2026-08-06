@@ -1,0 +1,2761 @@
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 176 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 175 pages
+  Indexed 6964 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.783 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 177 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 175 pages
+  Indexed 6964 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.637 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 177 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 175 pages
+  Indexed 6964 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.790 seconds
+[pbx-web] bucket changed (sig dca5f31b -> f97841e3), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 177 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 175 pages
+  Indexed 6964 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.755 seconds
+[pbx-web] bucket changed (sig f97841e3 -> ab2c2189), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 177 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 175 pages
+  Indexed 6964 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.799 seconds
+[pbx-web] bucket changed (sig ab2c2189 -> 4c3551eb), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 177 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 176 pages
+  Indexed 6966 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.927 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 177 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 176 pages
+  Indexed 6966 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.889 seconds
+[pbx-web] bucket changed (sig 4c3551eb -> 9fe07bb0), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 177 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 176 pages
+  Indexed 6966 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.813 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 178 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 176 pages
+  Indexed 6966 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.600 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 178 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 177 pages
+  Indexed 6967 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.750 seconds
+[pbx-web] bucket changed (sig 9fe07bb0 -> 2f817bca), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 178 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 177 pages
+  Indexed 6967 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.441 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 179 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 177 pages
+  Indexed 6967 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.414 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 179 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 178 pages
+  Indexed 6967 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.574 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 180 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 178 pages
+  Indexed 6967 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.446 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 180 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 179 pages
+  Indexed 6968 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.535 seconds
+[pbx-web] bucket changed (sig 2f817bca -> 5502e193), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 180 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 179 pages
+  Indexed 6968 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.470 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 181 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 179 pages
+  Indexed 6968 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.435 seconds
+[pbx-web] bucket changed (sig 5502e193 -> e86487b5), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 181 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 180 pages
+  Indexed 6981 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.541 seconds
+[pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 57008)
+Traceback (most recent call last):
+  File "/app/server.py", line 139, in _serve_recording
+    self.wfile.write(chunk)
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/app/server.py", line 59, in do_GET
+    self._serve_recording()
+  File "/app/server.py", line 146, in _serve_recording
+    self.send_error(500)
+  File "/usr/local/lib/python3.11/http/server.py", line 492, in send_error
+    self.end_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 542, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 546, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 182 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 180 pages
+  Indexed 6981 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.813 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 182 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 180 pages
+  Indexed 6981 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.797 seconds
+[pbx-web] bucket changed (sig e86487b5 -> 196c52e2), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 182 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 180 pages
+  Indexed 6981 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.912 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 182 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 181 pages
+  Indexed 7334 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.054 seconds
+[pbx-web] bucket changed (sig 196c52e2 -> 9114bb09), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 182 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 181 pages
+  Indexed 7334 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.950 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 182 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 181 pages
+  Indexed 7315 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.118 seconds
+[pbx-web] bucket changed (sig 9114bb09 -> 2dc24970), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 182 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 181 pages
+  Indexed 7315 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.055 seconds
+[pbx-web] recording fetch error for 1785285870.480/20260729-004430_19148734884_1785285870.480.wav: [Errno 104] Connection reset by peer
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 38764)
+Traceback (most recent call last):
+  File "/app/server.py", line 139, in _serve_recording
+    self.wfile.write(chunk)
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/app/server.py", line 59, in do_GET
+    self._serve_recording()
+  File "/app/server.py", line 146, in _serve_recording
+    self.send_error(500)
+  File "/usr/local/lib/python3.11/http/server.py", line 492, in send_error
+    self.end_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 542, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 546, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 183 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 181 pages
+  Indexed 7315 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.605 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 183 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 181 pages
+  Indexed 7315 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.828 seconds
+[pbx-web] bucket changed (sig 2dc24970 -> 2a66e8ab), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 183 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 181 pages
+  Indexed 7315 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.855 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 183 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 182 pages
+  Indexed 7319 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.680 seconds
+[pbx-web] bucket changed (sig 2a66e8ab -> 6560cfd9), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 183 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 182 pages
+  Indexed 7319 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.443 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 184 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 182 pages
+  Indexed 7319 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.585 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 184 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 183 pages
+  Indexed 7319 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.628 seconds
+[pbx-web] bucket changed (sig 6560cfd9 -> 7434840a), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 184 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 183 pages
+  Indexed 7319 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.466 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 185 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 183 pages
+  Indexed 7319 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.617 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 185 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 183 pages
+  Indexed 7319 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.683 seconds
+[pbx-web] bucket changed (sig 7434840a -> d828e4b1), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 185 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 183 pages
+  Indexed 7319 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.745 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 185 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 184 pages
+  Indexed 7326 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.671 seconds
+[pbx-web] bucket changed (sig d828e4b1 -> a3a10eca), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 185 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 184 pages
+  Indexed 7326 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.527 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 186 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 184 pages
+  Indexed 7326 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.690 seconds
+[pbx-web] bucket changed (sig a3a10eca -> 1785d8e2), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 186 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 184 pages
+  Indexed 7326 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.727 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 186 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 184 pages
+  Indexed 7326 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.682 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 186 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 185 pages
+  Indexed 7327 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.756 seconds
+[pbx-web] bucket changed (sig 1785d8e2 -> f5f22f79), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 186 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 185 pages
+  Indexed 7327 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.550 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 187 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 185 pages
+  Indexed 7327 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.885 seconds
+[pbx-web] bucket changed (sig f5f22f79 -> 9b6ee055), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 187 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 185 pages
+  Indexed 7327 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.903 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 187 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 185 pages
+  Indexed 7327 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.940 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 187 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 186 pages
+  Indexed 7361 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.132 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 187 files matching **/*.{html}
+
+[Parsing files]
+[pbx-web] bucket changed (sig 9b6ee055 -> 71ad3919), rebuilding
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 186 pages
+  Indexed 7362 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.154 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 188 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 186 pages
+  Indexed 7362 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.883 seconds
+[pbx-web] bucket changed (sig 71ad3919 -> 04ecedd6), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 188 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 186 pages
+  Indexed 7362 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.946 seconds
+[pbx-web] bucket changed (sig 04ecedd6 -> 6f602df5), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 188 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 187 pages
+  Indexed 7423 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.033 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 188 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 187 pages
+  Indexed 7427 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.837 seconds
+[pbx-web] bucket changed (sig 6f602df5 -> 14bcb158), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 188 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 187 pages
+  Indexed 7427 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.457 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 189 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 187 pages
+  Indexed 7427 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.630 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 189 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 187 pages
+  Indexed 7427 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.670 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 189 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 188 pages
+  Indexed 7430 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.669 seconds
+[pbx-web] bucket changed (sig 14bcb158 -> ffc9a609), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 189 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 188 pages
+  Indexed 7430 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.529 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 190 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 188 pages
+  Indexed 7430 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.663 seconds
+[pbx-web] bucket changed (sig ffc9a609 -> 97f61f6f), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 190 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 188 pages
+  Indexed 7430 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.668 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 190 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 189 pages
+  Indexed 7432 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.651 seconds
+[pbx-web] bucket changed (sig 97f61f6f -> b3b3e06c), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 190 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 189 pages
+  Indexed 7432 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.551 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 191 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 189 pages
+  Indexed 7432 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.926 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 191 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 189 pages
+  Indexed 7432 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.948 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 191 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 190 pages
+  Indexed 7435 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.729 seconds
+[pbx-web] bucket changed (sig b3b3e06c -> ce15ec21), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 191 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 190 pages
+  Indexed 7435 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.601 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 192 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 190 pages
+  Indexed 7435 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.609 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 192 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 190 pages
+  Indexed 7435 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.673 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 192 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 191 pages
+  Indexed 7438 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.776 seconds
+[pbx-web] bucket changed (sig ce15ec21 -> 095b463a), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 192 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 191 pages
+  Indexed 7438 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.589 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 193 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 191 pages
+  Indexed 7438 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.811 seconds
+[pbx-web] bucket changed (sig 095b463a -> df9e1221), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 193 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 191 pages
+  Indexed 7438 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.755 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 193 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 191 pages
+  Indexed 7438 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.974 seconds
+[pbx-web] bucket changed (sig df9e1221 -> 6047e83e), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 193 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 191 pages
+  Indexed 7438 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.944 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 193 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 192 pages
+  Indexed 7489 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.823 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 193 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 192 pages
+  Indexed 7490 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.767 seconds
+[pbx-web] bucket changed (sig 6047e83e -> 206b992f), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 193 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 192 pages
+  Indexed 7490 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.620 seconds
+[pbx-web] recording fetch error for 1785864705.535/20260804-173145_19142698463_1785864705.535.wav: [Errno 104] Connection reset by peer
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 49378)
+Traceback (most recent call last):
+  File "/app/server.py", line 139, in _serve_recording
+    self.wfile.write(chunk)
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/app/server.py", line 59, in do_GET
+    self._serve_recording()
+  File "/app/server.py", line 146, in _serve_recording
+    self.send_error(500)
+  File "/usr/local/lib/python3.11/http/server.py", line 492, in send_error
+    self.end_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 542, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 546, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+[pbx-web] recording fetch error for 1785864705.535/20260804-173145_19142698463_1785864705.535.wav: [Errno 104] Connection reset by peer
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 37668)
+Traceback (most recent call last):
+  File "/app/server.py", line 139, in _serve_recording
+    self.wfile.write(chunk)
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/app/server.py", line 59, in do_GET
+    self._serve_recording()
+  File "/app/server.py", line 146, in _serve_recording
+    self.send_error(500)
+  File "/usr/local/lib/python3.11/http/server.py", line 492, in send_error
+    self.end_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 542, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 546, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 194 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 192 pages
+  Indexed 7490 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.609 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 194 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 192 pages
+  Indexed 7490 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.682 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 194 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 193 pages
+  Indexed 7491 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.814 seconds
+[pbx-web] bucket changed (sig 206b992f -> 6feddabc), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 194 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 193 pages
+  Indexed 7491 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.567 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 195 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 193 pages
+  Indexed 7491 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.908 seconds
+[pbx-web] bucket changed (sig 6feddabc -> b33f4ed4), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 195 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 193 pages
+  Indexed 7491 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.939 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 195 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 193 pages
+  Indexed 7491 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.974 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 195 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 194 pages
+  Indexed 7494 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.130 seconds
+[pbx-web] recording fetch error for 1785939947.542/20260805-142547_19142698463_1785939947.542.wav: [Errno 104] Connection reset by peer
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 35462)
+Traceback (most recent call last):
+  File "/app/server.py", line 139, in _serve_recording
+    self.wfile.write(chunk)
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/app/server.py", line 59, in do_GET
+    self._serve_recording()
+  File "/app/server.py", line 146, in _serve_recording
+    self.send_error(500)
+  File "/usr/local/lib/python3.11/http/server.py", line 492, in send_error
+    self.end_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 542, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 546, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+[pbx-web] bucket changed (sig b33f4ed4 -> 81938c06), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 195 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 194 pages
+  Indexed 7494 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.958 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 195 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 194 pages
+  Indexed 7494 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.778 seconds
+[pbx-web] bucket changed (sig 81938c06 -> 795c2e70), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 195 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 194 pages
+  Indexed 7494 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.578 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 196 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 194 pages
+  Indexed 7494 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.913 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 196 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 194 pages
+  Indexed 7494 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.017 seconds
+[pbx-web] bucket changed (sig 795c2e70 -> 5785ec72), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 196 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 194 pages
+  Indexed 7494 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.981 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 196 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 195 pages
+  Indexed 7500 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.686 seconds
+[pbx-web] bucket changed (sig 5785ec72 -> 0fa4505d), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 196 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 195 pages
+  Indexed 7500 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.549 seconds
+[pbx-web] recording fetch error for 1785960497.546/20260805-200817_19142698463_1785960497.546.wav: [Errno 104] Connection reset by peer
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 42728)
+Traceback (most recent call last):
+  File "/app/server.py", line 139, in _serve_recording
+    self.wfile.write(chunk)
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/local/lib/python3.11/socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/local/lib/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/local/lib/python3.11/http/server.py", line 440, in handle
+    self.handle_one_request()
+  File "/usr/local/lib/python3.11/http/server.py", line 428, in handle_one_request
+    method()
+  File "/app/server.py", line 59, in do_GET
+    self._serve_recording()
+  File "/app/server.py", line 146, in _serve_recording
+    self.send_error(500)
+  File "/usr/local/lib/python3.11/http/server.py", line 492, in send_error
+    self.end_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 542, in end_headers
+    self.flush_headers()
+  File "/usr/local/lib/python3.11/http/server.py", line 546, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "/usr/local/lib/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 197 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 195 pages
+  Indexed 7500 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.718 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 197 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 196 pages
+  Indexed 7503 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.785 seconds
+[pbx-web] bucket changed (sig 0fa4505d -> 3e4eb214), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 197 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 196 pages
+  Indexed 7503 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.626 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 198 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 196 pages
+  Indexed 7503 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.001 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 198 files matching **/*.{html}
+
+[Parsing files]
+[pbx-web] bucket changed (sig 3e4eb214 -> 6371d683), rebuilding
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 196 pages
+  Indexed 7503 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.159 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 198 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 197 pages
+  Indexed 7597 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.215 seconds
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 198 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 197 pages
+  Indexed 7592 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 2.078 seconds
+[pbx-web] bucket changed (sig 6371d683 -> c5a03a93), rebuilding
+
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+Output:       "/var/www/calls/pagefind"
+
+[Walking source directory]
+Found 198 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 197 pages
+  Indexed 7592 words
+  Indexed 1 filter
+  Indexed 0 sorts
+
+Finished in 1.758 seconds

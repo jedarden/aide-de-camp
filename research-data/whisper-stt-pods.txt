@@ -1,0 +1,3 @@
+NAME                              READY   STATUS    RESTARTS   AGE   IP            NODE                   NOMINATED NODE   READINESS GATES
+whisper-openai-68966786fb-jsb5d   1/1     Running   0          53d   10.42.2.128   k3s-lenovo-tiny        <none>           <none>
+whisper-stt-847fd8d7b9-v2rs5      1/1     Running   0          24d   10.42.6.3     k3s-agent-minisforum   <none>           <none>

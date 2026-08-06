@@ -1,0 +1,4 @@
+NAME                                 READY   STATUS    RESTARTS   AGE   IP            NODE                   NOMINATED NODE   READINESS GATES
+lab-rebuild-relay-79957dbd4-xsqhl    1/1     Running   0          9d    10.42.6.177   k3s-agent-minisforum   <none>           <none>
+pbx-rebuild-relay-588d79c5b9-vmmlz   1/1     Running   0          22d   10.42.6.38    k3s-agent-minisforum   <none>           <none>
+pbx-web-5ff68464d-mkn8n              2/2     Running   0          8d    10.42.6.37    k3s-agent-minisforum   <none>           <none>
