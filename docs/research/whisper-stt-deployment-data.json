@@ -1,0 +1,259 @@
+{
+  "collection_metadata": {
+    "service": "whisper-stt",
+    "collection_date": "2026-08-06",
+    "analysis_period": "2026-07-08 to 2026-08-06 (30 days)",
+    "cluster": "ardenone-cluster",
+    "namespace": "whisper-stt"
+  },
+  "deployment_events": [
+    {
+      "timestamp": "2026-07-08T03:09:35Z",
+      "event_type": "deployment",
+      "status": "pending",
+      "details": {
+        "replicaset": "whisper-stt-5dbff75cbd",
+        "image": "ronaldraygun/whisper-stt:1.8.2",
+        "deployment_type": "recreate",
+        "replicas": 0,
+        "ready_replicas": 0,
+        "reason": "new replica set created"
+      }
+    },
+    {
+      "timestamp": "2026-07-08T03:16:13Z",
+      "event_type": "deployment",
+      "status": "pending",
+      "details": {
+        "replicaset": "whisper-stt-5b8558f478",
+        "image": "ronaldraygun/whisper-stt:1.8.4",
+        "deployment_type": "recreate",
+        "replicas": 0,
+        "ready_replicas": 0,
+        "reason": "new replica set created"
+      }
+    },
+    {
+      "timestamp": "2026-07-08T03:26:44Z",
+      "event_type": "deployment",
+      "status": "pending",
+      "details": {
+        "replicaset": "whisper-stt-6c497489fb",
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "deployment_type": "recreate",
+        "replicas": 0,
+        "ready_replicas": 0,
+        "reason": "new replica set created"
+      }
+    },
+    {
+      "timestamp": "2026-07-12T16:53:42Z",
+      "event_type": "deployment",
+      "status": "success",
+      "details": {
+        "replicaset": "whisper-stt-847fd8d7b9",
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "deployment_type": "recreate",
+        "replicas": 1,
+        "ready_replicas": 1,
+        "reason": "current active replica set"
+      }
+    }
+  ],
+  "pod_events": [
+    {
+      "timestamp": "2026-07-12T16:53:42Z",
+      "event_type": "pod_started",
+      "status": "success",
+      "details": {
+        "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
+        "node": "k3s-agent-minisforum",
+        "restart_count": 0,
+        "ready": true,
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "age_days": 25,
+        "uptime": "25 days (as of 2026-08-06)"
+      }
+    }
+  ],
+  "infrastructure_events": [
+    {
+      "timestamp": "2026-08-06T00:00:00Z",
+      "event_type": "pvc_status",
+      "status": "success",
+      "details": {
+        "pvc_name": "whisper-model-cache",
+        "status": "Bound",
+        "capacity": "10Gi",
+        "storage_class": "longhorn",
+        "age_days": 85,
+        "volume": "pvc-f77f7218-d3c7-4a19-8309-c45b1a5320cc"
+      }
+    },
+    {
+      "timestamp": "2026-08-06T00:00:00Z",
+      "event_type": "pvc_status",
+      "status": "success",
+      "details": {
+        "pvc_name": "whisper-openai-model-cache",
+        "status": "Bound",
+        "capacity": "10Gi",
+        "storage_class": "longhorn",
+        "age_days": 85,
+        "volume": "pvc-d5891df2-b37f-4043-96a1-7098e218378c"
+      }
+    },
+    {
+      "timestamp": "2026-08-06T00:00:00Z",
+      "event_type": "pvc_status",
+      "status": "success",
+      "details": {
+        "pvc_name": "whisper-stt-jobs",
+        "status": "Bound",
+        "capacity": "1Gi",
+        "storage_class": "longhorn",
+        "age_days": 42,
+        "volume": "pvc-0ea5e610-ab76-4576-84da-95ec5e25df61"
+      }
+    }
+  ],
+  "ci_cd_events": [
+    {
+      "timestamp": "2026-07-08T03:09:35Z",
+      "event_type": "argo_workflow",
+      "status": "not_found",
+      "details": {
+        "workflow_template": "whisper-stt-build",
+        "message": "No workflow executions found in argo-workflows namespace for the 30-day period (2026-07-08 to 2026-08-06). The workflow template exists but appears to not have been executed during this window, or executions have been cleaned up by retention policy.",
+        "note": "Deployments were likely performed via ArgoCD sync rather than CI/CD workflows"
+      }
+    }
+  ],
+  "deployment_history": [
+    {
+      "timestamp": "2026-06-24T20:55:36Z",
+      "revision": "22",
+      "image": "ronaldraygun/whisper-stt:1.2.5",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-06-25T14:08:07Z",
+      "revision": "23",
+      "image": "ronaldraygun/whisper-stt:1.3.0",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-06-25T14:10:16Z",
+      "revision": "24",
+      "image": "ronaldraygun/whisper-stt:1.3.1",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-06-26T12:42:03Z",
+      "revision": "25",
+      "image": "ronaldraygun/whisper-stt:1.4.1",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-06-26T16:33:34Z",
+      "revision": "26",
+      "image": "ronaldraygun/whisper-stt:1.5.1",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-07-01T19:46:33Z",
+      "revision": "27",
+      "image": "ronaldraygun/whisper-stt:1.6.0",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-07-02T02:20:33Z",
+      "revision": "28",
+      "image": "ronaldraygun/whisper-stt:1.7.0",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-07-08T03:09:35Z",
+      "revision": "29",
+      "image": "ronaldraygun/whisper-stt:1.8.2",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-07-08T03:16:13Z",
+      "revision": "30",
+      "image": "ronaldraygun/whisper-stt:1.8.4",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-07-08T03:26:44Z",
+      "revision": "31",
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "event_type": "historical_deployment"
+    },
+    {
+      "timestamp": "2026-07-12T16:53:42Z",
+      "revision": "32",
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "event_type": "historical_deployment"
+    }
+  ],
+  "monitoring_metrics": {
+    "pod_uptime": {
+      "whisper_stt": "25 days (2026-07-12 to 2026-08-06)",
+      "whisper_openai": "53 days (2026-06-14 to 2026-08-06)"
+    },
+    "restart_count": {
+      "whisper_stt": 0,
+      "whisper_openai": 0
+    },
+    "pod_status": {
+      "whisper_stt": "Running",
+      "whisper_openai": "Running"
+    },
+    "resource_requests": {
+      "cpu": "1 core",
+      "memory": "4Gi",
+      "storage": "11Gi total (10Gi model cache + 1Gi jobs)"
+    },
+    "resource_limits": {
+      "cpu": "8 cores",
+      "memory": "8Gi"
+    }
+  },
+  "infrastructure_status": {
+    "storage_classes_available": [
+      "longhorn",
+      "longhorn-ha",
+      "nfs-synology",
+      "nfs-synology-garage",
+      "local-path",
+      "proxmox-local-lvm"
+    ],
+    "pvc_status": "all_bound",
+    "storage_class_operational": true,
+    "longhorn_available": true,
+    "alternative_storage_available": true
+  },
+  "summary": {
+    "total_deployments_30_days": 4,
+    "successful_deployments": 1,
+    "pending_deployments": 3,
+    "failed_deployments": 0,
+    "current_image": "ronaldraygun/whisper-stt:1.8.6",
+    "deployment_frequency": "high (4 deployments on 2026-07-08, then stable on 2026-07-12)",
+    "infrastructure_health": "healthy",
+    "pod_stability": "excellent (0 restarts in 25 days)",
+    "storage_health": "all PVCs bound and operational",
+    "deployment_method": "ArgoCD sync (no CI/CD workflow executions found)",
+    "deployment_strategy": "Recreate",
+    "risk_level": "low",
+    "notes": [
+      "Multiple rapid deployments on 2026-07-08 (1.8.2 → 1.8.4 → 1.8.6)",
+      "Stable configuration since 2026-07-12",
+      "No crash_loop_backoff events detected",
+      "No image_pull_errors detected",
+      "Infrastructure fully recovered from previous PVC provisioning issues",
+      "Zero pod restarts indicating stable operation"
+    ]
+  }
+}
