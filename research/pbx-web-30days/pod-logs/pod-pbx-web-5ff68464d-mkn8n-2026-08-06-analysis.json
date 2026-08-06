@@ -1,0 +1,85 @@
+{
+  "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pod-pbx-web-5ff68464d-mkn8n-2026-08-06.log",
+  "file_name": "pod-pbx-web-5ff68464d-mkn8n-2026-08-06.log",
+  "analysis_date": "2026-08-06T13:40:21.580554",
+  "total_lines": 2762,
+  "patterns": {
+    "startup": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "oom_kill": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "error": {
+      "count": 42,
+      "timestamps": [
+        "1785277704",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "1785285870",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "1785864705",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "1785864705",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "1785939947",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "1785960497",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown"
+      ],
+      "samples": [
+        "[pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer",
+        "Exception occurred during processing of request from ('127.0.0.1', 57008)",
+        "Traceback (most recent call last):",
+        "ConnectionResetError: [Errno 104] Connection reset by peer",
+        "During handling of the above exception, another exception occurred:"
+      ]
+    },
+    "performance": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    }
+  },
+  "summary": [
+    {
+      "category": "error",
+      "count": 42,
+      "first_occurrence": "1785277704",
+      "last_occurrence": "unknown"
+    }
+  ]
+}

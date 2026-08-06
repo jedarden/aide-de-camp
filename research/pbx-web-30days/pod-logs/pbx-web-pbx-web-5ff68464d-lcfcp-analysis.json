@@ -1,0 +1,29 @@
+{
+  "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-pbx-web-5ff68464d-lcfcp.log",
+  "file_name": "pbx-web-pbx-web-5ff68464d-lcfcp.log",
+  "analysis_date": "2026-08-06T13:40:20.792334",
+  "total_lines": 1,
+  "patterns": {
+    "startup": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "oom_kill": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "error": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "performance": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    }
+  },
+  "summary": []
+}

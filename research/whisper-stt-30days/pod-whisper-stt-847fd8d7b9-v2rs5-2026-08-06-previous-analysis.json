@@ -1,0 +1,29 @@
+{
+  "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous.log",
+  "file_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous.log",
+  "analysis_date": "2026-08-06T13:40:23.600509",
+  "total_lines": 1,
+  "patterns": {
+    "startup": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "oom_kill": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "error": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "performance": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    }
+  },
+  "summary": []
+}

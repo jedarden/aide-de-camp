@@ -1,0 +1,103 @@
+{
+  "items": [
+    {
+      "apiVersion": "v1",
+      "count": 330,
+      "eventTime": null,
+      "firstTimestamp": "2026-08-05T12:47:03Z",
+      "involvedObject": {
+        "apiVersion": "v1",
+        "fieldPath": "spec.containers{site-generator}",
+        "kind": "Pod",
+        "name": "pbx-web-5ff68464d-lcfcp",
+        "namespace": "pbx-web",
+        "resourceVersion": "610175793",
+        "uid": "b792e42b-e860-44be-8c70-e1e4168a07c7"
+      },
+      "kind": "Event",
+      "lastTimestamp": "2026-08-06T16:32:44Z",
+      "message": "Pulling image \"ronaldraygun/pbx-web:1.0.9\"",
+      "metadata": {
+        "creationTimestamp": "2026-08-06T16:27:34Z",
+        "name": "pbx-web-5ff68464d-lcfcp.18c8e9881aa27aef",
+        "namespace": "pbx-web",
+        "resourceVersion": "610755478",
+        "uid": "64657ac9-3b78-4e84-b467-134ed974f5ee"
+      },
+      "reason": "Pulling",
+      "reportingComponent": "kubelet",
+      "reportingInstance": "k3s-manager",
+      "source": {
+        "component": "kubelet",
+        "host": "k3s-manager"
+      },
+      "type": "Normal"
+    },
+    {
+      "apiVersion": "v1",
+      "count": 7940,
+      "eventTime": null,
+      "firstTimestamp": "2026-08-05T12:46:58Z",
+      "involvedObject": {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "name": "pbx-web-5ff68464d-lcfcp",
+        "namespace": "pbx-web",
+        "resourceVersion": "610175793",
+        "uid": "b792e42b-e860-44be-8c70-e1e4168a07c7"
+      },
+      "kind": "Event",
+      "lastTimestamp": "2026-08-06T17:27:08Z",
+      "message": "Unable to retrieve some image pull secrets (docker-hub-registry); attempting to pull the image may not succeed.",
+      "metadata": {
+        "creationTimestamp": "2026-08-05T12:47:30Z",
+        "name": "pbx-web-5ff68464d-lcfcp.18c8e986ff52a135",
+        "namespace": "pbx-web",
+        "resourceVersion": "610771461",
+        "uid": "b799b4ac-f044-44e5-a9ef-78f390f2c601"
+      },
+      "reason": "FailedToRetrieveImagePullSecret",
+      "reportingComponent": "kubelet",
+      "reportingInstance": "k3s-manager",
+      "source": {
+        "component": "kubelet",
+        "host": "k3s-manager"
+      },
+      "type": "Warning"
+    },
+    {
+      "apiVersion": "v1",
+      "count": 7602,
+      "eventTime": null,
+      "firstTimestamp": "2026-08-05T12:47:20Z",
+      "involvedObject": {
+        "apiVersion": "v1",
+        "fieldPath": "spec.containers{site-generator}",
+        "kind": "Pod",
+        "name": "pbx-web-5ff68464d-lcfcp",
+        "namespace": "pbx-web",
+        "resourceVersion": "610175793",
+        "uid": "b792e42b-e860-44be-8c70-e1e4168a07c7"
+      },
+      "kind": "Event",
+      "lastTimestamp": "2026-08-06T17:27:31Z",
+      "message": "Back-off pulling image \"ronaldraygun/pbx-web:1.0.9\"",
+      "metadata": {
+        "creationTimestamp": "2026-08-05T12:47:34Z",
+        "name": "pbx-web-5ff68464d-lcfcp.18c8e98c3c7310f5",
+        "namespace": "pbx-web",
+        "resourceVersion": "610771537",
+        "uid": "25c05eb1-031e-4a33-818a-bf3080d1a4f1"
+      },
+      "reason": "BackOff",
+      "reportingComponent": "kubelet",
+      "reportingInstance": "k3s-manager",
+      "source": {
+        "component": "kubelet",
+        "host": "k3s-manager"
+      },
+      "type": "Normal"
+    }
+  ],
+  "count": 3
+}
