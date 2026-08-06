@@ -64,6 +64,78 @@ Logs are written to `/tmp/adc.log` (StandardOutput/StandardError) and systemd jo
 
 **Crash recovery:** The unit uses `Restart=on-failure` with 5-second backoff. If the process exits uncleanly (uncaught exception, OOM, etc.), systemd automatically restarts it.
 
+## Keeping the Live Checkout Synced
+
+The live checkout on the Hetzner server can drift from `origin/main` when commits are pushed from other locations (e.g., local machines, CI). Periodic syncs prevent merge conflicts and ensure the server runs the latest code.
+
+### Checking current divergence
+
+```bash
+# Check if local HEAD is ahead of origin (unpushed local commits)
+git log origin/main..HEAD --oneline
+
+# Check if local HEAD is behind origin (unpulled remote commits)
+git log HEAD..origin/main --oneline
+
+# Full status (shows branch, diverging commits, uncommitted changes)
+git status -sb
+```
+
+### Recommended sync frequency
+
+**Sync before every release** — make it step 0 in the version bump checklist. This ensures the release tag is created from a fully-updated checkout.
+
+Additional syncs are recommended:
+- After any CI auto-bump (e.g., `chore: bump to vX.Y.Z` commits from declarative-config)
+- Before starting new work that will create a release branch
+- Weekly if the repo is active across multiple machines
+
+### Safe merge procedure
+
+**Always sync before creating a release tag.** The procedure:
+
+```bash
+# 1. Check for uncommitted changes (including .beads/)
+git status
+
+# 2. If .beads/ has uncommitted changes, flush them first
+bf sync --flush-only
+
+# 3. Commit any other uncommitted changes
+git commit -am "WIP: pre-sync commit"
+
+# 4. Fetch latest from origin
+git fetch origin
+
+# 5. Merge origin/main into local main
+git merge origin/main -m "Merge origin/main into main"
+
+# 6. Push the merge commit
+git push origin main
+```
+
+This sequence guarantees:
+- All `.beads/` state is preserved in the checkpoint
+- No local work is lost
+- `origin/main` is integrated into local history
+- The merge commit is visible in the git log for attribution
+
+### Handling .beads/ uncommitted changes
+
+`.beads/` is git-ignored but contains live state (`beads.db`, `events.jsonl`). Before any sync:
+
+```bash
+# Flush the checkpoint (db → issues.jsonl)
+bf sync --flush-only
+
+# Verify the checkpoint is current
+git log -1 .beads/issues.jsonl
+
+# Proceed with sync
+```
+
+**Never** run `bf doctor --repair` before a sync without flushing first — repair rebuilds the db from the JSONL checkpoint and will destroy any unflushed beads.
+
 ## Versioning
 
 **Every meaningful push must bump the version and cut a git tag.**
@@ -78,6 +150,7 @@ Version lives in `pyproject.toml` → `[project] version`. At startup, `src/main
 
 ### Release checklist
 
+0. **Sync with origin** — See [Keeping the Live Checkout Synced](#keeping-the-live-checkout-synced)
 1. Edit `pyproject.toml` — bump `version`
 2. Commit: `git commit -m "chore: bump to vX.Y.Z"`
 3. Tag: `git tag vX.Y.Z`
