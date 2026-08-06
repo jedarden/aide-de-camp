@@ -1,12 +1,19 @@
 {
   "apiVersion": "v1",
+  "items": [],
   "kind": "List",
   "metadata": {
     "resourceVersion": ""
   },
-  "items": [],
-  "note": "No whisper-stt-build workflow runs found in the last 30 days (or ever). The workflow template exists but has never been executed.",
-  "query_date": "2026-08-06",
-  "template_exists": true,
-  "template_age_days": 71
+  "query_info": {
+    "template": "whisper-stt-build",
+    "namespace": "argo-workflows",
+    "cluster": "iad-ci",
+    "query_date": "2026-08-06",
+    "note": "No workflow runs found for whisper-stt-build template despite the template existing. The template was created 71 days ago but has never been executed.",
+    "template_exists": true,
+    "template_age_days": 71,
+    "expected_date_range": "2026-07-07 to 2026-08-06",
+    "runs_found": 0
+  }
 }
