@@ -1899,3 +1899,6 @@
 {"bead":"adc-3pbim","duration_ms":438399,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-06T19:30:39.830637814+00:00","worker":"golf"}
 {"bead":"adc-2lozt","event":"claim","strand":"auto","ts":"2026-08-06T19:30:39.884935694+00:00","worker":"golf"}
 {"adapter":"claude-code-glm-4.7","bead":"adc-2lozt","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-06T19:30:39.889357641+00:00","worker":"golf"}
+{"bead":"adc-181i4","duration_ms":600228,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-06T19:32:06.687077835+00:00","worker":"juliet"}
+{"bead":"adc-4l495","event":"claim","strand":"auto","ts":"2026-08-06T19:32:06.718225149+00:00","worker":"juliet"}
+{"adapter":"claude-code-glm-4.7","bead":"adc-4l495","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-06T19:32:06.721220280+00:00","worker":"juliet"}
