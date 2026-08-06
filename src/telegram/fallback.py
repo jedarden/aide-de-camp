@@ -13,6 +13,8 @@ from typing import Optional
 
 import httpx
 
+from .state_tracker import BridgeState
+
 logger = logging.getLogger(__name__)
 
 
@@ -110,6 +112,9 @@ class TelegramFallback:
         # of the flag cannot be interleaved by another coroutine.
         self._first_failure_lock: asyncio.Lock = asyncio.Lock()
 
+        # Bridge state tracker for reachability and failure deduplication
+        self._state_tracker = BridgeState()
+
     async def send_message(
         self,
         chat_id: int | str,
@@ -150,6 +155,9 @@ class TelegramFallback:
 
                 if response.status_code == 200:
                     logger.info(f"Sent Telegram message to chat {chat_id}")
+                    # Update reachability state - reset state tracker if was unreachable
+                    if not self._state_tracker.is_reachable:
+                        self._state_tracker.mark_as_reachable()
                     self._set_reachable(True)  # Update reachability state
                     return True
                 else:
@@ -239,6 +247,7 @@ class TelegramFallback:
             True if the bridge is reachable, False otherwise.
         """
         if self.bot_token is None:
+            self._state_tracker.mark_as_unreachable(datetime.now())
             self._set_reachable(False)
             return False
 
@@ -251,9 +260,14 @@ class TelegramFallback:
                     timeout=2.5,
                 )
                 is_available = response.status_code == 200
+                if is_available:
+                    self._state_tracker.mark_as_reachable()
+                else:
+                    self._state_tracker.mark_as_unreachable(datetime.now())
                 self._set_reachable(is_available)
                 return is_available
         except Exception:
+            self._state_tracker.mark_as_unreachable(datetime.now())
             self._set_reachable(False)
             return False
 
@@ -387,6 +401,28 @@ class TelegramFallback:
         """
         now = datetime.now()
         self._set_reachable(False, now=now)
+
+        # Update state tracker for reachability and deduplication
+        self._state_tracker.mark_as_unreachable(now)
+
+        # Log WARNING on first failure after bridge was reachable
+        # This uses the state tracker to prevent duplicate warnings per failure streak
+        if self._state_tracker.should_log_failure():
+            if error is not None:
+                error_type = type(error).__name__
+                message = str(error) or error_context or "unknown error"
+                logger.warning(
+                    f"Telegram bridge unreachable: send failed. "
+                    f"Error type: {error_type}. Error: {message}. "
+                    f"Bridge may be down or network issue."
+                )
+            else:
+                message = error_context or "unknown error"
+                logger.warning(
+                    f"Telegram bridge unreachable: send failed. "
+                    f"Error: {message}. Bridge may be down or network issue."
+                )
+
         self._failure_count += 1
         self._last_failure_timestamp = now
         self._failures_since_last_log += 1
@@ -412,7 +448,7 @@ class TelegramFallback:
             self._last_repeated_log_timestamp = now
             self._failures_since_last_log = 0
             logger.warning(
-                f"First Telegram send failure detected. "
+                f"Telegram bridge unreachable: send failed. "
                 f"Error type: {error_type}. Error: {message}. "
                 f"Subsequent failures of the same type are rate-limited (one "
                 f"DEBUG summary per {self._failure_log_interval_seconds:g}s); "
