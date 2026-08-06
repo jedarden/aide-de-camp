@@ -337,7 +337,8 @@ class TelegramFallback:
         """True if the rate-limit window has elapsed and a DEBUG summary may be logged.
 
         Caller MUST hold ``_first_failure_lock``. Returns True immediately when no
-        repeated log has been emitted yet in this startup.
+        repeated log has been emitted yet in this startup, or when the timestamp
+        is None (first failure hasn't started the rate-limit window yet).
         """
         if self._last_repeated_log_timestamp is None:
             return True
@@ -399,8 +400,7 @@ class TelegramFallback:
             self._has_failed_since_startup = True  # adc-2r8hh: mark that a failure occurred
             self._first_failure_timestamp = now
             self._seen_failure_types.add(error_type)
-            # Seed the rate-limit window so the WARNING is not immediately
-            # followed by a DEBUG storm.
+            # Start the rate-limit window from now
             self._last_repeated_log_timestamp = now
             self._failures_since_last_log = 0
             logger.warning(
@@ -419,6 +419,7 @@ class TelegramFallback:
             # rate-limit window so this type's immediate repeats are deduped.
             self._seen_failure_types.add(error_type)
             self._last_repeated_log_timestamp = now
+            # Reset the counter for the new failure type, starting from this one
             self._failures_since_last_log = 0
             logger.warning(
                 f"New Telegram send failure type during ongoing outage: "
@@ -435,13 +436,15 @@ class TelegramFallback:
         # avoid log spam.
         if self._repeated_log_cooldown_elapsed(now):
             batch = self._failures_since_last_log  # failures accumulated since last log
-            logger.debug(
-                f"Repeated Telegram send failures: {batch} failure(s) since last "
-                f"log (total {self._failure_count}). "
-                f"Latest error type: {error_type}. Error: {message}."
-            )
-            self._last_repeated_log_timestamp = now
-            self._failures_since_last_log = 0
+            # Only log if there are actual failures to report (avoid empty logs)
+            if batch > 0:
+                logger.debug(
+                    f"Repeated Telegram send failures: {batch} failure(s) since last "
+                    f"log (total {self._failure_count}). "
+                    f"Latest error type: {error_type}. Error: {message}."
+                )
+                self._last_repeated_log_timestamp = now
+                self._failures_since_last_log = 0
 
         return False
 

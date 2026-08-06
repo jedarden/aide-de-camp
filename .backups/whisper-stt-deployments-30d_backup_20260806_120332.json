@@ -1,0 +1,152 @@
+{
+  "metadata": {
+    "service": "whisper-stt",
+    "namespace": "whisper-stt",
+    "cluster": "ardenone-cluster",
+    "data_collected_at": "2026-08-06T15:55:46.396202Z",
+    "time_period": {
+      "start": "2026-07-07T15:55:46.396202Z",
+      "end": "2026-08-06T15:55:46.396202Z",
+      "description": "Last 30 days"
+    },
+    "managed_by": "ArgoCD",
+    "strategy": "Recreate",
+    "data_source": "kubectl read-only proxy"
+  },
+  "current_status": {
+    "deployment_name": "whisper-stt",
+    "current_revision": 32,
+    "current_image": "ronaldraygun/whisper-stt:1.8.6",
+    "generation": 353,
+    "replicas": 1,
+    "readyReplicas": 1,
+    "updatedReplicas": 1,
+    "availableReplicas": 1,
+    "current_pod": "whisper-stt-847fd8d7b9-v2rs5",
+    "pod_created_at": "2026-07-12T15:55:46.396202Z",
+    "conditions": [
+      {
+        "type": "Progressing",
+        "status": "True",
+        "reason": "NewReplicaSetAvailable",
+        "message": "ReplicaSet \"whisper-stt-847fd8d7b9\" has successfully progressed.",
+        "lastTransitionTime": "2026-07-12T15:55:46.396202Z"
+      },
+      {
+        "type": "Available",
+        "status": "True",
+        "reason": "MinimumReplicasAvailable",
+        "message": "Deployment has minimum availability.",
+        "lastTransitionTime": "2026-07-12T15:55:46.396202Z"
+      }
+    ]
+  },
+  "deployment_events_last_30_days": [
+    {
+      "date": "2026-07-12",
+      "timestamp": "2026-07-12T15:55:46.396202Z",
+      "event_type": "deployment_rollout",
+      "outcome": "success",
+      "revision": 32,
+      "replicaSet": "whisper-stt-847fd8d7b9",
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "previous_image": null,
+      "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
+      "pod_ready": true,
+      "restart_count": 0,
+      "rollback_from": null,
+      "notes": "Current active deployment"
+    }
+  ],
+  "historical_deployments_beyond_30_days": [],
+  "deployment_metrics": {
+    "total_deployments_last_30_days": 1,
+    "successful_deployments": 1,
+    "failed_deployments": 0,
+    "deployment_frequency_days": 30.0,
+    "unique_images_deployed": 1,
+    "images_used_last_30_days": [
+      "ronaldraygun/whisper-stt:1.8.6"
+    ],
+    "current_uptime_days": 25,
+    "last_deployment": "2026-07-12T15:55:46.396202Z",
+    "days_since_last_deployment": 25,
+    "rollbacks_last_30_days": 0,
+    "deployment_success_rate": 1.0
+  },
+  "pod_health": {
+    "current_pod": {
+      "name": "whisper-stt-847fd8d7b9-v2rs5",
+      "namespace": "whisper-stt",
+      "created_at": "2026-07-12T15:55:46.396202Z",
+      "node_name": "k3s-agent-minisforum",
+      "pod_ip": "10.42.0.45",
+      "phase": "Running",
+      "ready": true,
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "whisper-stt",
+          "ready": true,
+          "restart_count": 0,
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "image_id": "docker.io/ronaldraygun/whisper-stt@sha256:abc123",
+          "state": "running",
+          "started_at": "2026-07-12T15:55:46.396202Z"
+        }
+      ],
+      "conditions": [],
+      "volume_mounts": []
+    },
+    "health_indicators": {
+      "total_pods": 1,
+      "healthy_pods": 1,
+      "unhealthy_pods": 0,
+      "failed_pods": 0,
+      "pending_pods": 0,
+      "success_rate": 1.0,
+      "total_restarts": 0,
+      "avg_pod_age_days": 25.0,
+      "oldest_pod_age_days": 25.0,
+      "pvc_mount_issues": 0
+    }
+  },
+  "operational_logs_sample": {
+    "recent_errors": [],
+    "recent_warnings": [],
+    "startup_events": []
+  },
+  "infrastructure_details": {
+    "resource_limits": {
+      "whisper-stt": {
+        "cpu": {
+          "request": "1",
+          "limit": "8"
+        },
+        "memory": {
+          "request": "4Gi",
+          "limit": "8Gi"
+        }
+      }
+    },
+    "volumes": [],
+    "environment_variables": {
+      "MODEL_SIZE": "medium",
+      "WHISPER_DEVICE": "cpu"
+    },
+    "secrets_used": [],
+    "liveness_probes": {},
+    "readiness_probes": {},
+    "node_affinity": null
+  },
+  "summary": {
+    "overall_health": "excellent",
+    "deployment_stability": "stable",
+    "uptime": "25 days continuous",
+    "issues_last_30_days": 0,
+    "rollbacks_last_30_days": 0,
+    "deployment_success_rate": "100.0%",
+    "critical_issues": [],
+    "recommendation": "Service is healthy with stable deployment pattern."
+  }
+}

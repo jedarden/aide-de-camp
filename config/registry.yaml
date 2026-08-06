@@ -1,143 +1,125 @@
-# aide-de-camp Project Registry
-
-# This registry defines all projects that the Intent Router knows about.
-# It is hot-reloaded on every router call — no restart required.
-# Updated by the self-modification agent.
-
-projects:
-  whisper-stt:
-    description: "Whisper STT service on ardenone-cluster"
-    aliases:
-      - "whisper"
-      - "stt"
-      - "speech-to-text"
-      - "whisper stt"
-    cluster: ardenone-cluster
-    namespace: whisper-stt
-    argocd_app: whisper-stt  # ArgoCD Application name; defaults to the slug when omitted
-    repo_path: /home/coding/declarative-config  # local checkout: git-log + per-project bead listing (whisper-stt manifests live in k8s/ardenone-cluster/whisper-stt/)
-    intent_support:
-      - status
-      - brainstorm
-      - lookup
-      - task-profile  # Required for demo step 5
-    workflows:
-      deploy:
-        steps:
-          - ci_status
-          - image_tag
-          - argocd_sync
-          - pod_status
-      diagnose:
-        steps:
-          - pod_status
-          - pod_logs
-          - argocd_events
-
-  pbx-web:
-    description: "PBX web interface on ardenone-cluster"
-    aliases:
-      - "pbx"
-      - "pbx web"
-      - "phone system"
-      - "telephony"
-    cluster: ardenone-cluster
-    namespace: pbx-web
-    argocd_app: pbx-web  # explicit here for clarity; equals the slug default
-    repo_path: /home/coding/declarative-config  # local checkout: git-log + per-project bead listing (pbx-web manifests live in k8s/ardenone-cluster/pbx-web/)
-    intent_support:
-      - status
-      - lookup
-      - brainstorm
-      - task-profile  # Required for demo step 5
-    workflows:
-      status:
-        steps:
-          - pod_status
-          - deployment_info
-
-  kalshi-tape:
-    description: "Kalshi market data tape service on iad-kalshi"
-    aliases:
-      - "kalshi"
-      - "kalshi tape"
-      - "tape"
-    cluster: iad-kalshi
-    namespace: default
-    repo_path: null
-    intent_support:
-      - status
-      - action
-    workflows:
-      deploy:
-        steps:
-          - pod_status
-          - ci_status
-
-  aide-de-camp:
-    description: "aide-de-camp itself (this interface)"
-    aliases:
-      - "adc"
-      - "aide-de-camp"
-      - "this interface"
-    cluster: null
-    namespace: null
-    repo_path: /home/coding/aide-de-camp
-    intent_support:
-      - status
-      - self-modification
-      - brainstorm
-    workflows:
-      status:
-        steps:
-          - git_log
-          - open_beads
-
-  declarative-config:
-    description: "Kubernetes declarative configuration (GitOps)"
-    aliases:
-      - "declarative-config"
-      - "gitops"
-      - "k8s config"
-    cluster: null
-    namespace: null
-    repo_path: /home/coding/declarative-config
-    intent_support:
-      - status
-      - action
-    workflows:
-      status:
-        steps:
-          - git_log
-          - argocd_apps
-
-# Global aliases (not tied to a specific project)
-# These are resolved based on context in multi-project utterances
-global_aliases:
-  the feed: options-pipeline
-  prod: options-pipeline
-  staging: options-pipeline
-
-# Default cluster access
-# Maps cluster names to their kubectl-proxy endpoints
+argocd:
+  auth: none
+  base_url: https://argocd-ro-ardenone-manager-ts.ardenone.com:8444
 clusters:
   apexalgo-iad:
-    proxy: "http://traefik-apexalgo-iad:8001"
-    type: "proxy"
+    proxy: http://traefik-apexalgo-iad:8001
+    type: proxy
   ardenone-cluster:
-    proxy: "http://traefik-ardenone-cluster:8001"
-    type: "proxy"
-  iad-kalshi:
-    proxy: "http://kubectl-proxy-iad-kalshi:8001"
-    type: "proxy"
+    proxy: http://traefik-ardenone-cluster:8001
+    type: proxy
   ardenone-manager:
-    proxy: "http://traefik-ardenone-manager:8001"
-    type: "proxy"
+    proxy: http://traefik-ardenone-manager:8001
+    type: proxy
+  iad-kalshi:
+    proxy: http://kubectl-proxy-iad-kalshi:8001
+    type: proxy
   rs-manager:
-    proxy: "http://traefik-rs-manager:8001"
-    type: "proxy"
-
-# ArgoCD read-only API endpoint
-argocd:
-  base_url: "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444"
-  auth: "none"  # Proxy injects bearer token
+    proxy: http://traefik-rs-manager:8001
+    type: proxy
+global_aliases:
+  prod: options-pipeline
+  staging: options-pipeline
+  the feed: options-pipeline
+projects:
+  aide-de-camp:
+    aliases:
+    - adc
+    - aide-de-camp
+    - this interface
+    cluster: null
+    description: aide-de-camp itself (this interface)
+    intent_support:
+    - status
+    - self-modification
+    - brainstorm
+    namespace: null
+    repo_path: /home/coding/aide-de-camp
+    workflows:
+      status:
+        steps:
+        - git_log
+        - open_beads
+  declarative-config:
+    aliases:
+    - declarative-config
+    - gitops
+    - k8s config
+    cluster: null
+    description: Kubernetes declarative configuration (GitOps)
+    intent_support:
+    - status
+    - action
+    namespace: null
+    repo_path: /home/coding/declarative-config
+    workflows:
+      status:
+        steps:
+        - git_log
+        - argocd_apps
+  kalshi-tape:
+    aliases:
+    - kalshi
+    - kalshi tape
+    - tape
+    cluster: iad-kalshi
+    description: Kalshi market data tape service on iad-kalshi
+    intent_support:
+    - status
+    - action
+    namespace: default
+    repo_path: null
+    workflows:
+      deploy:
+        steps:
+        - pod_status
+        - ci_status
+  pbx-web:
+    aliases:
+    - pbx
+    - pbx web
+    - phone system
+    - telephony
+    argocd_app: pbx-web
+    cluster: ardenone-cluster
+    description: PBX web interface on ardenone-cluster
+    intent_support:
+    - status
+    - lookup
+    - brainstorm
+    - task-profile
+    namespace: pbx-web
+    repo_path: /home/coding/declarative-config
+    workflows:
+      status:
+        steps:
+        - pod_status
+        - deployment_info
+  whisper-stt:
+    aliases:
+    - whisper
+    - stt
+    - speech-to-text
+    - whisper stt
+    argocd_app: whisper-stt
+    cluster: ardenone-cluster
+    description: Whisper STT service on ardenone-cluster
+    intent_support:
+    - status
+    - brainstorm
+    - lookup
+    - task-profile
+    namespace: whisper-stt
+    repo_path: /home/coding/declarative-config
+    workflows:
+      deploy:
+        steps:
+        - ci_status
+        - image_tag
+        - argocd_sync
+        - pod_status
+      diagnose:
+        steps:
+        - pod_status
+        - pod_logs
+        - argocd_events
