@@ -278,7 +278,7 @@ async def generate_synthetic_result(request: SyntheticResultRequest) -> Syntheti
 
     # Create result record
     await store.create_result(
-        intent_id=intent_id,
+        intent_id=intent_id_created,
         topic_id=topic_id_created,
         session_id=session_id,
         summary=synthetic_summary,
@@ -295,7 +295,7 @@ async def generate_synthetic_result(request: SyntheticResultRequest) -> Syntheti
                 event_type="result_created",
                 target_surface_id=request.surface_id,
                 data={
-                    "intent_id": intent_id,
+                    "intent_id": intent_id_created,
                     "topic_id": topic_id_created,
                     "summary": synthetic_summary,
                     "urgency": urgency,
@@ -308,7 +308,7 @@ async def generate_synthetic_result(request: SyntheticResultRequest) -> Syntheti
     return SyntheticResultResponse(
         utterance_id=utterance_id,
         session_id=session_id,
-        intent_id=intent_id,
+        intent_id=intent_id_created,
         topic_id=topic_id_created,
         result_id=result_id,
         status="resolved",
