@@ -1,0 +1,65 @@
+{
+  "generated_at": "2026-08-06T12:23:55.485809",
+  "target_period": {
+    "start": "2026-07-07",
+    "end": "2026-08-06",
+    "total_days": 30
+  },
+  "services": {
+    "pbx-web": {
+      "timestamp_analysis": {
+        "service": "pbx-web",
+        "target_start": "2026-07-07T00:00:00Z",
+        "target_end": "2026-08-06T23:59:59Z",
+        "earliest_record": "2026-07-13T18:18:07Z",
+        "latest_record": "2026-07-28T17:26:12Z",
+        "coverage_days": 15,
+        "gaps_detected": false
+      },
+      "completeness": {
+        "service": "pbx-web",
+        "metadata_complete": true,
+        "findings_complete": true,
+        "extracted_data_complete": true,
+        "missing_fields": []
+      },
+      "statistics": {
+        "service": "pbx-web",
+        "total_deployments": 0,
+        "successful_deployments": 0,
+        "failed_deployments": 0,
+        "error_deployments": 0,
+        "data_source": "argo_workflows_ci + production_cluster",
+        "production_deployments_in_window": 2,
+        "workflows_found_in_ci": 0
+      }
+    },
+    "whisper-stt": {
+      "timestamp_analysis": {
+        "service": "whisper-stt",
+        "target_start": "2026-07-07T00:00:00Z",
+        "target_end": "2026-08-06T23:59:59Z",
+        "earliest_record": null,
+        "latest_record": null,
+        "coverage_days": 0,
+        "gaps_detected": false
+      },
+      "completeness": {
+        "service": "whisper-stt",
+        "metadata_complete": true,
+        "findings_complete": true,
+        "extracted_data_complete": true,
+        "missing_fields": []
+      },
+      "statistics": {
+        "service": "whisper-stt",
+        "total_deployments": 0,
+        "successful_deployments": 0,
+        "failed_deployments": 0,
+        "error_deployments": 0,
+        "data_source": "argo_workflows_ci",
+        "workflows_found_in_ci": 0
+      }
+    }
+  }
+}
