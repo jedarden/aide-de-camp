@@ -1,7 +1,8 @@
-# Deployment Pattern Analysis: 30-Day Comparison Report
+# 30-Day Deployment Pattern Analysis Report
+## Comprehensive pbx-web vs whisper-stt Comparison
 
-**Report Period:** 2026-07-08 to 2026-07-28  
-**Generated:** 2026-08-06T14:26:00.000000  
+**Report Generated:** 2026-08-06  
+**Analysis Period:** 2026-07-08 to 2026-07-28 (30-day window)  
 **Services Analyzed:** pbx-web, whisper-stt  
 **Analysis Type:** Failure patterns, deployment metrics, and operational risk assessment
 
@@ -9,9 +10,9 @@
 
 ## Executive Summary
 
-This report presents a comprehensive analysis of deployment patterns across two services—**pbx-web** and **whisper-stt**—over a 30-day window from July 8 through July 28, 2026. The analysis examined 9 total deployments (5 for pbx-web, 4 for whisper-stt) and found **perfect operational performance** across both services: **100% deployment success rate**, **100% uptime**, and **zero incidents**. Both services achieved zero-downtime deployments with no rollbacks, pod restarts, crash loops, or OOM kills recorded.
+This report presents a comprehensive 30-day deployment analysis comparing two services—pbx-web and whisper-stt—across deployment frequency, success rates, failure patterns, and operational risk indicators. Both services achieved perfect deployment records with **100% success rates**, **zero failures**, and **100% uptime** throughout the analysis period. The primary operational difference lies in deployment rhythms: pbx-web maintains a steady, consistent cadence (deploying every ~3 days over 16 days), while whisper-stt exhibits a burst deployment pattern (4 deployments in 5 days) followed by an extended 25+ day idle period.
 
-The primary operational difference lies in **deployment rhythm**: pbx-web maintains a **steady, consistent cadence** (deploying every ~3 days over 16 days), indicating active ongoing maintenance, while whisper-stt exhibits a **burst deployment pattern** (4 deployments in 5 days) followed by an **extended idle period of 25+ days**. While both patterns achieved perfect technical outcomes, whisper-stt's extended inactivity raises questions about whether the service is intentionally stable or unintentionally neglected. Additionally, pbx-web recorded 6 non-fatal log errors despite perfect deployment success—a pattern that warrants investigation to confirm these errors are truly benign.
+While both services demonstrate high deployment stability and zero-downtime capabilities, the analysis reveals several operational insights warranting attention. pbx-web shows active maintenance with consistent recent activity (last deployment 9 days ago) but has 6 non-fatal log errors that require investigation. whisper-stt maintains perfectly clean logs but exhibits concerning deployment staleness (25+ days without updates), creating uncertainty about whether the service is intentionally stable or unintentionally neglected. Overall, both deployment patterns—steady and burst—can produce perfect outcomes when properly executed, suggesting that success is driven by deployment quality and process rather than frequency or rhythm.
 
 **Overall Risk Level:** LOW  
 **Primary Concern:** whisper-stt deployment staleness (25+ days without updates)  
