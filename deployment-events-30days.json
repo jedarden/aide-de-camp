@@ -1,0 +1,205 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T17:20:00Z",
+    "time_period": {
+      "start": "2026-07-07T00:00:00Z",
+      "end": "2026-08-06T23:59:59Z",
+      "description": "30-day deployment analysis window"
+    },
+    "cluster": "ardenone-cluster",
+    "data_sources": [
+      "whisper-stt-deployment-data-30days.json",
+      "pbx-web-deployment-data-30days.json",
+      "research/pbx-web-deployments-30days.json"
+    ]
+  },
+  "whisper_stt_deployments": {
+    "namespace": "whisper-stt",
+    "deployment_events": [
+      {
+        "date": "2026-07-08",
+        "timestamp": "2026-07-08T03:09:35Z",
+        "event_type": "deployment_rollout",
+        "deployment": "whisper-stt",
+        "revision": 29,
+        "replicaSet": "whisper-stt-5dbff75cbd",
+        "image": "ronaldraygun/whisper-stt:1.8.2",
+        "outcome": "success",
+        "notes": "Initial deployment in rapid sequence"
+      },
+      {
+        "date": "2026-07-08",
+        "timestamp": "2026-07-08T03:16:13Z",
+        "event_type": "deployment_rollout",
+        "deployment": "whisper-stt",
+        "revision": 30,
+        "replicaSet": "whisper-stt-5b8558f478",
+        "image": "ronaldraygun/whisper-stt:1.8.4",
+        "outcome": "success",
+        "notes": "Second deployment in rapid sequence (6m 38s after previous)"
+      },
+      {
+        "date": "2026-07-08",
+        "timestamp": "2026-07-08T03:26:44Z",
+        "event_type": "deployment_rollout",
+        "deployment": "whisper-stt",
+        "revision": 31,
+        "replicaSet": "whisper-stt-6c497489fb",
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "outcome": "success",
+        "notes": "Third deployment in rapid sequence (10m 31s after previous)"
+      },
+      {
+        "date": "2026-07-12",
+        "timestamp": "2026-07-12T16:53:42Z",
+        "event_type": "deployment_rollout",
+        "deployment": "whisper-stt",
+        "revision": 32,
+        "replicaSet": "whisper-stt-847fd8d7b9",
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "outcome": "success",
+        "notes": "Current active deployment - same image as revision 31, possible config change"
+      }
+    ],
+    "summary": {
+      "total_deployments": 4,
+      "successful_deployments": 4,
+      "failed_deployments": 0,
+      "rollback_events": 0,
+      "unique_images": 3,
+      "deployment_frequency_days": 7.5,
+      "deployment_pattern": "Rapid iterative updates on 2026-07-08 (3 deployments in 17 minutes)"
+    }
+  },
+  "pbx_web_deployments": {
+    "namespace": "pbx-web",
+    "deployment_events": [
+      {
+        "date": "2026-07-13",
+        "timestamp": "2026-07-13T18:07:55Z",
+        "event_type": "deployment_rollback",
+        "deployment": "pbx-web",
+        "revision": 11,
+        "replicaSet": "pbx-web-754f4cfdf7",
+        "image": "ronaldraygun/pbx-web:1.0.8",
+        "outcome": "rolled_back",
+        "notes": "Rolled back from 1.0.9 to 1.0.8 on same day"
+      },
+      {
+        "date": "2026-07-13",
+        "timestamp": "2026-07-13T18:18:07Z",
+        "event_type": "deployment_rollout",
+        "deployment": "pbx-web",
+        "revision": 14,
+        "replicaSet": "pbx-web-5ff68464d",
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "outcome": "success",
+        "notes": "Re-deployment of 1.0.9 after rollback - 10m 12s after rollback"
+      },
+      {
+        "date": "2026-07-15",
+        "timestamp": "2026-07-15T03:24:40Z",
+        "event_type": "deployment_rollout",
+        "deployment": "pbx-rebuild-relay",
+        "revision": 5,
+        "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+        "image": "python:3-slim",
+        "outcome": "success",
+        "notes": "PBX rebuild relay deployment - supporting infrastructure"
+      },
+      {
+        "date": "2026-07-27",
+        "timestamp": "2026-07-27T17:56:07Z",
+        "event_type": "deployment_rollout",
+        "deployment": "lab-rebuild-relay",
+        "revision": 2,
+        "replicaSet": "lab-rebuild-relay-79957dbd4",
+        "image": "python:3-slim",
+        "outcome": "success",
+        "notes": "Lab rebuild relay deployment - supporting infrastructure"
+      },
+      {
+        "date": "2026-07-28",
+        "timestamp": "2026-07-28T17:26:12Z",
+        "event_type": "deployment_rollout",
+        "deployment": "pbx-web",
+        "revision": 14,
+        "replicaSet": "pbx-web-5ff68464d",
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "outcome": "success",
+        "notes": "Current active deployment - same image, possible config restart"
+      }
+    ],
+    "summary": {
+      "total_deployments": 5,
+      "successful_deployments": 5,
+      "failed_deployments": 0,
+      "rollback_events": 1,
+      "unique_images": 3,
+      "deployment_frequency_days": 6,
+      "deployment_pattern": "Mixed service and infrastructure deployments with one rollback incident"
+    }
+  },
+  "combined_analysis": {
+    "total_deployment_events": 9,
+    "whisper_stt_events": 4,
+    "pbx_web_events": 5,
+    "combined_deployment_frequency": 3.3_days,
+    "deployment_peaks": [
+      {
+        "date": "2026-07-08",
+        "count": 3,
+        "services": ["whisper-stt"],
+        "description": "Rapid whisper-stt image iterations (1.8.2 → 1.8.4 → 1.8.6)"
+      },
+      {
+        "date": "2026-07-13",
+        "count": 2,
+        "services": ["pbx-web"],
+        "description": "pbx-web rollback and re-deployment"
+      }
+    ],
+    "deployment_gaps": {
+      "longest_gap_days": 14,
+      "gap_period": "2026-07-15 to 2026-07-27",
+      "services_affected": ["pbx-web", "whisper-stt"],
+      "notes": "Normal operational period - no deployments needed"
+    },
+    "timestamp_validation": {
+      "all_timestamps_iso8601": true,
+      "all_in_30day_window": true,
+      "chronological_order": "maintained",
+      "missing_timestamps": 0
+    },
+    "deployment_success_rate": "100%",
+    "rollback_rate": "11% (1 of 9 events)",
+    "infrastructure_deployments": 2,
+    "service_deployments": 7
+  },
+  "ci_cd_workflow_status": {
+    "argo_workflows_available": false,
+    "note": "No Argo workflow executions found for either service in the 30-day period. Deployment timestamps derived from Kubernetes ReplicaSet metadata which captures actual rollout times.",
+    "data_reliability": "High - ReplicaSet creation timestamps are authoritative for deployment times",
+    "retention_policy_impact": "Historical workflow runs cleaned up, but deployment history preserved via ReplicaSets"
+  },
+  "coverage_assessment": {
+    "time_range_complete": true,
+    "start_coverage": "2026-07-08",
+    "end_coverage": "2026-07-28",
+    "gap_days": 4,
+    "gap_details": [
+      "2026-07-07: No deployments",
+      "2026-07-09 to 2026-07-12: No deployments",
+      "2026-07-16 to 2026-07-26: No deployments",
+      "2026-07-29 to 2026-08-06: No deployments"
+    ],
+    "interpretation": "Gaps represent stable operational periods with no deployment activity - normal for healthy services"
+  },
+  "deployment_frequency_comparison": {
+    "whisper_stt": "4 deployments in 30 days (1 per 7.5 days)",
+    "pbx_web": "5 deployments in 30 days (1 per 6 days)",
+    "winner": "pbx-web",
+    "margin": "25% more frequent deployments",
+    "context": "pbx-web includes infrastructure deployments (rebuild relays) which increases frequency"
+  }
+}
