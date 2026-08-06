@@ -225,10 +225,11 @@ async def get_store():
 @app.post("/api/v1/test/dispatch")
 async def test_dispatch(request: dict):
     """
-    Test dispatch endpoint matching /dispatch signature without SSE broadcast.
+    Test dispatch endpoint matching /dispatch signature with SSE broadcast.
 
     Accepts same request body as /dispatch (utterance, session_id, surface_id, utterance_id).
     Returns a basic JSON response for testing the endpoint structure.
+    Broadcasts SSE events to connected canvas surfaces when surface_id is provided.
 
     Request body:
     {
@@ -258,13 +259,33 @@ async def test_dispatch(request: dict):
 
     logger.info(f"[TEST_DISPATCH] utterance: {utterance[:100]}..., session_id: {session_id}, surface_id: {surface_id}")
 
+    # Broadcast SSE event if surface_id is provided (matches /dispatch pattern)
+    if surface_id and _broadcaster:
+        try:
+            await _broadcaster.broadcast(
+                SSEEvent(
+                    event_type="result_created",
+                    target_surface_id=surface_id,
+                    data={
+                        "utterance_id": utterance_id,
+                        "session_id": session_id,
+                        "summary": f"Test dispatch: {utterance[:100]}",
+                        "urgency": "normal",
+                    }
+                )
+            )
+            logger.info(f"[TEST_DISPATCH] Broadcast SSE event to surface {surface_id}")
+        except Exception as e:
+            logger.warning(f"[TEST_DISPATCH] Failed to broadcast SSE event: {e}")
+            # Non-fatal: continue and return response
+
     return {
         "status": "test",
         "utterance_id": utterance_id,
         "session_id": session_id,
         "intent_count": 0,
         "intent_ids": [],
-        "message": "Test dispatch endpoint - no SSE broadcast",
+        "message": "Test dispatch endpoint with SSE broadcast",
     }
 
 
