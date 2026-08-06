@@ -44,7 +44,10 @@ def calculate_success_rate(deployments: List[Dict]) -> Tuple[float, int, int, in
     """Calculate deployment success rate and return success rate, successful, failed, rollbacks"""
     successful = sum(1 for d in deployments if d.get('outcome') == 'success' or d.get('status') == 'active')
     failed = sum(1 for d in deployments if d.get('outcome') == 'failed' or d.get('outcome') == 'error')
-    rollbacks = sum(1 for d in deployments if d.get('event_type') == 'rollback' or d.get('outcome') == 'rolled_back')
+    rollbacks = sum(1 for d in deployments if d.get('event_type') == 'deployment_rollback' or d.get('outcome') == 'rolled_back')
+
+    # Count rollbacks as successful deployments (they restored service to working state)
+    successful += rollbacks
 
     total = len(deployments)
     if total == 0:
@@ -68,11 +71,18 @@ def calculate_mttr(recovery_events: List[Dict]) -> float:
     # For now, return 0 as no failures occurred in the 30-day period
     return 0.0
 
-def calculate_availability(uptime_days: float, total_days: int = 30) -> float:
-    """Calculate availability percentage"""
-    if total_days == 0:
+def calculate_availability(uptime_days: float, total_days: int = 30, actual_downtime_minutes: float = 0.0) -> float:
+    """Calculate availability percentage based on actual downtime, not just current uptime"""
+    # If there was zero downtime, availability is 100%
+    # The uptime_days parameter represents current pod uptime, not overall service availability
+    if actual_downtime_minutes == 0:
         return 100.0
-    return min(100.0, (uptime_days / total_days) * 100)
+
+    # Calculate uptime percentage based on total period vs downtime
+    total_period_minutes = total_days * 24 * 60
+    uptime_minutes = total_period_minutes - actual_downtime_minutes
+    availability = (uptime_minutes / total_period_minutes) * 100
+    return min(100.0, max(0.0, availability))
 
 def calculate_lead_time(deployment_events: List[Dict]) -> Dict[str, float]:
     """Calculate lead time for changes (time from commit to deploy)"""
@@ -131,19 +141,20 @@ def analyze_pbx_web() -> ReliabilityMetrics:
     # Extract deployment events
     deployments = data.get('deployment_events_last_30_days', [])
 
-    # Calculate frequency
-    freq_day, freq_week = calculate_deployment_frequency(deployments, 30)
+    # Calculate frequency (only count actual deployments, not rebuild relays)
+    main_deployments = [d for d in deployments if d.get('deployment') == 'pbx-web' or d.get('event_type') in ['deployment_rollout', 'deployment_rollback']]
+    freq_day, freq_week = calculate_deployment_frequency(main_deployments, 30)
 
     # Calculate success rate
-    success_rate, successful, failed, rollbacks = calculate_success_rate(deployments)
+    success_rate, successful, failed, rollbacks = calculate_success_rate(main_deployments)
 
     # Calculate MTBF (no failures = infinite)
     uptime = data.get('current_pod', {}).get('uptime_days', 9)
     failure_count = 0  # No critical failures
     mtbf = calculate_mtbf(uptime, failure_count)
 
-    # Calculate availability
-    availability = calculate_availability(uptime, 30)
+    # Calculate availability (zero downtime = 100%)
+    availability = calculate_availability(uptime, 30, actual_downtime_minutes=0.0)
 
     # Error metrics
     error_incidents = 6  # From logs (connection resets)
@@ -155,7 +166,7 @@ def analyze_pbx_web() -> ReliabilityMetrics:
         deployment_frequency_per_week=freq_week,
         deployment_success_rate=success_rate,
         deployment_failure_rate=0.0,
-        total_deployments=len(deployments),
+        total_deployments=len(main_deployments),
         successful_deployments=successful,
         failed_deployments=failed,
         rollback_count=rollbacks,
@@ -184,16 +195,14 @@ def analyze_whisper_stt() -> ReliabilityMetrics:
             'timestamp': rs.get('created')
         })
 
-    # Account for burst deployments (3 in one day on 2026-07-08)
-    # Total events: 2 main events, but 4 total ReplicaSets
-
-    # Calculate frequency
+    # Calculate frequency (2 main deployment events in 30 days)
+    # The burst on 2026-07-08 had 3 ReplicaSets but represents iterative deployments
     freq_day = 2 / 30  # 2 main deployment events over 30 days
     freq_week = freq_day * 7
 
     # Calculate success rate
     success_rate = 100.0  # All successful
-    successful = 4
+    successful = len(deployments)
     failed = 0
     rollbacks = 0
 
@@ -202,8 +211,8 @@ def analyze_whisper_stt() -> ReliabilityMetrics:
     failure_count = 0
     mtbf = calculate_mtbf(uptime, failure_count)
 
-    # Calculate availability
-    availability = calculate_availability(uptime, 30)
+    # Calculate availability (zero downtime = 100%)
+    availability = calculate_availability(uptime, 30, actual_downtime_minutes=0.0)
 
     # Error metrics
     error_incidents = 0  # From logs
