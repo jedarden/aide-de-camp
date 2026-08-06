@@ -1,0 +1,68 @@
+{
+  "service": "whisper-stt",
+  "time_range": {
+    "start": "2026-07-07T00:00:00Z",
+    "end": "2026-08-06T23:59:59Z",
+    "days": 30
+  },
+  "queries": {
+    "http_error_rates": {
+      "http_5xx_errors": 0,
+      "http_4xx_errors": 0,
+      "http_total_requests": 0,
+      "http_5xx_error_rate": 0.0,
+      "http_4xx_error_rate": 0.0,
+      "data_sources": [],
+      "log_files_analyzed": 0
+    },
+    "application_error_rates": {
+      "total_pods_analyzed": 10,
+      "pods_with_errors": 2,
+      "pods_without_errors": 8,
+      "total_error_count": 2,
+      "error_rate_per_pod": 0.2,
+      "error_rate_per_day": 0.06666666666666667,
+      "pods_with_error_details": [
+        {
+          "pod": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current",
+          "errors": 1
+        },
+        {
+          "pod": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06",
+          "errors": 1
+        }
+      ]
+    },
+    "oom_kill_rates": {
+      "total_pods_analyzed": 10,
+      "pods_with_oom_kills": 0,
+      "total_oom_kill_count": 0,
+      "oom_kill_rate_per_pod": 0.0,
+      "oom_kill_rate_per_day": 0.0,
+      "pods_affected_details": []
+    }
+  },
+  "test_results": {
+    "http_error_rates": {
+      "passed": false,
+      "message": "http_error_rates: No data sources found"
+    },
+    "application_error_rates": {
+      "passed": true,
+      "message": "application_error_rates: \u2713 Returns actual data (6 positive values)"
+    },
+    "oom_kill_rates": {
+      "passed": true,
+      "message": "oom_kill_rates: \u2713 Returns actual data (1 positive values)"
+    },
+    "deployment_error_rates": {
+      "passed": false,
+      "message": "deployment_error_rates: Query execution failed - 'str' object has no attribute 'get'"
+    },
+    "overall_error_rates": {
+      "passed": false,
+      "message": "overall_error_rates: Query execution failed - 'str' object has no attribute 'get'"
+    }
+  },
+  "query_timestamp": "2026-08-06T18:20:30.570721"
+}
