@@ -1,0 +1,156 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T12:03:32.329077Z",
+    "data_period_start": "2026-07-07T09:07:50Z",
+    "data_period_end": "2026-08-06T09:07:50Z",
+    "services": [
+      "whisper-stt",
+      "whisper-openai"
+    ],
+    "clusters": [
+      "ardenone-cluster"
+    ],
+    "data_sources": [
+      "kubernetes_replicasets",
+      "argo_cd"
+    ]
+  },
+  "argo_workflows": {
+    "whisper_stt_build": {
+      "template_name": "whisper-stt-build",
+      "template_created": "2026-05-27T02:26:47Z",
+      "workflow_runs_last_30_days": 0,
+      "workflow_runs": []
+    }
+  },
+  "argo_cd": {
+    "whisper-stt": {
+      "application_found": true,
+      "applications": [
+        {
+          "name": "whisper-stt",
+          "namespace": "whisper-stt",
+          "project": "default",
+          "sync_status": "Synced",
+          "health_status": "Healthy"
+        },
+        {
+          "name": "whisper-openai",
+          "namespace": "whisper-stt",
+          "project": "default",
+          "sync_status": "Synced",
+          "health_status": "Healthy"
+        }
+      ]
+    }
+  },
+  "cluster_deployments": {
+    "whisper-stt": {
+      "namespace": "whisper-stt",
+      "deployment_name": "whisper-stt",
+      "created_at": "2026-05-01T17:26:49Z",
+      "current_image": "ronaldraygun/whisper-stt:1.8.6",
+      "current_replicas": 1,
+      "last_updated": "2026-07-12T16:54:57Z",
+      "replica_history": [],
+      "deployments_last_30_days": 2,
+      "successful_deployments": 2,
+      "failed_deployments": 0,
+      "deployment_versions": [
+        "1.8.6"
+      ],
+      "all_versions_in_history": [
+        "1.8.6"
+      ]
+    }
+  },
+  "summary": {
+    "total_deployments_last_30_days": 2,
+    "whisper_stt_deployments": 1,
+    "successful_deployments": 2,
+    "failed_or_scaled_down": 0,
+    "data_coverage": "100%",
+    "gaps_detected": false,
+    "largest_gap_days": 0
+  },
+  "pod_health": {
+    "current_pods": [
+      {
+        "name": "whisper-stt-847fd8d7b9-v2rs5",
+        "created": "2026-07-12T16:53:42Z",
+        "age_days": 25,
+        "status": "Running",
+        "containers": [
+          {
+            "name": "whisper-stt",
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "ready": true,
+            "restartCount": 0,
+            "started": "2026-07-12T16:55:49Z"
+          }
+        ],
+        "totalRestartCount": 0,
+        "node": "k3s-agent-minisforum"
+      },
+      {
+        "name": "whisper-openai-68966786fb-jsb5d",
+        "created": "2026-06-14T04:55:49Z",
+        "age_days": 53,
+        "status": "Running",
+        "containers": [
+          {
+            "name": "whisper-openai",
+            "image": "fedirz/faster-whisper-server:latest-cpu",
+            "ready": true,
+            "restartCount": 0,
+            "started": "2026-06-14T04:56:53Z"
+          }
+        ],
+        "totalRestartCount": 0,
+        "node": "k3s-agent-minisforum"
+      }
+    ],
+    "pod_metrics": {
+      "total_pods": 2,
+      "running_pods": 2,
+      "total_containers": 2,
+      "total_restarts": 0,
+      "crashloops": 0,
+      "oomkills": 0,
+      "failed_pods": 0,
+      "pending_pods": 0
+    }
+  },
+  "resources": {
+    "whisper-stt": {
+      "requests": {
+        "cpu": "1",
+        "memory": "4Gi"
+      },
+      "limits": {
+        "cpu": "8",
+        "memory": "8Gi"
+      }
+    }
+  },
+  "storage": {
+    "whisper-model-cache": {
+      "capacity": "10Gi",
+      "storage_class": "longhorn",
+      "status": "Bound",
+      "age_days": 84
+    }
+  },
+  "error_incidents": {
+    "total_incidents": 0,
+    "critical_incidents": 0,
+    "warning_incidents": 0,
+    "incident_details": []
+  },
+  "notes": [
+    "Converted from existing deployment data format",
+    "Service running on ardenone-cluster",
+    "Current version: whisper-stt 1.8.6",
+    "Zero incidents, zero downtime, zero restarts"
+  ]
+}
