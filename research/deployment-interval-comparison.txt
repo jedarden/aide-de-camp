@@ -1,0 +1,31 @@
+
+================================================================================
+DEPLOYMENT INTERVAL STATISTICS - SIDE-BY-SIDE COMPARISON
+================================================================================
+
+Metric                                           pbx-web          whisper-stt
+--------------------------------------------------------------------------------
+Total Deployments (30 days)                         5.00                 4.00
+Min Interval (hours)                                0.17                 0.11
+Max Interval (hours)                              302.52               109.45
+Median Interval (hours)                            28.31                 0.18
+Mean Interval (hours)                              89.83                36.58
+Std Dev (hours)                                   142.47                63.11
+Coefficient of Variation                            1.59                 1.73
+--------------------------------------------------------------------------------
+
+INSIGHTS
+--------------------------------------------------------------------------------
+• [CONSISTENCY] Pbx-Web has more consistent deployment cadence
+  pbx-web has lower coefficient of variation (1.59 vs 1.73)
+
+• [FREQUENCY] Whisper-Stt deploys more frequently on average
+  Mean interval: 89.83h (pbx-web) vs 36.58h (whisper-stt)
+
+• [VARIANCE] Interval variance comparison
+  Standard deviation: 142.47h (pbx-web) vs 63.11h (whisper-stt)
+
+• [RANGE] Deployment interval ranges
+  Range (max-min): 302.35h (pbx-web) vs 109.34h (whisper-stt)
+
+================================================================================
