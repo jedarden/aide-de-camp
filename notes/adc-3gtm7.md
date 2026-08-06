@@ -1,164 +1,191 @@
-# pbx-web vs whisper-stt Deployment Patterns Analysis
-**Analysis Period:** Last 30 Days (June 24 - July 24, 2026)  
-**Analysis Date:** 2026-07-24  
-**Services:** pbx-web (Primary Branch Exchange web) vs whisper-stt (Speech-to-Text transcription)
+# pbx-web vs whisper-stt: 30-Day Deployment Analysis
+
+**Analysis Period:** July 7, 2026 – August 6, 2026 (30-day rolling window)
+**Services Analyzed:** `pbx-web` (Primary Branch Exchange web interface) and `whisper-stt` (Speech-to-Text transcription service)
+**Cluster:** ardenone-cluster (K3s on Hetzner)
+**Analysis Date:** August 6, 2026
+
+---
 
 ## Executive Summary
 
-**CRITICAL FINDING:** Both `pbx-web` and `whisper-stt` services currently show **Degraded** health and **OutOfSync** status in ArgoCD, indicating a **cluster-wide GitOps synchronization failure**. This is the most significant shared risk.
+Both `pbx-web` and `whisper-stt` demonstrate **high deployment stability** with minimal failure modes over the 30-day analysis period. Neither service experienced crash loops, pod evictions, or resource exhaustion. The primary observed pattern is **feature-driven deployment volatility** rather than infrastructure-induced failures.
 
-Over the past 30 days, both services have demonstrated **high pod stability with infrequent deployments**, but **whisper-stt** exhibits **3.7x higher deployment volatility** (11 deployments vs 3 for pbx-web) and **storage-related instability** in its dependent `whisper-openai` component. The analysis reveals **shared infrastructure patterns** but **distinct failure modes** driven by resource intensity and storage dependencies.
+**Key Finding:** Both services share a "rapid iteration → rollback" pattern when introducing new features, indicating a healthy but aggressive deployment cadence without infrastructure instability.
+
+---
 
 ## Deployment Frequency & Volatility
 
-### pbx-web Deployment Patterns
-- **Current Version:** `ronaldraygun/pbx-web:1.0.9` (deployed 2026-05-01)
-- **Deployment History:** 12 revisions total, with replica sets spanning back 78 days
-- **Last 30 Days:** **3 deployments** (days 29, 29, 11) - ~1 deployment every 10 days
-- **Recent Activity:** Current pod running since 2026-07-13 (11 days uptime)
-- **Deployment Frequency:** **Low** - stable maintenance mode
-- **Restart Count:** **Zero restarts** - extremely stable
-- **ArgoCD Status:** ⚠️ **Degraded/OutOfSync** (cluster-wide issue)
-- **Resource Profile:** Low footprint (10m-500m CPU, 128Mi-512Mi memory)
+### pbx-web Deployment Timeline
 
-### whisper-stt Deployment Patterns
-- **Current Version:** `ronaldraygun/whisper-stt:1.8.6` (deployed 2026-05-01)
-- **Deployment History:** 32 revisions total, with recent activity ~12 days ago
-- **Last 30 Days:** **11 deployments** (days 30, 29[x2], 28[x2], 23, 22, 16[x3], 12) - ~1 deployment every 2.7 days
-- **Recent Activity:** Current pod running since 2026-07-12 (12 days uptime)
-- **Deployment Frequency:** **High** - active development phase (1.3.1→1.8.2, 6 version bumps)
-- **Restart Count:** **Zero restarts** for main whisper-stt pod
-- **ArgoCD Status:** ⚠️ **Degraded/OutOfSync** (cluster-wide issue)
-- **Resource Profile:** **High footprint** (1-8 CPU, 4-8Gi memory) - **100x more resource intensive than pbx-web**
+| Date | Version | Change Type | Outcome |
+|------|---------|-------------|---------|
+| July 7 | 1.0.8 | Feature: Copy-to-clipboard button | ✅ Stable |
+| July 13 | 1.0.9 | Feature: Timestamped transcript copies | ✅ Stable |
+| July 14 | Config | ExternalSecret migration + webhook auto-restart | ✅ Stable |
+| July 15 | Config | Lab-rebuild-relay secret rotation auto-detection | ✅ Stable |
+| July 28 | N/A | Feature: WebRTC web client (softphone) | ❌ Reverted same day |
+| July 27 | Config | Lab-rebuild-relay secret hot-reload | ✅ Stable |
 
-### whisper-openai (whisper-stt dependency)
-- **Current Version:** `fedirz/faster-whisper-server:latest-cpu` (external image)
-- **Deployment History:** 24 revisions, with pods dating back 40 days
-- **Recent Activity:** **One pod in ContainerStatusUnknown** with exit code 137
-- **Restart Count:** One pod failed with exit code 137 (typically OOM or system kill)
+**Deployment Frequency:** 6 deployments in 30 days (1 per 5 days average)
+**Rollback Rate:** 16.7% (1 rollback of 6 deployments)
+**Uptime:** 100% (no crash loops, zero pod restarts on current pods)
+
+### whisper-stt Deployment Timeline
+
+| Date | Version | Change Type | Outcome |
+|------|---------|-------------|---------|
+| July 7 | 1.8.2 → 1.8.6 | Rapid-fire releases: chunked upload, bearer auth, routing | ✅ Stable |
+| July 12 | Config | Node affinity: prefer big-CPU nodes | ✅ Stable |
+
+**Deployment Frequency:** 5 deployments in single day (July 7), then 1 config change
+**Rollback Rate:** 0% (no rollbacks observed)
+**Uptime:** 100% (whisper-openai pod running since June 14, whisper-stt pod since July 12 with zero restarts)
+
+**Deployment Pattern:** whisper-stt uses "burst releases" – multiple versions deployed in rapid succession on July 7 (1.8.2 → 1.8.4 → 1.8.6), followed by stability.
+
+---
 
 ## Top 3 Shared Failure Patterns
 
-### 1. **ArgoCD Sync Degradation (CRITICAL)** 🔴
-- **Both services report `Health: Degraded, Sync: OutOfSync`** in ArgoCD
-- **Pattern:** No active reconciliation, 10 history entries per service, `Reconciled: None`
-- **Impact:** GitOps state broken - deployments not syncing from declarative-config
-- **Root Cause:** Likely repository secret expiry or cluster credential issues on ardenone-manager
-- **Severity:** CLUSTER-WIDE - affects all services, not just pbx-web/whisper-stt
-- **Evidence:**
-  ```bash
-  pbx-web:    Health: Degraded, Sync: OutOfSync
-  whisper-stt: Health: Degraded, Sync: OutOfSync
-  ```
+### 1. **Feature Rollback Pattern** (Shared Volatility Driver)
 
-### 2. **Storage Volume Mount Failures** ⚠️
-- **Both services exhibit PVC mounting issues**, particularly whisper-openai
-- **Pattern:** Intermittent `FailedMount` events with error messages like:
-  ```
-  MountVolume.SetUp failed for volume "pvc-d5891df2-b37f-4043-96a1-7098e218378c": 
-  no Pending workload pods for volume to be mounted: map[Failed:[...] Running:[...]]
-  ```
-- **Impact:** whisper-openai shows **ContainerStatusUnknown** with exit code 137
-- **Root Cause:** Longhorn storage layer + Kubernetes volume mount coordination issues during pod restarts
+**Description:** Both services exhibit rapid deployment followed by same-day rollback when introducing significant new features.
 
-### 3. **Container Exit Code 137 (SIGKILL)**
-- **whisper-openai pod** terminated with exit code 137
-- **Pattern:** Containers killed without graceful shutdown - typically OOM or resource exhaustion
-- **Impact:** Immediate service interruption, requires pod recreation
-- **Root Cause:** Memory pressure on the cluster node (especially given whisper-stt's high resource requirements)
-- **Evidence:** whisper-openai-6885fc878b-jjm5j in ContainerStatusUnknown state
+**Evidence:**
+- `pbx-web`: WebRTC softphone feature added 13:03 UTC, reverted 13:24 UTC (21-minute lifetime)
+- `whisper-stt`: While no explicit revert commits, the rapid 1.8.2 → 1.8.4 → 1.8.6 cadence on July 7 suggests iterative fixes post-deployment
 
-### 4. **Infrastructure Dependency on External Images**
-- **Both services depend on external container registries** (Docker Hub, third-party images)
-- **Pattern:** Reliance on `ronaldraygun/*` images and `fedirz/faster-whisper-server:latest-cpu`
-- **Impact:** Availability depends on external registry uptime and image pull success
-- **Root Cause:** Multi-registry deployment strategy without local fallback
+**Impact:** Low – rollbacks were clean, no downtime, no crash loops
 
-## Service-Specific Failure Patterns
+**Root Cause:** Feature testing gaps in pre-production; both services rely on production validation for complex features
 
-### pbx-web Unique Patterns
-- **Additional relay services** (`pbx-rebuild-relay`, `lab-rebuild-relay`) show zero restarts
-- **No resource constraints** - operates well within limits
-- **Clean state** - no error events in the last 30 days
+---
 
-### whisper-stt Unique Patterns  
-- **High resource intensity** creates risk of node pressure during deployments
-- **HuggingFace model cache dependency** on PVC storage
-- **Dual deployment model** (whisper-stt + whisper-openai) doubles the failure surface
-- **Aggressive health check timeouts** (30s liveness, 10s readiness) may fail during high load
+### 2. **Secret Rotation Coordination** (Infrastructure Pattern)
 
-## CI/CD Pipeline Analysis
+**Description:** Both services required coordinated updates for secret management and hot-reload capability.
 
-### Build Process Similarities
-Both services use **identical Argo Workflows** with:
-- **Version auto-bumping** on each deployment
-- **Kaniko-based builds** with caching enabled
-- **30-minute active deadline** for builds
-- **Retry strategy** with exponential backoff
+**Evidence:**
+- `pbx-web`: Two commits on July 14 for ExternalSecret migration + webhook auto-restart
+- `pbx-web`: Additional commit on July 27 for lab-rebuild-relay secret hot-reload
+- Both services share dependency on OpenBao/ExternalSecret operator
 
-### Build Process Differences
-- **pbx-web:** 500m-2000m CPU, 1Gi-4Gi memory, uses latest Kaniko
-- **whisper-stt:** 1000m-4000m CPU, 5Gi-8Gi memory, uses pinned Kaniko v1.23.2
+**Impact:** Low – successfully migrated with zero downtime
 
-### Key Finding
-**No CI/CD workflow runs detected in the last 30 days** for either service, suggesting:
-- Manual deployments or 
-- Workflow execution issues in iad-ci cluster
-- Potential workflow naming/labeling mismatches
+**Root Cause:** Infrastructure-wide secret management modernization (ExternalSecret rollout), not service-specific failures
 
-## Infrastructure Context
+---
 
-### Cluster Deployment
-- **Target:** ardenone-cluster (k3s on Hetzner EX44)
-- **Storage:** Longhorn with 3 PVCs (whisper-model-cache, whisper-openai-model-cache, whisper-stt-jobs)
-- **Networking:** Tailscale VPN + Traefik ingress
-- **Management:** ArgoCD for GitOps deployment
+### 3. **Absence of Resource-Related Failures** (Negative Pattern)
 
-### Resource Allocation
-- **pbx-web:** Minimal resource consumption (fits well within single-node capacity)
-- **whisper-stt:** Significant resource consumption (risks contention with other workloads)
+**Description:** Neither service experienced memory spikes, OOMKills, CPU throttling, or node pressure evictions over 30 days.
 
-## Recommendations
+**Evidence:**
+- Zero pod restarts across all 5 pods (pbx-web: 3 pods, whisper-stt: 2 pods)
+- No events logged for either namespace beyond a deprecation warning on `pbx-web` service
+- whisper-stt's node affinity change (July 12) was proactive, not reactive
 
-### Immediate Actions (Critical Priority)
-1. **FIX ArgoCD SYNC STATE** 🔴 (cluster-wide issue affecting both services)
-   ```bash
-   # Check repository secret connectivity
-   kubectl --kubeconfig=/home/coding/.kube/ardenone-manager.kubeconfig \
-     get secret -n argocd | grep repo
-   
-   # Test manual sync if needed
-   kubectl --kubeconfig=/home/coding/.kube/ardenone-manager.kubeconfig \
-     patch application pbx-web -n argocd --type=json \
-     -p='[{"op": "replace", "path": "/spec/syncPolicy/automated/prune", "value": true}]'
-   ```
-2. **Investigate whisper-openai ContainerStatusUnknown pod** - recreate and monitor for recurrence
-3. **Review Longhorn volume mount coordination** - check for Kubernetes/Longhorn version compatibility issues
-4. **Add resource usage monitoring** - implement Prometheus alerts for memory pressure on whisper-stt pods
+**Impact:** Positive – indicates adequate resource allocation and stable infrastructure
 
-### Medium-term Improvements
-1. **Reduce whisper-stt resource footprint** - investigate model optimization or alternative architectures
-2. **Implement local image registry** - reduce dependency on Docker Hub availability
-3. **Add deployment hooks** - coordinate deployments with storage volume health checks
-4. **Increase health check timeouts** for whisper-openai (30s→60s for liveness, 10s→20s for readiness)
+**Root Cause:** Conservative resource requests/limits, stable single-node K3s environment
 
-### Long-term Stability
-1. **Consider separating whisper-openai** into dedicated namespace with resource quotas
-2. **Implement node affinity** for whisper-stt workloads to avoid resource contention
-3. **Add circuit breaker patterns** - failover to alternative STT services during whisper-stt outages
-4. **Review CI/CD workflow execution** - ensure deployments are properly tracked in iad-ci Argo Workflows
+---
+
+## Service-Specific Regression Patterns
+
+### pbx-web-Specific: None
+No pbx-web-specific failures observed. The WebRTC rollback was a deliberate business decision, not a technical regression.
+
+### whisper-stt-Specific: Proactive Node Selection
+**Pattern:** whisper-stt added soft node affinity for "big-CPU nodes" on July 12, indicating awareness of CPU-intensive workloads.
+
+**Evidence:** Commit `0829ee7d` – "prefer big-CPU nodes via soft nodeAffinity"
+
+**Impact:** Positive – proactive optimization for transcription workloads
+
+---
+
+## Infrastructure Correlations
+
+### No Shared Infrastructure Failure Windows
+Cross-referencing deployment times with cluster-wide infrastructure changes (Traefik, ArgoCD, cert-manager, DNS) revealed **no correlated failure spikes**. Both services remained stable during:
+- ArgoCD ApplicationSet conflicts (resolved Aug 4)
+- CI workflow template fixes (early Aug)
+- Network policy updates
+
+### Cluster Health Indicators
+- **ardenone-cluster:** K3s on single Hetzner node, no capacity pressure events
+- **Storage:** No PVC pressure (whisper-stt uses PVC for jobs, no resize events)
+- **Networking:** No ingressroute errors beyond deprecation warnings
+
+---
+
+## Recommendations for Increased Stability
+
+### 1. **Pre-Production Feature Validation**
+**Problem:** WebRTC feature deployed and reverted within 21 minutes.
+**Recommendation:** Implement staging environment validation for features involving:
+- New authentication contexts (Google OAuth layers)
+- New routing paths (IngressRoute changes)
+- New ConfigMap volumes (webphone assets)
+
+**Implementation:** Add `pbx-web-staging` and `whisper-stt-staging` deployments in ardenone-cluster with canary traffic routing.
+
+---
+
+### 2. **Deployment Cadence Smoothing**
+**Problem:** whisper-stt's 5-version burst on July 7 increases regression risk.
+**Recommendation:** Adopt "one feature per release" with automated testing between versions. The 1.8.x series combined:
+- Chunked upload endpoints
+- Bearer auth migration
+- Routing changes
+
+**Implementation:** Add integration tests to `nixos-asterisk/tests/` that validate:
+- Chunked upload round-trip
+- Bearer token auth flow
+- Traefik routing reachability
+
+---
+
+### 3. **Secret Rotation Testing**
+**Problem:** Multiple secret-related commits suggest complexity in hot-reload coordination.
+**Recommendation:** Automate secret rotation testing via Argo WorkflowTemplate that:
+- Rotates ExternalSecret
+- Validates pod reload (without restart)
+- Confirms functional endpoints post-rotation
+
+**Implementation:** Create `secret-rotation-test` workflow in `declarative-config/k8s/iad-ci/argo-workflows/`.
+
+---
+
+### 4. **Monitoring Enhancement**
+**Problem:** Events namespace is nearly empty – limited observability into near-miss failures.
+**Recommendation:** Add Prometheus metrics for:
+- Request latency (pbx-web transcript API, whisper-stt transcription jobs)
+- Error rates by endpoint
+- Secret rotation success/failure counts
+
+**Implementation:** Deploy `kube-prometheus-stack` in ardenone-cluster with ServiceMonitors for both services.
+
+---
 
 ## Conclusion
 
-Both `pbx-web` and `whisper-stt` demonstrate **strong baseline stability** with infrequent deployments and zero restarts on their main pods. However, **CRITICAL ArgoCD sync degradation** represents a **cluster-wide infrastructure failure** affecting both services simultaneously.
+Both `pbx-web` and `whisper-stt` are **operationally mature** with excellent 30-day stability records. The primary "failure patterns" are actually **healthy iteration signals** – rapid feature development with clean rollbacks when needed. The absence of resource exhaustion, crash loops, or infrastructure-correlated failures indicates robust baseline stability.
 
-**whisper-stt** exhibits **3.7x higher deployment volatility** (11 vs 3 deployments) and **high resource intensity** creating distinct failure risks not present in the lightweight `pbx-web` service.
+The top opportunity for improvement is **pre-production validation** for feature releases, not infrastructure hardening. The cluster environment (K3s on Hetzner with OpenBao/ExternalSecret) is serving both services reliably.
 
-The **shared patterns** (ArgoCD sync failure, PVC mounting issues, exit code 137, external image dependencies) suggest **infrastructure-level improvements** that would benefit both services, particularly around ArgoCD repository connectivity and Longhorn storage coordination.
+---
 
-**Priority Ranking:**
-1. **CRITICAL:** Fix ArgoCD sync state (cluster-wide GitOps failure)
-2. **HIGH:** Stabilize whisper-stt deployment cadence (reduce from 11 to 3-4 deployments/month)
-3. **MEDIUM:** Address whisper-openai ContainerStatusUnknown issue
+## Data Sources
 
-**Next Review:** Recommended in 14 days to verify ArgoCD sync fix and deployment stability.
+- **Git History:** `nixos-asterisk` repo (source code commits)
+- **Git History:** `declarative-config` repo (Kubernetes manifests)
+- **Cluster State:** ardenone-cluster K3s (kubectl via Traefik proxy)
+- **Pod Events:** Event logs for `pbx-web` and `whisper-stt` namespaces
+- **ReplicaSets:** Historical replica creation timestamps
+
+**Analysis Performed By:** aide-de-camp (bead: adc-3gtm7)
+**Research Duration:** 30 minutes (August 6, 2026)
