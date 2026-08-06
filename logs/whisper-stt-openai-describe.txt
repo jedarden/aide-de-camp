@@ -1,0 +1,137 @@
+Name:             whisper-openai-68966786fb-jsb5d
+Namespace:        whisper-stt
+Priority:         0
+Service Account:  default
+Node:             k3s-lenovo-tiny/10.20.23.201
+Start Time:       Sun, 14 Jun 2026 00:55:49 -0400
+Labels:           app=whisper-openai
+                  kuik.enix.io/managed=true
+                  pod-template-hash=68966786fb
+Annotations:      kuik.enix.io/rewrite-images: true
+                  original-image-whisper-openai: fedirz/faster-whisper-server:latest-cpu
+                  original-init-image-model-download: fedirz/faster-whisper-server:latest-cpu
+Status:           Running
+IP:               10.42.2.128
+IPs:
+  IP:           10.42.2.128
+Controlled By:  ReplicaSet/whisper-openai-68966786fb
+Init Containers:
+  model-download:
+    Container ID:  containerd://0d4ee02f83c5c8dc49447eea05672a88cdd3e0780493fb2cc8cda20ea5b5913d
+    Image:         localhost:7439/fedirz/faster-whisper-server:latest-cpu
+    Image ID:      docker.io/fedirz/faster-whisper-server@sha256:760e5e43d427dc6cfbbc4731934b908b7de9c7e6d5309c6a1f0c8c923a5b6030
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /bin/sh
+      -c
+    Args:
+      set -e
+      VENV="/root/faster-whisper-server/.venv"
+      HF_CACHE="/root/.cache/huggingface/hub"
+      
+      mkdir -p "$HF_CACHE"
+      
+      DEEPDML_DIR="$HF_CACHE/models--deepdml--faster-whisper-large-v3-turbo-ct2"
+      if [ -d "$DEEPDML_DIR/snapshots" ]; then
+        echo "Model already cached, skipping download"
+      else
+        echo "Downloading deepdml/faster-whisper-large-v3-turbo-ct2..."
+        "$VENV/bin/python" -c "
+      from huggingface_hub import snapshot_download
+      result = snapshot_download(
+          repo_id='deepdml/faster-whisper-large-v3-turbo-ct2',
+          cache_dir='$HF_CACHE',
+      )
+      print('Downloaded to:', result)
+      "
+      fi
+      
+      # Systran/faster-whisper-large-v3-turbo is gated. Symlink so offline
+      # cache lookup for "large-v3-turbo" resolves to the deepdml model.
+      SYSTRAN_DIR="$HF_CACHE/models--Systran--faster-whisper-large-v3-turbo"
+      if [ ! -e "$SYSTRAN_DIR" ]; then
+        ln -s "models--deepdml--faster-whisper-large-v3-turbo-ct2" "$SYSTRAN_DIR"
+        echo "Created symlink Systran -> deepdml"
+      else
+        echo "Systran symlink already present"
+      fi
+      
+      # Write launcher script via base64 to avoid YAML indentation issues.
+      # Script patches _MODELS to accept "large-v3-turbo" (older faster-whisper
+      # doesn't know this size; _MODELS is a tuple so we use concatenation).
+      echo 'aW1wb3J0IHN5cwpzeXMucGF0aC5pbnNlcnQoMCwgJy9yb290L2Zhc3Rlci13aGlzcGVyLXNlcnZlcicpCgppbXBvcnQgZmFzdGVyX3doaXNwZXIudXRpbHMgYXMgX2Z3X3V0aWxzCmlmICdsYXJnZS12My10dXJibycgbm90IGluIF9md191dGlscy5fTU9ERUxTOgogICAgX2Z3X3V0aWxzLl9NT0RFTFNbJ2xhcmdlLXYzLXR1cmJvJ10gPSAnU3lzdHJhbi9mYXN0ZXItd2hpc3Blci1sYXJnZS12My10dXJibycKICAgIHByaW50KCdQYXRjaGVkIF9NT0RFTFMgdG8gaW5jbHVkZSBsYXJnZS12My10dXJibycpCgppbXBvcnQgdXZpY29ybgp1dmljb3JuLnJ1bigKICAgICdmYXN0ZXJfd2hpc3Blcl9zZXJ2ZXIubWFpbjpjcmVhdGVfYXBwJywKICAgIGZhY3Rvcnk9VHJ1ZSwKICAgIGhvc3Q9JzAuMC4wLjAnLAogICAgcG9ydD04MDAwLAopCg==' | base64 -d > /root/.cache/huggingface/launch.py
+      echo "launch.py written"
+      echo "Init complete"
+      
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Sun, 14 Jun 2026 00:56:34 -0400
+      Finished:     Sun, 14 Jun 2026 00:56:34 -0400
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     2
+      memory:  2Gi
+    Requests:
+      cpu:        500m
+      memory:     512Mi
+    Environment:  <none>
+    Mounts:
+      /root/.cache/huggingface from model-cache (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-jphr9 (ro)
+Containers:
+  whisper-openai:
+    Container ID:  containerd://29b98496fb267369b42e24e961f6fbb17761fe6b787518d0bd7b5233a03af7ef
+    Image:         localhost:7439/fedirz/faster-whisper-server:latest-cpu
+    Image ID:      docker.io/fedirz/faster-whisper-server@sha256:760e5e43d427dc6cfbbc4731934b908b7de9c7e6d5309c6a1f0c8c923a5b6030
+    Port:          8000/TCP
+    Host Port:     0/TCP
+    Command:
+      /root/faster-whisper-server/.venv/bin/python
+      /root/.cache/huggingface/launch.py
+    State:          Running
+      Started:      Sun, 14 Jun 2026 00:56:34 -0400
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     8
+      memory:  8Gi
+    Requests:
+      cpu:      1
+      memory:   4Gi
+    Liveness:   http-get http://:8000/health delay=0s timeout=1s period=30s #success=1 #failure=5
+    Readiness:  http-get http://:8000/health delay=0s timeout=1s period=10s #success=1 #failure=3
+    Startup:    http-get http://:8000/health delay=10s timeout=1s period=10s #success=1 #failure=30
+    Environment:
+      WHISPER__MODEL:             large-v3-turbo
+      WHISPER__INFERENCE_DEVICE:  cpu
+      HF_HOME:                    /root/.cache/huggingface
+      HF_HUB_OFFLINE:             1
+    Mounts:
+      /root/.cache/huggingface from model-cache (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-jphr9 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  model-cache:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  whisper-openai-model-cache
+    ReadOnly:   false
+  kube-api-access-jphr9:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>
