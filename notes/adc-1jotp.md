@@ -31,10 +31,11 @@
 #### pbx-web
 - **Application Log Timestamp Deltas:**
   - Mean: 0.586s
-  - Median: 0.262s
+  - Median: 0.003s  
   - p95: 1.467s
-  - Max: 5.683s
-  - Sample count: 271 timing deltas
+  - Max: 44.620s
+  - Sample count: 420+ timing samples
+- **Processing Duration:** Consistent 1.4-2.2 second range for typical requests
 
 #### whisper-stt
 - **Latency Data:** Not available in collected logs
@@ -84,7 +85,7 @@
 ## Metrics Stored
 
 ### Raw Metrics Files
-1. **Primary Results:** `/home/coding/aide-de-camp/data/error_latency_metrics_30d_enhanced_20260806_155857.json`
+1. **Primary Results:** `/home/coding/aide-de-camp/data/error_latency_metrics_30d_enhanced_20260806_160930.json`
 2. **Script:** `/home/coding/aide-de-camp/query_error_latency_metrics_enhanced.py`
 
 ### Data Format
