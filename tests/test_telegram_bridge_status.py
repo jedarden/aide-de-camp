@@ -16,24 +16,18 @@ class TestTelegramBridgeStatus:
     def test_initial_state(self):
         """Test that initial state is unknown."""
         fallback = TelegramFallback()
-        status = fallback.get_bridge_status()
+        status = fallback.get_status()
 
         assert status["reachable"] is None
         assert status["failure_count"] == 0
         assert status["last_check_time"] is None
-        assert status["bridge_url"] == "http://telegram-claude-bridge:8000"
-
-    def test_custom_bridge_url(self):
-        """Test custom bridge URL configuration."""
-        fallback = TelegramFallback(bridge_url="http://custom:9000")
-        status = fallback.get_bridge_status()
-
-        assert status["bridge_url"] == "http://custom:9000"
+        assert status["bot_configured"] is False  # No token by default
+        assert status["chat_id_configured"] is False  # No chat_id by default
 
     @pytest.mark.asyncio
-    async def test_check_bridge_available_success(self):
-        """Test successful bridge availability check."""
-        fallback = TelegramFallback()
+    async def test_check_telegram_available_success(self):
+        """Test successful Telegram availability check."""
+        fallback = TelegramFallback(bot_token="test_token")
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_response = MagicMock()
@@ -42,28 +36,28 @@ class TestTelegramBridgeStatus:
                 return_value=mock_response
             )
 
-            result = await fallback.check_bridge_available()
+            result = await fallback.check_telegram_available()
             assert result is True
 
-            status = fallback.get_bridge_status()
+            status = fallback.get_status()
             assert status["reachable"] is True
             assert status["last_check_time"] is not None
             datetime.fromisoformat(status["last_check_time"])  # valid ISO-8601
 
     @pytest.mark.asyncio
-    async def test_check_bridge_available_failure(self):
-        """Test failed bridge availability check."""
-        fallback = TelegramFallback()
+    async def test_check_telegram_available_failure(self):
+        """Test failed Telegram availability check."""
+        fallback = TelegramFallback(bot_token="test_token")
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
                 side_effect=Exception("Connection error")
             )
 
-            result = await fallback.check_bridge_available()
+            result = await fallback.check_telegram_available()
             assert result is False
 
-            status = fallback.get_bridge_status()
+            status = fallback.get_status()
             assert status["reachable"] is False
             # A failed check still counts as a determination — last_check_time set.
             assert status["last_check_time"] is not None
@@ -71,7 +65,7 @@ class TestTelegramBridgeStatus:
     @pytest.mark.asyncio
     async def test_last_check_time_reflects_most_recent_determination(self):
         """last_check_time tracks the most recent reachability determination."""
-        fallback = TelegramFallback()
+        fallback = TelegramFallback(bot_token="test_token")
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_response = MagicMock()
@@ -80,22 +74,22 @@ class TestTelegramBridgeStatus:
                 return_value=mock_response
             )
 
-            assert fallback.get_bridge_status()["last_check_time"] is None
+            assert fallback.get_status()["last_check_time"] is None
 
-            await fallback.check_bridge_available()
-            first = fallback.get_bridge_status()["last_check_time"]
+            await fallback.check_telegram_available()
+            first = fallback.get_status()["last_check_time"]
             assert first is not None
 
             # A second determination produces a timestamp at least as new.
-            await fallback.check_bridge_available()
-            second = fallback.get_bridge_status()["last_check_time"]
+            await fallback.check_telegram_available()
+            second = fallback.get_status()["last_check_time"]
             assert second is not None
             assert datetime.fromisoformat(second) >= datetime.fromisoformat(first)
 
     @pytest.mark.asyncio
     async def test_send_message_success_updates_status(self):
         """Test that successful send updates reachability status."""
-        fallback = TelegramFallback()
+        fallback = TelegramFallback(bot_token="test_token")
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_response = MagicMock()
@@ -107,7 +101,7 @@ class TestTelegramBridgeStatus:
             result = await fallback.send_message(123, "Test message")
             assert result is True
 
-            status = fallback.get_bridge_status()
+            status = fallback.get_status()
             assert status["reachable"] is True
             # A successful send is a reactive reachability determination.
             assert status["last_check_time"] is not None
@@ -115,7 +109,7 @@ class TestTelegramBridgeStatus:
     @pytest.mark.asyncio
     async def test_send_message_failure_increments_count(self):
         """Test that failed send increments failure count."""
-        fallback = TelegramFallback()
+        fallback = TelegramFallback(bot_token="test_token")
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
@@ -124,14 +118,15 @@ class TestTelegramBridgeStatus:
 
             await fallback.send_message(123, "Test message")
 
-            status = fallback.get_bridge_status()
+            status = fallback.get_status()
             assert status["reachable"] is False
             assert status["failure_count"] == 1
             assert status["last_check_time"] is not None
 
+    @pytest.mark.asyncio
     async def test_handle_send_failure_first_warns_then_rate_limits(self, caplog):
         """First failure WARNINGs; an immediate repeat is rate-limited (suppressed)."""
-        fallback = TelegramFallback()
+        fallback = TelegramFallback(bot_token="test_token")
 
         # First failure → WARNING (the one-per-startup notification).
         with patch("src.telegram.fallback.logger") as mock_logger:
@@ -149,9 +144,9 @@ class TestTelegramBridgeStatus:
         assert fallback._has_logged_first_failure is True
 
     @pytest.mark.asyncio
-    async def test_send_message_uses_debug_after_first_warning(self, caplog):
+    async def test_send_message_uses_debug_after_first_warning(self):
         """Test that subsequent send failures use DEBUG level."""
-        fallback = TelegramFallback()
+        fallback = TelegramFallback(bot_token="test_token")
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
@@ -161,10 +156,10 @@ class TestTelegramBridgeStatus:
             # First call
             await fallback.send_message(123, "Test message")
 
-            # Second call (should be DEBUG)
+            # Second call (should be DEBUG/rate-limited)
             await fallback.send_message(123, "Test message")
 
-            status = fallback.get_bridge_status()
+            status = fallback.get_status()
             assert status["failure_count"] == 2
 
     def test_get_telegram_fallback_singleton(self):
@@ -182,16 +177,16 @@ class TestBridgeStatusAPI:
     async def test_api_v1_telegram_bridge_status(self):
         """Test the GET /api/v1/status/telegram_bridge endpoint."""
         # Test the status method directly instead of importing the full app
-        fallback = TelegramFallback()
+        fallback = TelegramFallback(bot_token="test_token")
 
         # Set some state
         fallback._is_reachable = True
         fallback._failure_count = 5
 
-        status = fallback.get_bridge_status()
+        status = fallback.get_status()
 
         assert status["reachable"] is True
-        assert status["bridge_url"] == "http://telegram-claude-bridge:8000"
+        assert status["bot_configured"] is True  # bot_token is set
         assert status["failure_count"] == 5
 
 
