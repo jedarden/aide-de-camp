@@ -1,0 +1,40 @@
+[
+  {
+    "name": "whisper-openai-68966786fb-jsb5d",
+    "creationTimestamp": "2026-06-14T04:55:49Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "ready": true,
+    "image": "localhost:7439/fedirz/faster-whisper-server:latest-cpu",
+    "nodeName": "k3s-lenovo-tiny",
+    "resources": {
+      "requests": {
+        "cpu": "1",
+        "memory": "4Gi"
+      },
+      "limits": {
+        "cpu": "8",
+        "memory": "8Gi"
+      }
+    }
+  },
+  {
+    "name": "whisper-stt-847fd8d7b9-v2rs5",
+    "creationTimestamp": "2026-07-12T16:53:42Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "ready": true,
+    "image": "ronaldraygun/whisper-stt:1.8.6",
+    "nodeName": "k3s-agent-minisforum",
+    "resources": {
+      "requests": {
+        "cpu": "1",
+        "memory": "4Gi"
+      },
+      "limits": {
+        "cpu": "8",
+        "memory": "8Gi"
+      }
+    }
+  }
+]
