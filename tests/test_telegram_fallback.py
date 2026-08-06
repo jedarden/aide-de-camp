@@ -113,6 +113,60 @@ class TestGlobalFallbackInstance:
 class TestFirstFailureTracking:
     """Test first-failure detection: exactly one WARNING per process startup."""
 
+    async def test_has_failed_since_startup_flag_initial_state(self):
+        """adc-2r8hh: flag is False at startup (no failures yet)."""
+        fallback = TelegramFallback()
+        assert fallback._has_failed_since_startup is False
+
+    async def test_has_failed_since_startup_flag_set_on_first_failure(self):
+        """adc-2r8hh: flag sets to True on first Telegram send failure."""
+        fallback = TelegramFallback()
+        assert fallback._has_failed_since_startup is False
+
+        await fallback._handle_send_failure(error=ConnectionError("first failure"))
+
+        assert fallback._has_failed_since_startup is True
+
+    async def test_has_failed_since_startup_exposed_in_status(self):
+        """adc-2r8hh: flag is exposed in get_status() output."""
+        fallback = TelegramFallback()
+        status = fallback.get_status()
+        assert "has_failed_since_startup" in status
+        assert status["has_failed_since_startup"] is False
+
+        await fallback._handle_send_failure(error=ConnectionError("failure"))
+
+        status = fallback.get_status()
+        assert status["has_failed_since_startup"] is True
+
+    async def test_has_failed_since_startup_reset(self):
+        """adc-2r8hh: flag resets to False when first failure state is reset."""
+        fallback = TelegramFallback()
+
+        await fallback._handle_send_failure(error=ConnectionError("first"))
+        assert fallback._has_failed_since_startup is True
+
+        await fallback.reset_first_failure_state()
+        assert fallback._has_failed_since_startup is False
+
+    async def test_has_failed_since_startup_thread_safety(self):
+        """adc-2r8hh: flag is set under lock, preventing race conditions."""
+        import asyncio
+
+        fallback = TelegramFallback()
+        assert fallback._has_failed_since_startup is False
+
+        # Concurrent failures - all should see the flag as True after completion
+        await asyncio.gather(
+            *(
+                fallback._handle_send_failure(error=ConnectionError(f"failure{i}"))
+                for i in range(10)
+            )
+        )
+
+        assert fallback._has_failed_since_startup is True
+        assert fallback._failure_count == 10
+
     async def test_first_failure_logs_warning_with_error_type(self, caplog):
         """The first failure logs a WARNING carrying both error type and message."""
         fallback = TelegramFallback(bridge_url="http://test-bridge:8000")
