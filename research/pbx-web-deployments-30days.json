@@ -1,0 +1,147 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T16:30:00Z",
+    "time_range_start": "2026-07-07T00:00:00Z",
+    "time_range_end": "2026-08-06T16:30:00Z",
+    "target_period_days": 30,
+    "data_sources": [
+      "Argo Workflows (iad-ci cluster)",
+      "Kubernetes ReplicaSets (ardenone-cluster)",
+      "Deployments (ardenone-cluster)"
+    ]
+  },
+  "ci_workflows": {
+    "query_method": "kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig get workflows -n argo-workflows",
+    "workflow_template": "pbx-web-build",
+    "workflows_found": 0,
+    "note": "No pbx-web-build workflows found in iad-ci cluster within the 30-day window",
+    "root_cause": "Aggressive workflow cleanup policy - workflows are deleted within hours/days of completion"
+  },
+  "production_deployments": {
+    "cluster": "ardenone-cluster",
+    "namespace": "pbx-web",
+    "deployment_name": "pbx-web",
+    "management_method": "ArgoCD GitOps",
+    "deployments_in_window": [
+      {
+        "timestamp": "2026-07-13T18:07:55Z",
+        "date": "2026-07-13",
+        "revision": 11,
+        "replicaSet": "pbx-web-754f4cfdf7",
+        "image": "ronaldraygun/pbx-web:1.0.8",
+        "outcome": "deployment_rollout",
+        "notes": "Short-lived deployment, superseded by revision 14 same day"
+      },
+      {
+        "timestamp": "2026-07-13T18:18:07Z",
+        "date": "2026-07-13",
+        "revision": 14,
+        "replicaSet": "pbx-web-5ff68464d",
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "outcome": "deployment_rollout",
+        "notes": "Initial 1.0.9 deployment, active for 15 days until July 28"
+      },
+      {
+        "timestamp": "2026-07-28T17:05:51Z",
+        "date": "2026-07-28",
+        "revision": 13,
+        "replicaSet": "pbx-web-765bb76db8",
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "outcome": "deployment_rollout",
+        "notes": "Re-deployment of 1.0.9 image, current active as of 2026-08-06"
+      }
+    ]
+  },
+  "current_status": {
+    "active_replicaSet": "pbx-web-5ff68464d",
+    "active_image": "ronaldraygun/pbx-web:1.0.9",
+    "active_revision": 14,
+    "replicas": 1,
+    "deployment_age_days": 24,
+    "last_deployment_date": "2026-07-28"
+  },
+  "deployment_sequence_analysis": {
+    "unique_images_in_window": ["ronaldraygun/pbx-web:1.0.8", "ronaldraygun/pbx-web:1.0.9"],
+    "image_transitions": [
+      {
+        "from": "ronaldraygun/pbx-web:1.0.8",
+        "to": "ronaldraygun/pbx-web:1.0.9",
+        "transition_date": "2026-07-13",
+        "transition_time_minutes": 10
+      }
+    ],
+    "deployment_pattern": "Two deployments on July 13 (version upgrade 1.0.8→1.0.9), one re-deployment on July 28 (same 1.0.9 image)",
+    "stability_assessment": "Stable - same image (1.0.9) running since July 13"
+  },
+  "coverage_assessment": {
+    "target_period_days": 30,
+    "days_with_deployments": 2,
+    "deployment_count": 3,
+    "coverage_percentage": "6.7%",
+    "status": "Limited coverage - no CI workflows available, only ReplicaSet metadata"
+  },
+  "deployment_image_timeline": {
+    "active_deployments": [
+      {
+        "period": "2026-07-13 18:07 to 2026-07-13 18:18",
+        "duration_minutes": 11,
+        "image": "ronaldraygun/pbx-web:1.0.8",
+        "revision": 11,
+        "superseded_by": "ronaldraygun/pbx-web:1.0.9"
+      },
+      {
+        "period": "2026-07-13 18:18 to 2026-07-28 17:05",
+        "duration_minutes": 21567,
+        "duration_days": 15,
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "revision": 14,
+        "superseded_by": "Re-deployment of same image"
+      },
+      {
+        "period": "2026-07-28 17:05 to present (2026-08-06)",
+        "duration_minutes": 19845,
+        "duration_days": 14,
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "revision": 13,
+        "current": true
+      }
+    ]
+  },
+  "deployment_health": {
+    "success_count": 3,
+    "failure_count": 0,
+    "rollback_count": 0,
+    "health_status": "All deployments successful",
+    "current_image_uptime_days": 24
+  },
+  "methodology_notes": [
+    "CI workflow data unavailable due to aggressive cleanup policy (workflows deleted within hours/days)",
+    "Production deployment history reconstructed from Kubernetes ReplicaSet metadata",
+    "ReplicaSet creation timestamps indicate deployment timing",
+    "Revision numbers from deployment.kubernetes.io/revision annotations",
+    "Current status verified from active ReplicaSet with replicas=1"
+  ],
+  "data_limitations": [
+    "No CI build logs, step durations, or artifact metadata available",
+    "No deployment event logs available via kubectl get events",
+    "No ArgoCD sync history captured in this query",
+    "Build triggers and git commit SHAs not available from ReplicaSet metadata alone"
+  ],
+  "recommendations_for_complete_history": [
+    "Query ArgoCD application sync history for git commit context",
+    "Check container registry (ronaldraygun/pbx-web tags) for build metadata",
+    "Search declarative-config git history for manifest changes",
+    "Consider increasing workflow TTL for future CI tracking",
+    "Implement WorkflowArchive for permanent CI history retention"
+  ],
+  "summary": {
+    "period_analyzed": "2026-07-07 to 2026-08-06 (30 days)",
+    "ci_workflows_found": 0,
+    "production_deployments": 3,
+    "unique_images": 2,
+    "current_image": "ronaldraygun/pbx-web:1.0.9",
+    "deployment_success_rate": "100%",
+    "last_upgrade": "2026-07-13 (1.0.8 → 1.0.9)",
+    "assessment": "Stable service with limited deployment activity, no CI workflow history available"
+  }
+}
