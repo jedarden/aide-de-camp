@@ -154,19 +154,19 @@ async def lifespan(app: FastAPI):
     await _background_processor.start()
     logger.info("Background analysis processor started")
 
-    # Check Telegram bridge reachability
+    # Check Telegram Bot API reachability
     try:
         telegram_fallback = get_telegram_fallback()
-        bridge_available = await telegram_fallback.check_bridge_available()
-        if bridge_available:
-            logger.info(f"Telegram bridge reachable at {telegram_fallback.bridge_url}")
+        telegram_available = await telegram_fallback.check_telegram_available()
+        if telegram_available:
+            logger.info("Telegram Bot API reachable")
         else:
             logger.warning(
-                f"Telegram bridge unreachable at {telegram_fallback.bridge_url}. "
-                f"Telegram fallback will not be available."
+                "Telegram Bot API unreachable. "
+                "Telegram fallback will not be available."
             )
     except Exception as e:
-        logger.warning(f"Failed to check Telegram bridge reachability: {e}")
+        logger.warning(f"Failed to check Telegram Bot API reachability: {e}")
 
     # Warm up ZAI proxy connections proactively
     # This eliminates TLS handshake cost from the first actual LLM request
@@ -2147,18 +2147,18 @@ async def api_v1_background_analyze():
     }
 
 
-@app.get("/api/v1/status/telegram_bridge")
-async def api_v1_telegram_bridge_status():
-    """Get Telegram bridge reachability status."""
+@app.get("/api/v1/status/telegram")
+async def api_v1_telegram_status():
+    """Get Telegram Bot API integration status."""
     try:
         telegram_fallback = get_telegram_fallback()
-        status = telegram_fallback.get_bridge_status()
+        status = telegram_fallback.get_status()
         return status
     except Exception as e:
-        logger.error(f"Error getting Telegram bridge status: {e}")
+        logger.error(f"Error getting Telegram status: {e}")
         return JSONResponse(
             status_code=500,
-            content={"error": f"Failed to get bridge status: {str(e)}"}
+            content={"error": f"Failed to get Telegram status: {str(e)}"}
         )
 
 
