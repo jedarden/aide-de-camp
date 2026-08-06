@@ -1,0 +1,469 @@
+{
+  "collection_metadata": {
+    "timestamp": "2026-08-06T18:48:57.698360",
+    "analysis_period": {
+      "start": "2026-07-07T00:00:00Z",
+      "end": "2026-08-06T23:59:59Z",
+      "days": 30,
+      "period_hours": 720,
+      "period_seconds": 2592000
+    },
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "query_methodology": "rate-based aggregation patterns"
+  },
+  "services": {
+    "pbx-web": {
+      "service": "pbx-web",
+      "time_range": {
+        "start": "2026-07-07T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "days": 30,
+        "period_hours": 720,
+        "period_seconds": 2592000
+      },
+      "queries": {
+        "http_error_rates": {
+          "query_type": "http_error_rates",
+          "rate_patterns_used": [
+            "rate(http_5xx_errors, total_requests)",
+            "rate_per_day(http_5xx_errors)",
+            "rate_per_hour(http_4xx_errors)"
+          ],
+          "http_5xx_errors": 0,
+          "http_4xx_errors": 2,
+          "http_total_requests": 33129,
+          "http_5xx_error_rate": 0.0,
+          "http_4xx_error_rate": 6.037006852002777e-05,
+          "http_5xx_per_day": 0.0,
+          "http_4xx_per_day": 0.06666666666666667,
+          "http_5xx_per_hour": 0.0,
+          "http_4xx_per_hour": 0.002777777777777778,
+          "data_sources": [
+            "pbx-web-current-nginx.log"
+          ],
+          "log_files_analyzed": 1
+        },
+        "application_error_rates": {
+          "query_type": "application_error_rates",
+          "rate_patterns_used": [
+            "rate_per_day(application_errors)",
+            "rate(application_errors, total_pods)",
+            "rate(application_errors, analysis_period_hours)"
+          ],
+          "total_pods_analyzed": 8,
+          "pods_with_errors": 1,
+          "pods_without_errors": 7,
+          "total_error_count": 5,
+          "error_rate_per_pod": 0.625,
+          "error_rate_per_day": 0.16666666666666666,
+          "error_rate_per_hour": 0.006944444444444444,
+          "pods_with_error_details": [
+            {
+              "pod": "pod-pbx-web-5ff68464d-mkn8n-2026-08-06",
+              "errors": 5
+            }
+          ]
+        },
+        "oom_kill_rates": {
+          "query_type": "oom_kill_rates",
+          "rate_patterns_used": [
+            "rate_per_day(total_oom_kill_count)",
+            "rate(oom_kills, pods_with_oom_kills)",
+            "rate(oom_kills, total_pods)"
+          ],
+          "total_pods_analyzed": 8,
+          "pods_with_oom_kills": 0,
+          "total_oom_kill_count": 0,
+          "oom_kill_rate_per_pod": 0.0,
+          "oom_kill_rate_per_day": 0.0,
+          "oom_kill_rate_per_hour": 0.0,
+          "pods_affected_details": []
+        },
+        "deployment_error_rates": {
+          "query_type": "deployment_error_rates",
+          "rate_patterns_used": [
+            "rate(failed_deployments, total_deployments)",
+            "rate_per_day(total_deployments)",
+            "rate(successful_deployments, total_deployments)"
+          ],
+          "total_deployments": 0,
+          "successful_deployments": 0,
+          "failed_deployments": 0,
+          "deployment_error_rate": 0.0,
+          "deployment_success_rate": 0.0,
+          "deployment_rate_per_day": 0.0,
+          "deployment_times": [],
+          "timing_stats": {}
+        },
+        "overall_error_rates": {
+          "query_type": "overall_error_rates",
+          "rate_patterns_used": [
+            "weighted_error_score(all_errors, severity_weights)",
+            "rate_per_day(total_errors_all_sources)",
+            "rate_per_day(weighted_error_score)"
+          ],
+          "total_errors_all_sources": 7,
+          "error_rate_per_day": 0.23333333333333334,
+          "weighted_error_score": 6.0,
+          "weighted_error_rate_per_day": 0.2,
+          "error_breakdown": {
+            "http_5xx_errors": 0,
+            "http_4xx_errors": 2,
+            "app_errors": 5,
+            "oom_kills": 0,
+            "deployment_failures": 0
+          },
+          "component_metrics": {
+            "http": {
+              "query_type": "http_error_rates",
+              "rate_patterns_used": [
+                "rate(http_5xx_errors, total_requests)",
+                "rate_per_day(http_5xx_errors)",
+                "rate_per_hour(http_4xx_errors)"
+              ],
+              "http_5xx_errors": 0,
+              "http_4xx_errors": 2,
+              "http_total_requests": 33129,
+              "http_5xx_error_rate": 0.0,
+              "http_4xx_error_rate": 6.037006852002777e-05,
+              "http_5xx_per_day": 0.0,
+              "http_4xx_per_day": 0.06666666666666667,
+              "http_5xx_per_hour": 0.0,
+              "http_4xx_per_hour": 0.002777777777777778,
+              "data_sources": [
+                "pbx-web-current-nginx.log"
+              ],
+              "log_files_analyzed": 1
+            },
+            "application": {
+              "query_type": "application_error_rates",
+              "rate_patterns_used": [
+                "rate_per_day(application_errors)",
+                "rate(application_errors, total_pods)",
+                "rate(application_errors, analysis_period_hours)"
+              ],
+              "total_pods_analyzed": 8,
+              "pods_with_errors": 1,
+              "pods_without_errors": 7,
+              "total_error_count": 5,
+              "error_rate_per_pod": 0.625,
+              "error_rate_per_day": 0.16666666666666666,
+              "error_rate_per_hour": 0.006944444444444444,
+              "pods_with_error_details": [
+                {
+                  "pod": "pod-pbx-web-5ff68464d-mkn8n-2026-08-06",
+                  "errors": 5
+                }
+              ]
+            },
+            "oom": {
+              "query_type": "oom_kill_rates",
+              "rate_patterns_used": [
+                "rate_per_day(total_oom_kill_count)",
+                "rate(oom_kills, pods_with_oom_kills)",
+                "rate(oom_kills, total_pods)"
+              ],
+              "total_pods_analyzed": 8,
+              "pods_with_oom_kills": 0,
+              "total_oom_kill_count": 0,
+              "oom_kill_rate_per_pod": 0.0,
+              "oom_kill_rate_per_day": 0.0,
+              "oom_kill_rate_per_hour": 0.0,
+              "pods_affected_details": []
+            },
+            "deployment": {
+              "query_type": "deployment_error_rates",
+              "rate_patterns_used": [
+                "rate(failed_deployments, total_deployments)",
+                "rate_per_day(total_deployments)",
+                "rate(successful_deployments, total_deployments)"
+              ],
+              "total_deployments": 0,
+              "successful_deployments": 0,
+              "failed_deployments": 0,
+              "deployment_error_rate": 0.0,
+              "deployment_success_rate": 0.0,
+              "deployment_rate_per_day": 0.0,
+              "deployment_times": [],
+              "timing_stats": {}
+            }
+          }
+        }
+      },
+      "query_timestamp": "2026-08-06T18:48:57.737261",
+      "queries_executed": [
+        "http_error_rates",
+        "application_error_rates",
+        "oom_kill_rates",
+        "deployment_error_rates",
+        "http_error_rates",
+        "application_error_rates",
+        "oom_kill_rates",
+        "deployment_error_rates",
+        "overall_error_rates"
+      ],
+      "test_results": {
+        "http_error_rates": {
+          "passed": true,
+          "message": "http_error_rates: \u2713 Returns actual data (7 positive values)",
+          "positive_values_count": 7,
+          "zero_values_count": 4
+        },
+        "application_error_rates": {
+          "passed": true,
+          "message": "application_error_rates: \u2713 Returns actual data (8 positive values)",
+          "positive_values_count": 8,
+          "zero_values_count": 0
+        },
+        "oom_kill_rates": {
+          "passed": true,
+          "message": "oom_kill_rates: \u2713 Returns actual data (1 positive values)",
+          "positive_values_count": 1,
+          "zero_values_count": 5
+        },
+        "deployment_error_rates": {
+          "passed": false,
+          "message": "deployment_error_rates: All metric values are zero - no data collected",
+          "positive_values_count": 0,
+          "zero_values_count": 6
+        },
+        "overall_error_rates": {
+          "passed": true,
+          "message": "overall_error_rates: \u2713 Returns actual data (4 positive values)",
+          "positive_values_count": 4,
+          "zero_values_count": 0
+        }
+      }
+    },
+    "whisper-stt": {
+      "service": "whisper-stt",
+      "time_range": {
+        "start": "2026-07-07T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "days": 30,
+        "period_hours": 720,
+        "period_seconds": 2592000
+      },
+      "queries": {
+        "http_error_rates": {
+          "query_type": "http_error_rates",
+          "rate_patterns_used": [
+            "rate(http_5xx_errors, total_requests)",
+            "rate_per_day(http_5xx_errors)",
+            "rate_per_hour(http_4xx_errors)"
+          ],
+          "http_5xx_errors": 0,
+          "http_4xx_errors": 0,
+          "http_total_requests": 0,
+          "http_5xx_error_rate": 0.0,
+          "http_4xx_error_rate": 0.0,
+          "http_5xx_per_day": 0.0,
+          "http_4xx_per_day": 0.0,
+          "http_5xx_per_hour": 0.0,
+          "http_4xx_per_hour": 0.0,
+          "data_sources": [],
+          "log_files_analyzed": 0
+        },
+        "application_error_rates": {
+          "query_type": "application_error_rates",
+          "rate_patterns_used": [
+            "rate_per_day(application_errors)",
+            "rate(application_errors, total_pods)",
+            "rate(application_errors, analysis_period_hours)"
+          ],
+          "total_pods_analyzed": 10,
+          "pods_with_errors": 2,
+          "pods_without_errors": 8,
+          "total_error_count": 2,
+          "error_rate_per_pod": 0.2,
+          "error_rate_per_day": 0.06666666666666667,
+          "error_rate_per_hour": 0.002777777777777778,
+          "pods_with_error_details": [
+            {
+              "pod": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current",
+              "errors": 1
+            },
+            {
+              "pod": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06",
+              "errors": 1
+            }
+          ]
+        },
+        "oom_kill_rates": {
+          "query_type": "oom_kill_rates",
+          "rate_patterns_used": [
+            "rate_per_day(total_oom_kill_count)",
+            "rate(oom_kills, pods_with_oom_kills)",
+            "rate(oom_kills, total_pods)"
+          ],
+          "total_pods_analyzed": 10,
+          "pods_with_oom_kills": 0,
+          "total_oom_kill_count": 0,
+          "oom_kill_rate_per_pod": 0.0,
+          "oom_kill_rate_per_day": 0.0,
+          "oom_kill_rate_per_hour": 0.0,
+          "pods_affected_details": []
+        },
+        "deployment_error_rates": {
+          "query_type": "deployment_error_rates",
+          "rate_patterns_used": [
+            "rate(failed_deployments, total_deployments)",
+            "rate_per_day(total_deployments)",
+            "rate(successful_deployments, total_deployments)"
+          ],
+          "total_deployments": 0,
+          "successful_deployments": 0,
+          "failed_deployments": 0,
+          "deployment_error_rate": 0.0,
+          "deployment_success_rate": 0.0,
+          "deployment_rate_per_day": 0.0,
+          "deployment_times": [],
+          "timing_stats": {}
+        },
+        "overall_error_rates": {
+          "query_type": "overall_error_rates",
+          "rate_patterns_used": [
+            "weighted_error_score(all_errors, severity_weights)",
+            "rate_per_day(total_errors_all_sources)",
+            "rate_per_day(weighted_error_score)"
+          ],
+          "total_errors_all_sources": 2,
+          "error_rate_per_day": 0.06666666666666667,
+          "weighted_error_score": 2.0,
+          "weighted_error_rate_per_day": 0.06666666666666667,
+          "error_breakdown": {
+            "http_5xx_errors": 0,
+            "http_4xx_errors": 0,
+            "app_errors": 2,
+            "oom_kills": 0,
+            "deployment_failures": 0
+          },
+          "component_metrics": {
+            "http": {
+              "query_type": "http_error_rates",
+              "rate_patterns_used": [
+                "rate(http_5xx_errors, total_requests)",
+                "rate_per_day(http_5xx_errors)",
+                "rate_per_hour(http_4xx_errors)"
+              ],
+              "http_5xx_errors": 0,
+              "http_4xx_errors": 0,
+              "http_total_requests": 0,
+              "http_5xx_error_rate": 0.0,
+              "http_4xx_error_rate": 0.0,
+              "http_5xx_per_day": 0.0,
+              "http_4xx_per_day": 0.0,
+              "http_5xx_per_hour": 0.0,
+              "http_4xx_per_hour": 0.0,
+              "data_sources": [],
+              "log_files_analyzed": 0
+            },
+            "application": {
+              "query_type": "application_error_rates",
+              "rate_patterns_used": [
+                "rate_per_day(application_errors)",
+                "rate(application_errors, total_pods)",
+                "rate(application_errors, analysis_period_hours)"
+              ],
+              "total_pods_analyzed": 10,
+              "pods_with_errors": 2,
+              "pods_without_errors": 8,
+              "total_error_count": 2,
+              "error_rate_per_pod": 0.2,
+              "error_rate_per_day": 0.06666666666666667,
+              "error_rate_per_hour": 0.002777777777777778,
+              "pods_with_error_details": [
+                {
+                  "pod": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current",
+                  "errors": 1
+                },
+                {
+                  "pod": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06",
+                  "errors": 1
+                }
+              ]
+            },
+            "oom": {
+              "query_type": "oom_kill_rates",
+              "rate_patterns_used": [
+                "rate_per_day(total_oom_kill_count)",
+                "rate(oom_kills, pods_with_oom_kills)",
+                "rate(oom_kills, total_pods)"
+              ],
+              "total_pods_analyzed": 10,
+              "pods_with_oom_kills": 0,
+              "total_oom_kill_count": 0,
+              "oom_kill_rate_per_pod": 0.0,
+              "oom_kill_rate_per_day": 0.0,
+              "oom_kill_rate_per_hour": 0.0,
+              "pods_affected_details": []
+            },
+            "deployment": {
+              "query_type": "deployment_error_rates",
+              "rate_patterns_used": [
+                "rate(failed_deployments, total_deployments)",
+                "rate_per_day(total_deployments)",
+                "rate(successful_deployments, total_deployments)"
+              ],
+              "total_deployments": 0,
+              "successful_deployments": 0,
+              "failed_deployments": 0,
+              "deployment_error_rate": 0.0,
+              "deployment_success_rate": 0.0,
+              "deployment_rate_per_day": 0.0,
+              "deployment_times": [],
+              "timing_stats": {}
+            }
+          }
+        }
+      },
+      "query_timestamp": "2026-08-06T18:48:57.738402",
+      "queries_executed": [
+        "http_error_rates",
+        "application_error_rates",
+        "oom_kill_rates",
+        "deployment_error_rates",
+        "http_error_rates",
+        "application_error_rates",
+        "oom_kill_rates",
+        "deployment_error_rates",
+        "overall_error_rates"
+      ],
+      "test_results": {
+        "http_error_rates": {
+          "passed": false,
+          "message": "http_error_rates: All metric values are zero - no data collected",
+          "positive_values_count": 0,
+          "zero_values_count": 10
+        },
+        "application_error_rates": {
+          "passed": true,
+          "message": "application_error_rates: \u2713 Returns actual data (8 positive values)",
+          "positive_values_count": 8,
+          "zero_values_count": 0
+        },
+        "oom_kill_rates": {
+          "passed": true,
+          "message": "oom_kill_rates: \u2713 Returns actual data (1 positive values)",
+          "positive_values_count": 1,
+          "zero_values_count": 5
+        },
+        "deployment_error_rates": {
+          "passed": false,
+          "message": "deployment_error_rates: All metric values are zero - no data collected",
+          "positive_values_count": 0,
+          "zero_values_count": 6
+        },
+        "overall_error_rates": {
+          "passed": true,
+          "message": "overall_error_rates: \u2713 Returns actual data (4 positive values)",
+          "positive_values_count": 4,
+          "zero_values_count": 0
+        }
+      }
+    }
+  }
+}
