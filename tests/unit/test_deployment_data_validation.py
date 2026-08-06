@@ -13,6 +13,7 @@ from src.validation.deployment_data import (
     validate_deployment_record,
     validate_timestamp,
     validate_required_fields,
+    validate_data_types,
     DEPLOYMENT_DATA_SCHEMA
 )
 
@@ -931,3 +932,409 @@ class TestValidateRequiredFields:
         is_valid, error = validate_required_fields(data)
         assert is_valid is True
         assert error == ""
+
+
+class TestValidateDataTypes:
+    """Test the validate_data_types function for type checking against schema."""
+
+    def test_string_field_valid_type_passes(self):
+        """Test that valid string type passes validation."""
+        data = {"service": "pbx-web"}
+        schema = {"service": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_string_field_invalid_type_fails(self):
+        """Test that invalid string type fails validation."""
+        data = {"service": 123}  # Should be string
+        schema = {"service": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "service must be str" in error
+        assert "int" in error
+
+    def test_string_field_list_type_fails(self):
+        """Test that string field as list fails validation."""
+        data = {"service": ["pbx-web"]}  # Should be string
+        schema = {"service": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "service must be str" in error
+        assert "list" in error
+
+    def test_integer_field_valid_int_passes(self):
+        """Test that valid integer type passes validation."""
+        data = {"total_deployments": 10}
+        schema = {"total_deployments": int}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_integer_field_string_fails(self):
+        """Test that integer field as string fails validation."""
+        data = {"total_deployments": "10"}  # Should be int
+        schema = {"total_deployments": int}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "total_deployments must be int" in error
+        assert "str" in error
+
+    def test_integer_field_float_fails(self):
+        """Test that integer field as float fails validation."""
+        data = {"total_deployments": 10.5}  # Should be int
+        schema = {"total_deployments": int}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "total_deployments must be int" in error
+        assert "float" in error
+
+    def test_float_field_valid_float_passes(self):
+        """Test that valid float type passes validation."""
+        data = {"success_rate": 80.0}
+        schema = {"success_rate": float}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_float_field_int_accepted_passes(self):
+        """Test that float field accepts int values."""
+        data = {"success_rate": 80}  # int is acceptable for float field
+        schema = {"success_rate": float}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_float_field_string_fails(self):
+        """Test that float field as string fails validation."""
+        data = {"success_rate": "80.0"}  # Should be numeric
+        schema = {"success_rate": float}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "success_rate must be numeric" in error
+        assert "str" in error
+
+    def test_list_field_valid_list_passes(self):
+        """Test that valid list type passes validation."""
+        data = {"deployment_names": ["pbx-web"]}
+        schema = {"deployment_names": list}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_list_field_string_fails(self):
+        """Test that list field as string fails validation."""
+        data = {"deployment_names": "pbx-web"}  # Should be list
+        schema = {"deployment_names": list}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "deployment_names must be a list" in error
+        assert "str" in error
+
+    def test_list_field_dict_fails(self):
+        """Test that list field as dict fails validation."""
+        data = {"deployment_names": {"name": "pbx-web"}}  # Should be list
+        schema = {"deployment_names": list}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "deployment_names must be a list" in error
+        assert "dict" in error
+
+    def test_list_field_int_fails(self):
+        """Test that list field as int fails validation."""
+        data = {"deployment_names": 123}  # Should be list
+        schema = {"deployment_names": list}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "deployment_names must be a list" in error
+        assert "int" in error
+
+    def test_date_field_valid_timestamp_passes(self):
+        """Test that valid date/timestamp string passes validation."""
+        data = {"first_deployment": "2026-07-01T00:00:00Z"}
+        schema = {"first_deployment": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_date_field_invalid_format_fails(self):
+        """Test that invalid date format fails validation."""
+        data = {"first_deployment": "invalid-date"}
+        schema = {"first_deployment": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "invalid date string" in error
+        assert "first_deployment" in error
+
+    def test_date_field_empty_string_passes(self):
+        """Test that empty date string is accepted (valid string, just empty)."""
+        data = {"first_deployment": ""}
+        schema = {"first_deployment": str}
+        is_valid, error = validate_data_types(data, schema)
+        # Empty string is valid as a string type
+        assert is_valid is True
+        assert error == ""
+
+    def test_date_field_with_offset_passes(self):
+        """Test that date with timezone offset passes validation."""
+        data = {"created_at": "2026-08-06T12:00:00+00:00"}
+        schema = {"created_at": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_date_field_without_offset_passes(self):
+        """Test that date without timezone passes validation."""
+        data = {"updated_at": "2026-08-06T12:00:00"}
+        schema = {"updated_at": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_multiple_field_types_all_valid_passes(self):
+        """Test that multiple fields with correct types pass validation."""
+        data = {
+            "service": "pbx-web",
+            "total_deployments": 10,
+            "success_rate": 80.0,
+            "deployment_names": ["pbx-web"],
+            "first_deployment": "2026-07-01T00:00:00Z"
+        }
+        schema = {
+            "service": str,
+            "total_deployments": int,
+            "success_rate": float,
+            "deployment_names": list,
+            "first_deployment": str
+        }
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_multiple_field_types_one_invalid_fails(self):
+        """Test that multiple field validation fails when one is invalid."""
+        data = {
+            "service": "pbx-web",
+            "total_deployments": "10",  # Should be int
+            "success_rate": 80.0,
+            "deployment_names": ["pbx-web"]
+        }
+        schema = {
+            "service": str,
+            "total_deployments": int,
+            "success_rate": float,
+            "deployment_names": list
+        }
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "total_deployments must be int" in error
+
+    def test_multiple_field_types_multiple_invalid_fails(self):
+        """Test that multiple field validation fails when multiple are invalid."""
+        data = {
+            "service": 123,  # Should be string
+            "total_deployments": "10",  # Should be int
+            "success_rate": 80.0,
+            "deployment_names": "not-a-list"  # Should be list
+        }
+        schema = {
+            "service": str,
+            "total_deployments": int,
+            "success_rate": float,
+            "deployment_names": list
+        }
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        # Should contain multiple error messages
+        assert "service must be str" in error
+        assert "total_deployments must be int" in error
+        assert "deployment_names must be a list" in error
+
+    def test_field_not_in_data_skipped(self):
+        """Test that fields in schema but not in data are skipped."""
+        data = {"service": "pbx-web"}
+        schema = {"service": str, "total_deployments": int, "success_rate": float}
+        is_valid, error = validate_data_types(data, schema)
+        # Should pass because only 'service' is validated (others are not in data)
+        assert is_valid is True
+        assert error == ""
+
+    def test_field_not_in_schema_ignored(self):
+        """Test that fields in data but not in schema are ignored."""
+        data = {
+            "service": "pbx-web",
+            "extra_field": "ignored",
+            "another_extra": 12345
+        }
+        schema = {"service": str}
+        is_valid, error = validate_data_types(data, schema)
+        # Should pass because extra fields not in schema are ignored
+        assert is_valid is True
+        assert error == ""
+
+    def test_non_dict_data_fails(self):
+        """Test that non-dictionary data fails validation."""
+        data = "not a dict"
+        schema = {"service": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "Data must be a dictionary" in error
+
+    def test_non_dict_schema_fails(self):
+        """Test that non-dictionary schema fails validation."""
+        data = {"service": "pbx-web"}
+        schema = "not a dict"
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "Schema must be a dictionary" in error
+
+    def test_none_data_fails(self):
+        """Test that None data fails validation."""
+        data = None
+        schema = {"service": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "Data must be a dictionary" in error
+
+    def test_empty_schema_passes(self):
+        """Test that empty schema always passes."""
+        data = {"service": "pbx-web", "total_deployments": 10}
+        schema = {}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_empty_data_passes(self):
+        """Test that empty data passes if schema fields are not present."""
+        data = {}
+        schema = {"service": str, "total_deployments": int}
+        is_valid, error = validate_data_types(data, schema)
+        # Should pass because fields are not in data (skipped)
+        assert is_valid is True
+        assert error == ""
+
+    def test_full_deployment_schema_with_valid_data_passes(self):
+        """Test full DEPLOYMENT_DATA_SCHEMA with valid deployment data."""
+        data = {
+            "service": "pbx-web",
+            "period_days": 30,
+            "total_deployments": 10,
+            "successful_deployments": 8,
+            "failed_deployments": 2,
+            "success_rate": 80.0,
+            "failure_rate": 20.0,
+            "deployment_frequency_per_day": 0.33,
+            "mean_time_between_deployments_hours": 72.0,
+            "deployment_names": ["pbx-web"],
+            "first_deployment": "2026-07-01T00:00:00Z",
+            "last_deployment": "2026-07-30T23:59:59Z"
+        }
+        is_valid, error = validate_data_types(data, DEPLOYMENT_DATA_SCHEMA)
+        assert is_valid is True
+        assert error == ""
+
+    def test_full_deployment_schema_with_invalid_types_fails(self):
+        """Test full DEPLOYMENT_DATA_SCHEMA with invalid types fails."""
+        data = {
+            "service": 123,  # Should be string
+            "period_days": "30",  # Should be int
+            "total_deployments": 10.5,  # Should be int
+            "successful_deployments": 8,
+            "failed_deployments": 2,
+            "success_rate": "80.0",  # Should be float
+            "failure_rate": 20.0,
+            "deployment_frequency_per_day": 0.33,
+            "mean_time_between_deployments_hours": 72.0,
+            "deployment_names": "not-a-list",  # Should be list
+            "first_deployment": "invalid-date",  # Should be valid timestamp
+            "last_deployment": "2026-07-30T23:59:59Z"
+        }
+        is_valid, error = validate_data_types(data, DEPLOYMENT_DATA_SCHEMA)
+        assert is_valid is False
+        # Should contain multiple type errors
+        assert "service must be str" in error
+        assert "period_days must be int" in error
+        assert "total_deployments must be int" in error
+        assert "success_rate must be numeric" in error
+        assert "deployment_names must be a list" in error
+        assert "invalid date string" in error
+
+    def test_numeric_fields_zero_value_passes(self):
+        """Test that zero is valid for numeric fields."""
+        data = {
+            "total_deployments": 0,
+            "success_rate": 0.0,
+            "deployment_frequency_per_day": 0
+        }
+        schema = {
+            "total_deployments": int,
+            "success_rate": float,
+            "deployment_frequency_per_day": float
+        }
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_list_field_empty_list_passes(self):
+        """Test that empty list is valid for list fields."""
+        data = {"deployment_names": []}
+        schema = {"deployment_names": list}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_string_field_empty_string_passes(self):
+        """Test that empty string is valid for string fields."""
+        data = {"service": ""}
+        schema = {"service": str}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_negative_numbers_valid_for_types(self):
+        """Test that negative numbers are valid for numeric types (type checking only)."""
+        data = {
+            "total_deployments": -10,
+            "success_rate": -80.0
+        }
+        schema = {
+            "total_deployments": int,
+            "success_rate": float
+        }
+        is_valid, error = validate_data_types(data, schema)
+        # Type validation should pass (negative numbers are still valid types)
+        assert is_valid is True
+        assert error == ""
+
+    def test_timestamp_field_various_formats(self):
+        """Test various valid timestamp formats."""
+        valid_timestamps = [
+            "2026-08-06T12:00:00Z",
+            "2026-08-06T12:00:00+00:00",
+            "2026-08-06T12:00:00",
+            "2026-08-06T12:00:00.123Z",
+            "2024-02-29T12:00:00Z"  # Leap year
+        ]
+
+        for timestamp in valid_timestamps:
+            data = {"created_at": timestamp}
+            schema = {"created_at": str}
+            is_valid, error = validate_data_types(data, schema)
+            assert is_valid is True, f"Timestamp {timestamp} should be valid: {error}"
+            assert error == ""
+
+    def test_boolean_field_type_validation(self):
+        """Test that boolean type validation works correctly."""
+        data = {"is_active": True}
+        schema = {"is_active": bool}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is True
+        assert error == ""
+
+    def test_boolean_field_wrong_type_fails(self):
+        """Test that boolean field with wrong type fails."""
+        data = {"is_active": "true"}  # Should be bool
+        schema = {"is_active": bool}
+        is_valid, error = validate_data_types(data, schema)
+        assert is_valid is False
+        assert "is_active must be bool" in error

@@ -346,6 +346,92 @@ def _validate_fields_in_record(data: dict) -> Tuple[bool, str]:
     return True, ""
 
 
+def validate_data_types(data: dict, schema: dict) -> Tuple[bool, str]:
+    """
+    Validate that all data types match the expected schema.
+
+    This function checks that each field in the data matches the expected type
+    defined in the schema. It supports strings, integers, floats, lists, and
+    date/timestamp validation.
+
+    Args:
+        data: Dictionary containing deployment data to validate
+        schema: Dictionary mapping field names to their expected types
+
+    Returns:
+        Tuple of (is_valid: bool, error_message: str)
+        Returns (True, "") if all types are valid
+        Returns (False, error_message) if any type mismatches are found
+
+    Examples:
+        >>> schema = {"service": str, "total_deployments": int}
+        >>> data = {"service": "pbx-web", "total_deployments": 10}
+        >>> is_valid, error = validate_data_types(data, schema)
+        >>> is_valid
+        True
+        >>> error
+        ''
+
+        >>> # Invalid type
+        >>> data = {"service": "pbx-web", "total_deployments": "10"}
+        >>> is_valid, error = validate_data_types(data, schema)
+        >>> is_valid
+        False
+        >>> "must be int" in error
+        True
+    """
+    if not isinstance(data, dict):
+        return False, f"Data must be a dictionary, got {type(data).__name__}"
+
+    if not isinstance(schema, dict):
+        return False, f"Schema must be a dictionary, got {type(schema).__name__}"
+
+    type_errors = []
+
+    for field_name, expected_type in schema.items():
+        # Skip validation if field is not present in data
+        if field_name not in data:
+            continue
+
+        value = data[field_name]
+
+        # Handle float fields - accept both int and float
+        if expected_type is float:
+            if not isinstance(value, (int, float)):
+                type_errors.append(f"{field_name} must be numeric, got {type(value).__name__}")
+
+        # Handle list fields
+        elif expected_type is list:
+            if not isinstance(value, list):
+                type_errors.append(f"{field_name} must be a list, got {type(value).__name__}")
+
+        # Handle string fields
+        elif expected_type is str:
+            if not isinstance(value, str):
+                type_errors.append(f"{field_name} must be str, got {type(value).__name__}")
+            else:
+                # Additional validation for timestamp fields
+                if field_name in ["first_deployment", "last_deployment", "created_at", "updated_at"]:
+                    if value and not validate_timestamp(value):
+                        type_errors.append(f"{field_name} contains invalid date string: {value}")
+
+        # Handle integer fields
+        elif expected_type is int:
+            if not isinstance(value, int):
+                type_errors.append(f"{field_name} must be int, got {type(value).__name__}")
+
+        # Handle any other expected type
+        else:
+            if not isinstance(value, expected_type):
+                type_errors.append(f"{field_name} must be {expected_type.__name__}, got {type(value).__name__}")
+
+    if type_errors:
+        error_message = "; ".join(type_errors)
+        return False, error_message
+
+    return True, ""
+
+
 # Export the simple version as the main function for the task requirement
 __all__ = [
     "validate_deployment_data",
@@ -353,4 +439,5 @@ __all__ = [
     "validate_deployment_record",
     "validate_timestamp",
     "validate_required_fields",
+    "validate_data_types",
 ]
