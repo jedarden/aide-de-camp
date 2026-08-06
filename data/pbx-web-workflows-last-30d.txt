@@ -1,0 +1,29 @@
+# pbx-web-build Argo Workflows - Last 30 Days Query Result
+
+**Query Date:** 2026-08-06
+**Time Period:** 2026-07-07 to 2026-08-06 (last 30 days)
+**Cluster:** iad-ci
+**Namespace:** argo-workflows
+**Workflow Template:** pbx-web-build
+
+## Command Executed
+
+```bash
+kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig get workflows -n argo-workflows \
+  -l workflows.argoproj.io/workflow-template-ref-name=pbx-web-build \
+  --sort-by=.metadata.creationTimestamp
+```
+
+## Result
+
+**No resources found in argo-workflows namespace.**
+
+## Interpretation
+
+There have been **zero executions** of the pbx-web-build workflow template in the last 30 days (2026-07-07 to 2026-08-06).
+
+This could indicate:
+- The workflow template exists but hasn't been triggered
+- The workflow was last run more than 30 days ago
+- The workflow is run on-demand rather than on a schedule
+- There may be an issue with the template or its triggering mechanism
