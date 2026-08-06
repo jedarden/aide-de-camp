@@ -3,9 +3,11 @@ MemoryStore unit tests.
 
 Tests MemoryStore initialization, in-memory operations, and JSON persistence:
 
-Load initialization tests (bead adc-6cfeq):
+Load initialization tests (bead adc-6cfeq, adc-4uqev):
 - load() initializes with empty facts list
 - load() initializes with provided session_id
+- load() handles missing data/memory/ directory gracefully (adc-4uqev)
+- load() handles empty facts dict in _data
 - add_fact() appends fact to in-memory facts list
 - add_fact() increments facts counter
 - Multiple add_fact() calls accumulate correctly
@@ -88,6 +90,34 @@ def test_load_initializes_empty_facts_dict(store: MemoryStore) -> None:
     assert "facts" in store._data
     assert store._data["facts"] == []
     assert store._data["session_id"] == store.session_id
+
+
+def test_load_with_missing_directory(tmp_path: Path) -> None:
+    """Test load() handles missing data/memory/ directory gracefully."""
+    import shutil
+
+    # Create a non-existent directory path
+    missing_dir = tmp_path / "nonexistent" / "memory" / "path"
+
+    # Ensure the directory truly doesn't exist
+    if missing_dir.exists():
+        shutil.rmtree(missing_dir.parent)
+
+    # Create a store with the missing directory path
+    test_store = MemoryStore(
+        session_id="test-session-missing-dir",
+        memory_dir=str(missing_dir),
+        logger=MagicMock()
+    )
+
+    # load() should handle missing directory gracefully without errors
+    test_store.load()
+
+    # Verify it initializes with empty state despite missing directory
+    assert len(test_store._facts) == 0
+    assert isinstance(test_store._facts, list)
+    assert test_store._data["session_id"] == test_store.session_id
+    assert test_store._data["facts"] == []
 
 
 # --- add_fact() in-memory tests ----------------------------------------------
