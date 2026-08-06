@@ -1,0 +1,2 @@
+LAST SEEN   TYPE      REASON                 OBJECT            MESSAGE
+52m         Warning   deprecatedAnnotation   service/pbx-web   Service uses deprecated annotation metallb.universe.tf/allow-shared-ip
