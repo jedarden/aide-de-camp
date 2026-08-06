@@ -1,0 +1,39 @@
+{
+  "test_date": "2026-07-07T13:36:48-04:00",
+  "test_date_calculated": "30 days ago from 2026-08-06",
+  "results": {
+    "metadata.creationTimestamp": {
+      "tested": true,
+      "command": "kubectl get workflows -n argo-workflows --field-selector=metadata.creationTimestamp>=DATE",
+      "error": "Unable to find that match field selector: invalid selector: 'metadata.creationTimestamp'; can't understand 'metadata.creationTimestamp'",
+      "supported": false
+    },
+    "creationTimestamp": {
+      "tested": true,
+      "command": "kubectl get workflows -n argo-workflows --field-selector=creationTimestamp>=DATE",
+      "error": "Exit code 1 (silent failure)",
+      "supported": false
+    },
+    "status.phase": {
+      "tested": true,
+      "command": "kubectl get workflows -n argo-workflows --field-selector=status.phase=Succeeded",
+      "error": "field label not supported: status.phase",
+      "supported": false
+    },
+    "metadata.name": {
+      "tested": true,
+      "command": "kubectl get workflows -n argo-workflows --field-selector=metadata.name!=nonexistent",
+      "error": null,
+      "supported": true,
+      "note": "Basic metadata.name field selector works on workflows"
+    }
+  },
+  "conclusion": {
+    "summary": "kubectl field selectors do NOT support creationTimestamp filtering on Argo Workflows custom resources",
+    "reasoning": "The Argo Workflow CRD (argoproj.io/v1alpha1) does not expose creationTimestamp as a queryable field. Only basic metadata.name field selectors are supported.",
+    "recommendation": "Alternative approaches needed: 1) Client-side filtering after fetching all workflows, 2) Use jq with JSON output, 3) Custom script with date arithmetic, 4) Argo Workflow API with time-based queries"
+  },
+  "test_timestamp": "2026-08-06T13:36:48-04:00",
+  "kubernetes_version": "Client Version: v1.29.6",
+  "cluster": "iad-ci"
+}
