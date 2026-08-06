@@ -1,65 +1,44 @@
-# Task adc-5lmty: pbx-web-build 30-day Workflow Query Results
+# Task adc-5lmty: pbx-web-build 30-Day Workflow Query
 
-## Task Completed
-Successfully queried the last 30 days of pbx-web-build workflows from iad-ci Argo Workflows.
+## Summary
 
-## Key Findings
-**Result: 0 pbx-web-build workflows found**
+Query executed to retrieve last 30 days of pbx-web-build workflows from iad-ci Argo Workflows.
 
-## Executed Query
-```bash
-kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig get workflows -n argo-workflows \
-  -l workflows.argoproj.io/workflow-template=pbx-web-build \
-  --sort-by=.metadata.creationTimestamp \
-  -o json
-```
+## Results
 
-### Investigation Summary
-1. **Workflow Template Status**: The `pbx-web-build` workflow template exists in the argo-workflows namespace
+**Finding: No pbx-web-build workflows found in the last 30 days.**
 
-2. **Workflow Instance Status**: No workflow instances have been created from the pbx-web-build template in the available retention window
+### Query Details
+- **Date:** 2026-08-06
+- **Window:** Last 30 days (2026-07-07 to 2026-08-06)
+- **Cluster:** iad-ci
+- **Namespace:** argo-workflows
+- **Template:** pbx-web-build (exists, created 2026-05-27)
 
-3. **Available Data Range**: 2026-07-27 to 2026-08-06 (approximately 10 days of workflow history available)
+### Visible Workflows Context
+- Total workflows visible: 23
+- Oldest workflow: 2026-07-27 (gribtract-ci-manual-mbntt)
+- Newest workflow: Various from 2026-08-05
 
-4. **Total Workflows in Namespace**: 25 workflows (other templates active: spaxel-build, acb-build, armor-build, needle-ci, seam-ci, mta-my-way-build)
+### Analysis
+The workflow retention period appears to be approximately 10 days (oldest visible is from 2026-07-27, 10 days ago from 2026-08-06). This suggests:
 
-5. **Label Selector Investigation**: No workflows found matching label `workflows.argoproj.io/workflow-template=pbx-web-build` or containing "pbx-web" in workflow name
+1. **Short retention policy:** Workflows are cleaned up after ~10 days, which is shorter than the 30-day query window
+2. **Infrequent execution:** pbx-web-build may not have been executed in the last 10 days
+3. **Manual triggering:** The workflow may only run on-demand rather than on a schedule
 
-### Possible Explanations
-- The workflow may not have been triggered in the last 30 days
-- Argo Workflows may have a retention policy that cleans up completed workflows (observed 10-day retention)
-- The workflow might be triggered manually rather than on a schedule
-- pbx-web may be deployed through GitOps (ArgoCD) rather than CI builds
-- Development may be focused on other components
+### Verification Steps Performed
+1. ✓ Verified workflow template exists (pbx-web-build, created 2026-05-27)
+2. ✓ Checked all workflows in argo-workflows namespace
+3. ✓ Searched for pbx-web related workflow names
+4. ✓ Identified oldest workflow timestamp (2026-07-27)
+5. ✓ Saved results to ~/scratch/pbx-web-raw-30d.json
 
 ### Deliverables
-**Raw Data**:
-- Location: `~/scratch/pbx-web-raw-30d.json`
-- Content: Validated JSON with empty `items` array (119 bytes)
-- Verification: `cat ~/scratch/pbx-web-raw-30d.json | jq '.'`
+- Raw query results: `~/scratch/pbx-web-raw-30d.json`
+- All visible workflows: `~/scratch/pbx-web-all-workflows-visible.json`
 
-**Analysis Summary**:
-- Location: `~/scratch/pbx-web-query-summary.md`
-- Content: Comprehensive analysis with interpretation and recommended next steps
-
-## Acceptance Criteria Status
-✓ Query retrieves all pbx-web-build workflows (0 found)
-✓ Query includes proper label selector (`workflows.argoproj.io/workflow-template=pbx-web-build`)
-✓ Raw JSON saved to ~/scratch/pbx-web-raw-30d.json
-✓ Record count verified (N=0 workflows in available retention window)
-
-## Next Steps
-This finding suggests that either:
-1. pbx-web-build is not actively being built via Argo Workflows
-2. Build activity happens outside the Argo Workflows pipeline
-3. Workflow retention is shorter than 30 days (observed ~10 days)
-
-**Recommended Further Investigation**:
-- Check pbx-web deployment status via ArgoCD: `kubectl get applications -n argocd | grep pbx`
-- Review container registry for ronaldraygun/pbx-web image timestamps
-- Check if pbx-web uses declarative-config for deployments
-- Verify pbx-web pods running in cluster: `kubectl get pods -A -l app=pbx-web`
-
----
-*Query executed: 2026-08-06*
-*Bead ID: adc-5lmty*
+### Recommendations
+- Check workflow retention policy in workflow controller configuration
+- Verify if pbx-web-build is triggered manually or via automation
+- Consider alternative data sources for 30-day deployment analysis (e.g., deployment logs, build history)
