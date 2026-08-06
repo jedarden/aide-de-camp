@@ -366,3 +366,74 @@ async def api_v1_test_drop_sse(request: TestDropSSERequest) -> dict:
         f"[TEST] drop-sse session={request.session_id} streams_dropped={dropped}"
     )
     return {"session_id": request.session_id, "dropped_streams": dropped}
+
+
+class TestSSEBroadcastRequest(BaseModel):
+    """Request model for test SSE broadcast."""
+    surface_id: Optional[str] = Field(
+        default=None,
+        description="Optional surface ID to target with the broadcast"
+    )
+    event_type: str = Field(
+        default="test",
+        description="SSE event type to broadcast"
+    )
+    test_data: dict = Field(
+        default_factory=dict,
+        description="Test data to include in the broadcast payload"
+    )
+
+
+@router.post("/test/sse-broadcast")
+async def api_v1_test_sse_broadcast(request: TestSSEBroadcastRequest) -> dict:
+    """
+    Test endpoint for SSE broadcast functionality.
+
+    Mounted at ``POST /api/v1/test/sse-broadcast``. This endpoint accepts
+    test SSE broadcast requests and returns 200 OK. Currently provides
+    only the skeleton without actual SSE broadcasting (future enhancement).
+
+    Request body:
+    ```
+    {
+        "surface_id": "optional-surface-id",
+        "event_type": "test",
+        "test_data": {"key": "value"}
+    }
+    ```
+
+    Returns:
+    ```
+    {
+        "status": "ok",
+        "message": "Test SSE broadcast endpoint received request",
+        "surface_id": "...",
+        "event_type": "test"
+    }
+    ```
+
+    Future enhancement: Actual SSE broadcast to connected surfaces when
+    surface_id is provided.
+    """
+    logger.info(
+        f"[TEST] SSE broadcast request received - "
+        f"surface_id: {request.surface_id}, event_type: {request.event_type}"
+    )
+
+    # TODO: Future enhancement - implement actual SSE broadcast
+    # if request.surface_id:
+    #     broadcaster = get_broadcaster()
+    #     await broadcaster.broadcast(
+    #         SSEEvent(
+    #             event_type=request.event_type,
+    #             target_surface_id=request.surface_id,
+    #             data=request.test_data,
+    #         )
+    #     )
+
+    return {
+        "status": "ok",
+        "message": "Test SSE broadcast endpoint received request",
+        "surface_id": request.surface_id,
+        "event_type": request.event_type,
+    }
