@@ -3629,3 +3629,113 @@ if not api_key:
 **Reported by bead adc-4iq**
 
 ---
+
+## Memory Store Unit-Level Persistence Verification - 2026-08-06
+
+**Bead:** adc-434h5
+**Component:** src/memory/store.py (MemoryStore)
+**Test Type:** Unit-level persistence verification (no API key required)
+
+### Test Summary
+
+All 25 unit tests in `tests/test_memory_store.py` passed successfully, verifying core persistence operations for MemoryStore.
+
+### Test Coverage
+
+#### 1. load() Initialization ✅ PASS
+- **Test:** `test_load_initializes_empty_store`
+- **Result:** Empty store initializes correctly when file doesn't exist
+- **Verification:** `_data` contains `{"facts": [], "session_id": <session_id>}`
+
+#### 2. File Path Creation ✅ PASS
+- **Test:** `test_load_creates_file_path_correctly`, `test_file_path_uses_correct_hash_length`
+- **Result:** File path format: `data/memory/session_{16-char-sha256-hash}.json`
+- **Verification:** Hash is exactly 16 characters, alphanumeric
+
+#### 3. JSON File Creation ✅ PASS
+- **Test:** `test_save_creates_json_file`, `test_json_file_structure_is_valid`
+- **Result:** JSON file created at expected path with valid structure
+- **Verification:** Top-level keys: `session_id`, `facts`, `updated_at`
+
+#### 4. Fact Persistence ✅ PASS
+- **Test:** `test_save_persists_fact_to_disk`
+- **Result:** Fact data correctly persisted with all required fields
+- **Verification:** Fact object contains `text`, `category`, `confidence`, `created_at`, `last_referenced`
+
+#### 5. Persistence Across Load Cycles ✅ PASS
+- **Test:** `test_fact_survives_load_cycle`, `test_multiple_facts_survive_load_cycle`
+- **Result:** Facts survive fresh MemoryStore.load() across new instances
+- **Verification:** All facts (text, category, confidence) preserved correctly
+
+#### 6. Deduplication Logic ✅ PASS
+- **Test:** `test_duplicate_exact_match`, `test_duplicate_case_insensitive`, `test_duplicate_whitespace_normalized`, `test_duplicate_long_text_prefix_match`
+- **Result:** `_is_duplicate()` correctly identifies:
+  - Exact matches
+  - Case-insensitive matches
+  - Whitespace-normalized matches
+  - Prefix matches for long texts (>20 chars)
+- **Verification:** Duplicate facts return `False` from `add_fact()`, only one copy stored
+
+#### 7. Category Boundaries ✅ PASS
+- **Test:** `test_duplicate_different_category_allowed`
+- **Result:** Same text with different category is allowed
+- **Verification:** Both facts stored when categories differ
+
+#### 8. Edge Cases ✅ PASS
+- **Test:** `test_add_empty_text_returns_false`, `test_add_whitespace_only_text_returns_false`, `test_confidence_clamping`
+- **Result:** Empty/whitespace text rejected, confidence clamped to [0.0, 1.0]
+- **Verification:** Invalid input handled gracefully
+
+#### 9. Session Isolation ✅ PASS
+- **Test:** `test_different_sessions_have_different_files`
+- **Result:** Different sessions create different memory files
+- **Verification:** Hash collision prevention working
+
+#### 10. Corrupted JSON Handling ✅ PASS
+- **Test:** `test_load_with_corrupted_json_falls_back_safely`
+- **Result:** Corrupted JSON handled gracefully, falls back to empty state
+- **Verification:** No crashes, clean recovery
+
+### End-to-End Verification
+
+Manual verification script confirms persistence behavior:
+
+```python
+# Create store and add facts
+store = MemoryStore(session_id="verification-test-session")
+store.load()
+store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.9)
+store.add_fact("Lives in Berlin", FactCategory.PERSONAL, 0.95)
+
+# File created: session_aea84c6358f96b54.json
+# JSON structure valid with facts array, session_id, updated_at
+
+# Fresh load cycle
+new_store = MemoryStore(session_id="verification-test-session")
+new_store.load()
+# Result: 2 facts loaded successfully
+
+# Deduplication test
+result = new_store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.9)
+# Result: False (duplicate detected), total facts remains 2
+```
+
+### Findings
+
+✅ **All unit tests pass** - 25/25 tests successful
+✅ **JSON file creation verified** - Files created at correct paths with valid structure
+✅ **Persistence across load cycles confirmed** - Facts survive fresh MemoryStore instances
+✅ **Deduplication logic verified** - Exact, case-insensitive, whitespace-normalized, and prefix matching all work correctly
+✅ **Category boundaries enforced** - Same text with different category allowed
+✅ **Edge cases handled** - Empty text, invalid confidence, corrupted JSON all handled gracefully
+✅ **Session isolation confirmed** - Different sessions create different files
+
+### Production Status
+
+As of 2026-06-10, `data/memory/` directory is **empty** - the MemoryStore feature has never persisted data in production. The unit tests confirm the implementation is correct and ready for use when needed.
+
+### No Code Modifications Required
+
+This is a verification-only task. The MemoryStore implementation (`src/memory/store.py`) and unit tests (`tests/test_memory_store.py`) are both functioning correctly. No bugs found.
+
+---
