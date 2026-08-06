@@ -1,28 +1,112 @@
 {
-  "query_info": {
-    "workflow_template": "pbx-web-build",
-    "namespace": "argo-workflows",
-    "cluster": "iad-ci",
-    "query_date": "2026-08-06",
-    "query_window_start": "2026-07-07",
-    "query_window_days": 30
+  "metadata": {
+    "generated_at": "2026-08-06T12:37:36Z",
+    "date_range_start": "2026-07-07T00:00:00Z",
+    "date_range_end": "2026-08-06T12:37:36Z",
+    "service": "pbx-web",
+    "namespace": "pbx-web",
+    "cluster": "ardenone-cluster",
+    "managed_by": "ArgoCD",
+    "strategy": "Recreate"
   },
-  "workflow_template": {
-    "name": "pbx-web-build",
-    "created": "2026-05-27T02:25:59Z",
-    "exists": true,
-    "parameters": {
-      "git-repo": "jedarden/nixos-asterisk",
-      "branch": "main",
-      "container-path": "pbx-web"
+  "deployments": [
+    {
+      "date": "2026-06-15",
+      "timestamp": "2026-06-15T18:11:38Z",
+      "revision": 6,
+      "replicaSet": "pbx-web-9fc5b5f59",
+      "image": "ronaldraygun/pbx-web:1.0.2",
+      "notes": "Prior to 30-day window"
+    },
+    {
+      "date": "2026-06-21",
+      "timestamp": "2026-06-21T11:13:44Z",
+      "revision": 7,
+      "replicaSet": "pbx-web-69794b7fcc",
+      "image": "ronaldraygun/pbx-web:1.0.4",
+      "notes": "Prior to 30-day window"
+    },
+    {
+      "date": "2026-06-23",
+      "timestamp": "2026-06-23T18:37:39Z",
+      "revision": 8,
+      "replicaSet": "pbx-web-5cc966f86d",
+      "image": "ronaldraygun/pbx-web:1.0.5",
+      "notes": "Prior to 30-day window"
+    },
+    {
+      "date": "2026-06-23",
+      "timestamp": "2026-06-23T18:55:52Z",
+      "revision": 9,
+      "replicaSet": "pbx-web-66f79fd6f9",
+      "image": "ronaldraygun/pbx-web:1.0.6",
+      "notes": "Prior to 30-day window"
+    },
+    {
+      "date": "2026-06-25",
+      "timestamp": "2026-06-25T15:23:48Z",
+      "revision": 10,
+      "replicaSet": "pbx-web-6d86477cdb",
+      "image": "ronaldraygun/pbx-web:1.0.7",
+      "notes": "Prior to 30-day window"
+    },
+    {
+      "date": "2026-07-13",
+      "timestamp": "2026-07-13T18:07:55Z",
+      "event_type": "deployment_rollback",
+      "revision": 11,
+      "replicaSet": "pbx-web-754f4cfdf7",
+      "image": "ronaldraygun/pbx-web:1.0.8",
+      "outcome": "rolled_back",
+      "notes": "Rolled back to 1.0.8 on same day"
+    },
+    {
+      "date": "2026-07-13",
+      "timestamp": "2026-07-13T18:18:07Z",
+      "event_type": "deployment_rollout",
+      "revision": 14,
+      "replicaSet": "pbx-web-5ff68464d",
+      "image": "ronaldraygun/pbx-web:1.0.9",
+      "outcome": "success",
+      "notes": "Initial deployment of revision 14"
+    },
+    {
+      "date": "2026-07-15",
+      "timestamp": "2026-07-15T03:24:40Z",
+      "event_type": "deployment_rollout",
+      "deployment": "pbx-rebuild-relay",
+      "revision": 5,
+      "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+      "image": "python:3-slim",
+      "outcome": "success",
+      "notes": "PBX rebuild relay deployment"
+    },
+    {
+      "date": "2026-07-27",
+      "timestamp": "2026-07-27T17:56:07Z",
+      "event_type": "deployment_rollout",
+      "deployment": "lab-rebuild-relay",
+      "revision": 2,
+      "replicaSet": "lab-rebuild-relay-79957dbd4",
+      "image": "python:3-slim",
+      "outcome": "success",
+      "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
+      "pod_ready": true,
+      "restart_count": 0,
+      "notes": "Lab rebuild relay deployment"
+    },
+    {
+      "date": "2026-07-28",
+      "timestamp": "2026-07-28T17:26:12Z",
+      "event_type": "deployment_rollout",
+      "revision": 14,
+      "replicaSet": "pbx-web-5ff68464d",
+      "image": "ronaldraygun/pbx-web:1.0.9",
+      "outcome": "success",
+      "pod_name": "pbx-web-5ff68464d-mkn8n",
+      "pod_ready": true,
+      "restart_count": 0,
+      "notes": "Current active deployment"
     }
-  },
-  "deployments": [],
-  "summary": {
-    "total_runs": 0,
-    "successful_runs": 0,
-    "failed_runs": 0,
-    "running_runs": 0,
-    "note": "WorkflowTemplate pbx-web-build exists but has never been executed. No deployment data available."
-  }
+  ]
 }
