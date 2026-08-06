@@ -1,0 +1,50 @@
+{
+  "search_metadata": {
+    "query": "pbx-web deployment logs - last 30 days",
+    "search_period_start": "2026-07-07T00:00:00Z",
+    "search_period_end": "2026-08-06T23:59:59Z",
+    "workflow_template": "pbx-web-build",
+    "cluster": "iad-ci",
+    "namespace": "argo-workflows",
+    "queried_at": "2026-08-06T21:00:00Z"
+  },
+  "workflow_template_info": {
+    "name": "pbx-web-build",
+    "created": "2026-05-27T02:25:59Z",
+    "resource_version": "53851372",
+    "templates_count": 3,
+    "entrypoint": "build"
+  },
+  "deployment_runs": [],
+  "summary": {
+    "total_runs": 0,
+    "successful_runs": 0,
+    "failed_runs": 0,
+    "runs_last_30_days": 0,
+    "runs_last_7_days": 0,
+    "runs_last_24_hours": 0
+  },
+  "findings": [
+    "The pbx-web-build workflow template exists and was created on 2026-05-27",
+    "No workflow runs have been recorded for pbx-web-build in the iad-ci cluster",
+    "This indicates that pbx-web deployments are either:",
+    "  - Not automated via Argo Workflows",
+    "  - Deployed using a different method",
+    "  - Deployed to a different cluster",
+    "  - Not deployed within the last 30 days"
+  ],
+  "recommendations": [
+    "Verify if pbx-web is deployed via a different CI/CD system",
+    "Check if deployments go directly to nixos-asterisk cluster without iad-ci workflow",
+    "Investigate deployment logs in the target cluster directly",
+    "Consider implementing Argo Workflows-based deployment if desired"
+  ],
+  "raw_query_result": {
+    "apiVersion": "v1",
+    "items": [],
+    "kind": "List",
+    "metadata": {
+      "resourceVersion": ""
+    }
+  }
+}
