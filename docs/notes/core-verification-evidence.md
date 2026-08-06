@@ -4377,6 +4377,202 @@ The test suite has expanded from 25 to 39 tests, adding comprehensive coverage f
 **Test artifacts:** Full test suite in `tests/test_memory_store.py` (39 tests, 721 lines)  
 **Companion verification:** Integration-level verification requires OPENAI_API_KEY and voice session execution
 
-**Verification completed:** 2026-08-06 09:45 UTC  
+**Verification completed:** 2026-08-06 09:45 UTC
+**Reported by bead:** adc-434h5
+
+---
+
+## Memory extraction - Unit-Level Persistence Verification (2026-08-06 Updated)
+
+**Bead:** adc-434h5
+**Task:** Verify MemoryStore unit-level persistence
+**Test File:** tests/unit/test_memory_store.py
+**Date:** 2026-08-06
+
+### Test Execution
+
+**All 40 unit tests PASSED:**
+
+```bash
+$ .venv/bin/python -m pytest tests/unit/test_memory_store.py -v
+============================== test session starts ==============================
+platform linux -- Python 3.13.5, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/coding/aide-de-camp
+configfile: pytest.ini
+collected 40 items
+
+tests/unit/test_memory_store.py::test_load_initializes_with_empty_facts_list PASSED
+tests/unit/test_memory_store.py::test_load_initializes_with_provided_session_id PASSED
+tests/unit/test_memory_store.py::test_load_initializes_empty_facts_dict PASSED
+tests/unit/test_memory_store.py::test_add_fact_appends_to_in_memory_facts_list PASSED
+tests/unit/test_memory_store.py::test_add_fact_increments_facts_counter PASSED
+tests/unit/test_memory_store.py::test_multiple_add_fact_calls_accumulate_correctly PASSED
+tests/unit/test_memory_store.py::test_add_fact_returns_false_for_duplicate_without_changing_counter PASSED
+tests/unit/test_memory_store.py::test_add_fact_on_empty_store PASSED
+tests/unit/test_memory_store.py::test_facts_list_order_preserved_on_multiple_adds PASSED
+tests/unit/test_memory_store.py::test_save_creates_directory_if_missing PASSED
+tests/unit/test_memory_store.py::test_save_creates_json_file_at_correct_path PASSED
+tests/unit/test_memory_store.py::test_save_writes_facts_in_correct_json_structure PASSED
+tests/unit/test_memory_store.py::test_save_file_content_matches_memory_store_state PASSED
+tests/unit/test_memory_store.py::test_save_includes_updated_at_field PASSED
+tests/unit/test_memory_store.py::test_save_includes_session_id PASSED
+tests/unit/test_memory_store.py::test_save_with_empty_facts PASSED
+tests/unit/test_memory_store.py::test_save_with_multiple_facts PASSED
+tests/unit/test_memory_store.py::test_save_fact_category_is_enum_value PASSED
+tests/unit/test_memory_store.py::test_save_overwrites_existing_file PASSED
+tests/unit/test_memory_store.py::test_load_reads_existing_json_file PASSED
+tests/unit/test_memory_store.py::test_load_with_empty_json_file PASSED
+tests/unit/test_memory_store.py::test_load_with_malformed_fact_entry PASSED
+tests/unit/test_memory_store.py::test_load_with_missing_facts_field PASSED
+tests/unit/test_memory_store.py::test_load_with_missing_session_id PASSED
+tests/unit/test_memory_store.py::test_is_duplicate_detects_exact_match PASSED
+tests/unit/test_memory_store.py::test_is_duplicate_detects_normalized_match PASSED
+tests/unit/test_memory_store.py::test_is_duplicate_different_category_not_duplicate PASSED
+tests/unit/test_memory_store.py::test_is_duplicate_detects_long_text_overlap PASSED
+tests/unit/test_memory_store.py::test_is_duplicate_short_text_no_overlap PASSED
+tests/unit/test_memory_store.py::test_is_duplicate_no_facts PASSED
+tests/unit/test_memory_store.py::test_add_fact_skips_duplicate_exact_match PASSED
+tests/unit/test_memory_store.py::test_add_fact_skips_duplicate_normalized_match PASSED
+tests/unit/test_memory_store.py::test_add_fact_allows_same_text_different_category PASSED
+tests/unit/test_memory_store.py::test_add_fact_after_load_from_persisted_file PASSED
+tests/unit/test_memory_store.py::test_round_trip_save_load_preserves_facts PASSED
+tests/unit/test_memory_store.py::test_round_trip_preserves_metadata PASSED
+tests/unit/test_memory_store.py::test_round_trip_with_empty_facts PASSED
+tests/unit/test_memory_store.py::test_round_trip_preserves_session_id PASSED
+tests/unit/test_memory_store.py::test_round_trip_multiple_cycles PASSED
+tests/unit/test_memory_store.py::test_round_trip_preserves_fact_order PASSED
+
+============================== 40 passed in 0.08s ==============================
+```
+
+### Acceptance Criteria Verification
+
+#### ✅ Unit tests for load(), add_fact(), save() pass
+All 40 tests in tests/unit/test_memory_store.py pass successfully, covering:
+- load() initialization tests (3 tests)
+- add_fact() in-memory tests (7 tests)
+- save() persistence tests (10 tests)
+- load() from existing JSON tests (5 tests)
+- _is_duplicate() tests (6 tests)
+- deduplication on add_fact() tests (4 tests)
+- round-trip persistence tests (5 tests)
+
+#### ✅ JSON file creation verified
+Tests confirm JSON files are created at the correct path:
+- Path format: `data/memory/session_{sha256(session_id)[:16]}.json`
+- Directory created automatically if missing
+- Files contain valid JSON structure with required fields
+- Verified with actual session files in data/memory/ directory
+
+#### ✅ Deduplication logic verified
+Deduplication tests confirm:
+- Exact match detection works
+- Normalized matching (case-insensitive, whitespace normalization) works
+- Long text overlap detection (>20 chars) works
+- Short text doesn't trigger false positives
+- Different categories allow same text
+- Empty facts list handles correctly
+
+#### ✅ Facts survive fresh MemoryStore load()
+Round-trip tests confirm:
+- Facts persist across save/load cycles
+- Metadata (created_at, last_referenced) preserved
+- Insertion order maintained
+- Multiple cycles work correctly
+- Session ID preserved
+
+#### ✅ Findings appended to docs/notes/core-verification-evidence.md
+This section documents the complete verification results.
+
+### Manual Verification Results
+
+Manual test script confirmed all operations:
+
+```
+=== MemoryStore Persistence Verification ===
+
+Test 1: load() initializes correctly
+✅ PASS: load() initializes with empty facts list and session_id
+
+Test 2: add_fact() adds facts in memory
+✅ PASS: add_fact() adds facts to in-memory list
+
+Test 3: save() persists to JSON file at correct path
+✅ PASS: save() creates session_1e39105fb545628d.json
+
+Test 4: Persisted facts survive fresh MemoryStore load()
+✅ PASS: Fresh MemoryStore load() restores persisted facts
+
+Test 5: _is_duplicate() deduplication works correctly
+  ✅ Detects exact duplicate
+  ✅ Detects normalized duplicates (whitespace/case insensitive)
+  ✅ Different category is not considered duplicate
+  ✅ add_fact() skips duplicates correctly
+
+Test 6: JSON file structure verification
+✅ PASS: JSON structure is correct
+
+=== ALL VERIFICATION TESTS PASSED ===
+```
+
+### Actual Disk Persistence Verification
+
+Verified actual JSON files in data/memory/ directory:
+
+```bash
+$ ls -la data/memory/
+total 32
+drwxrwxr-x 2 coding coding 4096 Aug  6 08:17 .
+drwxrwxr-x 6 coding coding 4096 Aug  6 10:39 ..
+-rw-rw-r-- 1 coding coding  338 Aug  6 07:30 session_05a6bfae1122b9dc.json
+-rw-rw-r-- 1 coding coding  338 Aug  6 07:48 session_13b1eca99b1c2d3e.json
+-rw-rw-r-- 1 coding coding  559 Aug  6 07:48 session_324ba330e0502bac.json
+-rw-rw-r-- 1 coding coding  338 Aug  6 07:48 session_43e7655bc83e8f9c.json
+-rw-rw-r-- 1 coding coding  322 Aug  6 07:48 session_66c6a2c31a33be3a.json
+-rw-rw-r-- 1 coding coding  794 Aug  6 07:48 session_68b57dc8eef5670e.json
+```
+
+Example JSON structure verified:
+```json
+{
+    "facts": [
+        {
+            "text": "User's dog is named Rex",
+            "category": "personal",
+            "confidence": 0.95,
+            "created_at": "2026-08-06T11:30:37.781516+00:00",
+            "last_referenced": "2026-08-06T11:30:37.781516+00:00"
+        }
+    ],
+    "session_id": "test-session-e6a74ae5",
+    "updated_at": "2026-08-06T11:30:37.781566+00:00"
+}
+```
+
+SHA256 hash calculation verified:
+```python
+Session ID: test-session-e6a74ae5
+Expected hash: 05a6bfae1122b9dc
+Expected filename: session_05a6bfae1122b9dc.json
+File exists: True
+```
+
+### Conclusions
+
+**MemoryStore unit-level persistence is production-ready:**
+
+1. **Comprehensive test coverage:** 40 tests cover all operations, edge cases, and error paths
+2. **Robust persistence:** Facts survive save/load cycles with correct serialization
+3. **Proper deduplication:** Duplicate detection works with text normalization and category awareness
+4. **Graceful error handling:** Corrupted/missing JSON files handled safely
+5. **Session isolation:** Each session gets unique hash-based filename (16-character SHA256 prefix)
+6. **Valid JSON structure:** All required fields present with correct types
+7. **Actual disk persistence:** Verified with real session files in data/memory/
+
+**No code modifications required.** All acceptance criteria met through unit test verification.
+
+**Test artifacts:** Full test suite in `tests/unit/test_memory_store.py` (908 lines, 40 tests)
+**Execution time:** 0.08s (all tests)
+**Verification completed:** 2026-08-06 10:40 UTC
 **Reported by bead:** adc-434h5
 
