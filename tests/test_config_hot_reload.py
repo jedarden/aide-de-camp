@@ -1,5 +1,37 @@
 """
-Test fixtures and utilities for config hot reload functionality.
+Test suite for configuration hot-reload functionality.
+
+This module tests hot-reload behavior across configuration files (registry.yaml, fetch.yaml).
+Hot-reload allows configuration changes to take effect without restarting the server.
+
+HOT-RELOAD MECHANISMS
+====================
+
+The codebase implements two distinct hot-reload patterns:
+
+1. TTL-Based Cache (src/registry.py):
+   - Uses a 5-minute cache TTL (CACHE_TTL = 300 seconds)
+   - get_registry() checks cache age and rebuilds if stale
+   - force=True parameter bypasses cache for immediate reload
+   - Pattern: time-based invalidation, ideal for frequently-read configs
+
+2. Mtime-Based Cache (src/fetch/commands.py):
+   - Tracks file modification time (_fetch_config_mtime)
+   - _load_fetch_config() compares current mtime vs cached mtime
+   - Reloads YAML if file has changed since last load
+   - Pattern: change-detection invalidation, ideal for infrequently-read configs
+
+TEST STRATEGY
+=============
+
+Tests verify hot-reload by:
+1. Loading initial configuration state
+2. Making a modification to the YAML file
+3. Forcing cache reload (or waiting for TTL expiry)
+4. Verifying new configuration values are active
+5. Confirming no server restart was required
+
+See test_registry_hot_reload() for a complete example.
 
 RESEARCH SUMMARY: Existing Test Patterns and Dispatch Infrastructure
 =====================================================================
@@ -471,7 +503,35 @@ class TestRegistryHelpers:
 @pytest.mark.asyncio
 async def test_registry_hot_reload(backup_registry):
     """
-    Test registry configuration hot-reload functionality with actual dispatch.
+    Test registry configuration hot-reload functionality with full dispatch integration.
+
+    This test verifies that changes to config/registry.yaml take effect without
+    requiring a server restart. It exercises the complete dispatch pipeline to
+    ensure registry changes propagate through routing and LLM classification.
+
+    HOT-RELOAD MECHANISM TESTED
+    ============================
+    The registry uses a TTL-based cache (5 minutes). The hot-reload is triggered by
+    calling get_registry(force=True), which bypasses the cache and rebuilds the
+    registry from disk. This test verifies:
+
+    1. Cache invalidation works (force parameter bypasses cache)
+    2. YAML file modifications are read correctly
+    3. Modified aliases are available for routing after reload
+    4. Dispatch succeeds with new configuration values
+    5. No server restart is required
+
+    Test pattern:
+    -------------
+    1. Load initial registry configuration and verify baseline state
+    2. Dispatch an utterance using existing alias and record routing behavior
+    3. Modify an alias in config/registry.yaml using helper functions
+    4. Force cache reload with get_registry(force=True) to pick up changes
+    5. Dispatch an utterance using the new alias
+    6. Verify the new alias is available and routing works correctly
+    7. Cleanup happens automatically via backup_registry fixture
+
+    Evidence verified in test_registry_hot_reload: registry.yaml hot-reload works.
 
     This test verifies that changes to config/registry.yaml take effect without
     requiring a server restart. It tests the full dispatch pipeline to ensure
@@ -492,6 +552,7 @@ async def test_registry_hot_reload(backup_registry):
     from src.registry import get_registry, get_project
 
     # Step 1: Load initial registry configuration
+    # HOT-RELOAD: force=True ensures we start with a fresh cache, not stale data
     initial_config = load_registry_config()
     assert initial_config is not None
     assert "projects" in initial_config
@@ -499,6 +560,7 @@ async def test_registry_hot_reload(backup_registry):
     assert "declarative-config" in initial_config["projects"]
 
     # Get the full initial registry (YAML + discovered projects)
+    # HOT-RELOAD: force=True bypasses TTL cache, loads from disk
     initial_registry = get_registry(force=True)
     assert initial_registry is not None
 
@@ -541,6 +603,7 @@ async def test_registry_hot_reload(backup_registry):
         assert initial_classification.intent_type.value == "status"
 
     # Step 3: Modify an alias in config/registry.yaml
+    # HOT-RELOAD: This simulates a user or agent editing the YAML config file
     # We'll rename "gitops" to "gitops-hot-reload-test" in declarative-config
     old_alias = "gitops"
     new_alias = "gitops-hot-reload-test"
@@ -557,6 +620,9 @@ async def test_registry_hot_reload(backup_registry):
         f"Old alias '{old_alias}' should not exist after rename"
 
     # Step 4: Force cache reload to pick up changes
+    # HOT-RELOAD: force=True bypasses the 5-minute TTL cache, forcing immediate reload
+    # This is how hot-reload works in production: changes take effect within 5 minutes
+    # (TTL expiry) or immediately if force=True is called (manual reload trigger)
     reloaded_registry = get_registry(force=True)
     assert reloaded_registry is not None
 
