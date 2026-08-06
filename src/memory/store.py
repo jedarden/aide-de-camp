@@ -94,11 +94,23 @@ class MemoryStore:
             self.logger.debug(f"Failed to load memory: {e}")
             self._data = {"facts": [], "session_id": self.session_id}
 
-        # Load facts
+        # Ensure session_id is present (handle missing/null/empty cases)
+        if not self._data.get("session_id"):
+            self._data["session_id"] = self.session_id
+
+        # Ensure facts field exists and is a list
+        if not isinstance(self._data.get("facts"), list):
+            self._data["facts"] = []
+
+        # Load facts with graceful error handling
         self._facts = []
         for f in self._data.get("facts", []):
             if isinstance(f, dict):
-                self._facts.append(Fact.from_dict(f))
+                try:
+                    self._facts.append(Fact.from_dict(f))
+                except (KeyError, ValueError, TypeError) as e:
+                    # Skip malformed fact entries
+                    self.logger.debug(f"Skipping malformed fact: {e}")
 
         self.logger.debug(f"Loaded {len(self._facts)} facts from memory")
 

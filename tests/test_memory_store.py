@@ -489,3 +489,153 @@ def test_file_path_uses_correct_hash_length(store: MemoryStore) -> None:
 
     assert len(hash_part) == 16, "Hash should be exactly 16 characters"
     assert hash_part.isalnum(), "Hash should be alphanumeric"
+
+
+# --- additional load() edge case tests (bead adc-hxc18) ----------------------
+
+
+def test_load_with_missing_facts_field(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test load() handles JSON missing 'facts' field gracefully."""
+    # Create a file with valid JSON but missing 'facts' field
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({"session_id": store.session_id}, f)
+
+    store.load()
+
+    # Should fall back to empty facts list
+    assert store._facts == []
+    assert store._data.get("session_id") == store.session_id
+
+
+def test_load_with_missing_session_id_field(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test load() handles JSON missing 'session_id' field gracefully."""
+    # Create a file with valid JSON but missing 'session_id' field
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({"facts": []}, f)
+
+    store.load()
+
+    # Should initialize with current session_id
+    assert store._data.get("session_id") == store.session_id
+    assert store._facts == []
+
+
+def test_load_with_empty_facts_array(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test load() correctly handles JSON with empty facts array."""
+    # Create a file with empty facts array
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": []
+        }, f)
+
+    store.load()
+
+    # Should load with empty facts
+    assert store._facts == []
+    assert len(store._facts) == 0
+
+
+def test_load_with_invalid_fact_structure(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test load() handles facts with invalid/missing fields gracefully."""
+    # Create a file with malformed fact data
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": [
+                {"text": "Valid fact", "category": "preference", "confidence": 0.8,
+                 "created_at": "2024-01-01T00:00:00Z", "last_referenced": "2024-01-01T00:00:00Z"},
+                {"text": "Missing fields"},  # Invalid fact
+                None,  # Not a dict
+                "string_instead_of_dict",  # Wrong type
+                {"text": "Partial fact", "category": "context"}  # Missing required fields
+            ]
+        }, f)
+
+    store.load()
+
+    # Should load only the valid fact and skip invalid ones
+    assert len(store._facts) == 1
+    assert store._facts[0].text == "Valid fact"
+    assert store._facts[0].category == FactCategory.PREFERENCE
+
+
+def test_load_with_extra_unknown_fields(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test load() handles JSON with extra/unknown fields gracefully."""
+    # Create a file with extra fields
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": [],
+            "unknown_field": "some_value",
+            "another_unknown": 123,
+            "nested": {"key": "value"}
+        }, f)
+
+    store.load()
+
+    # Should load successfully, ignoring extra fields
+    assert store._facts == []
+    assert store._data.get("session_id") == store.session_id
+
+
+def test_load_with_null_session_id(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test load() handles JSON with null session_id."""
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": None,
+            "facts": []
+        }, f)
+
+    store.load()
+
+    # Should use the store's session_id
+    assert store._data.get("session_id") == store.session_id
+
+
+def test_load_with_facts_as_non_list(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test load() handles JSON where 'facts' is not a list."""
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": "not_a_list"
+        }, f)
+
+    store.load()
+
+    # Should fall back to empty list
+    assert store._facts == []
+
+
+def test_session_id_persists_across_load(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test that session_id is correctly stored and retrieved."""
+    store.load()
+    store.add_fact("Test fact", FactCategory.CONTEXT, 0.8)
+
+    # Read the file directly to verify session_id is stored
+    with open(store.file_path, "r") as f:
+        data = json.load(f)
+
+    assert data["session_id"] == store.session_id
+    assert isinstance(data["session_id"], str)
+    assert len(data["session_id"]) > 0
+
+
+def test_load_from_empty_json_object(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test load() handles completely empty JSON object."""
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({}, f)
+
+    store.load()
+
+    # Should initialize with defaults
+    assert store._facts == []
+    assert store._data.get("session_id") == store.session_id

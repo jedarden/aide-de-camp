@@ -1,0 +1,24 @@
+{
+  "name": "whisper-openai-68966786fb-jsb5d",
+  "createdAt": "2026-06-14T04:55:49Z",
+  "restartCount": 0,
+  "state": {
+    "running": {
+      "startedAt": "2026-06-14T04:56:34Z"
+    }
+  },
+  "ready": true,
+  "image": "localhost:7439/fedirz/faster-whisper-server:latest-cpu"
+}
+{
+  "name": "whisper-stt-847fd8d7b9-v2rs5",
+  "createdAt": "2026-07-12T16:53:42Z",
+  "restartCount": 0,
+  "state": {
+    "running": {
+      "startedAt": "2026-07-12T16:53:55Z"
+    }
+  },
+  "ready": true,
+  "image": "ronaldraygun/whisper-stt:1.8.6"
+}
