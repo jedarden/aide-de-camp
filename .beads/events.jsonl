@@ -1341,3 +1341,6 @@
 {"bead":"adc-1u4yi","duration_ms":193107,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-06T17:16:30.774512104+00:00","worker":"hotel"}
 {"bead":"adc-2u9hm","event":"claim","strand":"auto","ts":"2026-08-06T17:16:30.842462615+00:00","worker":"hotel"}
 {"adapter":"claude-code-glm-4.7","bead":"adc-2u9hm","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-06T17:16:30.846687232+00:00","worker":"hotel"}
+{"bead":"adc-48lbk","duration_ms":600223,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-06T17:16:53.443860196+00:00","worker":"delta"}
+{"bead":"adc-48lbk","event":"claim","strand":"auto","ts":"2026-08-06T17:16:53.496093684+00:00","worker":"delta"}
+{"adapter":"claude-code-glm-4.7","bead":"adc-48lbk","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-06T17:16:53.502967724+00:00","worker":"delta"}
