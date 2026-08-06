@@ -1,23 +1,32 @@
 [
   {
-    "name": "pbx-web-765bb76db8",
-    "revision": "13",
-    "creationTimestamp": "2026-07-28T17:05:51Z",
+    "deployment_id": "pbx-web",
+    "timestamp": "2026-05-01T14:28:11Z",
+    "finished_at": null,
     "image": "ronaldraygun/pbx-web:1.0.9",
-    "was_deployed": true
+    "image_tag": "1.0.9",
+    "revision": "current",
+    "status": "active",
+    "replicas": 1,
+    "ready_replicas": 1,
+    "deployment_type": "argocd_rollout",
+    "service": "pbx-web",
+    "namespace": "pbx-web",
+    "age_days": 97
   },
   {
-    "name": "pbx-web-5ff68464d",
-    "revision": "14",
-    "creationTimestamp": "2026-07-13T18:18:07Z",
-    "image": "ronaldraygun/pbx-web:1.0.9",
-    "was_deployed": true
-  },
-  {
-    "name": "pbx-web-754f4cfdf7",
-    "revision": "11",
-    "creationTimestamp": "2026-07-13T18:07:55Z",
-    "image": "ronaldraygun/pbx-web:1.0.8",
-    "was_deployed": true
+    "deployment_id": "pbx-rebuild-relay",
+    "timestamp": "2026-05-02T11:21:29Z",
+    "finished_at": null,
+    "image": "python:3-slim",
+    "image_tag": "3-slim",
+    "revision": "current",
+    "status": "active",
+    "replicas": 1,
+    "ready_replicas": 1,
+    "deployment_type": "argocd_rollout",
+    "service": "pbx-web",
+    "namespace": "pbx-web",
+    "age_days": 96
   }
 ]
