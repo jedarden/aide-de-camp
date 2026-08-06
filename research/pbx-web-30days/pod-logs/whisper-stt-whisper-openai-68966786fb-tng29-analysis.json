@@ -1,0 +1,29 @@
+{
+  "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/whisper-stt-whisper-openai-68966786fb-tng29.log",
+  "file_name": "whisper-stt-whisper-openai-68966786fb-tng29.log",
+  "analysis_date": "2026-08-06T13:40:21.623256",
+  "total_lines": 0,
+  "patterns": {
+    "startup": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "oom_kill": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "error": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "performance": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    }
+  },
+  "summary": []
+}

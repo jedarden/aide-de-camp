@@ -1,0 +1,683 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pbx-web:apps/Deployment:pbx-web/lab-rebuild-relay",
+                    "configmap.reloader.stakater.com/reload": "pbx-rebuild-relay-script",
+                    "deployment.kubernetes.io/revision": "1",
+                    "secret.reloader.stakater.com/reload": "lab-rebuild-relay"
+                },
+                "creationTimestamp": "2026-05-02T20:26:55Z",
+                "generation": 2,
+                "labels": {
+                    "app.kubernetes.io/component": "webhook-relay",
+                    "app.kubernetes.io/name": "lab-rebuild-relay"
+                },
+                "name": "lab-rebuild-relay",
+                "namespace": "pbx-web",
+                "resourceVersion": "610177607",
+                "uid": "c523dfb8-57a7-41ce-bf49-97f616b6f1d6"
+            },
+            "spec": {
+                "progressDeadlineSeconds": 600,
+                "replicas": 1,
+                "revisionHistoryLimit": 3,
+                "selector": {
+                    "matchLabels": {
+                        "app": "lab-rebuild-relay"
+                    }
+                },
+                "strategy": {
+                    "rollingUpdate": {
+                        "maxSurge": "25%",
+                        "maxUnavailable": "25%"
+                    },
+                    "type": "RollingUpdate"
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "app": "lab-rebuild-relay",
+                            "app.kubernetes.io/name": "lab-rebuild-relay"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "python3",
+                                    "/scripts/relay.py"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "GITHUB_WEBHOOK_SECRET",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "github-webhook-secret",
+                                                "name": "lab-rebuild-relay"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "PBX_REBUILD_TOKEN",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "lab-rebuild-token",
+                                                "name": "lab-rebuild-relay"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "PBX_REBUILD_URL",
+                                        "value": "http://lab-rebuild-egress.pbx-web.svc.cluster.local:8761/rebuild"
+                                    },
+                                    {
+                                        "name": "REPO_FILTER",
+                                        "value": "declarative-config"
+                                    },
+                                    {
+                                        "name": "WEBHOOK_PATH",
+                                        "value": "/github-webhook-lab"
+                                    },
+                                    {
+                                        "name": "PORT",
+                                        "value": "9001"
+                                    }
+                                ],
+                                "image": "python:3-slim",
+                                "imagePullPolicy": "IfNotPresent",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 9001,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "relay",
+                                "ports": [
+                                    {
+                                        "containerPort": 9001,
+                                        "name": "webhook",
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 9001,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 5,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "100m",
+                                        "memory": "128Mi"
+                                    },
+                                    "requests": {
+                                        "cpu": "5m",
+                                        "memory": "32Mi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/scripts",
+                                        "name": "scripts",
+                                        "readOnly": true
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {
+                            "runAsGroup": 1000,
+                            "runAsNonRoot": true,
+                            "runAsUser": 1000
+                        },
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "configMap": {
+                                    "defaultMode": 365,
+                                    "name": "pbx-rebuild-relay-script"
+                                },
+                                "name": "scripts"
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "availableReplicas": 1,
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-07-28T02:45:37Z",
+                        "lastUpdateTime": "2026-07-28T02:45:37Z",
+                        "message": "ReplicaSet \"lab-rebuild-relay-79d6d858bb\" has successfully progressed.",
+                        "reason": "NewReplicaSetAvailable",
+                        "status": "True",
+                        "type": "Progressing"
+                    },
+                    {
+                        "lastTransitionTime": "2026-08-05T12:47:18Z",
+                        "lastUpdateTime": "2026-08-05T12:47:18Z",
+                        "message": "Deployment has minimum availability.",
+                        "reason": "MinimumReplicasAvailable",
+                        "status": "True",
+                        "type": "Available"
+                    }
+                ],
+                "observedGeneration": 2,
+                "readyReplicas": 1,
+                "replicas": 1,
+                "updatedReplicas": 1
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pbx-web:apps/Deployment:pbx-web/pbx-rebuild-relay",
+                    "configmap.reloader.stakater.com/reload": "pbx-rebuild-relay-script",
+                    "deployment.kubernetes.io/revision": "4",
+                    "secret.reloader.stakater.com/reload": "pbx-rebuild-relay"
+                },
+                "creationTimestamp": "2026-05-02T11:20:30Z",
+                "generation": 5,
+                "labels": {
+                    "app.kubernetes.io/component": "webhook-relay",
+                    "app.kubernetes.io/name": "pbx-rebuild-relay"
+                },
+                "name": "pbx-rebuild-relay",
+                "namespace": "pbx-web",
+                "resourceVersion": "610177624",
+                "uid": "1d02e3fc-c835-438f-8299-7afa3a15db0a"
+            },
+            "spec": {
+                "progressDeadlineSeconds": 600,
+                "replicas": 1,
+                "revisionHistoryLimit": 3,
+                "selector": {
+                    "matchLabels": {
+                        "app": "pbx-rebuild-relay"
+                    }
+                },
+                "strategy": {
+                    "rollingUpdate": {
+                        "maxSurge": "25%",
+                        "maxUnavailable": "25%"
+                    },
+                    "type": "RollingUpdate"
+                },
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "kubectl.kubernetes.io/restartedAt": "2026-05-02T11:45:00Z"
+                        },
+                        "creationTimestamp": null,
+                        "labels": {
+                            "app": "pbx-rebuild-relay",
+                            "app.kubernetes.io/name": "pbx-rebuild-relay"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "python3",
+                                    "/scripts/relay.py"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "STAKATER_PBX_REBUILD_RELAY_SCRIPT_CONFIGMAP",
+                                        "value": "a3d953c67c3a3f55b100df6996241ec8345b8f8f"
+                                    },
+                                    {
+                                        "name": "GITHUB_WEBHOOK_SECRET",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "github-webhook-secret",
+                                                "name": "pbx-rebuild-relay"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "PBX_REBUILD_TOKEN",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "pbx-rebuild-token",
+                                                "name": "pbx-rebuild-relay"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "PBX_REBUILD_URL",
+                                        "value": "http://pbx-rebuild-egress.pbx-web.svc.cluster.local:8761/rebuild"
+                                    },
+                                    {
+                                        "name": "REPO_FILTER",
+                                        "value": "nixos-asterisk"
+                                    },
+                                    {
+                                        "name": "PORT",
+                                        "value": "9001"
+                                    }
+                                ],
+                                "image": "python:3-slim",
+                                "imagePullPolicy": "IfNotPresent",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 9001,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "relay",
+                                "ports": [
+                                    {
+                                        "containerPort": 9001,
+                                        "name": "webhook",
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 9001,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 5,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "100m",
+                                        "memory": "128Mi"
+                                    },
+                                    "requests": {
+                                        "cpu": "5m",
+                                        "memory": "32Mi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/scripts",
+                                        "name": "scripts",
+                                        "readOnly": true
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {
+                            "runAsGroup": 1000,
+                            "runAsNonRoot": true,
+                            "runAsUser": 1000
+                        },
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "configMap": {
+                                    "defaultMode": 365,
+                                    "name": "pbx-rebuild-relay-script"
+                                },
+                                "name": "scripts"
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "availableReplicas": 1,
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-07-28T02:45:25Z",
+                        "lastUpdateTime": "2026-07-28T02:45:25Z",
+                        "message": "ReplicaSet \"pbx-rebuild-relay-8596977857\" has successfully progressed.",
+                        "reason": "NewReplicaSetAvailable",
+                        "status": "True",
+                        "type": "Progressing"
+                    },
+                    {
+                        "lastTransitionTime": "2026-08-05T12:47:18Z",
+                        "lastUpdateTime": "2026-08-05T12:47:18Z",
+                        "message": "Deployment has minimum availability.",
+                        "reason": "MinimumReplicasAvailable",
+                        "status": "True",
+                        "type": "Available"
+                    }
+                ],
+                "observedGeneration": 5,
+                "readyReplicas": 1,
+                "replicas": 1,
+                "updatedReplicas": 1
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "pbx-web:apps/Deployment:pbx-web/pbx-web",
+                    "deployment.kubernetes.io/revision": "13",
+                    "secret.reloader.stakater.com/reload": "pbx-web-auth,garage-pbx-creds"
+                },
+                "creationTimestamp": "2026-05-01T20:50:07Z",
+                "generation": 13,
+                "labels": {
+                    "app.kubernetes.io/component": "web",
+                    "app.kubernetes.io/name": "pbx-web"
+                },
+                "name": "pbx-web",
+                "namespace": "pbx-web",
+                "resourceVersion": "606884471",
+                "uid": "70251fc0-aeba-4ba5-ba13-aae0dd50d28f"
+            },
+            "spec": {
+                "progressDeadlineSeconds": 600,
+                "replicas": 1,
+                "revisionHistoryLimit": 10,
+                "selector": {
+                    "matchLabels": {
+                        "app": "pbx-web"
+                    }
+                },
+                "strategy": {
+                    "type": "Recreate"
+                },
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "kubectl.kubernetes.io/restartedAt": "2026-06-15T18:10:00Z"
+                        },
+                        "creationTimestamp": null,
+                        "labels": {
+                            "app": "pbx-web",
+                            "app.kubernetes.io/component": "web",
+                            "app.kubernetes.io/name": "pbx-web"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "S3_ENDPOINT",
+                                        "value": "http://garage.garage-operator.svc.cluster.local:3900"
+                                    },
+                                    {
+                                        "name": "S3_BUCKET",
+                                        "value": "recordings"
+                                    },
+                                    {
+                                        "name": "S3_ACCESS_KEY",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "access-key",
+                                                "name": "garage-pbx-creds"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "S3_SECRET_KEY",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "secret-key",
+                                                "name": "garage-pbx-creds"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "REBUILD_API_TOKEN",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "key": "api-token",
+                                                "name": "pbx-web-auth"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "PYTHONUNBUFFERED",
+                                        "value": "1"
+                                    }
+                                ],
+                                "image": "ronaldraygun/pbx-web:1.0.9",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 9000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 5
+                                },
+                                "name": "site-generator",
+                                "ports": [
+                                    {
+                                        "containerPort": 9000,
+                                        "name": "rebuild",
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 9000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 5,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 5
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "500m",
+                                        "memory": "512Mi"
+                                    },
+                                    "requests": {
+                                        "cpu": "10m",
+                                        "memory": "128Mi"
+                                    }
+                                },
+                                "securityContext": {
+                                    "runAsNonRoot": true,
+                                    "runAsUser": 1000
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/var/www/calls",
+                                        "name": "www"
+                                    }
+                                ]
+                            },
+                            {
+                                "image": "nginx:alpine",
+                                "imagePullPolicy": "IfNotPresent",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/",
+                                        "port": 80,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "nginx",
+                                "ports": [
+                                    {
+                                        "containerPort": 80,
+                                        "name": "http",
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/",
+                                        "port": 80,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 3,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "100m",
+                                        "memory": "128Mi"
+                                    },
+                                    "requests": {
+                                        "cpu": "5m",
+                                        "memory": "32Mi"
+                                    }
+                                },
+                                "securityContext": {
+                                    "capabilities": {
+                                        "add": [
+                                            "NET_BIND_SERVICE"
+                                        ],
+                                        "drop": [
+                                            "ALL"
+                                        ]
+                                    },
+                                    "runAsNonRoot": true,
+                                    "runAsUser": 101
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/var/www/calls",
+                                        "name": "www"
+                                    },
+                                    {
+                                        "mountPath": "/etc/nginx/conf.d",
+                                        "name": "nginx-conf"
+                                    },
+                                    {
+                                        "mountPath": "/var/cache/nginx",
+                                        "name": "nginx-cache"
+                                    },
+                                    {
+                                        "mountPath": "/var/run",
+                                        "name": "nginx-run"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {
+                            "fsGroup": 101
+                        },
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "emptyDir": {},
+                                "name": "www"
+                            },
+                            {
+                                "configMap": {
+                                    "defaultMode": 420,
+                                    "name": "pbx-web-nginx-conf"
+                                },
+                                "name": "nginx-conf"
+                            },
+                            {
+                                "emptyDir": {
+                                    "medium": "Memory",
+                                    "sizeLimit": "16Mi"
+                                },
+                                "name": "nginx-cache"
+                            },
+                            {
+                                "emptyDir": {
+                                    "medium": "Memory",
+                                    "sizeLimit": "8Mi"
+                                },
+                                "name": "nginx-run"
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastTransitionTime": "2026-05-01T20:50:09Z",
+                        "lastUpdateTime": "2026-05-01T20:50:09Z",
+                        "message": "Deployment does not have minimum availability.",
+                        "reason": "MinimumReplicasUnavailable",
+                        "status": "False",
+                        "type": "Available"
+                    },
+                    {
+                        "lastTransitionTime": "2026-07-28T17:36:41Z",
+                        "lastUpdateTime": "2026-07-28T17:36:41Z",
+                        "message": "ReplicaSet \"pbx-web-5ff68464d\" has timed out progressing.",
+                        "reason": "ProgressDeadlineExceeded",
+                        "status": "False",
+                        "type": "Progressing"
+                    }
+                ],
+                "observedGeneration": 13,
+                "replicas": 1,
+                "unavailableReplicas": 1,
+                "updatedReplicas": 1
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

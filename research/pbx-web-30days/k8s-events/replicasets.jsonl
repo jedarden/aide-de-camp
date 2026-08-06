@@ -1,0 +1,88 @@
+{
+  "name": "pbx-web-765bb76db8",
+  "created": "2026-07-28T17:05:51Z",
+  "revision": "13",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.9"
+}
+{
+  "name": "pbx-web-5ff68464d",
+  "created": "2026-07-13T18:18:07Z",
+  "revision": "14",
+  "replicas": 1,
+  "readyReplicas": 1,
+  "image": "ronaldraygun/pbx-web:1.0.9"
+}
+{
+  "name": "pbx-web-754f4cfdf7",
+  "created": "2026-07-13T18:07:55Z",
+  "revision": "11",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.8"
+}
+{
+  "name": "pbx-web-6d86477cdb",
+  "created": "2026-06-25T15:23:48Z",
+  "revision": "10",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.7"
+}
+{
+  "name": "pbx-web-66f79fd6f9",
+  "created": "2026-06-23T18:55:52Z",
+  "revision": "9",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.6"
+}
+{
+  "name": "pbx-web-5cc966f86d",
+  "created": "2026-06-23T18:37:39Z",
+  "revision": "8",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.5"
+}
+{
+  "name": "pbx-web-69794b7fcc",
+  "created": "2026-06-21T11:13:44Z",
+  "revision": "7",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.4"
+}
+{
+  "name": "pbx-web-9fc5b5f59",
+  "created": "2026-06-15T18:11:38Z",
+  "revision": "6",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.2"
+}
+{
+  "name": "pbx-web-85858b7dd4",
+  "created": "2026-05-11T18:17:51Z",
+  "revision": "5",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.2"
+}
+{
+  "name": "pbx-web-5cc44d5c4c",
+  "created": "2026-05-07T18:57:22Z",
+  "revision": "4",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.1"
+}
+{
+  "name": "pbx-web-5488fd45c8",
+  "created": "2026-05-07T18:40:16Z",
+  "revision": "3",
+  "replicas": 0,
+  "readyReplicas": null,
+  "image": "ronaldraygun/pbx-web:1.0.0"
+}

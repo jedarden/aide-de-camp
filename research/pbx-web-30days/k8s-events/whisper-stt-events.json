@@ -1,0 +1,9 @@
+{
+    "apiVersion": "v1",
+    "items": [],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
+Error from server (BadRequest): Unable to find "/v1, Resource=events" that match label selector "", field selector "lastTimestamp": invalid selector: 'lastTimestamp'; can't understand 'lastTimestamp'

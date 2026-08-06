@@ -1,0 +1,29 @@
+{
+  "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log",
+  "file_name": "pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log",
+  "analysis_date": "2026-08-06T13:40:20.858349",
+  "total_lines": 36223,
+  "patterns": {
+    "startup": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "oom_kill": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "error": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "performance": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    }
+  },
+  "summary": []
+}

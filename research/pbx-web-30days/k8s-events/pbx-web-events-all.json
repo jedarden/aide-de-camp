@@ -1,0 +1,252 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "action": "ClusterIPAllocation",
+            "apiVersion": "v1",
+            "eventTime": "2026-08-06T17:10:59.674267Z",
+            "firstTimestamp": null,
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "name": "lab-rebuild-egress",
+                "namespace": "pbx-web",
+                "resourceVersion": "610765967",
+                "uid": "25afe3b4-b1cc-448f-8408-a2b051984b44"
+            },
+            "kind": "Event",
+            "lastTimestamp": null,
+            "message": "Cluster IP [IPv4]: 10.43.13.16 is not allocated; repairing",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T17:10:59Z",
+                "name": "lab-rebuild-egress.18c94683edda47fe",
+                "namespace": "pbx-web",
+                "resourceVersion": "610765968",
+                "uid": "2b018934-6b33-409b-bcde-17cc1c804a02"
+            },
+            "reason": "ClusterIPNotAllocated",
+            "reportingComponent": "ipallocator-repair-controller",
+            "reportingInstance": "ipallocator-repair-controller-k3s-manager",
+            "source": {},
+            "type": "Warning"
+        },
+        {
+            "action": "ClusterIPAllocation",
+            "apiVersion": "v1",
+            "eventTime": "2026-08-06T17:11:52.874282Z",
+            "firstTimestamp": null,
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "name": "lab-rebuild-egress",
+                "namespace": "pbx-web",
+                "resourceVersion": "610766933",
+                "uid": "25afe3b4-b1cc-448f-8408-a2b051984b44"
+            },
+            "kind": "Event",
+            "lastTimestamp": null,
+            "message": "Cluster IP [IPv4]: 10.43.244.49 is not allocated; repairing",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T17:11:52Z",
+                "name": "lab-rebuild-egress.18c9469050d21cfa",
+                "namespace": "pbx-web",
+                "resourceVersion": "610766935",
+                "uid": "758d4d71-21e3-4752-b768-65e1b35bc56e"
+            },
+            "reason": "ClusterIPNotAllocated",
+            "reportingComponent": "ipallocator-repair-controller",
+            "reportingInstance": "ipallocator-repair-controller-k3s-manager",
+            "source": {},
+            "type": "Warning"
+        },
+        {
+            "action": "ClusterIPAllocation",
+            "apiVersion": "v1",
+            "eventTime": "2026-08-06T17:14:01.715002Z",
+            "firstTimestamp": null,
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "name": "lab-rebuild-egress",
+                "namespace": "pbx-web",
+                "resourceVersion": "610768000",
+                "uid": "25afe3b4-b1cc-448f-8408-a2b051984b44"
+            },
+            "kind": "Event",
+            "lastTimestamp": null,
+            "message": "Cluster IP [IPv4]: 10.43.68.53 is not allocated; repairing",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T17:14:01Z",
+                "name": "lab-rebuild-egress.18c946ae50537ec4",
+                "namespace": "pbx-web",
+                "resourceVersion": "610768002",
+                "uid": "2a1e0547-df08-49e5-a343-ac26cbab60da"
+            },
+            "reason": "ClusterIPNotAllocated",
+            "reportingComponent": "ipallocator-repair-controller",
+            "reportingInstance": "ipallocator-repair-controller-k3s-manager",
+            "source": {},
+            "type": "Warning"
+        },
+        {
+            "action": "ClusterIPAllocation",
+            "apiVersion": "v1",
+            "eventTime": "2026-08-06T17:16:45.342322Z",
+            "firstTimestamp": null,
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "name": "lab-rebuild-egress",
+                "namespace": "pbx-web",
+                "resourceVersion": "610768838",
+                "uid": "25afe3b4-b1cc-448f-8408-a2b051984b44"
+            },
+            "kind": "Event",
+            "lastTimestamp": null,
+            "message": "Cluster IP [IPv4]: 10.43.76.62 is not allocated; repairing",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T17:16:45Z",
+                "name": "lab-rebuild-egress.18c946d469463e58",
+                "namespace": "pbx-web",
+                "resourceVersion": "610768839",
+                "uid": "0cf72d4c-4bf6-4050-987c-f386998e00cc"
+            },
+            "reason": "ClusterIPNotAllocated",
+            "reportingComponent": "ipallocator-repair-controller",
+            "reportingInstance": "ipallocator-repair-controller-k3s-manager",
+            "source": {},
+            "type": "Warning"
+        },
+        {
+            "action": "ClusterIPAllocation",
+            "apiVersion": "v1",
+            "eventTime": "2026-08-06T17:11:52.808783Z",
+            "firstTimestamp": null,
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "name": "pbx-rebuild-egress",
+                "namespace": "pbx-web",
+                "resourceVersion": "610766929",
+                "uid": "5ccffc36-06db-4c6f-918b-65282098f508"
+            },
+            "kind": "Event",
+            "lastTimestamp": null,
+            "message": "Cluster IP [IPv4]: 10.43.121.254 is not allocated; repairing",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T17:11:52Z",
+                "name": "pbx-rebuild-egress.18c946904ceaaa36",
+                "namespace": "pbx-web",
+                "resourceVersion": "610766936",
+                "uid": "dd826beb-954a-4ea3-b76d-9bc1722784a1"
+            },
+            "reason": "ClusterIPNotAllocated",
+            "reportingComponent": "ipallocator-repair-controller",
+            "reportingInstance": "ipallocator-repair-controller-k3s-manager",
+            "source": {},
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 330,
+            "eventTime": null,
+            "firstTimestamp": "2026-08-05T12:47:03Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{site-generator}",
+                "kind": "Pod",
+                "name": "pbx-web-5ff68464d-lcfcp",
+                "namespace": "pbx-web",
+                "resourceVersion": "610175793",
+                "uid": "b792e42b-e860-44be-8c70-e1e4168a07c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-08-06T16:32:44Z",
+            "message": "Pulling image \"ronaldraygun/pbx-web:1.0.9\"",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T16:27:34Z",
+                "name": "pbx-web-5ff68464d-lcfcp.18c8e9881aa27aef",
+                "namespace": "pbx-web",
+                "resourceVersion": "610755478",
+                "uid": "64657ac9-3b78-4e84-b467-134ed974f5ee"
+            },
+            "reason": "Pulling",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "k3s-manager",
+            "source": {
+                "component": "kubelet",
+                "host": "k3s-manager"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 7940,
+            "eventTime": null,
+            "firstTimestamp": "2026-08-05T12:46:58Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "pbx-web-5ff68464d-lcfcp",
+                "namespace": "pbx-web",
+                "resourceVersion": "610175793",
+                "uid": "b792e42b-e860-44be-8c70-e1e4168a07c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-08-06T17:27:08Z",
+            "message": "Unable to retrieve some image pull secrets (docker-hub-registry); attempting to pull the image may not succeed.",
+            "metadata": {
+                "creationTimestamp": "2026-08-05T12:47:30Z",
+                "name": "pbx-web-5ff68464d-lcfcp.18c8e986ff52a135",
+                "namespace": "pbx-web",
+                "resourceVersion": "610771461",
+                "uid": "b799b4ac-f044-44e5-a9ef-78f390f2c601"
+            },
+            "reason": "FailedToRetrieveImagePullSecret",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "k3s-manager",
+            "source": {
+                "component": "kubelet",
+                "host": "k3s-manager"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 7602,
+            "eventTime": null,
+            "firstTimestamp": "2026-08-05T12:47:20Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{site-generator}",
+                "kind": "Pod",
+                "name": "pbx-web-5ff68464d-lcfcp",
+                "namespace": "pbx-web",
+                "resourceVersion": "610175793",
+                "uid": "b792e42b-e860-44be-8c70-e1e4168a07c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-08-06T17:27:31Z",
+            "message": "Back-off pulling image \"ronaldraygun/pbx-web:1.0.9\"",
+            "metadata": {
+                "creationTimestamp": "2026-08-05T12:47:34Z",
+                "name": "pbx-web-5ff68464d-lcfcp.18c8e98c3c7310f5",
+                "namespace": "pbx-web",
+                "resourceVersion": "610771537",
+                "uid": "25c05eb1-031e-4a33-818a-bf3080d1a4f1"
+            },
+            "reason": "BackOff",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "k3s-manager",
+            "source": {
+                "component": "kubelet",
+                "host": "k3s-manager"
+            },
+            "type": "Normal"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

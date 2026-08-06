@@ -1,0 +1,606 @@
+{
+  "analysis_date": "2026-08-06T13:40:23.600637",
+  "total_logs_analyzed": 19,
+  "results": {
+    "pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb.log": {
+      "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb.log",
+      "file_name": "pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb.log",
+      "analysis_date": "2026-08-06T13:40:20.770654",
+      "total_lines": 500,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pbx-web-pbx-rebuild-relay-8596977857-4292b.log": {
+      "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-pbx-rebuild-relay-8596977857-4292b.log",
+      "file_name": "pbx-web-pbx-rebuild-relay-8596977857-4292b.log",
+      "analysis_date": "2026-08-06T13:40:20.781745",
+      "total_lines": 500,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pbx-web-pbx-web-5ff68464d-lcfcp.log": {
+      "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-pbx-web-5ff68464d-lcfcp.log",
+      "file_name": "pbx-web-pbx-web-5ff68464d-lcfcp.log",
+      "analysis_date": "2026-08-06T13:40:20.792334",
+      "total_lines": 1,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06.log": {
+      "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06.log",
+      "file_name": "pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06.log",
+      "analysis_date": "2026-08-06T13:40:20.792479",
+      "total_lines": 3222,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log": {
+      "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log",
+      "file_name": "pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log",
+      "analysis_date": "2026-08-06T13:40:20.858349",
+      "total_lines": 36223,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-pbx-web-5ff68464d-mkn8n-2026-08-06.log": {
+      "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pod-pbx-web-5ff68464d-mkn8n-2026-08-06.log",
+      "file_name": "pod-pbx-web-5ff68464d-mkn8n-2026-08-06.log",
+      "analysis_date": "2026-08-06T13:40:21.580554",
+      "total_lines": 2762,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 42,
+          "timestamps": [
+            "1785277704",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "1785285870",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "1785864705",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "1785864705",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "1785939947",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "1785960497",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown"
+          ],
+          "samples": [
+            "[pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer",
+            "Exception occurred during processing of request from ('127.0.0.1', 57008)",
+            "Traceback (most recent call last):",
+            "ConnectionResetError: [Errno 104] Connection reset by peer",
+            "During handling of the above exception, another exception occurred:"
+          ]
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": [
+        {
+          "category": "error",
+          "count": 42,
+          "first_occurrence": "1785277704",
+          "last_occurrence": "unknown"
+        }
+      ]
+    },
+    "whisper-stt-whisper-openai-68966786fb-tng29.log": {
+      "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/whisper-stt-whisper-openai-68966786fb-tng29.log",
+      "file_name": "whisper-stt-whisper-openai-68966786fb-tng29.log",
+      "analysis_date": "2026-08-06T13:40:21.623256",
+      "total_lines": 0,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "whisper-stt-whisper-stt-847fd8d7b9-b8rsj.log": {
+      "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/whisper-stt-whisper-stt-847fd8d7b9-b8rsj.log",
+      "file_name": "whisper-stt-whisper-stt-847fd8d7b9-b8rsj.log",
+      "analysis_date": "2026-08-06T13:40:21.623353",
+      "total_lines": 0,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-whisper-openai-68966786fb-jsb5d-2026-06-14.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-06-14.log",
+      "file_name": "pod-whisper-openai-68966786fb-jsb5d-2026-06-14.log",
+      "analysis_date": "2026-08-06T13:40:21.623418",
+      "total_lines": 91112,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current.log",
+      "file_name": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current.log",
+      "analysis_date": "2026-08-06T13:40:23.588450",
+      "total_lines": 5,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 1,
+          "timestamps": [
+            "unknown"
+          ],
+          "samples": [
+            "error: You must be logged in to the server (the server has asked for the client to provide credentials)"
+          ]
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": [
+        {
+          "category": "error",
+          "count": 1,
+          "first_occurrence": "unknown",
+          "last_occurrence": "unknown"
+        }
+      ]
+    },
+    "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-previous.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-previous.log",
+      "file_name": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-previous.log",
+      "analysis_date": "2026-08-06T13:40:23.588806",
+      "total_lines": 2,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-stderr.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-stderr.log",
+      "file_name": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-stderr.log",
+      "analysis_date": "2026-08-06T13:40:23.588961",
+      "total_lines": 500,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-whisper-openai-68966786fb-jsb5d-2026-08-06.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06.log",
+      "file_name": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06.log",
+      "analysis_date": "2026-08-06T13:40:23.599807",
+      "total_lines": 1,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 1,
+          "timestamps": [
+            "unknown"
+          ],
+          "samples": [
+            "error: error from server (NotFound): namespaces \"whisper-stt\" not found in namespace \"whisper-stt\""
+          ]
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": [
+        {
+          "category": "error",
+          "count": 1,
+          "first_occurrence": "unknown",
+          "last_occurrence": "unknown"
+        }
+      ]
+    },
+    "pod-whisper-stt-847fd8d7b9-v2rs5-2026-07-12.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-07-12.log",
+      "file_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-07-12.log",
+      "analysis_date": "2026-08-06T13:40:23.599911",
+      "total_lines": 14,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-current.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-current.log",
+      "file_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-current.log",
+      "analysis_date": "2026-08-06T13:40:23.600239",
+      "total_lines": 0,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous.log",
+      "file_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous.log",
+      "analysis_date": "2026-08-06T13:40:23.600509",
+      "total_lines": 1,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-stderr.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-stderr.log",
+      "file_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-stderr.log",
+      "analysis_date": "2026-08-06T13:40:23.600397",
+      "total_lines": 0,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    },
+    "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06.log": {
+      "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06.log",
+      "file_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06.log",
+      "analysis_date": "2026-08-06T13:40:23.600454",
+      "total_lines": 0,
+      "patterns": {
+        "startup": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "oom_kill": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "error": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        },
+        "performance": {
+          "count": 0,
+          "timestamps": [],
+          "samples": []
+        }
+      },
+      "summary": []
+    }
+  }
+}
