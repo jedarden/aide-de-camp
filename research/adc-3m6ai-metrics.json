@@ -1,0 +1,29 @@
+{
+  "analysis_date": "2026-08-06",
+  "metrics": [
+    {
+      "service": "whisper-stt",
+      "total_deployments": 10,
+      "first_deployment": "2026-06-25T14:08:07+00:00",
+      "last_deployment": "2026-07-12T16:53:42+00:00",
+      "time_range_days": 17.11,
+      "frequency_deployments_per_day": 0.5843,
+      "frequency_deployments_per_week": 4.09,
+      "frequency_deployments_per_month": 17.53,
+      "mean_time_between_deployments_hours": 45.64,
+      "mean_time_between_deployments_days": 1.9
+    },
+    {
+      "service": "pbx-web",
+      "total_deployments": 11,
+      "first_deployment": "2026-05-07T18:40:16+00:00",
+      "last_deployment": "2026-07-28T17:05:51+00:00",
+      "time_range_days": 81.93,
+      "frequency_deployments_per_day": 0.1343,
+      "frequency_deployments_per_week": 0.94,
+      "frequency_deployments_per_month": 4.03,
+      "mean_time_between_deployments_hours": 196.64,
+      "mean_time_between_deployments_days": 8.19
+    }
+  ]
+}
