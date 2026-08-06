@@ -1,0 +1,63 @@
+{
+  "namespace": "pbx-web",
+  "cluster": "ardenone-cluster",
+  "analysis_period": "last 30 days (2026-07-07 to 2026-08-06)",
+  "data_sources": [
+    "kubectl logs",
+    "kubectl describe",
+    "Victorialogs"
+  ],
+  "current_pods": [
+    {
+      "name": "pbx-web-5ff68464d-mkn8n",
+      "age_days": 8,
+      "restart_count": 0,
+      "containers": [
+        "site-generator",
+        "nginx"
+      ],
+      "image": "ronaldraygun/pbx-web:1.0.9"
+    },
+    {
+      "name": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+      "age_days": 22,
+      "restart_count": 0,
+      "containers": [
+        "relay"
+      ],
+      "image": "localhost:7439/python:3-slim"
+    },
+    {
+      "name": "lab-rebuild-relay-79957dbd4-xsqhl",
+      "age_days": 9,
+      "restart_count": 0,
+      "containers": [
+        "relay"
+      ],
+      "image": "localhost:7439/python:3-slim"
+    }
+  ],
+  "deployment_history": {
+    "pbx_web_replica_sets": 11,
+    "oldest_replica_set_age_days": 95,
+    "current_deployment_age_days": 23
+  },
+  "error_patterns": {
+    "recording_fetch_errors": [
+      "[Errno 104] Connection reset by peer",
+      "BrokenPipeError: [Errno 32] Broken pipe"
+    ],
+    "internal_server_errors": true,
+    "error_context": "Recording fetch failures from storage backend"
+  },
+  "health_status": {
+    "current_health_checks": "6625 in recent logs",
+    "health_check_success": true,
+    "pod_status": "All pods running with 0 restarts"
+  },
+  "log_coverage": {
+    "victorialogs_recent": "10000 logs from 2026-08-06 09:58 to 16:52 UTC (~7 hours)",
+    "kubectl_logs_available": true,
+    "pod_events_available": false
+  }
+}
