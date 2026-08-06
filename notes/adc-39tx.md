@@ -70,6 +70,80 @@ WARNING src.telegram.fallback: First Telegram send failure detected at http://12
 So `/tmp/adc.log` sees **one** WARNING line per process startup, regardless of how many
 sends fail — no duplicate WARNINGs, no DEBUG spam. This is precisely the design intent.
 
+## 4. Additional verification (2026-08-06)
+
+Created `tests/verify_telegram_warning_once.py` to comprehensively verify deduplication behavior:
+
+### Test Suite Results
+
+All three tests passed:
+
+1. **First Failure Only WARNING** ✅
+   - First failure logged with WARNING (error context present)
+   - Second failure did NOT produce another WARNING
+   - Failure count correctly incremented
+   - First failure flag set
+
+2. **Different Failure Types Get Independent WARNINGs** ✅
+   - Exception and HTTPError each produced independent WARNING logs
+   - All failures counted correctly
+   - Distinct failure types tracked (2 types)
+
+3. **Repeated Failures Respect Rate-Limit Cooldown** ✅
+   - Only first failure produced WARNING
+   - Second failure counted silently (cooldown active)
+   - DEBUG summary produced after cooldown elapsed
+   - Confirmed 2 failures counted silently before DEBUG log
+
+### Live Test Output
+
+```
+======================================================================
+Telegram WARNING Log Deduplication Tests
+======================================================================
+
+Test: First failure only produces WARNING
+  WARNING logs count: 1
+  DEBUG logs count: 0
+  ✓ First failure logged with WARNING (error context present)
+  ✓ Second failure did NOT produce another WARNING
+  ✓ Failure count correctly incremented
+  ✓ First failure flag is set
+✅ Test passed: WARNING appears only on first failure
+
+Test: Different failure types get independent WARNING logs
+  WARNING logs count: 2
+  ✓ Both failure types produced independent WARNING logs
+  ✓ All failures counted correctly
+  ✓ Distinct failure types tracked correctly
+✅ Test passed: Different failure types get independent WARNINGs
+
+Test: Repeated failures respect rate-limit cooldown
+  WARNING logs: 1
+  DEBUG logs: 0
+  ✓ Only first failure produced WARNING
+  ✓ Second failure counted silently (cooldown active)
+  DEBUG logs after cooldown: 1
+  ✓ DEBUG summary produced after cooldown elapsed
+✅ Test passed: Repeated failures respect cooldown
+
+======================================================================
+✅ All tests passed!
+======================================================================
+```
+
+### WARNING Log Format Verified
+
+The WARNING includes:
+- Error type (e.g., "Exception", "HTTPError")
+- Error message (e.g., "Connection timeout")
+- Rate-limit interval information
+
+Example from test:
+```
+WARNING telegram.fallback: First Telegram send failure detected. Error type: Exception. Error: Connection timeout. Subsequent failures of the same type are rate-limited (one DEBUG summary per 300s); a different failure type is logged independently.
+```
+
 ## Mechanism (why it's correct)
 
 `_handle_send_failure` acquires `_first_failure_lock` and calls `_record_failure_locked`
