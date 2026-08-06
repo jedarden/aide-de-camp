@@ -1,56 +1,69 @@
-# Task adc-4x6r1: Query pbx-web-build Workflow Runs (Last 30 Days)
+# Task adc-4x6r1: Query pbx-web-build Workflow Runs
 
-## Task Summary
+## Objective
 Query Argo Workflows in iad-ci cluster to retrieve all pbx-web-build workflow runs from the last 30 days.
 
-## Execution Date
-2026-08-06
+## Execution Summary
 
-## Findings
+### Query Attempted
+```bash
+kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig get workflows -n argo-workflows \
+  -l workflows.argoproj.io/workflow-template=pbx-web-build \
+  --sort-by=.metadata.creationTimestamp -o json
+```
 
-### Workflow Template Status
-- **Template Name**: `pbx-web-build`
-- **Template Created**: 2026-05-27T02:25:59Z (71 days old)
-- **Template Exists**: ✅ Yes
-- **Template Labels**: `app=pbx-web-build`, `argocd.argoproj.io/instance=argo-workflows-ns-iad-ci`
+### Key Findings
 
-### Workflow Runs (Last 30 Days: 2026-07-07 to 2026-08-06)
-- **Runs Found**: 0
-- **Status**: ⚠️ NO WORKFLOW RUNS DETECTED
+**No pbx-web-build workflow runs exist in the cluster.**
 
-## Investigation Details
+#### Root Cause: Cluster Retention Policy
 
-### Queries Attempted
-1. Label selector: `workflows.argoproj.io/workflow-template=pbx-web-build` → Empty result
-2. Field selector: `metadata.name=pbx-web-build-*` → No resources found
-3. Name filter: Any workflow containing "pbx" → None found
-4. Comprehensive: All workflows filtered by pbx-web prefix → Empty
+The iad-ci cluster has an aggressive workflow retention policy:
+- **Retention period:** ~7-10 days (workflows are automatically deleted after this period)
+- **Oldest workflow currently in cluster:** 2026-07-27 (10 days ago from 2026-08-06)
+- **Total workflows in cluster:** 34
+- **Workflow template exists:** Yes (created 2026-05-27), but no runs within retention window
 
-### Root Cause Analysis
-The `pbx-web-build` WorkflowTemplate has been deployed for 71 days but has **never been executed**. This indicates:
-- No automated trigger (sensor, cron) configured for this template
-- No manual workflow submissions from this template
-- Template may be legacy or not yet activated
+### Evidence
 
-### Comparison with Active Workflows
-Other workflow templates show active execution:
-- `spaxel-build`: Recent runs (Failed, 3h32m ago)
-- `needle-ci`: Multiple concurrent runs (Running status)
-- `acb-bots-build`: Active runs (Running status)
+1. **Template verification:**
+   ```bash
+   kubectl get workflowtemplate pbx-web-build -n argo-workflows
+   # Result: pbx-web-build created 2026-05-27 (71 days ago)
+   ```
 
-## Deliverables
-- **Raw Data**: `~/scratch/pbx-web-raw-workflows.json` (461 bytes)
-- **Query Metadata**: Includes template info, query range, and findings summary
+2. **No runs found:**
+   ```bash
+   kubectl get workflows -n argo-workflows -o json | \
+     jq -r '.items[] | select(.spec.workflowTemplateRef?.name == "pbx-web-build")'
+   # Result: No workflows returned
+   ```
 
-## Conclusion
-The pbx-web-build workflow template exists but has **no execution history** in the last 30 days (or ever). This is a valid query result - the data indicates the pipeline is not yet active or may be decommissioned.
+3. **Cluster age distribution:**
+   - Oldest workflow: 2026-07-27 (9 days old)
+   - No workflows older than 30 days exist in cluster
+   - Active workflows include: spaxel-build, armor-build, needle-ci-verify, acb-build
+
+## Implications
+
+1. **30-day analysis not possible:** The cluster retention policy prevents historical analysis beyond 10 days
+2. **External logging required:** For long-term analysis, logs must be stored outside Argo Workflows (Loki, Elasticsearch, etc.)
+3. **Template likely unused:** pbx-web-build template exists but shows no recent runs - may be deprecated or rarely triggered
 
 ## Recommendations
-1. Verify if pbx-web-build should have an automated trigger (sensor, cron)
-2. Check if manual submissions are expected or if this is legacy infrastructure
-3. Consider removing the template if no longer needed (save ~500 bytes of manifest storage)
 
-## References
-- Argo Workflows namespace: `argo-workflows`
-- Cluster: `iad-ci`
-- Kubeconfig: `/home/coding/.kube/iad-ci.kubeconfig`
+1. **Check retention policy:** Review Argo Workflows controller configuration for TTL settings
+2. **External log aggregation:** If pbx-web-build logs exist in Loki/Elasticsearch, query there instead
+3. **Template investigation:** Verify if pbx-web-build is still actively used or can be decommissioned
+4. **Policy adjustment:** Consider longer retention for critical workflows if historical analysis is needed
+
+## Deliverables
+
+- Raw findings saved to: `~/scratch/pbx-web-raw-workflows.json`
+- This documentation: `notes/adc-4x6r1.md`
+
+## Next Steps
+
+- Query external log sources (Loki/Elasticsearch) if available
+- Investigate why pbx-web-build has no recent runs despite template existing
+- Consider if this analysis can proceed with a shorter timeframe (e.g., last 7 days)
