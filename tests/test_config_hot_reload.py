@@ -604,7 +604,8 @@ async def test_registry_hot_reload(backup_registry):
             f"Old alias '{old_alias}' should not exist after hot-reload"
 
     # Verify other data was preserved in the config
-    assert len(reloaded_registry["projects"]) == len(initial_config["projects"])
+    # Compare initial_registry vs reloaded_registry (both from get_registry)
+    assert len(reloaded_registry["projects"]) == len(initial_registry["projects"])
     assert "aide-de-camp" in reloaded_registry["projects"]
     assert "global_aliases" in reloaded_registry
 
