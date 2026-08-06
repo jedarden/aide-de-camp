@@ -1,0 +1,37 @@
+{
+  "analysis_metadata": {
+    "generated_at": "2026-08-06T16:39:19.878282",
+    "analysis_period": "Last 30 days",
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "pbx_web_metrics": {
+    "total_deployments": 5,
+    "days_with_deployments": 4,
+    "avg_deployments_per_day": 0.312,
+    "daily_breakdown": {
+      "2026-07-28": 1,
+      "2026-07-27": 1,
+      "2026-07-15": 1,
+      "2026-07-13": 2
+    }
+  },
+  "whisper_stt_metrics": {
+    "total_deployments": 4,
+    "days_with_deployments": 2,
+    "avg_deployments_per_day": 0.8,
+    "daily_breakdown": {
+      "2026-07-12": 1,
+      "2026-07-08": 3
+    }
+  },
+  "comparative_analysis": {
+    "pbx_web_daily_count": 4,
+    "pbx_web_avg_per_day": 0.312,
+    "whisper_stt_daily_count": 2,
+    "whisper_stt_avg_per_day": 0.8,
+    "more_frequent_service": "whisper-stt"
+  }
+}
