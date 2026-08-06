@@ -1,0 +1,140 @@
+{
+  "service": "pbx-web",
+  "data_source": "git_commit_logs",
+  "note": "No CI/CD workflow runs found in Argo Workflows (iad-ci). This data represents git commits to deployment manifests in declarative-config repo.",
+  "extracted_at": "2026-08-06T21:45:00Z",
+  "date_range": {
+    "start": "2026-07-08T00:00:00Z",
+    "end": "2026-08-06T23:59:59Z",
+    "target_days": 30,
+    "actual_days": 29
+  },
+  "total_events": 11,
+  "events": [
+    {
+      "timestamp": "2026-08-04T23:42:12-04:00",
+      "commit_hash": "816b043919e0d8229a7b33dffe78203a9f424d1e",
+      "author": "jedarden",
+      "message": "fix(ardenone-cluster): remove duplicate Applications that fought the ApplicationSet",
+      "event_type": "config_change",
+      "files_changed": 1,
+      "files": ["k8s/ardenone-cluster/pbx-web/application.yaml"],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-28T13:24:42-04:00",
+      "commit_hash": "0fb7b127a910aa970bf76613ac2a071bec8a20af",
+      "author": "jedarden",
+      "message": "Revert \"feat(pbx-web): add WebRTC web client page behind Google OAuth\"",
+      "event_type": "rollback",
+      "files_changed": 4,
+      "files": [
+        "k8s/ardenone-cluster/pbx-web/pbx-web-configmap.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-web-deployment.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-web-internal-ingressroute.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-web-webphone-configmap.yml"
+      ],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-28T13:03:33-04:00",
+      "commit_hash": "7c3667ed6a4a9ae808bba4bf72bcfff128bf9e52",
+      "author": "jedarden",
+      "message": "feat(pbx-web): add WebRTC web client page behind Google OAuth",
+      "event_type": "feature_addition",
+      "files_changed": 4,
+      "files": [
+        "k8s/ardenone-cluster/pbx-web/pbx-web-configmap.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-web-deployment.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-web-internal-ingressroute.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-web-webphone-configmap.yml"
+      ],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-27T22:40:27-04:00",
+      "commit_hash": "0fbfa9aaeecf61947942e8440dc5f9192aede267",
+      "author": "jedarden",
+      "message": "eso/ardenone-manager: authenticate to OpenBao with Kubernetes auth",
+      "event_type": "config_change",
+      "files_changed": 0,
+      "files": [],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-27T22:17:58-04:00",
+      "commit_hash": "fd0e735bbee741bd05409765973c477aa1c1347b",
+      "author": "jedarden",
+      "message": "openbao/ardenone-manager: let OpenBao review SA tokens, for ESO k8s auth",
+      "event_type": "config_change",
+      "files_changed": 0,
+      "files": [],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-27T13:58:00-04:00",
+      "commit_hash": "3e906393b4668a0b0649d3b59c7ef5d45aeb89b0",
+      "author": "jedarden",
+      "message": "k8s: warn that multiple OpenBao instances hold overlapping paths",
+      "event_type": "config_change",
+      "files_changed": 0,
+      "files": [],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-27T13:55:38-04:00",
+      "commit_hash": "42167a49fb553b3af9d9f5ee9c30781726064b03",
+      "author": "jedarden",
+      "message": "pbx-web: make lab-rebuild-relay pick up rotated secrets automatically",
+      "event_type": "config_change",
+      "files_changed": 2,
+      "files": [
+        "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-deployment.yml",
+        "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-externalsecret.yml"
+      ],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-14T23:21:50-04:00",
+      "commit_hash": "25c11c891c91532dbd4c96fdfe9104aa61a4ecb7",
+      "author": "jedarden",
+      "message": "fix(pbx-web): force ESO resync + auto-restart on webhook secret rotation",
+      "event_type": "bugfix",
+      "files_changed": 2,
+      "files": [
+        "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-deployment.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-externalsecret.yml"
+      ],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-14T15:38:37-04:00",
+      "commit_hash": "83af76cde01f463e98b9fa966cc73b80d320baaa",
+      "author": "jedarden",
+      "message": "fix(pbx-web): migrate secrets to OpenBao/ExternalSecret",
+      "event_type": "secret_migration",
+      "files_changed": 8,
+      "files": [
+        "k8s/ardenone-cluster/pbx-web/garage-pbx-creds-externalsecret.yml",
+        "k8s/ardenone-cluster/pbx-web/garage-pbx-creds-secret.yml",
+        "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-externalsecret.yml",
+        "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-sealedsecret.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-externalsecret.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-sealedsecret.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-web-auth-externalsecret.yml",
+        "k8s/ardenone-cluster/pbx-web/pbx-web-auth-sealedsecret.yml"
+      ],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-13T14:15:32-04:00",
+      "commit_hash": "f20d55e5c3ad12eef64662bb795f8004492afda2",
+      "author": "jedarden",
+      "message": "feat(pbx-web): bump image to 1.0.9 (copy transcript now includes timestamps)",
+      "event_type": "image_bump",
+      "files_changed": 1,
+      "files": ["k8s/ardenone-cluster/pbx-web/pbx-web-deployment.yml"],
+      "image_version": "1.0.9"
+    }
+  ]
+}
