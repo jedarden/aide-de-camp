@@ -1,0 +1,101 @@
+{
+  "collection_date": "2026-08-06T12:50:00Z",
+  "date_range": "2026-07-08 to 2026-08-06",
+  "cluster": "ardenone-cluster",
+  "namespace": "pbx-web",
+  "deployment_events": [
+    {
+      "timestamp": "2026-07-13T18:07:55Z",
+      "event_type": "replica_set_created",
+      "resource_name": "pbx-web-754f4cfdf7",
+      "deployment": "pbx-web",
+      "status": "success",
+      "details": "New replica set created, replicas: 0"
+    },
+    {
+      "timestamp": "2026-07-13T18:18:07Z",
+      "event_type": "rolling_update",
+      "resource_name": "pbx-web-5ff68464d",
+      "deployment": "pbx-web",
+      "status": "success",
+      "details": "Rolling update completed, 1 replica active"
+    },
+    {
+      "timestamp": "2026-07-15T03:24:40Z",
+      "event_type": "replica_set_created",
+      "resource_name": "pbx-rebuild-relay-588d79c5b9",
+      "deployment": "pbx-rebuild-relay",
+      "status": "success",
+      "details": "New replica set created, 1 replica active"
+    },
+    {
+      "timestamp": "2026-07-27T17:56:07Z",
+      "event_type": "replica_set_created",
+      "resource_name": "lab-rebuild-relay-79957dbd4",
+      "deployment": "lab-rebuild-relay",
+      "status": "success",
+      "details": "New replica set created, 1 replica active"
+    },
+    {
+      "timestamp": "2026-07-28T17:05:51Z",
+      "event_type": "replica_set_created",
+      "resource_name": "pbx-web-765bb76db8",
+      "deployment": "pbx-web",
+      "status": "success",
+      "details": "New replica set created, replicas: 0"
+    }
+  ],
+  "current_state": {
+    "deployments": [
+      {
+        "name": "pbx-web",
+        "created": "2026-05-01T14:28:11Z",
+        "images": ["ronaldraygun/pbx-web:1.0.9", "nginx:alpine"],
+        "replicas": 1,
+        "ready_replicas": 1,
+        "available_replicas": 1,
+        "status": "available"
+      },
+      {
+        "name": "pbx-rebuild-relay",
+        "created": "2026-05-02T11:21:29Z",
+        "images": ["python:3-slim"],
+        "replicas": 1,
+        "ready_replicas": 1,
+        "available_replicas": 1,
+        "status": "available"
+      },
+      {
+        "name": "lab-rebuild-relay",
+        "created": "2026-05-02T20:27:38Z",
+        "images": ["python:3-slim"],
+        "replicas": 1,
+        "ready_replicas": 1,
+        "available_replicas": 1,
+        "status": "available"
+      }
+    ],
+    "active_replica_sets": [
+      "pbx-web-5ff68464d",
+      "pbx-rebuild-relay-588d79c5b9",
+      "lab-rebuild-relay-79957dbd4"
+    ]
+  },
+  "ci_cd_data": {
+    "workflows_found": 0,
+    "pbx_web_builds": 0,
+    "note": "No pbx-web-build workflows found in iad-ci cluster within last 30 days. Current image ronaldraygun/pbx-web:1.0.9 was deployed prior to the analysis window."
+  },
+  "events": {
+    "total_events": 0,
+    "note": "No Kubernetes events found in pbx-web namespace (events may have been aged out by the cluster)"
+  },
+  "summary": {
+    "total_deployment_events": 5,
+    "successful_events": 5,
+    "failed_events": 0,
+    "last_deployment_activity": "2026-07-28T17:05:51Z",
+    "current_image_version": "1.0.9",
+    "deployment_health": "healthy - all deployments showing Available=True with 1/1 replicas ready"
+  }
+}

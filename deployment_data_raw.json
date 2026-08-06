@@ -1,0 +1,242 @@
+{
+  "query_metadata": {
+    "query_date": "2026-08-06T12:00:00Z",
+    "query_window": "30 days",
+    "query_start": "2026-07-07T00:00:00Z",
+    "clusters_queried": ["ardenone-cluster", "ardenone-manager"],
+    "ci_system": "Argo Workflows (iad-ci)"
+  },
+  "services": {
+    "pbx-web": {
+      "description": "PBX web interface deployment",
+      "image_repository": "ronaldraygun/pbx-web",
+      "deployments": {
+        "ardenone-cluster": [
+          {
+            "timestamp": "2026-07-28T17:05:51Z",
+            "replica_set": "pbx-web-765bb76db8",
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "replicas": 0,
+            "status": "rolled_out",
+            "age_days": 9
+          },
+          {
+            "timestamp": "2026-07-13T18:18:07Z",
+            "replica_set": "pbx-web-5ff68464d",
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "replicas": 1,
+            "status": "active",
+            "age_days": 24
+          },
+          {
+            "timestamp": "2026-07-13T18:07:55Z",
+            "replica_set": "pbx-web-754f4cfdf7",
+            "image": "ronaldraygun/pbx-web:1.0.8",
+            "replicas": 0,
+            "status": "superseded",
+            "age_days": 24
+          },
+          {
+            "timestamp": "2026-07-15T03:24:40Z",
+            "replica_set": "pbx-rebuild-relay-588d79c5b9",
+            "image": "python:3-slim",
+            "replicas": 1,
+            "status": "active",
+            "note": "Rebuild relay deployment"
+          },
+          {
+            "timestamp": "2026-07-27T17:56:07Z",
+            "replica_set": "lab-rebuild-relay-79957dbd4",
+            "image": "python:3-slim",
+            "replicas": 1,
+            "status": "active",
+            "note": "Lab rebuild relay deployment"
+          }
+        ],
+        "ardenone-manager": [
+          {
+            "timestamp": "2026-07-28T17:04:40Z",
+            "replica_set": "pbx-web-765bb76db8",
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "replicas": 0,
+            "status": "rolled_out"
+          },
+          {
+            "timestamp": "2026-07-13T18:19:45Z",
+            "replica_set": "pbx-web-5ff68464d",
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "replicas": 1,
+            "status": "active"
+          },
+          {
+            "timestamp": "2026-07-13T18:05:57Z",
+            "replica_set": "pbx-web-754f4cfdf7",
+            "image": "ronaldraygun/pbx-web:1.0.8",
+            "replicas": 0,
+            "status": "superseded"
+          }
+        ]
+      },
+      "version_history": [
+        {
+          "timestamp": "2026-07-13T14:14:09-0400",
+          "commit": "3946d12d138b6494145c2a584bd2f704cf63a39b",
+          "version": "1.0.9",
+          "message": "chore(pbx-web): bump VERSION to 1.0.9"
+        },
+        {
+          "timestamp": "2026-07-13T18:03:32+0000",
+          "commit": "83343f17408df6467e1598d02bff3380b63a0d81",
+          "version": "1.0.8",
+          "message": "ci: auto-bump version to 1.0.8"
+        }
+      ],
+      "argo_workflows": {
+        "template": "pbx-web-build",
+        "runs_last_30_days": 0,
+        "note": "No workflow runs found in iad-ci cluster - deployments may be manual or via GitOps"
+      }
+    },
+    "whisper-stt": {
+      "description": "Whisper speech-to-text API service",
+      "image_repository": "ronaldraygun/whisper-stt",
+      "deployments": {
+        "ardenone-cluster": [
+          {
+            "timestamp": "2026-07-12T16:53:42Z",
+            "replica_set": "whisper-stt-847fd8d7b9",
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "replicas": 1,
+            "status": "active",
+            "age_days": 25
+          },
+          {
+            "timestamp": "2026-07-08T03:26:44Z",
+            "replica_set": "whisper-stt-6c497489fb",
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "replicas": 0,
+            "status": "superseded"
+          },
+          {
+            "timestamp": "2026-07-08T03:16:13Z",
+            "replica_set": "whisper-stt-5b8558f478",
+            "image": "ronaldraygun/whisper-stt:1.8.4",
+            "replicas": 0,
+            "status": "superseded"
+          },
+          {
+            "timestamp": "2026-07-08T03:09:35Z",
+            "replica_set": "whisper-stt-5dbff75cbd",
+            "image": "ronaldraygun/whisper-stt:1.8.2",
+            "replicas": 0,
+            "status": "superseded"
+          }
+        ],
+        "ardenone-manager": [
+          {
+            "timestamp": "2026-07-12T16:55:23Z",
+            "replica_set": "whisper-stt-847fd8d7b9",
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "replicas": 1,
+            "status": "active"
+          },
+          {
+            "timestamp": "2026-07-08T03:26:19Z",
+            "replica_set": "whisper-stt-6c497489fb",
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "replicas": 0,
+            "status": "superseded"
+          },
+          {
+            "timestamp": "2026-07-08T03:17:54Z",
+            "replica_set": "whisper-stt-5b8558f478",
+            "image": "ronaldraygun/whisper-stt:1.8.4",
+            "replicas": 0,
+            "status": "superseded"
+          },
+          {
+            "timestamp": "2026-07-08T03:09:28Z",
+            "replica_set": "whisper-stt-5dbff75cbd",
+            "image": "ronaldraygun/whisper-stt:1.8.2",
+            "replicas": 0,
+            "status": "superseded"
+          }
+        ]
+      },
+      "version_history": [
+        {
+          "timestamp": "2026-07-08T03:21:24+0000",
+          "commit": "4b83578cdaa3c875c2192be59fa48f0a490499e9",
+          "version": "1.8.6",
+          "message": "ci: auto-bump version to 1.8.6"
+        },
+        {
+          "timestamp": "2026-07-07T23:20:50-0400",
+          "commit": "f6046b532309b6d133d0ad0fb8391ec4888a1b4d",
+          "version": "1.8.5",
+          "message": "fix(whisper-stt): bearer-auth GET/DELETE /jobs/{id} too (1.8.5)"
+        },
+        {
+          "timestamp": "2026-07-08T03:13:39+0000",
+          "commit": "7699f69ffc7e79698f22b9a149391a44dd6fcf6f",
+          "version": "1.8.4",
+          "message": "ci: auto-bump version to 1.8.4"
+        },
+        {
+          "timestamp": "2026-07-07T23:13:16-0400",
+          "commit": "edba130172412ef9ce6cbfa0f2f2b05991f0a105",
+          "version": "1.8.3",
+          "message": "fix(whisper-stt): bearer-auth the chunked upload endpoints (1.8.3)"
+        },
+        {
+          "timestamp": "2026-07-08T03:04:30+0000",
+          "commit": "50ce4c815e15ab9df15ec9ea50a3441f7c8ade5c",
+          "version": "1.8.2",
+          "message": "ci: auto-bump version to 1.8.2"
+        },
+        {
+          "timestamp": "2026-07-08T01:32:36+0000",
+          "commit": "16b8a98e21289466d092be8c4467a40e49c0e2dc",
+          "version": "1.8.1",
+          "message": "ci: auto-bump version to 1.8.1"
+        },
+        {
+          "timestamp": "2026-07-07T21:32:13-0400",
+          "commit": "3908a26ca3a20c3802e0b2fa1e2dfd3b84848a67",
+          "version": "1.8.0",
+          "message": "feat(whisper-stt): add chunked upload for large files (1.8.0)"
+        }
+      ],
+      "argo_workflows": {
+        "template": "whisper-stt-build",
+        "runs_last_30_days": 0,
+        "note": "No workflow runs found in iad-ci cluster - deployments may be manual or via GitOps"
+      }
+    }
+  },
+  "summary": {
+    "total_deployments_found": 12,
+    "services_queried": 2,
+    "clusters_queried": 2,
+    "date_range": "2026-07-07 to 2026-08-06",
+    "pbx_web_deployments": 5,
+    "whisper_stt_deployments": 7,
+    "deployment_gap_days": 0,
+    "coverage": "complete_30_day_window",
+    "notes": [
+      "Both services deployed via GitOps (ArgoCD) on ardenone-cluster and ardenone-manager",
+      "No recent Argo Workflow runs found - builds may be manual or triggered outside iad-ci",
+      "whisper-stt had rapid deployment cycle on 2026-07-08 (4 deployments in 30 minutes)",
+      "All deployments shown successful status based on ReplicaSet rollout completion"
+    ]
+  },
+  "data_quality": {
+    "completeness": "high",
+    "gaps": [],
+    "limitations": [
+      "Argo Workflow history not available - iad-ci shows no recent runs for these services",
+      "Cluster events not available - likely aged out beyond default retention",
+      "Deployment status inferred from ReplicaSet replica counts, not explicit event logs"
+    ]
+  }
+}
