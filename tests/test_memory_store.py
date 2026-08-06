@@ -718,3 +718,326 @@ def test_load_from_empty_json_object(store: MemoryStore, temp_memory_dir: Path) 
     # Should initialize with defaults
     assert store._facts == []
     assert store._data.get("session_id") == store.session_id
+
+
+# --- load() initialization edge cases (bead adc-4uqev) --------------------------
+
+
+def test_load_with_nonexistent_memory_directory(tmp_path: Path, session_id: str) -> None:
+    """Test load() when memory directory doesn't exist at all."""
+    # Create a MemoryStore with a non-existent directory
+    nonexistent_dir = tmp_path / "nonexistent" / "memory" / "path"
+    logger = MagicMock()
+    store = MemoryStore(
+        session_id=session_id,
+        memory_dir=str(nonexistent_dir),
+        logger=logger
+    )
+
+    # load() should not crash - it should initialize empty state
+    store.load()
+
+    assert store._facts == []
+    assert store._data == {"facts": [], "session_id": store.session_id}
+    assert store.file_path.parent == nonexistent_dir
+
+
+def test_load_with_empty_memory_directory(tmp_path: Path, session_id: str) -> None:
+    """Test load() when memory directory exists but is empty."""
+    # Create an empty directory
+    empty_dir = tmp_path / "empty_memory"
+    empty_dir.mkdir(parents=True, exist_ok=True)
+
+    logger = MagicMock()
+    store = MemoryStore(
+        session_id=session_id,
+        memory_dir=str(empty_dir),
+        logger=logger
+    )
+
+    # load() should not crash - should initialize empty state
+    store.load()
+
+    assert store._facts == []
+    assert store._data == {"facts": [], "session_id": store.session_id}
+
+
+def test_load_creates_empty_state_when_file_missing(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test load() creates empty state when specific memory file doesn't exist."""
+    # Ensure directory exists but file doesn't
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    assert not store.file_path.exists()
+
+    store.load()
+
+    # Should initialize with empty state
+    assert store._facts == []
+    assert store._data == {"facts": [], "session_id": store.session_id}
+
+
+def test_load_is_idempotent(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test that calling load() multiple times is safe (idempotent)."""
+    store.load()
+
+    # Add a fact
+    store.add_fact("Test fact", FactCategory.CONTEXT, 0.8)
+    initial_count = len(store._facts)
+
+    # Call load() again - should not change the facts already in memory
+    store.load()
+
+    assert len(store._facts) == initial_count
+    assert store._facts[0].text == "Test fact"
+
+
+def test_load_with_nested_nonexistent_path(tmp_path: Path, session_id: str) -> None:
+    """Test load() with deeply nested non-existent directory path."""
+    # Create a path with multiple non-existent levels
+    nested_dir = tmp_path / "level1" / "level2" / "level3" / "memory"
+    logger = MagicMock()
+    store = MemoryStore(
+        session_id=session_id,
+        memory_dir=str(nested_dir),
+        logger=logger
+    )
+
+    # Should not crash
+    store.load()
+
+    assert store._facts == []
+    assert store._data == {"facts": [], "session_id": store.session_id}
+
+
+def test_load_then_save_creates_directory(tmp_path: Path, session_id: str) -> None:
+    """Test that save() creates directory structure after load() from nonexistent dir."""
+    # Create store with non-existent directory
+    nonexistent_dir = tmp_path / "does" / "not" / "exist"
+    logger = MagicMock()
+    store = MemoryStore(
+        session_id=session_id,
+        memory_dir=str(nonexistent_dir),
+        logger=logger
+    )
+
+    # Load from non-existent directory
+    store.load()
+    assert not store.file_path.parent.exists()
+
+    # Save should create the directory
+    store.add_fact("Test fact", FactCategory.CONTEXT, 0.8)
+
+    # Directory and file should now exist
+    assert store.file_path.parent.exists()
+    assert store.file_path.exists()
+
+
+def test_load_initializes_session_id_field(store: MemoryStore, temp_memory_dir: Path) -> None:
+    """Test that load() initializes session_id field correctly."""
+    store.load()
+
+    # Check internal data structure
+    assert "session_id" in store._data
+    assert store._data["session_id"] == store.session_id
+    assert isinstance(store._data["session_id"], str)
+
+
+def test_load_initializes_facts_field_as_empty_list(store: MemoryStore) -> None:
+    """Test that load() initializes facts field as empty list when file missing."""
+    store.load()
+
+    # Should have facts field initialized
+    assert "facts" in store._data
+    assert isinstance(store._data["facts"], list)
+    assert len(store._data["facts"]) == 0
+    assert store._facts == []
+
+
+def test_load_with_partial_directory_exists(tmp_path: Path, session_id: str) -> None:
+    """Test load() when partial directory structure exists."""
+    # Create partial structure: /tmp/level1/level2 exists but level3 doesn't
+    partial_dir = tmp_path / "level1" / "level2"
+    full_dir = partial_dir / "level3" / "memory"
+    partial_dir.mkdir(parents=True, exist_ok=True)
+
+    logger = MagicMock()
+    store = MemoryStore(
+        session_id=session_id,
+        memory_dir=str(full_dir),
+        logger=logger
+    )
+
+    # Should handle gracefully
+    store.load()
+
+    assert store._facts == []
+    assert store._data == {"facts": [], "session_id": store.session_id}
+
+
+# --- save() persistence tests (bead adc-434vw) -----------------------------------
+
+
+def test_save_creates_file_at_exact_hashed_path(tmp_path: Path, session_id: str) -> None:
+    """Test save() creates JSON file at correct path: session_<sha256(session_id)[:16]>.json"""
+    memory_dir = tmp_path / "data" / "memory"
+    logger = MagicMock()
+    store = MemoryStore(
+        session_id=session_id,
+        memory_dir=str(memory_dir),
+        logger=logger
+    )
+
+    # Calculate expected hash
+    expected_hash = hashlib.sha256(session_id.encode()).hexdigest()[:16]
+    expected_filename = f"session_{expected_hash}.json"
+
+    # Save without calling load() first
+    store.add_fact("Test fact", FactCategory.CONTEXT, 0.8)
+
+    # Verify file exists at expected path
+    assert store.file_path.exists()
+    assert store.file_path.name == expected_filename
+    assert str(store.file_path.parent) == str(memory_dir)
+
+
+def test_save_creates_data_memory_directory_if_missing(tmp_path: Path, session_id: str) -> None:
+    """Test save() creates data/memory/ directory if it doesn't exist."""
+    # Use a path that definitely doesn't exist
+    memory_dir = tmp_path / "data" / "memory"
+    assert not memory_dir.exists(), "Directory should not exist initially"
+
+    logger = MagicMock()
+    store = MemoryStore(
+        session_id=session_id,
+        memory_dir=str(memory_dir),
+        logger=logger
+    )
+
+    # Save should create the directory
+    store.add_fact("Test fact", FactCategory.CONTEXT, 0.8)
+
+    # Verify directory was created
+    assert memory_dir.exists(), "Directory should be created by save()"
+    assert memory_dir.is_dir(), "Should be a directory"
+
+
+def test_save_creates_nested_directory_structure(tmp_path: Path, session_id: str) -> None:
+    """Test save() creates nested directory structure like data/deep/nested/memory."""
+    # Use a deeply nested path that doesn't exist
+    nested_dir = tmp_path / "data" / "deep" / "nested" / "memory"
+    assert not nested_dir.exists(), "Nested directory should not exist initially"
+
+    logger = MagicMock()
+    store = MemoryStore(
+        session_id=session_id,
+        memory_dir=str(nested_dir),
+        logger=logger
+    )
+
+    # Save should create all parent directories
+    store.add_fact("Test fact", FactCategory.CONTEXT, 0.8)
+
+    # Verify entire path was created
+    assert nested_dir.exists(), "Nested directory should be created"
+    assert nested_dir.is_dir(), "Should be a directory"
+    assert store.file_path.exists(), "File should exist in nested directory"
+
+
+def test_save_overwrites_existing_file(store: MemoryStore) -> None:
+    """Test file overwrites on subsequent save() calls."""
+    store.load()
+
+    # First save
+    store.add_fact("First fact", FactCategory.PREFERENCE, 0.9)
+    first_modified = store.file_path.stat().st_mtime
+
+    # Small delay to ensure timestamp difference
+    import time
+    time.sleep(0.01)
+
+    # Second save - should overwrite
+    store.add_fact("Second fact", FactCategory.PERSONAL, 0.85)
+    second_modified = store.file_path.stat().st_mtime
+
+    # Verify file was overwritten (modified time should be later)
+    assert second_modified > first_modified, "File should be overwritten on subsequent save"
+
+    # Verify both facts are in the file
+    with open(store.file_path, "r") as f:
+        data = json.load(f)
+
+    assert len(data["facts"]) == 2
+    texts = [f["text"] for f in data["facts"]]
+    assert "First fact" in texts
+    assert "Second fact" in texts
+
+
+def test_save_persists_all_fact_fields(store: MemoryStore) -> None:
+    """Test that persisted JSON structure contains all fact fields."""
+    store.load()
+    store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.95)
+
+    # Read the file and verify structure
+    with open(store.file_path, "r") as f:
+        data = json.load(f)
+
+    # Verify top-level fields
+    assert "session_id" in data
+    assert "facts" in data
+    assert "updated_at" in data
+
+    # Verify fact has all required fields
+    fact = data["facts"][0]
+    required_fields = {"text", "category", "confidence", "created_at", "last_referenced"}
+    assert set(fact.keys()) == required_fields
+
+    # Verify field types
+    assert isinstance(fact["text"], str)
+    assert isinstance(fact["category"], str)
+    assert isinstance(fact["confidence"], float)
+    assert isinstance(fact["created_at"], str)
+    assert isinstance(fact["last_referenced"], str)
+
+
+def test_save_persists_multiple_facts(store: MemoryStore) -> None:
+    """Test that all facts are persisted correctly."""
+    store.load()
+
+    # Add multiple facts
+    facts_to_add = [
+        ("Prefers dark mode", FactCategory.PREFERENCE, 0.9),
+        ("Lives in Berlin", FactCategory.PERSONAL, 0.95),
+        ("Working on Kubernetes", FactCategory.CONTEXT, 0.8),
+        ("Corrected about X", FactCategory.CORRECTION, 0.85),
+    ]
+
+    for text, category, confidence in facts_to_add:
+        store.add_fact(text, category, confidence)
+
+    # Read the file and verify all facts are present
+    with open(store.file_path, "r") as f:
+        data = json.load(f)
+
+    assert len(data["facts"]) == len(facts_to_add)
+
+    # Verify each fact
+    for i, (text, category, confidence) in enumerate(facts_to_add):
+        fact = data["facts"][i]
+        assert fact["text"] == text
+        assert fact["category"] == category.value
+        assert fact["confidence"] == confidence
+
+
+def test_save_without_prior_load(store: MemoryStore) -> None:
+    """Test save() works correctly without calling load() first."""
+    # Don't call load() - just add facts directly
+    store.add_fact("Direct save test", FactCategory.CONTEXT, 0.8)
+
+    # Verify file was created
+    assert store.file_path.exists()
+
+    # Verify content
+    with open(store.file_path, "r") as f:
+        data = json.load(f)
+
+    assert len(data["facts"]) == 1
+    assert data["facts"][0]["text"] == "Direct save test"
