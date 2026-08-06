@@ -1,0 +1,1 @@
+Error from server (BadRequest): Unable to find "argoproj.io/v1alpha1, Resource=workflows" that match label selector "workflows.argoproj.io/workflow-template-invoke=whisper-stt-build", field selector "status.startedTime": invalid selector: 'status.startedTime'; can't understand 'status.startedTime'
