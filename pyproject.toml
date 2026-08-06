@@ -24,6 +24,8 @@ dev = [
     # real content — not the identical-blank captures the old suite produced when
     # Playwright was broken. Only the e2e browser tests need it.
     "Pillow>=10.0.0",
+    # Data analysis for deployment log parsing (bead adc-en94p):
+    "pandas>=2.0.0",
 ]
 
 [build-system]
