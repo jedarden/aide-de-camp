@@ -1,0 +1,69 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "action": "ClusterIPAllocation",
+            "apiVersion": "v1",
+            "eventTime": "2026-08-06T21:55:08.065761Z",
+            "firstTimestamp": null,
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "name": "pbx-rebuild-egress",
+                "namespace": "pbx-web",
+                "resourceVersion": "214283197",
+                "uid": "9f5d6808-97ac-48c0-99bb-dea6fc8ff431"
+            },
+            "kind": "Event",
+            "lastTimestamp": null,
+            "message": "Cluster IP [IPv4]: 10.43.94.154 is not allocated; repairing",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T21:55:08Z",
+                "name": "pbx-rebuild-egress.18c95605512c4ba6",
+                "namespace": "pbx-web",
+                "resourceVersion": "214283200",
+                "uid": "2dd1b1e3-ff3e-4327-b8db-d73f4f935c10"
+            },
+            "reason": "ClusterIPNotAllocated",
+            "reportingComponent": "ipallocator-repair-controller",
+            "reportingInstance": "ipallocator-repair-controller-k3s-server-a",
+            "source": {},
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 246,
+            "eventTime": null,
+            "firstTimestamp": "2026-05-01T14:28:10Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "name": "pbx-web",
+                "namespace": "pbx-web",
+                "resourceVersion": "148668318",
+                "uid": "ee224610-36de-48b3-9d09-67aa0b660ac6"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-08-06T21:31:01Z",
+            "message": "Service uses deprecated annotation metallb.universe.tf/allow-shared-ip",
+            "metadata": {
+                "creationTimestamp": "2026-08-06T21:31:01Z",
+                "name": "pbx-web.18ab775666ec3b99",
+                "namespace": "pbx-web",
+                "resourceVersion": "214271994",
+                "uid": "f4341d90-42f7-4456-a813-9aa4069a590e"
+            },
+            "reason": "deprecatedAnnotation",
+            "reportingComponent": "metallb-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "metallb-controller"
+            },
+            "type": "Warning"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
