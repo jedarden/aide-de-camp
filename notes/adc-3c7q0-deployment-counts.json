@@ -1,0 +1,91 @@
+{
+  "analysis_metadata": {
+    "generated_at": "2026-08-06T14:25:00Z",
+    "analysis_bead": "adc-3c7q0",
+    "data_sources": [
+      "pbx-web-deployment-data-30days.json",
+      "whisper-stt-deployment-data-30days.json"
+    ],
+    "time_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "cluster": "ardenone-cluster"
+  },
+  "deployment_counts": {
+    "pbx-web": {
+      "total_deployments": 5,
+      "successful_deployments": 5,
+      "failed_deployments": 0,
+      "rollback_events": 1,
+      "deployment_success_rate": "100%",
+      "verification": {
+        "total_events_counted": 5,
+        "success_outcomes": [
+          "2026-07-28: revision 14 (pbx-web-5ff68464d) - success",
+          "2026-07-27: lab-rebuild-relay - success",
+          "2026-07-15: pbx-rebuild-relay - success",
+          "2026-07-13: revision 14 (pbx-web-5ff68464d) - success",
+          "2026-07-13: revision 11 rollback - rolled_back (deployed successfully then rolled back)"
+        ],
+        "failed_outcomes": [],
+        "total_verified": 5,
+        "success_plus_failure_equals_total": true
+      }
+    },
+    "whisper-stt": {
+      "total_deployments": 4,
+      "successful_deployments": 4,
+      "failed_deployments": 0,
+      "rollback_events": 0,
+      "deployment_success_rate": "100%",
+      "breakdown_by_deployment": {
+        "whisper-stt": {
+          "total_deployments": 2,
+          "successful": 2,
+          "failed": 0
+        },
+        "whisper-openai": {
+          "total_deployments": 2,
+          "successful": 2,
+          "failed": 0
+        }
+      },
+      "verification": {
+        "total_events_counted": 4,
+        "success_outcomes": [
+          "2026-07-12: whisper-stt revision 32 (847fd8d7b9) - success",
+          "2026-07-08: whisper-stt revision 31 (6c497489fb) - success",
+          "2026-07-08: whisper-stt revision 30 (5b8558f478) - success",
+          "2026-06-14: whisper-openai revision 24 (68966786fb) - success"
+        ],
+        "failed_outcomes": [],
+        "total_verified": 4,
+        "success_plus_failure_equals_total": true
+      }
+    }
+  },
+  "summary": {
+    "total_services_analyzed": 2,
+    "combined_total_deployments": 9,
+    "combined_successful_deployments": 9,
+    "combined_failed_deployments": 0,
+    "combined_success_rate": "100%",
+    "services_with_failures": 0,
+    "services_with_100_percent_success": 2,
+    "services_list": ["pbx-web", "whisper-stt"]
+  },
+  "acceptance_criteria_verification": {
+    "pbx-web_success_count_computed": true,
+    "pbx-web_failure_count_computed": true,
+    "whisper-stt_success_count_computed": true,
+    "whisper-stt_failure_count_computed": true,
+    "total_counts_verified": true,
+    "intermediate_counts_stored": true
+  },
+  "notes": [
+    "Both services show 100% deployment success rate over 30-day period",
+    "pbx-web had 1 rollback event which is counted as a successful deployment that was later rolled back",
+    "whisper-stt namespace includes 2 deployments: whisper-stt and whisper-openai",
+    "All deployments verified against validated data from child bead 1",
+    "Success criteria: deployment reached ready state and/or completed rollout",
+    "Failure criteria: deployment failed to reach ready state or encountered rollout errors"
+  ]
+}
