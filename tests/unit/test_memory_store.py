@@ -935,3 +935,386 @@ def test_round_trip_preserves_fact_order(store: MemoryStore) -> None:
     # Verify order is preserved
     loaded_texts = [f.text for f in new_store._facts]
     assert loaded_texts == facts_order
+
+
+# --- load() edge case tests (bead adc-4uqev) -----------------------------------
+
+
+def test_load_with_invalid_json_fails_gracefully(store: MemoryStore) -> None:
+    """Test that load() handles invalid JSON gracefully by initializing empty state."""
+    # Create a file with invalid JSON
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        f.write("{invalid json content}")
+
+    # Load should handle the error gracefully
+    store.load()
+
+    # Verify it initializes with empty state
+    assert len(store._facts) == 0
+    assert store._data["session_id"] == store.session_id
+    assert store._data["facts"] == []
+
+
+def test_load_with_null_session_id(store: MemoryStore) -> None:
+    """Test that load() handles null session_id by replacing it."""
+    import json
+
+    # Create a file with null session_id
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": None,
+            "facts": []
+        }, f)
+
+    # Load - should replace null session_id
+    store.load()
+
+    # Verify session_id was replaced
+    assert store._data["session_id"] == store.session_id
+    assert store.session_id == "test-session-123"
+
+
+def test_load_with_empty_string_session_id(store: MemoryStore) -> None:
+    """Test that load() handles empty string session_id by replacing it."""
+    import json
+
+    # Create a file with empty string session_id
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": "",
+            "facts": []
+        }, f)
+
+    # Load - should replace empty session_id
+    store.load()
+
+    # Verify session_id was replaced
+    assert store._data["session_id"] == store.session_id
+
+
+def test_load_with_facts_not_a_list(store: MemoryStore) -> None:
+    """Test that load() handles facts field that is not a list."""
+    import json
+
+    # Create a file with facts as a dict instead of list
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": {"not": "a list"}
+        }, f)
+
+    # Load - should handle gracefully
+    store.load()
+
+    # Verify facts field is reset to empty list
+    assert isinstance(store._data["facts"], list)
+    assert len(store._facts) == 0
+
+
+def test_load_with_non_dict_fact_entries(store: MemoryStore) -> None:
+    """Test that load() skips non-dict entries in facts array."""
+    import json
+
+    # Create a file with mixed valid and non-dict fact entries
+    mixed_facts = [
+        {
+            "text": "Valid fact",
+            "category": "preference",
+            "confidence": 0.8,
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "last_referenced": "2024-01-01T12:00:00+00:00"
+        },
+        "string instead of dict",
+        123,
+        None,
+        ["array", "instead", "of", "dict"]
+    ]
+
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": mixed_facts
+        }, f)
+
+    # Load - should skip non-dict entries
+    store.load()
+
+    # Verify only the valid fact was loaded
+    assert len(store._facts) == 1
+    assert store._facts[0].text == "Valid fact"
+
+
+def test_load_with_invalid_category_value(store: MemoryStore) -> None:
+    """Test that load() skips facts with invalid category values."""
+    import json
+
+    # Create a file with valid and invalid category values
+    mixed_facts = [
+        {
+            "text": "Valid fact",
+            "category": "preference",
+            "confidence": 0.8,
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "last_referenced": "2024-01-01T12:00:00+00:00"
+        },
+        {
+            "text": "Invalid category",
+            "category": "not_a_real_category",
+            "confidence": 0.7,
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "last_referenced": "2024-01-01T12:00:00+00:00"
+        }
+    ]
+
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": mixed_facts
+        }, f)
+
+    # Load - should skip the invalid category fact
+    store.load()
+
+    # Verify only the valid fact was loaded
+    assert len(store._facts) == 1
+    assert store._facts[0].text == "Valid fact"
+
+
+def test_load_with_missing_required_fact_fields(store: MemoryStore) -> None:
+    """Test that load() skips facts with missing required fields."""
+    import json
+
+    # Create a file with facts missing various required fields
+    malformed_facts = [
+        {"text": "Missing category", "confidence": 0.8},
+        {"category": "preference", "confidence": 0.8},
+        {"text": "Missing confidence", "category": "preference"},
+        {
+            "text": "Valid fact",
+            "category": "preference",
+            "confidence": 0.8,
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "last_referenced": "2024-01-01T12:00:00+00:00"
+        }
+    ]
+
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": malformed_facts
+        }, f)
+
+    # Load - should skip all malformed facts
+    store.load()
+
+    # Verify only the valid fact was loaded
+    assert len(store._facts) == 1
+    assert store._facts[0].text == "Valid fact"
+
+
+def test_load_with_completely_empty_file(store: MemoryStore) -> None:
+    """Test that load() handles completely empty JSON file."""
+    import json
+
+    # Create an empty JSON object
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({}, f)
+
+    # Load - should initialize with defaults
+    store.load()
+
+    # Verify defaults are set
+    assert store._data["session_id"] == store.session_id
+    assert store._data["facts"] == []
+    assert len(store._facts) == 0
+
+
+def test_load_creates_empty_store_when_no_file(store: MemoryStore) -> None:
+    """Test that load() with no existing file creates an empty MemoryStore."""
+    # Ensure no file exists
+    if store.file_path.exists():
+        store.file_path.unlink()
+
+    # Load should create empty store
+    store.load()
+
+    # Verify empty store state
+    assert len(store._facts) == 0
+    assert isinstance(store._facts, list)
+    assert store._data["session_id"] == store.session_id
+    assert store._data["facts"] == []
+
+
+def test_load_reconstructs_facts_from_existing_file(store: MemoryStore) -> None:
+    """Test that load() reconstructs facts correctly from existing JSON file."""
+    import json
+    from datetime import datetime, timezone
+
+    # Create a file with complex fact data
+    test_facts = [
+        {
+            "text": "User prefers dark mode",
+            "category": "preference",
+            "confidence": 0.9,
+            "created_at": "2024-01-15T10:30:00+00:00",
+            "last_referenced": "2024-01-15T10:30:00+00:00"
+        },
+        {
+            "text": "User lives in Berlin, Germany",
+            "category": "personal",
+            "confidence": 0.95,
+            "created_at": "2024-01-16T14:20:00+00:00",
+            "last_referenced": "2024-01-16T14:20:00+00:00"
+        },
+        {
+            "text": "User corrected assistant about memory implementation",
+            "category": "correction",
+            "confidence": 1.0,
+            "created_at": "2024-01-17T09:15:00+00:00",
+            "last_referenced": "2024-01-17T09:15:00+00:00"
+        }
+    ]
+
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": test_facts,
+            "updated_at": "2024-01-17T09:15:00+00:00"
+        }, f)
+
+    # Load from file
+    store.load()
+
+    # Verify all facts reconstructed correctly
+    assert len(store._facts) == 3
+
+    # Check first fact
+    assert store._facts[0].text == "User prefers dark mode"
+    assert store._facts[0].category == FactCategory.PREFERENCE
+    assert store._facts[0].confidence == 0.9
+    assert store._facts[0].created_at == "2024-01-15T10:30:00+00:00"
+    assert store._facts[0].last_referenced == "2024-01-15T10:30:00+00:00"
+
+    # Check second fact
+    assert store._facts[1].text == "User lives in Berlin, Germany"
+    assert store._facts[1].category == FactCategory.PERSONAL
+    assert store._facts[1].confidence == 0.95
+
+    # Check third fact
+    assert store._facts[2].text == "User corrected assistant about memory implementation"
+    assert store._facts[2].category == FactCategory.CORRECTION
+    assert store._facts[2].confidence == 1.0
+
+
+def test_load_preserves_session_id_from_file(store: MemoryStore) -> None:
+    """Test that load() preserves session_id from file in _data dict."""
+    import json
+
+    test_session_id = "preserved-session-abc123"
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": test_session_id,
+            "facts": []
+        }, f)
+
+    # Load from file
+    store.load()
+
+    # Verify session_id is preserved from file in _data
+    # Note: store.session_id is set in __init__ and doesn't get updated from file
+    assert store._data["session_id"] == test_session_id
+
+
+def test_load_handles_missing_data_memory_directory_gracefully(store: MemoryStore) -> None:
+    """Test that load() handles missing data/memory/ directory gracefully."""
+    import shutil
+
+    # Create a path to a non-existent directory
+    non_existent_dir = store.memory_dir.parent / "completely_nonexistent_path"
+
+    # Ensure directory doesn't exist
+    if non_existent_dir.exists():
+        shutil.rmtree(non_existent_dir)
+
+    # Create a new store with non-existent directory
+    test_store = MemoryStore(
+        session_id="test-missing-dir",
+        memory_dir=str(non_existent_dir),
+        logger=store.logger
+    )
+
+    # Load should handle gracefully without errors
+    test_store.load()
+
+    # Verify it initializes with empty state
+    assert len(test_store._facts) == 0
+    assert isinstance(test_store._facts, list)
+    assert test_store._data["session_id"] == test_store.session_id
+    assert test_store._data["facts"] == []
+
+
+def test_load_with_multiple_malformed_and_valid_facts(store: MemoryStore) -> None:
+    """Test that load() handles a mix of multiple malformed and valid facts."""
+    import json
+
+    # Create a file with many malformed and valid facts mixed
+    mixed_facts = [
+        "string entry",
+        123,
+        None,
+        {"text": "Missing fields"},
+        {
+            "text": "Valid fact 1",
+            "category": "preference",
+            "confidence": 0.9,
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "last_referenced": "2024-01-01T12:00:00+00:00"
+        },
+        ["array", "entry"],
+        {
+            "text": "Valid fact 2",
+            "category": "personal",
+            "confidence": 0.85,
+            "created_at": "2024-01-02T12:00:00+00:00",
+            "last_referenced": "2024-01-02T12:00:00+00:00"
+        },
+        {
+            "category": "context",
+            "confidence": 0.7,
+            "created_at": "2024-01-03T12:00:00+00:00",
+            "last_referenced": "2024-01-03T12:00:00+00:00"
+        },
+        {
+            "text": "Valid fact 3",
+            "category": "context",
+            "confidence": 0.8,
+            "created_at": "2024-01-04T12:00:00+00:00",
+            "last_referenced": "2024-01-04T12:00:00+00:00"
+        }
+    ]
+
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": mixed_facts
+        }, f)
+
+    # Load - should skip malformed and load valid
+    store.load()
+
+    # Verify only valid facts were loaded
+    assert len(store._facts) == 3
+    assert store._facts[0].text == "Valid fact 1"
+    assert store._facts[1].text == "Valid fact 2"
+    assert store._facts[2].text == "Valid fact 3"
