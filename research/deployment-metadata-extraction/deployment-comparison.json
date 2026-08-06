@@ -1,0 +1,58 @@
+{
+  "extraction_date": "2026-08-06T12:09:09.954080",
+  "analysis_period": "30_days",
+  "services_compared": [
+    "pbx-web",
+    "whisper-stt"
+  ],
+  "pbx_web_deployments": [
+    {
+      "deployment_name": "pbx-web",
+      "revisions_30_days": 4,
+      "frequency": "low",
+      "strategy": "RollingUpdate",
+      "success_rate": 100.0,
+      "days_since_last": 24
+    },
+    {
+      "deployment_name": "pbx-rebuild-relay",
+      "revisions_30_days": 1,
+      "frequency": "very_low",
+      "strategy": "RollingUpdate",
+      "success_rate": 100.0,
+      "days_since_last": 22
+    },
+    {
+      "deployment_name": "lab-rebuild-relay",
+      "revisions_30_days": 1,
+      "frequency": "very_low",
+      "strategy": "RollingUpdate",
+      "success_rate": 100.0,
+      "days_since_last": 10
+    }
+  ],
+  "whisper_stt_deployments": [
+    {
+      "deployment_name": "whisper-stt",
+      "revisions_30_days": 10,
+      "frequency": "high",
+      "strategy": "Recreate",
+      "success_rate": 100.0,
+      "days_since_last": 24
+    },
+    {
+      "deployment_name": "whisper-openai",
+      "revisions_30_days": 5,
+      "frequency": "medium",
+      "strategy": "RollingUpdate",
+      "success_rate": 100.0,
+      "days_since_last": 53
+    }
+  ],
+  "key_findings": [
+    "pbx-web had 4 deployments vs whisper-stt's 10",
+    "pbx-web uses RollingUpdate strategy vs whisper-stt's Recreate",
+    "pbx-web deployment frequency: low vs whisper-stt: high",
+    "pbx-web success rate: 100.0% vs whisper-stt: 100.0%"
+  ]
+}

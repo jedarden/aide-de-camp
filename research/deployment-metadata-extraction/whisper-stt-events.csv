@@ -1,0 +1,16 @@
+service,deployment_name,revision,replicaset,timestamp,age_days,status,replicas,available,ready,image,strategy,success
+whisper-stt,whisper-stt,32,whisper-stt-847fd8d7b9,2026-07-12T16:53:42Z,24,active,1,1,1,ronaldraygun/whisper-stt:1.8.6,Recreate,True
+whisper-stt,whisper-stt,31,whisper-stt-6c497489fb,2026-07-08T03:26:44Z,29,scaled_down,0,0,0,unknown,Recreate,True
+whisper-stt,whisper-stt,30,whisper-stt-5b8558f478,2026-07-08T03:16:13Z,29,scaled_down,0,0,0,unknown,Recreate,True
+whisper-stt,whisper-stt,29,whisper-stt-5dbff75cbd,2026-07-08T03:09:35Z,29,scaled_down,0,0,0,unknown,Recreate,True
+whisper-stt,whisper-stt,28,whisper-stt-6b96f4569c,2026-07-02T02:20:33Z,35,scaled_down,0,0,0,unknown,Recreate,True
+whisper-stt,whisper-stt,27,whisper-stt-6464bdf67b,2026-07-01T19:46:33Z,36,scaled_down,0,0,0,unknown,Recreate,True
+whisper-stt,whisper-stt,26,whisper-stt-5b884b75f4,2026-06-26T16:33:34Z,41,scaled_down,0,0,0,unknown,Recreate,True
+whisper-stt,whisper-stt,25,whisper-stt-78bbf5f57f,2026-06-26T12:42:03Z,41,scaled_down,0,0,0,unknown,Recreate,True
+whisper-stt,whisper-stt,24,whisper-stt-558c7cf44,2026-06-25T14:10:16Z,42,scaled_down,0,0,0,unknown,Recreate,True
+whisper-stt,whisper-stt,23,whisper-stt-65fb7f8dd9,2026-06-25T14:08:07Z,42,scaled_down,0,0,0,unknown,Recreate,True
+whisper-stt,whisper-openai,24,whisper-openai-68966786fb,2026-06-14T04:55:48Z,53,active,1,1,1,fedirz/faster-whisper-server:latest-cpu,RollingUpdate,True
+whisper-stt,whisper-openai,23,whisper-openai-6885fc878b,2026-06-14T04:52:13Z,53,scaled_down,0,0,0,unknown,RollingUpdate,True
+whisper-stt,whisper-openai,22,whisper-openai-6b75db654f,2026-06-14T04:48:36Z,53,scaled_down,0,0,0,unknown,RollingUpdate,True
+whisper-stt,whisper-openai,21,whisper-openai-85b44d79b4,2026-06-14T04:27:44Z,53,scaled_down,0,0,0,unknown,RollingUpdate,True
+whisper-stt,whisper-openai,20,whisper-openai-55bb9fb46f,2026-06-14T04:11:57Z,53,scaled_down,0,0,0,unknown,RollingUpdate,True
