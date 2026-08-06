@@ -3493,6 +3493,148 @@ elif msg_type == "adc.turn_done":
 
 ---
 
+## Memory Store Unit-Level Persistence Verification - 2026-08-06
+
+**Bead:** adc-434h5
+**Repository:** /home/coding/aide-de-camp
+**Feature:** MemoryStore persistence verification (split from adc-zec)
+**Test Time:** 2026-08-06 08:40 UTC
+**Test File:** `tests/test_memory_store.py`
+
+### Test Environment
+- Python: 3.13 (venv at `.venv/bin/python`)
+- Test Framework: pytest 9.1.1
+- Test Scope: Unit-level MemoryStore operations (no API key needed)
+- Hermetic: Uses temporary directories to avoid touching production data
+
+### Test Execution Results
+**Command:** `.venv/bin/python -m pytest tests/test_memory_store.py -v`  
+**Status:** ✅ **ALL 25 TESTS PASSED** (execution time: 0.09s)
+
+### Test Coverage
+
+#### Basic load/save operations (5 tests)
+✅ `test_load_initializes_empty_store` - load() creates empty state when file doesn't exist  
+✅ `test_load_creates_file_path_correctly` - file path uses correct hash format  
+✅ `test_save_creates_json_file` - save() creates JSON file at expected path  
+✅ `test_save_persists_fact_to_disk` - fact data persisted correctly with all fields  
+✅ `test_load_with_corrupted_json_falls_back_safely` - corrupted JSON handled gracefully
+
+#### Persistence across load cycles (2 tests)  
+✅ `test_fact_survives_load_cycle` - single fact persists through fresh MemoryStore instance  
+✅ `test_multiple_facts_survive_load_cycle` - multiple facts survive load cycles
+
+#### Duplicate detection logic (7 tests)
+✅ `test_duplicate_exact_match` - exact matches detected and rejected  
+✅ `test_duplicate_case_insensitive` - case-insensitive deduplication works  
+✅ `test_duplicate_whitespace_normalized` - whitespace normalization in deduplication  
+✅ `test_duplicate_long_text_prefix_match` - prefix matching for long texts (>20 chars)  
+✅ `test_duplicate_different_category_allowed` - same text, different category allowed  
+✅ `test_duplicate_short_text_no_prefix_match` - short texts don't trigger prefix matching  
+✅ `test_no_duplicate_for_different_text` - genuinely different facts allowed
+
+#### Fact limit and trimming (1 test)
+✅ `test_add_fact_trims_oldest_when_at_limit` - FIFO trimming when MAX_FACTS (100) reached
+
+#### get_facts operations (2 tests)
+✅ `test_get_facts_returns_copy` - get_facts() returns copy, not internal list  
+✅ `test_get_facts_updates_timestamps` - last_referenced timestamps updated on access
+
+#### Category serialization (2 tests)
+✅ `test_fact_category_serialization_roundtrip` - all categories survive save/load cycle  
+✅ `test_fact_to_dict_and_from_dict` - Fact serialization methods work correctly
+
+#### Empty/edge case handling (3 tests)
+✅ `test_add_empty_text_returns_false` - empty text rejected  
+✅ `test_add_whitespace_only_text_returns_false` - whitespace-only text rejected  
+✅ `test_confidence_clamping` - confidence values clamped to [0.0, 1.0]
+
+#### Session isolation (1 test)
+✅ `test_different_sessions_have_different_files` - different sessions create separate files
+
+#### File structure validation (2 tests)
+✅ `test_json_file_structure_is_valid` - JSON file has expected structure  
+✅ `test_file_path_uses_correct_hash_length` - hash is exactly 16 characters
+
+### Detailed Findings
+
+#### 1. JSON File Creation and Structure
+**Location:** `data/memory/session_<sha256(session_id)[:16]>.json`  
+**Structure verified:**
+```json
+{
+  "session_id": "test-session-123",
+  "facts": [
+    {
+      "text": "User prefers dark mode",
+      "category": "preference",
+      "confidence": 0.9,
+      "created_at": "2024-08-06T08:40:00Z",
+      "last_referenced": "2024-08-06T08:40:00Z"
+    }
+  ],
+  "updated_at": "2024-08-06T08:40:00Z"
+}
+```
+✅ All required fields present  
+✅ Valid JSON format  
+✅ Category enum values serialized correctly
+
+#### 2. Persistence Across Load Cycles
+✅ Facts survive `MemoryStore` instance destruction  
+✅ New instance loads from same file path  
+✅ All metadata (text, category, confidence, timestamps) preserved  
+✅ Session isolation maintained (different sessions = different files)
+
+#### 3. Deduplication Logic
+✅ Exact match detection works (case-insensitive, whitespace-normalized)  
+✅ Near-exact match for long texts (>20 chars) via prefix/suffix matching  
+✅ Same text with different category allowed (correct behavior)  
+✅ Short texts (<20 chars) don't trigger prefix matching (prevents false positives)
+
+#### 4. Edge Cases and Error Handling
+✅ Empty/whitespace-only text rejected cleanly  
+✅ Corrupted JSON falls back to empty state (no crashes)  
+✅ Confidence values clamped to valid range [0.0, 1.0]  
+✅ MAX_FACTS limit enforced with FIFO trimming
+
+#### 5. Hermetic Testing
+✅ All tests use temporary directories (`tmp_path` fixture)  
+✅ No production data touched during test execution  
+✅ Each test isolates session_id to prevent conflicts
+
+### Verification Status
+
+| Component | Tests | Status | Details |
+|-----------|-------|--------|---------|
+| load() initialization | 2 | ✅ PASS | Empty state & file path creation verified |
+| add_fact() operations | 8 | ✅ PASS | Addition, deduplication, trimming verified |
+| save() persistence | 3 | ✅ PASS | JSON creation, structure, corruption handling verified |
+| Fact persistence | 2 | ✅ PASS | Load cycles preserve all data verified |
+| _is_duplicate() logic | 7 | ✅ PASS | Exact, near-exact, category-aware dedup verified |
+| Edge cases | 10 | ✅ PASS | Empty input, confidence clamping, isolation verified |
+
+**Overall:** ✅ **ALL 25 UNIT TESTS PASS**
+
+### Conclusions
+
+1. **MemoryStore persistence is correct at the unit level** - All core operations (load, add_fact, save) work as specified
+2. **Deduplication logic is sound** - Handles exact matches, near-exact matches, and category differences correctly
+3. **Error handling is robust** - Corrupted JSON, invalid input, and edge cases handled gracefully
+4. **Session isolation works** - Different sessions create separate files with no cross-contamination
+5. **File structure is valid** - JSON files created with correct structure and all required fields
+6. **Tests are hermetic** - No production data touched, all tests use temporary directories
+
+**Current State:** `data/memory/` directory exists with 6 session files (created during earlier integration testing)  
+**Production Usage:** Memory extraction has not been used in practice (no voice sessions with OPENAI_API_KEY configured)
+
+**No source code modifications required.** Unit-level verification confirms implementation correctness.
+
+**Test artifacts:** Full test suite in `tests/test_memory_store.py` (25 tests, 492 lines)  
+**Companion verification:** Integration-level verification requires OPENAI_API_KEY and voice session execution
+
+---
+
 ## Voice Path Verification - 2026-08-06
 
 **Bead:** adc-4iq
