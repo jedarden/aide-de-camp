@@ -138,7 +138,7 @@ One LLM call per utterance. Receives the full utterance text, the project regist
 
 `lookup_kind` appears only on `lookup` threads (see the intent-type list below); no other intent type carries it.
 
-Intent types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`
+Intent types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`, `stuck`
 
 - **status**: Query current state (pods, pipelines, deployments, beads)
 - **action**: Execute a command (deploy, restart, create) — executes only through the Action Execution Model (declarative-config Git operations + ArgoCD sync status, or reviewed escalation beads); never direct kubectl mutation
@@ -149,6 +149,7 @@ Intent types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modi
 - **monitoring-config**: Configure ambient monitoring rules
 - **task-profile**: Durable async work items that escalate to NEEDLE beads
 - **clarification**: Low-confidence routing outcome requiring user input (meta-type, not dispatched)
+- **stuck**: Task blocked by circuit breaker (fenced bead) — renders a "needs your input" card with refusal reason
 
 The router reloads its segmentation prompt and the project registry per call through an mtime-checked cache: each file is stat'd on every call and re-read only when its mtime has changed — the same strategy every hot-reloaded artifact uses (see Hot-Reload Architecture). Hot-reload is automatic; an edit takes effect on the next call.
 
@@ -672,9 +673,11 @@ aide-de-camp/
 │   ├── agents/              ← agent implementations
 │   │   ├── self_modification.py  ← self-improvement agent
 │   │   └── ui_regen.py          ← UI-regen agent
+│   ├── bead_validation/     ← bead validation logic (Generated-Bead Safety)
 │   ├── components/          ← component library and hot-reload
 │   │   ├── library.py           ← component library DB operations
 │   │   └── hot_reload.py        ← hot-reload watcher
+│   ├── concurrency/         ← concurrency control (asyncio.Semaphore limiter for synthesize calls)
 │   ├── context/             ← context warming and pre-fetch
 │   │   ├── warmer.py            ← context warmer for active topics
 │   │   └── prefetch.py          ← speculative pre-fetch
@@ -682,6 +685,9 @@ aide-de-camp/
 │   ├── diff/                ← diff generation for results
 │   ├── environment/         ← environment and repo discovery
 │   │   └── discovery.py        ← repo scanner: seeds registry.yaml (one-time/on-demand scan); self-mod agent is sole ongoing author (see Project Registry)
+│   ├── errors/              ← error handling (degraded state, circuit breaker, stuck intents)
+│   │   ├── degraded_state.py    ← Degraded-state UX card rendering
+│   │   └── circuit_breaker.py   ← Re-dispatch circuit breaker logic
 │   ├── escalate/            ← escalate strand for task-profile intents
 │   │   ├── handler.py           ← escalate request handler
 │   │   ├── llm.py               ← LLM calls for bead formulation
@@ -694,17 +700,24 @@ aide-de-camp/
 │   │   ├── commands.py          ← fetch command matrix, intent types, data structures
 │   │   └── orchestrator.py      ← FetchStrand: concurrent fetch execution, streaming, coverage tracking
 │   ├── intent/              ← intent router (LLM classification)
-│   │   └── router.py            ← intent segmentation and routing
+│   │   ├── router.py            ← intent segmentation and routing
+│   │   └── deterministic_router.py ← fast-path deterministic routing (70-80% of requests)
+│   ├── instrument/           ← timing instrumentation (DispatchTimings, latency budget)
+│   ├── llm/                 ← LLM client wrappers (ZAI proxy integration, timing breakdown)
 │   ├── memory/              ← memory store and extraction (supporting store for cross-session context; not yet surfaced by any component — Future Work)
 │   │   ├── store.py             ← memory persistence
 │   │   └── extraction.py        ← memory extraction from results
 │   ├── monitoring/          ← ambient monitoring
 │   │   └── ambient.py           ← ambient monitoring rules
+│   ├── persistence/         ← persistence layer abstractions (DB connections, repository pattern)
 │   ├── realtime/            ← OpenAI Realtime API voice session
 │   │   ├── session.py           ← voice session handler
 │   │   ├── batching.py          ← result batching for narration
 │   │   ├── continuity.py        ← audio-to-canvas session continuity
 │   │   └── dispatch.py          ← tool-as-trigger dispatch
+│   ├── render/              ← hot-path rendering (deterministic component selection, card cache)
+│   │   └── hot_path.py          ← hot-path selector (no LLM)
+│   ├── schemas/             ← Pydantic schemas (API models, validation)
 │   ├── session/             ← session store (SQLite)
 │   │   └── store.py             ← session store operations
 │   ├── sse/                 ← SSE broadcasting
@@ -717,10 +730,11 @@ aide-de-camp/
 │   ├── synthesize/          ← synthesize strand (LLM)
 │   │   └── strand.py            ← result synthesis
 │   ├── telegram/            ← Telegram fallback surface
-│   │   └── fallback.py          ← Telegram delivery
+│   │   └── fallback.py          ← Telegram delivery (⚠ NON-FUNCTIONAL until ADR-1 implementation)
 │   ├── test/                ← test-harness endpoints (bypass Web Speech API for e2e tests)
 │   ├── topic/               ← topic model
 │   │   └── model.py             ← topic operations
+│   ├── validation/          ├── validation utilities (bead body validation, safety checks)
 │   ├── watcher/             ← bead watcher daemon
 │   │   └── daemon.py            ← NEEDLE bead watcher
 │   ├── canvas/              ← web frontend (SSE consumer, card renderer)
@@ -1125,7 +1139,7 @@ aide-de-camp adds a routing and rendering layer on top of existing infrastructur
 - **kubectl proxies** — fetch strand uses existing kubectl proxy access per cluster.
 - **ArgoCD** — fetch strand reads ArgoCD application state via the endpoint mapped to the project's `cluster` in `config/clusters.yaml`: the no-auth read-only proxy `argocd-ro-ardenone-manager-ts.ardenone.com:8444` for ardenone-cluster apps (ArgoCD on ardenone-manager); apexalgo-iad and the other iad-* Spot clusters are managed by rs-manager's ArgoCD, which has no equivalent read-only proxy today (must-fix before the demo — see the Phase 5 known-issues register).
 
-Net-new code: the codebase measures approximately **15,400 lines** of Python. That is a size figure, not a completeness figure — the count includes stubbed paths (ADR-1's Telegram fallback methods, which log a warning and return `False`, count the same as working code). For an honest completeness picture, use the per-phase statuses in Implementation Phases (verified-in-tests vs. verified-live) plus a stub sweep of `src/`, not line or module counts. See the File System Layout section for the module breakdown.
+Net-new code: the codebase measures approximately **30,336 lines** of Python. That is a size figure, not a completeness figure — the count includes stubbed paths (ADR-1's Telegram fallback methods, which log a warning and return `False`, count the same as working code). For an honest completeness picture, use the per-phase statuses in Implementation Phases (verified-in-tests vs. verified-live) plus a stub sweep of `src/`, not line or module counts. See the File System Layout section for the module breakdown.
 
 ---
 
