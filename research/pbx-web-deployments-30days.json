@@ -1,39 +1,41 @@
 {
-  "metadata": {
-    "retrieval_date": "2026-08-06T12:37:36Z",
-    "timeframe_start": "2026-07-07T00:00:00Z",
-    "timeframe_end": "2026-08-06T12:37:36Z",
-    "total_workflows": 3,
-    "source": "Kubernetes Deployment/ReplicaSet history via ArgoCD",
-    "note": "Derived from ReplicaSet metadata - CI workflows not available due to cleanup policy"
+  "deployments": [],
+  "summary": {
+    "total_deployment_count": 0,
+    "time_period": {
+      "start": "2026-07-06T00:00:00Z",
+      "end": "2026-08-06T23:59:59Z",
+      "requested_lookback_days": 30
+    },
+    "data_availability": {
+      "status": "no_data_found",
+      "reason": "workflow_retention_policy",
+      "cluster_workflows_found": 14,
+      "pbx_web_workflows_found": 0
+    },
+    "findings": {
+      "workflow_template_exists": true,
+      "template_created": "2026-05-27T02:25:59Z",
+      "actual_retention_period": "approximately_10_days",
+      "oldest_workflow_in_cluster": "2026-07-27T18:59:34Z",
+      "total_workflows_in_cluster": 14,
+      "pbx_web_build_runs_found": 0,
+      "retention_window_days": 10
+    },
+    "alternatives_considered": [
+      "Check Argo Workflows retention policy settings in iad-ci cluster",
+      "Consider configuring longer TTL for pbx-web-build workflows if historical data is needed",
+      "Use external logging/storage for workflow run history beyond retention period",
+      "Alternative: Check if pbx-web-build logs are persisted elsewhere (e.g., Loki, Elasticsearch)",
+      "Manual trigger may be required for pbx-web-build workflows"
+    ]
   },
-  "deployments": [
-    {
-      "workflow_id": "pbx-web-5ff68464d",
-      "timestamp": "2026-07-28T17:26:12Z",
-      "phase": "Succeeded",
-      "started_at": "2026-07-28T17:26:12Z",
-      "finished_at": "2026-07-28T17:26:12Z",
-      "duration_seconds": 30.0,
-      "status_message": "deployment_rollout: Current active deployment"
-    },
-    {
-      "workflow_id": "pbx-web-5ff68464d",
-      "timestamp": "2026-07-13T18:18:07Z",
-      "phase": "Succeeded",
-      "started_at": "2026-07-13T18:18:07Z",
-      "finished_at": "2026-07-13T18:18:07Z",
-      "duration_seconds": 30.0,
-      "status_message": "deployment_rollout: Initial deployment of revision 14"
-    },
-    {
-      "workflow_id": "pbx-web-754f4cfdf7",
-      "timestamp": "2026-07-13T18:07:55Z",
-      "phase": "Succeeded",
-      "started_at": "2026-07-13T18:07:55Z",
-      "finished_at": "2026-07-13T18:07:55Z",
-      "duration_seconds": 30.0,
-      "status_message": "deployment_rollback: Rolled back to 1.0.8 on same day"
-    }
-  ]
+  "metadata": {
+    "generated_at": "2026-08-06T20:55:06.013274Z",
+    "source": "pbx-web-workflows-raw.json",
+    "cluster": "iad-ci",
+    "namespace": "argo-workflows",
+    "workflow_template": "pbx-web-build",
+    "note": "No pbx-web-build workflow runs found in available retention window"
+  }
 }
