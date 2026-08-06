@@ -1,0 +1,112 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T11:18:20.772771",
+    "task_id": "adc-3m6ai",
+    "description": "Deployment frequency and timing metrics",
+    "time_period_days": 30
+  },
+  "pbx_web": {
+    "service_name": "pbx-web",
+    "namespace": "pbx-web",
+    "cluster": "ardenone-cluster",
+    "metrics": {
+      "total_deployments": 5,
+      "deployment_frequency_per_day": 0.1667,
+      "mean_time_between_deployments_hours": 89.83,
+      "time_range_days": 14.97,
+      "first_deployment": "2026-07-13T18:07:55+00:00",
+      "last_deployment": "2026-07-28T17:26:12+00:00",
+      "consecutive_gaps_hours": [
+        0.17,
+        33.11,
+        302.52,
+        23.5
+      ]
+    },
+    "deployment_events": [
+      {
+        "timestamp": "2026-07-13T18:07:55+00:00",
+        "event_type": "deployment_rollback",
+        "outcome": "rolled_back"
+      },
+      {
+        "timestamp": "2026-07-13T18:18:07+00:00",
+        "event_type": "deployment_rollout",
+        "outcome": "success"
+      },
+      {
+        "timestamp": "2026-07-15T03:24:40+00:00",
+        "event_type": "deployment_rollout",
+        "outcome": "success"
+      },
+      {
+        "timestamp": "2026-07-27T17:56:07+00:00",
+        "event_type": "deployment_rollout",
+        "outcome": "success"
+      },
+      {
+        "timestamp": "2026-07-28T17:26:12+00:00",
+        "event_type": "deployment_rollout",
+        "outcome": "success"
+      }
+    ]
+  },
+  "whisper_stt": {
+    "service_name": "whisper-stt",
+    "namespace": "whisper-stt",
+    "cluster": "ardenone-cluster",
+    "metrics": {
+      "total_deployments": 4,
+      "deployment_frequency_per_day": 0.1333,
+      "mean_time_between_deployments_hours": 36.58,
+      "time_range_days": 4.57,
+      "first_deployment": "2026-07-08T03:09:35+00:00",
+      "last_deployment": "2026-07-12T16:53:42+00:00",
+      "consecutive_gaps_hours": [
+        0.11,
+        0.18,
+        109.45
+      ]
+    },
+    "deployment_events": [
+      {
+        "timestamp": "2026-07-08T03:09:35+00:00",
+        "status": "inactive",
+        "revision": 29,
+        "image": "ronaldraygun/whisper-stt:1.8.2"
+      },
+      {
+        "timestamp": "2026-07-08T03:16:13+00:00",
+        "status": "inactive",
+        "revision": 30,
+        "image": "ronaldraygun/whisper-stt:1.8.4"
+      },
+      {
+        "timestamp": "2026-07-08T03:26:44+00:00",
+        "status": "inactive",
+        "revision": 31,
+        "image": "ronaldraygun/whisper-stt:1.8.6"
+      },
+      {
+        "timestamp": "2026-07-12T16:53:42+00:00",
+        "status": "active",
+        "revision": 32,
+        "image": "ronaldraygun/whisper-stt:1.8.6"
+      }
+    ]
+  },
+  "comparison": {
+    "pbx_web_deployments_per_day": 0.1667,
+    "whisper_stt_deployments_per_day": 0.1333,
+    "frequency_ratio": 1.25,
+    "pbx_web_mean_time_between_hours": 89.83,
+    "whisper_stt_mean_time_between_hours": 36.58
+  },
+  "summary": {
+    "pbx_web_total_deployments": 5,
+    "whisper_stt_total_deployments": 4,
+    "pbx_web_time_range_days": 14.97,
+    "whisper_stt_time_range_days": 4.57,
+    "analysis_complete": true
+  }
+}
