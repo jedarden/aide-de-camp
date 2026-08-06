@@ -1,0 +1,307 @@
+{
+  "collection_metadata": {
+    "timestamp": "2026-08-06T15:56:26.351454",
+    "analysis_period": {
+      "start": "2026-07-07T00:00:00Z",
+      "end": "2026-08-06T23:59:59Z",
+      "days": 30
+    },
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "services": {
+    "pbx-web": {
+      "service": "pbx-web",
+      "analysis_period": {
+        "start": "2026-07-07T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "days": 30
+      },
+      "error_metrics": {
+        "pod_logs": {
+          "total_pods_analyzed": 8,
+          "pods_with_errors": 1,
+          "pods_with_oom_kills": 0,
+          "total_error_count": 42,
+          "total_oom_kill_count": 0,
+          "error_samples": [
+            "[pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer",
+            "Exception occurred during processing of request from ('127.0.0.1', 57008)"
+          ],
+          "oom_kill_samples": [],
+          "pods_details": [
+            {
+              "pod_name": "pbx-web-pbx-web-5ff68464d-lcfcp",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "whisper-stt-whisper-openai-68966786fb-tng29",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "whisper-stt-whisper-stt-847fd8d7b9-b8rsj",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pbx-web-pbx-rebuild-relay-8596977857-4292b",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-pbx-web-5ff68464d-mkn8n-2026-08-06",
+              "error_count": 42,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [
+                "[pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer",
+                "Exception occurred during processing of request from ('127.0.0.1', 57008)",
+                "Traceback (most recent call last):"
+              ],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            }
+          ],
+          "error_rate_per_pod": 5.25,
+          "oom_kill_rate_per_pod": 0.0
+        },
+        "nginx": {
+          "http_5xx_errors": 0,
+          "http_4xx_errors": 2,
+          "http_total_requests": 33129,
+          "response_times": [],
+          "error_details": [],
+          "log_file_found": true,
+          "log_file_size": 4392661,
+          "log_lines_analyzed": 33137,
+          "http_5xx_error_rate": 0.0,
+          "http_4xx_error_rate": 6.037006852002777e-05
+        },
+        "deployments": {
+          "total_deployments": 0,
+          "successful_deployments": 0,
+          "failed_deployments": 0,
+          "deployment_times": [],
+          "deployment_error_rate": 0.0,
+          "deployment_found": false
+        },
+        "overall": {
+          "total_errors_all_sources": 44,
+          "error_rate_per_day": 1.4666666666666666,
+          "pod_errors_per_day": 1.4,
+          "oom_kills_per_day": 0.0,
+          "http_5xx_per_day": 0.0,
+          "http_4xx_per_day": 0.06666666666666667,
+          "deployment_errors_per_day": 0.0,
+          "deployment_success_rate": 0.0
+        }
+      },
+      "latency_metrics": {},
+      "data_gaps": [
+        "deployments-30days.json not found"
+      ],
+      "collection_timestamp": "2026-08-06T15:56:26.351469"
+    },
+    "whisper-stt": {
+      "service": "whisper-stt",
+      "analysis_period": {
+        "start": "2026-07-07T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "days": 30
+      },
+      "error_metrics": {
+        "pod_logs": {
+          "total_pods_analyzed": 10,
+          "pods_with_errors": 2,
+          "pods_with_oom_kills": 0,
+          "total_error_count": 2,
+          "total_oom_kill_count": 0,
+          "error_samples": [
+            "error: You must be logged in to the server (the server has asked for the client to provide credentials)",
+            "error: error from server (NotFound): namespaces \"whisper-stt\" not found in namespace \"whisper-stt\""
+          ],
+          "oom_kill_samples": [],
+          "pods_details": [
+            {
+              "pod_name": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current",
+              "error_count": 1,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [
+                "error: You must be logged in to the server (the server has asked for the client to provide credentials)"
+              ],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-current",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-previous",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06",
+              "error_count": 1,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [
+                "error: error from server (NotFound): namespaces \"whisper-stt\" not found in namespace \"whisper-stt\""
+              ],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-07-12",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-stderr",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-whisper-openai-68966786fb-jsb5d-2026-06-14",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            },
+            {
+              "pod_name": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-stderr",
+              "error_count": 0,
+              "oom_kill_count": 0,
+              "performance_count": 0,
+              "error_samples": [],
+              "oom_kill_samples": [],
+              "performance_samples": []
+            }
+          ],
+          "error_rate_per_pod": 0.2,
+          "oom_kill_rate_per_pod": 0.0
+        },
+        "nginx": {
+          "http_5xx_errors": 0,
+          "http_4xx_errors": 0,
+          "http_total_requests": 0,
+          "response_times": [],
+          "error_details": [],
+          "log_file_found": false,
+          "log_file_size": 0,
+          "log_lines_analyzed": 0
+        },
+        "deployments": {
+          "total_deployments": 1,
+          "successful_deployments": 0,
+          "failed_deployments": 0,
+          "deployment_times": [],
+          "deployment_error_rate": 0.0,
+          "deployment_found": true
+        },
+        "overall": {
+          "total_errors_all_sources": 2,
+          "error_rate_per_day": 0.06666666666666667,
+          "pod_errors_per_day": 0.06666666666666667,
+          "oom_kills_per_day": 0.0,
+          "http_5xx_per_day": 0.0,
+          "http_4xx_per_day": 0.0,
+          "deployment_errors_per_day": 0.0,
+          "deployment_success_rate": 0.0
+        }
+      },
+      "latency_metrics": {},
+      "data_gaps": [
+        "No nginx log files found",
+        "Failed to read deployments file: 'str' object has no attribute 'get'"
+      ],
+      "collection_timestamp": "2026-08-06T15:56:26.465903"
+    }
+  }
+}
