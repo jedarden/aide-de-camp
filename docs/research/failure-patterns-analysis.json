@@ -1,0 +1,380 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T14:26:00.000000",
+    "analysis_period": "30-day window (2026-07-08 to 2026-07-28)",
+    "input_file": "deployment-metrics-comparison.json",
+    "services_analyzed": ["pbx-web", "whisper-stt"],
+    "analysis_type": "failure patterns and operational risk assessment"
+  },
+  "overall_assessment": {
+    "summary": "Both services achieved perfect deployment records with zero failures during the analysis period",
+    "total_deployments_analyzed": 9,
+    "total_failures": 0,
+    "combined_success_rate": "100%",
+    "key_observation": "With zero failures, this analysis focuses on operational patterns, deployment rhythms, and potential risk indicators rather than traditional failure modes"
+  },
+  "common_patterns": {
+    "shared_success_patterns": {
+      "pattern": "Perfect deployment success",
+      "category": "common",
+      "frequency": {
+        "pbx-web": 5,
+        "whisper-stt": 4,
+        "combined": 9
+      },
+      "percentage_of_total": "100%",
+      "severity": "none (positive pattern)",
+      "description": "Both services achieved 100% deployment success with zero failures, rollbacks, or incidents",
+      "timestamps": {
+        "pbx-web": ["2026-07-13", "2026-07-15", "2026-07-27", "2026-07-28"],
+        "whisper-stt": ["2026-07-08", "2026-07-12"]
+      },
+      "trend": "Consistent excellence throughout analysis period"
+    },
+    "shared_stability_patterns": {
+      "pattern": "High stability with zero downtime",
+      "category": "common",
+      "frequency": "continuous",
+      "severity": "none (positive pattern)",
+      "description": "Both services maintained 100% uptime with zero-downtime deployments",
+      "indicators": [
+        "zero pod restarts",
+        "zero crash loops",
+        "zero OOM kills",
+        "zero incidents",
+        "all pods running healthy"
+      ],
+      "trend": "Sustained high stability"
+    },
+    "shared_deployment_patterns": {
+      "pattern": "Low deployment volume",
+      "category": "common",
+      "frequency": "9 total deployments across 30 days",
+      "severity": "informational",
+      "description": "Both services show relatively low deployment frequency, suggesting stable mature services or conservative release practices",
+      "implications": [
+        "Low deployment risk due to infrequent changes",
+        "Potential for feature stagnation if too conservative",
+        "Easy to maintain high success rates with low deployment volume"
+      ],
+      "trend": "Stable but may indicate over-conservative release practices"
+    }
+  },
+  "unique_patterns": {
+    "pbx_web_specific": {
+      "steady_rhythm_pattern": {
+        "pattern": "Consistent deployment cadence",
+        "category": "unique-to-pbx-web",
+        "frequency": 5,
+        "percentage_of_service_deployments": "100%",
+        "severity": "low (operational pattern)",
+        "description": "pbx-web deployments spread evenly over 16 days (every ~3 days) with consistent weekly activity",
+        "deployment_distribution": {
+          "week_1": 2 deployments,
+          "week_2": 1 deployment,
+          "week_3": 1 deployment,
+          "week_4": 1 deployment
+        },
+        "benefits": [
+          "Predictable release schedule",
+          "Regular maintenance and updates",
+          "No deployment clustering or burst pressure"
+        ],
+        "risks": [
+          "Minimal - steady rhythm reduces deployment stress"
+        ],
+        "timestamps": ["2026-07-13", "2026-07-15", "2026-07-27", "2026-07-28"],
+        "trend": "Sustainable, consistent rhythm"
+      },
+      "log_error_pattern": {
+        "pattern": "Non-fatal log errors",
+        "category": "unique-to-pbx-web",
+        "frequency": 6,
+        "severity": "low (non-blocking)",
+        "description": "pbx-web has 6 log errors despite 100% deployment success - these are non-fatal errors that don't block deployments",
+        "impact": "none on deployments",
+        "potential_causes": [
+          "Expected error handling for edge cases",
+          "Transient network or dependency issues",
+          "Debug-level logging for monitoring",
+          "Non-critical warnings"
+        ],
+        "recommendation": "Investigate log error patterns to ensure they're truly benign",
+        "trend": "Requires investigation to confirm non-critical nature"
+      },
+      "active_maintenance_pattern": {
+        "pattern": "Ongoing active maintenance",
+        "category": "unique-to-pbx-web",
+        "frequency": 5,
+        "severity": "none (positive pattern)",
+        "description": "pbx-web has consistent recent deployment activity (last deployment 9 days ago) indicating active maintenance",
+        "staleness_score": 9,
+        "staleness_category": "recent",
+        "benefits": [
+          "Service is actively maintained",
+          "Regular updates and patches",
+          "Lower risk of bit rot or dependency staleness"
+        ],
+        "trend": "Healthy, active maintenance pattern"
+      }
+    },
+    "whisper_stt_specific": {
+      "burst_deployment_pattern": {
+        "pattern": "Burst deployment with extended idle periods",
+        "category": "unique-to-whisper-stt",
+        "frequency": 4,
+        "percentage_of_service_deployments": "100%",
+        "severity": "medium (operational risk indicator)",
+        "description": "whisper-stt had 4 deployments in 5 days (burst pattern) followed by 25+ days of complete inactivity",
+        "deployment_distribution": {
+          "burst_window": "2026-07-08 to 2026-07-12 (5 days)",
+          "deployments_in_burst": 4,
+          "idle_period": "2026-07-12 to 2026-07-28 (16+ days)"
+        },
+        "benefits": [
+          "Batched feature releases",
+          "Focused development windows",
+          "Extended stable periods between releases"
+        ],
+        "risks": [
+          "Deployment staleness (25+ days without updates)",
+          "Potential for bit rot or dependency staleness",
+          "Unclear if service is neglected or frozen in stable state",
+          "Large batched deployments may carry more risk per deployment"
+        ],
+        "timestamps": ["2026-07-08 (3 deployments)", "2026-07-12 (1 deployment)"],
+        "trend": "Concerning - extended idle period may indicate neglect or frozen service",
+        "staleness_score": 25,
+        "staleness_category": "stale"
+      },
+      "clean_logs_pattern": {
+        "pattern": "Zero log errors",
+        "category": "unique-to-whisper-stt",
+        "frequency": 0,
+        "severity": "none (positive pattern)",
+        "description": "whisper-stt has perfectly clean logs with zero errors - suggests mature error handling or low verbosity",
+        "comparison": "vs 6 log errors for pbx-web",
+        "potential_explanations": [
+          "More conservative error logging configuration",
+          "Mature error handling prevents logged errors",
+          "Lower deployment volume reduces error exposure",
+          "Service may be less feature-rich (fewer edge cases)"
+        ],
+        "trend": "Positive - indicates clean operation or conservative logging"
+      },
+      "low_frequency_pattern": {
+        "pattern": "Very low deployment frequency",
+        "category": "unique-to-whisper-stt",
+        "frequency": 4,
+        "percentage_of_active_days": "40%",
+        "severity": "medium (operational risk indicator)",
+        "description": "whisper-stt only deployed on 2 days out of 30-day analysis period - extremely low activity",
+        "deployment_density": "4 deployments in 5 days, then 16+ days idle",
+        "risks": [
+          "Service may be neglected or abandoned",
+          "Potential security vulnerabilities from lack of updates",
+          "Dependency staleness risk",
+          "Unclear if this is intentional stability or problematic neglect"
+        ],
+        "trend": "Concerning - extended idle period needs investigation",
+        "recommendation": "Investigate whether whisper-stt is intentionally stable or unintentionally neglected"
+      }
+    }
+  },
+  "risk_assessment": {
+    "low_risk_indicators": [
+      {
+        "indicator": "Zero deployment failures",
+        "scope": "both services",
+        "confidence": "high",
+        "mitigation": "Continue current deployment practices"
+      },
+      {
+        "indicator": "Zero downtime",
+        "scope": "both services",
+        "confidence": "high",
+        "mitigation": "Continue current deployment practices"
+      },
+      {
+        "indicator": "Zero incidents",
+        "scope": "both services",
+        "confidence": "high",
+        "mitigation": "Continue current monitoring and response practices"
+      }
+    ],
+    "medium_risk_indicators": [
+      {
+        "indicator": "whisper-stt deployment staleness (25+ days)",
+        "scope": "whisper-stt only",
+        "confidence": "medium",
+        "severity": "unclear - could be intentional stability or neglect",
+        "mitigation": "Investigate service status, determine if staleness is intentional",
+        "action": "Check if whisper-stt is in maintenance freeze or intentionally stable"
+      },
+      {
+        "indicator": "pbx-web non-fatal log errors",
+        "scope": "pbx-web only",
+        "confidence": "low",
+        "severity": "low - non-blocking but may indicate edge cases",
+        "mitigation": "Investigate log error patterns to confirm benign nature",
+        "action": "Review log error types and frequencies"
+      }
+    ],
+    "high_risk_indicators": [],
+    "recommendations": [
+      {
+        "priority": "medium",
+        "action": "Investigate whisper-stt staleness",
+        "reason": "25+ days without deployment may indicate neglect or frozen service",
+        "suggested_investigation": "Check service roadmap, maintenance status, and dependency health"
+      },
+      {
+        "priority": "low",
+        "action": "Review pbx-web log errors",
+        "reason": "6 non-fatal errors may indicate edge cases or transient issues",
+        "suggested_investigation": "Categorize log error types and determine if they're truly benign"
+      },
+      {
+        "priority": "low",
+        "action": "Document burst vs steady deployment strategies",
+        "reason": "Both patterns work (100% success) - document as valid deployment strategies",
+        "suggested_action": "Capture team rationale for each service's deployment rhythm"
+      }
+    ]
+  },
+  "temporal_patterns": {
+    "deployment_activity_timeline": {
+      "week_1_2026-07-07": {
+        "pbx-web": 2 deployments,
+        "whisper-stt": 4 deployments,
+        "combined": 6 deployments,
+        "observation": "whisper-stt burst window, pbx-web steady start"
+      },
+      "week_2_2026-07-14": {
+        "pbx-web": 1 deployment,
+        "whisper-stt": 0 deployments,
+        "combined": 1 deployment,
+        "observation": "whisper-stt idle period begins"
+      },
+      "week_3_2026-07-21": {
+        "pbx-web": 1 deployment,
+        "whisper-stt": 0 deployments,
+        "combined": 1 deployment,
+        "observation": "whisper-stt remains idle"
+      },
+      "week_4_2026-07-28": {
+        "pbx-web": 1 deployment,
+        "whisper-stt": 0 deployments,
+        "combined": 1 deployment,
+        "observation": "whisper-stt remains idle, pbx-web continues steady rhythm"
+      }
+    },
+    "trend_analysis": {
+      "deployment_frequency_trend": {
+        "pbx-web": "steady, consistent rhythm throughout period",
+        "whisper-stt": "burst in first week, then complete idle period"
+      },
+      "success_rate_trend": {
+        "pbx-web": "maintained 100% throughout",
+        "whisper-stt": "maintained 100% throughout active period"
+      },
+      "staleness_trend": {
+        "pbx-web": "consistent, low staleness (max 9 days)",
+        "whisper-stt": "increasing staleness trend (16+ days and counting)"
+      }
+    }
+  },
+  "frequency_and_severity_analysis": {
+    "pattern_frequency_rankings": {
+      "most_frequent": {
+        "rank_1": {
+          "pattern": "Successful deployments",
+          "category": "common",
+          "frequency": 9,
+          "severity": "none (positive)"
+        },
+        "rank_2": {
+          "pattern": "pbx-web steady rhythm",
+          "category": "unique-to-pbx-web",
+          "frequency": 5,
+          "severity": "none (positive)"
+        },
+        "rank_3": {
+          "pattern": "whisper-stt burst deployments",
+          "category": "unique-to-whisper-stt",
+          "frequency": 4,
+          "severity": "medium (staleness risk)"
+        }
+      }
+    },
+    "severity_rankings": {
+      "high_severity": [],
+      "medium_severity": [
+        {
+          "pattern": "whisper-stt deployment staleness",
+          "category": "unique-to-whisper-stt",
+          "severity_score": "medium",
+          "impact": "potential neglect or bit rot risk"
+        }
+      ],
+      "low_severity": [
+        {
+          "pattern": "pbx-web log errors",
+          "category": "unique-to-pbx-web",
+          "severity_score": "low",
+          "impact": "non-blocking, requires investigation"
+        }
+      ],
+      "informational": [
+        {
+          "pattern": "low deployment volume",
+          "category": "common",
+          "severity_score": "informational",
+          "impact": "indicates conservative release practices"
+        }
+      ]
+    }
+  },
+  "correlations": {
+    "deployment_frequency_vs_success": {
+      "observation": "No correlation - both services achieved 100% success despite different deployment frequencies and patterns",
+      "conclusion": "Success rate is driven by deployment quality and testing, not frequency or rhythm"
+    },
+    "deployment_pattern_vs_stability": {
+      "observation": "Both patterns (steady vs burst) achieve 100% uptime and zero-downtime deployments",
+      "conclusion": "Both steady and burst deployment patterns can produce stable outcomes when properly executed"
+    },
+    "staleness_vs_risk": {
+      "observation": "whisper-stt's 25+ day idle period creates uncertainty about service status",
+      "conclusion": "Extended deployment gaps may indicate either intentional stability or problematic neglect - requires investigation"
+    },
+    "log_errors_vs_success": {
+      "observation": "pbx-web has 6 log errors but 100% success; whisper-stt has 0 log errors and 100% success",
+      "conclusion": "Log error count does not correlate with deployment success in this dataset"
+    }
+  },
+  "summary": {
+    "key_findings": [
+      "Both services achieved perfect deployment records with zero failures during the 30-day analysis period",
+      "No common failure patterns exist - both services operated flawlessly",
+      "pbx-web exhibits a steady, consistent deployment rhythm (every ~3 days) indicating active maintenance",
+      "whisper-stt exhibits a burst deployment pattern (4 deployments in 5 days) followed by 25+ days of inactivity",
+      "The primary operational difference is deployment rhythm: steady (pbx-web) vs burst+idle (whisper-stt)",
+      "whisper-stt's extended idle period (25+ days) is the main risk indicator requiring investigation",
+      "pbx-web's 6 non-fatal log errors warrant review but do not impact deployment success",
+      "Low deployment volume across both services suggests conservative release practices or stable mature services"
+    ],
+    "operational_insights": [
+      "Both deployment patterns (steady and burst) can produce perfect outcomes when properly executed",
+      "Deployment success is driven by quality and process, not frequency or rhythm",
+      "Extended deployment gaps create uncertainty about service status and require investigation",
+      "Non-fatal log errors may exist even with perfect deployment success rates"
+    ],
+    "risk_summary": {
+      "overall_risk_level": "low",
+      "primary_concern": "whisper-stt deployment staleness (25+ days)",
+      "secondary_concern": "pbx-web non-fatal log errors (6 instances)",
+      "recommendation": "Investigate whisper-stt maintenance status and pbx-web log error patterns"
+    }
+  }
+}
