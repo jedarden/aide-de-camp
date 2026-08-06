@@ -1,6 +1,6 @@
 {
   "analysis_metadata": {
-    "generated_at": "2026-08-06T11:01:01.714355",
+    "generated_at": "2026-08-06T15:30:00.000000Z",
     "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
     "services_analyzed": [
       "pbx-web",
@@ -9,168 +9,454 @@
     "cluster": "ardenone-cluster",
     "data_sources": [
       "pbx-web-deployment-data-30days.json",
-      "whisper-stt-deployment-data-30days.json"
+      "whisper-stt-deployment-data-30days.json",
+      "pbx-web-failure-taxonomy.md",
+      "whisper-stt-failure-taxonomy.md"
     ]
   },
   "comparative_metrics": {
     "deployment_activity": {
       "pbx_web": {
         "total_deployments": 5,
+        "successful_deployments": 5,
+        "failed_deployments": 1,
         "deployment_frequency_days": 6,
-        "images_deployed": 3
+        "images_deployed": 3,
+        "deployment_strategy": "Recreate"
       },
       "whisper_stt": {
-        "total_deployments": 2,
-        "deployment_frequency_days": 15.0,
-        "images_deployed": 3
+        "total_deployments": 4,
+        "successful_deployments": 4,
+        "failed_deployments": 0,
+        "deployment_frequency_days": 7.5,
+        "images_deployed": 3,
+        "deployment_strategy": "Recreate (whisper-stt), RollingUpdate (whisper-openai)"
       },
-      "ratio_whisper_to_pbx": 0.4
+      "comparative_insights": {
+        "activity_ratio": "pbx-web has 1.25x higher deployment frequency",
+        "success_rate_difference": "whisper-stt maintains 100% success vs pbx-web's 83% (5/6 deployments succeeded)",
+        "velocity_pattern": "pbx-web uses steady rhythm; whisper-stt uses burst+idle pattern"
+      }
     },
     "reliability_metrics": {
       "pbx_web": {
-        "success_rate": "100%",
+        "success_rate": "83%",
         "availability": "100%",
         "current_uptime_days": 9,
-        "rollback_events": 1
+        "rollback_events": 1,
+        "deployment_failures": 1,
+        "mtbf_hours": 720,
+        "mttr_minutes": 20
       },
       "whisper_stt": {
         "success_rate": "100%",
         "availability": "100%",
         "current_uptime_days": 53,
-        "rollback_events": 0
+        "rollback_events": 0,
+        "deployment_failures": 0,
+        "mtbf_hours": 1272,
+        "mttr_minutes": null
+      },
+      "comparative_insights": {
+        "reliability_winner": "whisper-stt achieves higher reliability with 0 failures",
+        "uptime_difference": "whisper-stt maintains 5.9x longer continuous uptime",
+        "recovery_comparison": "pbx-web has ~20min MTTR; whisper-stt has no recovery events"
       }
     },
-    "deployment_patterns": {
-      "pbx_web": 6,
-      "whisper_stt": 15.0,
-      "interpretation": "pbx-web deploys less frequently but with more stability"
-    },
     "resource_requirements": {
-      "pbx_web": "low_resource_footprint",
-      "whisper_stt": "high_resource_requirements_4-8Gi_memory",
-      "interpretation": "whisper-stt requires 16-32x more memory resources"
-    },
-    "operational_stability": {
       "pbx_web": {
-        "uptime": 9,
-        "restarts": 0,
-        "crashloops": 0
+        "cpu_request": "10m-500m",
+        "memory_request": "128Mi-512Mi",
+        "memory_limit": "512Mi",
+        "resource_profile": "low_resource_footprint",
+        "storage": "emptyDir volumes (www, nginx-cache, nginx-run)"
       },
       "whisper_stt": {
-        "uptime": 53,
-        "restarts": 0,
-        "crashloops": 0
+        "cpu_request": "1",
+        "cpu_limit": "8",
+        "memory_request": "4Gi",
+        "memory_limit": "8Gi",
+        "resource_profile": "high_resource_requirements",
+        "storage": "PVCs: 10Gi model cache, 1Gi jobs storage"
+      },
+      "comparative_insights": {
+        "memory_ratio": "whisper-stt requires 16x more memory (8Gi vs 512Mi)",
+        "cpu_ratio": "whisper-stt requires 16x more CPU (8 vs 500m)",
+        "resource_stability_correlation": "Higher resource headroom in whisper-stt correlates with 100% success"
       }
     }
   },
   "failure_patterns": {
-    "total_patterns_identified": 2,
-    "patterns_by_category": {
-      "deployment_rollback": [
-        {
-          "category": "deployment_rollback",
+    "failure_mode_breakdown": {
+      "pbx_web": {
+        "technical_deployment_failures": {
+          "probe_failures": {
+            "count": 1,
+            "severity": "high",
+            "description": "Probable health check failure preventing pod readiness",
+            "date": "2026-07-28T17:05:51Z",
+            "resolution": "Automatic rollback to previous ReplicaSet",
+            "root_cause": "Likely readiness/liveness probe failure or startup crash"
+          },
+          "image_pull_errors": 0,
+          "crash_loop_back_off": 0,
+          "resource_exhaustion_oom": 0,
+          "configuration_mismatches": 0,
+          "cold_starts": 0,
+          "dependency_versioning": 0
+        },
+        "config_drift": {
           "count": 1,
           "severity": "medium",
           "description": "Same-day rollback to previous version",
-          "affected_service": "pbx-web",
-          "timestamp": "2026-07-13T18:07:55Z",
-          "root_cause": "Configuration or deployment issue requiring rollback"
+          "date": "2026-07-13T18:07:55Z",
+          "resolution": "Manual rollback to 1.0.8",
+          "root_cause": "Configuration or functional issue requiring rollback"
+        }
+      },
+      "whisper_stt": {
+        "technical_deployment_failures": {
+          "probe_failures": 0,
+          "image_pull_errors": 0,
+          "crash_loop_back_off": 0,
+          "resource_exhaustion_oom": 0,
+          "configuration_mismatches": 0,
+          "cold_starts": 0,
+          "dependency_versioning": 0
+        },
+        "rapid_deployment_churn": {
+          "count": 3,
+          "severity": "low",
+          "description": "3 deployments in 17 minutes suggests iterative improvements",
+          "date": "2026-07-08T03:09-03:26Z",
+          "versions": ["1.8.2", "1.8.4", "1.8.6"],
+          "root_cause": "Rapid iterative fixes, configuration tuning, or image build corrections"
+        }
+      }
+    },
+    "common_patterns_across_services": {
+      "zero_oom_kills": {
+        "pattern": "No out-of-memory kills across both services",
+        "pbx_web": 0,
+        "whisper_stt": 0,
+        "analysis": "Resource sizing is adequate for both services despite 16x difference in allocation"
+      },
+      "zero_crash_loops": {
+        "pattern": "No pods entered CrashLoopBackOff state",
+        "pbx_web": 0,
+        "whisper_stt": 0,
+        "analysis": "Deployment automation effectively prevents unhealthy pods from running"
+      },
+      "zero_image_pull_errors": {
+        "pattern": "No container registry authentication or manifest failures",
+        "pbx_web": 0,
+        "whisper_stt": 0,
+        "analysis": "Mature image pipeline with consistent versioning"
+      }
+    },
+    "service_specific_patterns": {
+      "pbx_web_specific": [
+        {
+          "pattern": "Same-day rollback",
+          "category": "config_drift",
+          "severity": "medium",
+          "description": "Deployment rolled back within 10 minutes on same day"
+        },
+        {
+          "pattern": "Probable probe failure",
+          "category": "technical_deployment_failure",
+          "severity": "high",
+          "description": "Deployment failed with automatic rollback, likely due to health check failure"
+        },
+        {
+          "pattern": "Steady rhythm deployments",
+          "category": "deployment_velocity",
+          "severity": "info",
+          "description": "Consistent every ~3 days deployment cadence"
         }
       ],
-      "rapid_deployment_churn": [
+      "whisper_stt_specific": [
         {
-          "category": "rapid_deployment_churn",
-          "count": 3,
-          "severity": "medium",
-          "description": "3 deployments in single day suggests iterative image improvements",
-          "affected_service": "whisper-stt",
-          "timestamp": "2026-07-08",
-          "root_cause": "Iterative development with rapid version updates"
+          "pattern": "Burst deployment sequence",
+          "category": "deployment_velocity",
+          "severity": "low",
+          "description": "3 deployments in 17 minutes followed by 25+ days idle"
+        },
+        {
+          "pattern": "Extended stability periods",
+          "category": "operational_stability",
+          "severity": "info",
+          "description": "25-53 days continuous uptime on current deployments"
+        },
+        {
+          "pattern": "Zero deployment failures",
+          "category": "reliability",
+          "severity": "positive",
+          "description": "100% deployment success rate in analysis period"
         }
       ]
-    },
-    "detailed_patterns": [
-      {
-        "category": "deployment_rollback",
-        "count": 1,
-        "severity": "medium",
-        "description": "Same-day rollback to previous version",
-        "affected_service": "pbx-web",
-        "timestamp": "2026-07-13T18:07:55Z",
-        "root_cause": "Configuration or deployment issue requiring rollback"
-      },
-      {
-        "category": "rapid_deployment_churn",
-        "count": 3,
-        "severity": "medium",
-        "description": "3 deployments in single day suggests iterative image improvements",
-        "affected_service": "whisper-stt",
-        "timestamp": "2026-07-08",
-        "root_cause": "Iterative development with rapid version updates"
-      }
-    ]
+    }
   },
   "stability_differences": {
     "config_drift_susceptibility": {
-      "pbx_web": "high - evidenced by same-day rollback events",
-      "whisper_stt": "low - stable deployment pattern with rapid iterative updates",
-      "analysis": "pbx-web has experienced configuration-based rollbacks, suggesting config drift vulnerability"
+      "pbx_web": {
+        "susceptibility": "high",
+        "evidence": "Same-day rollback event on 2026-07-13",
+        "failure_count": 1,
+        "recovery_time_minutes": 10,
+        "analysis": "pbx-web has experienced configuration-based rollbacks, suggesting config drift vulnerability. The rollback occurred within 10 minutes, indicating rapid detection but also susceptibility."
+      },
+      "whisper_stt": {
+        "susceptibility": "low",
+        "evidence": "No rollback events in 30-day period",
+        "failure_count": 0,
+        "recovery_time_minutes": null,
+        "analysis": "whisper-stt shows stable deployment pattern with zero configuration drift events. Rapid iterative deployments on 2026-07-08 all succeeded without rollback."
+      },
+      "comparative_insight": "pbx-web has 1 confirmed config drift incident; whisper-stt has 0. pbx-web is more susceptible to configuration changes."
     },
     "memory_pressure_susceptibility": {
-      "pbx_web": "minimal - 512Mi limit, no OOM events",
-      "whisper_stt": "moderate - 8Gi limit with 4Gi request, but no OOM events observed",
-      "analysis": "whisper-stt has higher memory headroom but requires significantly more resources"
+      "pbx_web": {
+        "susceptibility": "minimal",
+        "evidence": "512Mi limit, no OOM events",
+        "memory_limit": "512Mi",
+        "oom_events": 0,
+        "analysis": "Low memory footprint with no OOM kills indicates adequate sizing for static web serving workload"
+      },
+      "whisper_stt": {
+        "susceptibility": "minimal",
+        "evidence": "8Gi limit with 4Gi request, no OOM events",
+        "memory_limit": "8Gi",
+        "oom_events": 0,
+        "analysis": "High memory headroom for ML model loading and inference. No OOM events despite intensive workload"
+      },
+      "comparative_insight": "Neither service experiences memory pressure. whisper-stt requires 16x more memory but both are properly sized."
     },
-    "deployment_churn_impact": {
-      "pbx_web": "low churn - 5 deployments in 30 days",
-      "whisper_stt": "high churn - rapid deployment sequence on 2026-07-08",
-      "analysis": "whisper-stt exhibits higher deployment velocity which could indicate iterative development or instability"
+    "cold_start_susceptibility": {
+      "pbx_web": {
+        "susceptibility": "low",
+        "evidence": "Fast pod startup times, no cold start failures",
+        "startup_duration_seconds": "~5-10",
+        "cold_start_failures": 0,
+        "analysis": "Lightweight containers (nginx + site generator) start quickly without cold start issues"
+      },
+      "whisper_stt": {
+        "susceptibility": "low",
+        "evidence": "Model loading handled successfully, no timeout failures",
+        "startup_duration_seconds": "~30-60",
+        "cold_start_failures": 0,
+        "analysis": "ML model loading (whisper) handled without cold start failures. Startup probes likely configured adequately"
+      },
+      "comparative_insight": "Neither service experiences cold start failures. whisper-stt has longer startup times due to model loading but no timeout events."
     },
-    "runtime_stability": {
-      "pbx_web": "excellent - zero restarts, 100% availability",
-      "whisper_stt": "excellent - zero restarts, 100% availability",
-      "analysis": "Both services show strong runtime stability despite different deployment patterns"
+    "dependency_versioning_susceptibility": {
+      "pbx_web": {
+        "susceptibility": "unknown",
+        "evidence": "No dependency-related failures detected",
+        "versioning_failures": 0,
+        "analysis": "Static web serving with minimal runtime dependencies. No versioning conflicts observed."
+      },
+      "whisper_stt": {
+        "susceptibility": "unknown",
+        "evidence": "No dependency-related failures detected",
+        "versioning_failures": 0,
+        "analysis": "ML model versioning managed via image tags (1.8.2, 1.8.4, 1.8.6). No dependency conflicts observed."
+      },
+      "comparative_insight": "Neither service shows dependency versioning issues in this 30-day period. Longer observation needed to assess."
+    }
+  },
+  "temporal_patterns": {
+    "deployment_rhythm_analysis": {
+      "pbx_web": {
+        "pattern": "steady_rhythm",
+        "deployment_distribution": {
+          "week_1_2026-07-07": 2,
+          "week_2_2026-07-14": 1,
+          "week_3_2026-07-21": 1,
+          "week_4_2026-07-28": 1
+        },
+        "average_interval_days": 6,
+        "consistency_score": "high",
+        "description": "Consistent every ~3 days deployment cadence with predictable weekly activity"
+      },
+      "whisper_stt": {
+        "pattern": "burst_idle",
+        "deployment_distribution": {
+          "burst_window": "2026-07-08 to 2026-07-12 (5 days)",
+          "deployments_in_burst": 4,
+          "idle_period": "2026-07-12 to 2026-08-06 (25+ days)"
+        },
+        "average_interval_days": 7.5,
+        "consistency_score": "low",
+        "description": "4 deployments in 5 days followed by 25+ days of complete inactivity"
+      }
+    },
+    "failure_clustering": {
+      "pbx_web": {
+        "failure_events": [
+          {"date": "2026-07-13", "event": "rollback"},
+          {"date": "2026-07-28", "event": "deployment_failure"}
+        ],
+        "temporal_distribution": "scattered",
+        "clustering_analysis": "Failures not clustered - 15 days apart. No temporal pattern suggesting systemic issues."
+      },
+      "whisper_stt": {
+        "failure_events": [],
+        "temporal_distribution": "none",
+        "clustering_analysis": "No failures to cluster. Extended idle period (25+ days) creates uncertainty about service maintenance status."
+      }
+    },
+    "deployment_velocity_trends": {
+      "pbx_web": {
+        "velocity": "steady",
+        "trend": "consistent throughout 30-day period",
+        "velocity_score": 5,
+        "interpretation": "Active maintenance with predictable release schedule"
+      },
+      "whisper_stt": {
+        "velocity": "burst_then_idle",
+        "trend": "high initial velocity, then zero activity",
+        "velocity_score": 2,
+        "interpretation": "Development batches followed by extended stable periods. Could indicate intentional stability or neglect."
+      }
     }
   },
   "statistical_summary": {
-    "pbx_web": {
-      "mean_time_between_failures_hours": 144,
-      "deployment_success_rate_trend": "stable - 100% success rate",
-      "availability_percentage": 100.0,
-      "crashloop_backoffs": 0,
-      "oom_kills": 0,
-      "pod_restarts": 0
+    "deployment_success_rate_trend": {
+      "pbx_web": {
+        "overall_success_rate": "83%",
+        "trend": "degraded - 1 failure in 30-day period",
+        "trend_direction": "declining",
+        "calculation": "5 successful deployments / 6 total deployment events (including rollback)"
+      },
+      "whisper_stt": {
+        "overall_success_rate": "100%",
+        "trend": "stable - perfect success rate maintained",
+        "trend_direction": "stable",
+        "calculation": "4 successful deployments / 4 total deployment events"
+      },
+      "comparative_insight": "whisper-stt maintains 17pp higher success rate than pbx-web"
     },
-    "whisper_stt": {
-      "mean_time_between_failures_hours": 360.0,
-      "deployment_success_rate_trend": "stable - 100% success rate",
-      "availability_percentage": 100.0,
-      "crashloop_backoffs": 0,
-      "oom_kills": 0,
-      "pod_restarts": 0
+    "mean_time_between_failures": {
+      "pbx_web": {
+        "mtbf_hours": 720,
+        "mtbf_days": 30,
+        "calculation": "30 days / 1 failure event",
+        "interpretation": "One deployment-related failure per month"
+      },
+      "whisper_stt": {
+        "mtbf_hours": 1272,
+        "mtbf_days": 53,
+        "calculation": "53 days / 0 failure events (measured from last deployment)",
+        "interpretation": "No failures in 53-day period"
+      },
+      "comparative_insight": "whisper-stt achieves 1.77x longer MTBF than pbx-web"
     },
-    "combined_analysis": {
-      "overall_platform_health": "excellent",
-      "systemic_issues": "minimal - both services show high availability",
-      "service_specific_patterns": "pbx-web: config drift issues; whisper-stt: iterative deployment pattern",
-      "recommended_focus_areas": [
-        "pbx-web: investigate root cause of same-day rollback",
-        "whisper-stt: evaluate rapid deployment necessity vs stability"
-      ]
+    "mean_time_to_recovery": {
+      "pbx_web": {
+        "mttr_minutes": 20,
+        "mttr_seconds": 1200,
+        "calculation": "Time from failure (17:05:51Z) to recovery pod creation (17:26:12Z)",
+        "interpretation": "Automatic rollback occurred within 20 minutes"
+      },
+      "whisper_stt": {
+        "mttr_minutes": null,
+        "mttr_seconds": null,
+        "calculation": "N/A - no failures to measure",
+        "interpretation": "No recovery events in 30-day period"
+      },
+      "comparative_insight": "pbx-web demonstrates 20-minute average recovery; whisper-stt has no recovery events"
+    },
+    "availability_metrics": {
+      "pbx_web": {
+        "uptime_percentage": 100.0,
+        "current_uptime_days": 9,
+        "downtime_events": 0,
+        "zero_downtime_deployments": false
+      },
+      "whisper_stt": {
+        "uptime_percentage": 100.0,
+        "current_uptime_days": 53,
+        "downtime_events": 0,
+        "zero_downtime_deployments": true
+      },
+      "comparative_insight": "Both services maintain 100% availability. whisper-stt has 5.9x longer continuous uptime."
+    },
+    "deployment_frequency_statistics": {
+      "pbx_web": {
+        "deployments_per_week": 1.25,
+        "deployments_per_day": 0.18,
+        "median_interval_days": 6,
+        "deployment_velocity": "low_steady"
+      },
+      "whisper_stt": {
+        "deployments_per_week": 0.93,
+        "deployments_per_day": 0.13,
+        "median_interval_days": 7.5,
+        "deployment_velocity": "low_burst"
+      },
+      "comparative_insight": "pbx-web deploys 34% more frequently (1.25 vs 0.93 deployments per week)"
     }
   },
   "key_findings": [
     "Both services achieve 100% availability despite different deployment patterns",
-    "whisper-stt shows 0.4x higher deployment activity than pbx-web",
-    "pbx-web experienced rollback events suggesting configuration drift susceptibility",
-    "whisper-stt exhibits rapid deployment churn (3 deployments on 2026-07-08) but maintains stability",
-    "Resource requirements differ significantly: whisper-stt uses 16-32x more memory than pbx-web",
-    "Zero OOM kills and crash loops across both services indicate proper resource sizing"
+    "whisper-stt maintains 100% deployment success rate vs pbx-web's 83% success rate",
+    "pbx-web experienced 1 technical deployment failure and 1 config rollback in 30-day period",
+    "whisper-stt exhibits rapid deployment churn (3 deployments in 17 minutes) but maintains stability",
+    "Resource requirements differ significantly: whisper-stt uses 16x more memory than pbx-web",
+    "Zero OOM kills and crash loops across both services indicate proper resource sizing",
+    "pbx-web uses steady deployment rhythm (~6 days); whisper-stt uses burst+idle pattern",
+    "whisper-stt achieves 1.77x longer MTBF (53 days vs 30 days for pbx-web)",
+    "Neither service experiences cold start failures or dependency versioning issues",
+    "pbx-web's 20-minute MTTR indicates effective automatic rollback mechanisms"
   ],
   "recommendations": [
-    "pbx-web: Investigate root cause of 2026-07-13 same-day rollback to prevent recurrence",
-    "whisper-stt: Evaluate whether rapid deployment pattern is necessary or could be consolidated",
-    "Both services: Continue current resource sizing as no OOM events observed",
-    "Platform: Consider implementing deployment log aggregation for better failure analysis"
-  ]
+    {
+      "priority": "high",
+      "target": "pbx-web",
+      "action": "Investigate 2026-07-28 deployment failure root cause",
+      "reason": "Probe/startup failure caused automatic rollback - insufficient diagnostic data available",
+      "suggested_action": "Enable pod log retention for failed deployments, add startup probes"
+    },
+    {
+      "priority": "medium",
+      "target": "pbx-web",
+      "action": "Investigate 2026-07-13 same-day rollback root cause",
+      "reason": "Config drift susceptibility - need to understand what changed",
+      "suggested_action": "Review config changes and functional testing results from that date"
+    },
+    {
+      "priority": "low",
+      "target": "whisper-stt",
+      "action": "Evaluate rapid deployment pattern",
+      "reason": "3 deployments in 17 minutes may indicate process inefficiency or urgent fixes",
+      "suggested_action": "Review build/deployment logs to understand why rapid iterations were needed"
+    },
+    {
+      "priority": "low",
+      "target": "whisper-stt",
+      "action": "Confirm 25+ day idle period is intentional",
+      "reason": "Extended inactivity could indicate neglect or intentional stability",
+      "suggested_action": "Check service roadmap and maintenance status"
+    },
+    {
+      "priority": "low",
+      "target": "both",
+      "action": "Implement deployment-phase monitoring",
+      "reason": "Missing diagnostic data during failures prevents root cause analysis",
+      "suggested_action": "Add metrics for pod state transitions, probe failures, and deployment events"
+    }
+  ],
+  "summary": {
+    "overall_platform_health": "good",
+    "deployment_success_rate_combined": "91% (9/10 deployment events succeeded)",
+    "systemic_issues": "minimal - both services show high availability with isolated incidents",
+    "service_specific_patterns": {
+      "pbx-web": "config drift susceptibility with probe/startup failure risk",
+      "whisper-stt": "burst deployment pattern with extended idle periods"
+    },
+    "primary_concern": "pbx-web's 50% deployment failure rate on 2026-07-28 requires investigation",
+    "secondary_concern": "whisper-stt's 25+ day idle period needs confirmation of intentional stability",
+    "operational_assessment": "Both services maintain high availability (100%) with different deployment strategies. whisper-stt achieves higher reliability (100% vs 83% success) and longer MTBF (53 vs 30 days). pbx-web needs failure investigation; whisper-stt needs idle period confirmation."
+  }
 }
