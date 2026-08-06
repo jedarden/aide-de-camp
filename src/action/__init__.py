@@ -6,7 +6,7 @@ defined in project registry entries. All actions execute through GitOps
 mutation patterns (declarative-config edits) or read-only status checks.
 """
 
-from .executor import ActionExecutor, get_action_executor
+from .executor import ActionExecutor, StepExecutor, get_action_executor
 from .models import (
     ActionResult,
     ExecutionContext,
@@ -36,6 +36,7 @@ from .steps import (
 __all__ = [
     # Executor
     "ActionExecutor",
+    "StepExecutor",
     "get_action_executor",
     # Models
     "ActionResult",
@@ -60,3 +61,13 @@ __all__ = [
     "execute_open_beads_step",
     "execute_pod_status_step",
 ]
+
+# Import-time validation: ensure all exported symbols are available
+_imported_symbols = set(globals().keys()) - {"__all__", "_imported_symbols"}
+_missing_symbols = set(__all__) - _imported_symbols
+if _missing_symbols:
+    raise ImportError(
+        f"Action module is missing exported symbols: {_missing_symbols}. "
+        "This indicates a circular import or missing dependency."
+    )
+del _imported_symbols, _missing_symbols
