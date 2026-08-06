@@ -65,6 +65,84 @@ Each deployment data file follows this JSON structure:
 | `git_commit.author` | string | Commit author |
 | `nodes` | array | Per-step execution details |
 
+## Validation
+
+### Required Fields Validation
+
+The validation system ensures deployment data completeness through required field checks:
+
+**Standard Format Required Fields:**
+- `date` — Deployment date/time (ISO 8601 timestamp)
+- `environment` — Deployment environment (e.g., production, staging)
+- `region` — Deployment region (e.g., us-east-1, eu-west-1, cluster name)
+- `deployment_id` — Unique deployment identifier (replicaSet, deployment name, or generated ID)
+- `status` — Deployment status (success, failed, unknown)
+
+**Validation Behavior:**
+- Checks all deployment entries for required fields
+- Collects all errors across entries (does not stop at first failure)
+- Returns `(False, ["Missing required field X in entry Y"])` for missing fields
+- Returns `(True, [])` when all required fields are present
+
+**Usage Example:**
+
+```python
+from validate_deployment_file import validate_required_fields, map_deployment_to_standard_format
+
+# Map deployment data to standard format
+metadata = {
+    "service": "pbx-web",
+    "namespace": "pbx-web",
+    "cluster": "ardenone-cluster"
+}
+
+standard_deployments = [
+    map_deployment_to_standard_format(deployment, metadata)
+    for deployment in deployment_data["deployments"]
+]
+
+# Validate required fields
+is_valid, errors = validate_required_fields(standard_deployments)
+
+if not is_valid:
+    for error in errors:
+        print(f"Validation error: {error}")
+```
+
+**Testing:**
+
+Run the validation test suite:
+
+```bash
+cd /home/coding/aide-de-camp
+.venv/bin/python test_required_fields_validation.py
+```
+
+Tests cover:
+- Missing required field detection
+- All required fields present validation
+- Multiple entries with missing fields
+- Deployment data mapping to standard format
+- Integration with real deployment data structure
+
+### Running Validation
+
+Validate deployment data files:
+
+```bash
+cd /home/coding/aide-de-camp/docs/research/deployment-data
+python validate_deployment_file.py
+```
+
+This validates:
+- JSON parseability
+- Top-level structure completeness
+- Deployment array structure
+- Required field presence
+- Status value validity
+- Timestamp format (ISO 8601)
+- Duration field types
+
 ## Usage
 
 ### Extracting data
@@ -192,3 +270,4 @@ All deployment data files contain the required schema fields:
 - `CLAUDE.md` — CI/CD architecture and workflow templates
 - `docs/research/whisper-stt-deployment-schema.md` — Schema documentation examples
 - `coverage-report.json` — Detailed coverage analysis (JSON format)
+- `validate_deployment_file.py` — Validation functions and tests

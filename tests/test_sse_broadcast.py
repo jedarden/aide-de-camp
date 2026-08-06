@@ -285,6 +285,214 @@ class TestSurfaceIDTargeting:
 # --- Session ID targeting tests -------------------------------------------------
 
 
+class TestSurfaceIDTargetingEdgeCases:
+    """Test edge cases for surface ID targeting (bead adc-1cxul)."""
+
+    async def test_target_nonexistent_surface_returns_zero(self, broadcaster):
+        """Targeting a non-existent surface_id returns 0."""
+        conn = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        event = SSEEvent(
+            event_type=EventType.RESULT_CREATED,
+            data={"message": "should not send"},
+            target_surface_id="nonexistent-surface"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        assert sent_count == 0  # No surfaces match
+
+        # Verify conn queue is empty
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn.queue.get(), timeout=0.1)
+
+        broadcaster.unregister(conn.connection_id)
+
+    async def test_target_with_rendered_html(self, broadcaster):
+        """Targeted broadcast includes rendered_html field."""
+        conn = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        event = SSEEvent(
+            event_type=EventType.RESULT_CREATED,
+            data={"summary": "test"},
+            rendered_html="<div>Targeted content</div>",
+            target_surface_id="surface-1"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        assert sent_count == 1
+
+        queued = await asyncio.wait_for(conn.queue.get(), timeout=1.0)
+        assert queued.rendered_html == "<div>Targeted content</div>"
+        assert queued.data["summary"] == "test"
+
+        broadcaster.unregister(conn.connection_id)
+
+    async def test_concurrent_targeted_broadcasts(self, broadcaster):
+        """Multiple concurrent broadcasts to different targets work correctly."""
+        # Create multiple connections
+        conn1 = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn2 = broadcaster.register(
+            surface_id="surface-2",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn3 = broadcaster.register(
+            surface_id="surface-3",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        # Create events targeting different surfaces
+        events = [
+            SSEEvent(
+                event_type=EventType.RESULT_CREATED,
+                data={"target": 1},
+                target_surface_id="surface-1"
+            ),
+            SSEEvent(
+                event_type=EventType.RESULT_CREATED,
+                data={"target": 2},
+                target_surface_id="surface-2"
+            ),
+            SSEEvent(
+                event_type=EventType.RESULT_CREATED,
+                data={"target": 3},
+                target_surface_id="surface-3"
+            ),
+        ]
+
+        # Broadcast all concurrently
+        tasks = [broadcaster.broadcast(event) for event in events]
+        results = await asyncio.gather(*tasks)
+
+        # Each should reach exactly one surface
+        assert all(count == 1 for count in results)
+
+        # Verify each connection got its specific event
+        event1 = await asyncio.wait_for(conn1.queue.get(), timeout=1.0)
+        assert event1.data["target"] == 1
+
+        event2 = await asyncio.wait_for(conn2.queue.get(), timeout=1.0)
+        assert event2.data["target"] == 2
+
+        event3 = await asyncio.wait_for(conn3.queue.get(), timeout=1.0)
+        assert event3.data["target"] == 3
+
+        broadcaster.unregister(conn1.connection_id)
+        broadcaster.unregister(conn2.connection_id)
+        broadcaster.unregister(conn3.connection_id)
+
+    async def test_target_surface_different_session(self, broadcaster):
+        """target_surface_id only matches surface, regardless of session."""
+        # Same surface_id in different sessions
+        conn1 = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn2 = broadcaster.register(
+            surface_id="surface-1",  # Same surface_id
+            session_id="session-2",  # Different session
+            surface_type="canvas"
+        )
+        conn3 = broadcaster.register(
+            surface_id="surface-2",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        # Target surface-1 without session filter
+        event = SSEEvent(
+            event_type=EventType.RESULT_CREATED,
+            data={"message": "to both surface-1s"},
+            target_surface_id="surface-1"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        # Both surface-1 connections should receive (different sessions)
+        assert sent_count == 2
+
+        # Both conn1 and conn2 should receive
+        event1 = await asyncio.wait_for(conn1.queue.get(), timeout=1.0)
+        assert event1.data["message"] == "to both surface-1s"
+
+        event2 = await asyncio.wait_for(conn2.queue.get(), timeout=1.0)
+        assert event2.data["message"] == "to both surface-1s"
+
+        # conn3 should not receive
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn3.queue.get(), timeout=0.1)
+
+        broadcaster.unregister(conn1.connection_id)
+        broadcaster.unregister(conn2.connection_id)
+        broadcaster.unregister(conn3.connection_id)
+
+    async def test_target_session_and_surface_intersection(self, broadcaster):
+        """Combining target_session_id and target_surface_id filters to intersection."""
+        # Setup: multiple surfaces across multiple sessions
+        conn1 = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn2 = broadcaster.register(
+            surface_id="surface-2",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn3 = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-2",
+            surface_type="canvas"
+        )
+        conn4 = broadcaster.register(
+            surface_id="surface-2",
+            session_id="session-2",
+            surface_type="canvas"
+        )
+
+        # Target exact intersection: session-1 AND surface-2
+        event = SSEEvent(
+            event_type=EventType.RESULT_CREATED,
+            data={"message": "exact match"},
+            target_session_id="session-1",
+            target_surface_id="surface-2"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        # Only conn2 matches both filters
+        assert sent_count == 1
+
+        # Verify only conn2 received
+        event2 = await asyncio.wait_for(conn2.queue.get(), timeout=1.0)
+        assert event2.data["message"] == "exact match"
+
+        # Others should not receive
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn1.queue.get(), timeout=0.1)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn3.queue.get(), timeout=0.1)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn4.queue.get(), timeout=0.1)
+
+        broadcaster.unregister(conn1.connection_id)
+        broadcaster.unregister(conn2.connection_id)
+        broadcaster.unregister(conn3.connection_id)
+        broadcaster.unregister(conn4.connection_id)
+
+
 class TestSessionIDTargeting:
     """Test session ID targeting functionality."""
 

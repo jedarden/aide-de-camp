@@ -1,0 +1,94 @@
+{
+  "service": "whisper-stt",
+  "query_window": {
+    "start": "2026-07-07T17:50:21.053536",
+    "end": "2026-08-06T17:50:21.053536",
+    "days": 30
+  },
+  "events": {
+    "total": 0,
+    "warnings": 0,
+    "failed": 0,
+    "normal": 0,
+    "by_type": {},
+    "by_reason": {},
+    "timeline": []
+  },
+  "pods": {
+    "total": 2,
+    "running": 2,
+    "failed": 0,
+    "pending": 0,
+    "succeeded": 0,
+    "unknown": 0,
+    "restart_counts": [
+      0,
+      0
+    ],
+    "container_statuses": {
+      "total": 2,
+      "waiting": 0,
+      "running": 2,
+      "terminated": 0
+    },
+    "waiting_reasons": {},
+    "terminated_reasons": {},
+    "details": [
+      {
+        "name": "whisper-openai-68966786fb-jsb5d",
+        "creation_timestamp": "2026-06-14T04:55:49",
+        "phase": "Running",
+        "restart_count": 0,
+        "ready": true,
+        "node": "k3s-lenovo-tiny",
+        "containers": [
+          {
+            "name": "whisper-openai",
+            "image": "localhost:7439/fedirz/faster-whisper-server:latest-cpu",
+            "restart_count": 0,
+            "ready": true,
+            "started": true
+          }
+        ]
+      },
+      {
+        "name": "whisper-stt-847fd8d7b9-v2rs5",
+        "creation_timestamp": "2026-07-12T16:53:42",
+        "phase": "Running",
+        "restart_count": 0,
+        "ready": true,
+        "node": "k3s-agent-minisforum",
+        "containers": [
+          {
+            "name": "whisper-stt",
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "restart_count": 0,
+            "ready": true,
+            "started": true
+          }
+        ]
+      }
+    ],
+    "restart_stats": {
+      "total_restarts": 0,
+      "max_restarts": 0,
+      "avg_restarts": 0.0,
+      "pods_with_restarts": 0
+    }
+  },
+  "failure_modes": {
+    "crash_loop_back_off": 0,
+    "oom_killed": 0,
+    "image_pull_backoff": 0,
+    "image_pull_error": 0,
+    "liveness_probe_failure": 0,
+    "readiness_probe_failure": 0,
+    "container_not_ready": 0,
+    "pod_not_ready": 0
+  },
+  "coverage": {
+    "earliest_data": "2026-06-14T04:55:49",
+    "expected_start": "2026-07-07T17:50:21.053536",
+    "has_full_coverage": true
+  }
+}
