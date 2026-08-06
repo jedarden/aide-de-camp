@@ -1,0 +1,6 @@
+date,timestamp,event_type,deployment,revision,replicaSet,image,outcome,pod_name,pod_ready,restart_count,notes
+2026-07-28,2026-07-28T17:26:12Z,deployment_rollout,pbx-web,14,pbx-web-5ff68464d,ronaldraygun/pbx-web:1.0.9,success,pbx-web-5ff68464d-mkn8n,true,0,Current active deployment
+2026-07-27,2026-07-27T17:56:07Z,deployment_rollout,lab-rebuild-relay,2,lab-rebuild-relay-79957dbd4,python:3-slim,success,lab-rebuild-relay-79957dbd4-xsqhl,true,0,Lab rebuild relay deployment
+2026-07-15,2026-07-15T03:24:40Z,deployment_rollout,pbx-rebuild-relay,5,pbx-rebuild-relay-588d79c5b9,python:3-slim,success,,true,0,PBX rebuild relay deployment
+2026-07-13,2026-07-13T18:18:07Z,deployment_rollout,pbx-web,14,pbx-web-5ff68464d,ronaldraygun/pbx-web:1.0.9,success,,true,0,Initial deployment of revision 14
+2026-07-13,2026-07-13T18:07:55Z,deployment_rollback,pbx-web,11,pbx-web-754f4cfdf7,ronaldraygun/pbx-web:1.0.8,rolled_back,,true,0,Rolled back to 1.0.8 on same day
