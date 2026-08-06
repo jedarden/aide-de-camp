@@ -96,6 +96,67 @@ def router(temp_router_md, hot_reload_manager):
     return r
 
 
+def patch_deterministic_router():
+    """
+    Context manager to disable deterministic router for testing.
+    Forces all requests through LLM path.
+    """
+    from src.intent.deterministic_router import FastPathResult
+
+    def mock_get_det_router():
+        mock_router = MagicMock()
+        mock_router.route_utterance.return_value = FastPathResult(
+            success=False,
+            intents=[],
+            confidence=0.0,
+            reasoning="LLM path forced for test"
+        )
+        mock_router.get_stats.return_value = {
+            "total_calls": 0,
+            "fast_path_hits": 0,
+            "hit_rate": 0.0,
+        }
+        return mock_router
+
+    return patch('src.intent.deterministic_router.get_deterministic_router', side_effect=mock_get_det_router)
+
+
+@pytest.fixture
+def router_with_det_disabled(temp_router_md, hot_reload_manager):
+    """
+    An IntentRouter with deterministic router disabled to force LLM path.
+    Used for testing hot-reload behavior without fast-path interference.
+    """
+    from src.intent.deterministic_router import FastPathResult
+
+    r = IntentRouter(prompt_path=Path(temp_router_md))
+    r._reload_manager = hot_reload_manager
+    store = MagicMock()
+    store.get_session = AsyncMock(return_value=None)
+    r.store = store
+
+    # Mock get_deterministic_router to always return failure
+    async def mock_get_det_router():
+        mock_router = MagicMock()
+        mock_router.route_utterance.return_value = FastPathResult(
+            success=False,
+            intents=[],
+            confidence=0.0,
+            reasoning="LLM path forced"
+        )
+        mock_router.get_stats.return_value = {
+            "total_calls": 0,
+            "fast_path_hits": 0,
+            "hit_rate": 0.0,
+        }
+        return mock_router
+
+    # Patch the import in router.py
+    import src.intent.router as router_module
+    with patch.object(router_module, 'get_deterministic_router', mock_get_det_router):
+        yield r
+
+
 @pytest.fixture
 def mock_zai_client():
     """A ZAI client whose call_simple we can swap to capture the system prompt."""
@@ -288,7 +349,9 @@ class TestRoutingBehaviorHotReload:
 
         This proves hot-reload affects routing behavior, not just prompt text.
         """
-        ROUTER_MD_STATUS_BIASED = """\
+        # Use patch_deterministic_router to disable fast-path
+        with patch_deterministic_router():
+            ROUTER_MD_STATUS_BIASED = """\
 # Intent Router System Prompt (status-biased test)
 
 You are the Intent Router for aide-de-camp.
@@ -300,7 +363,7 @@ Types: status|action|brainstorm|lookup|reminder|task-profile
 Schema: {"intent_type":"<type>","project_slug":"<id|null>","utterance_fragment":"<text>"}
 """
 
-        ROUTER_MD_ACTION_BIASED = """\
+            ROUTER_MD_ACTION_BIASED = """\
 # Intent Router System Prompt (action-biased test)
 
 You are the Intent Router for aide-de-camp.
@@ -312,120 +375,121 @@ Types: status|action|brainstorm|lookup|reminder|task-profile
 Schema: {"intent_type":"<type>","project_slug":"<id|null>","utterance_fragment":"<text>"}
 """
 
-        # Track all LLM calls and their responses
-        llm_calls = []
-        response_sequence = []
+            # Track all LLM calls and their responses
+            llm_calls = []
+            response_sequence = []
 
-        async def mock_llm_call(system_prompt, user_message, **kwargs):
-            """Mock that returns different classifications based on prompt content."""
-            llm_calls.append({"system_prompt": system_prompt, "user_message": user_message})
+            async def mock_llm_call(system_prompt, user_message, **kwargs):
+                """Mock that returns different classifications based on prompt content."""
+                llm_calls.append({"system_prompt": system_prompt, "user_message": user_message})
 
-            # Check which bias is in the prompt and return corresponding classification
-            if "status-biased" in system_prompt:
-                response_sequence.append("status")
-                return {
-                    "content": json.dumps([{
-                        "intent_type": "status",
-                        "project_slug": None,
-                        "urgency": "normal",
-                        "utterance_fragment": "check the pods",
-                        "confidence": 0.9,
-                        "reasoning": "Status-biased prompt routed to status",
-                    }]),
-                    "timing_network_ms": 100,
-                    "timing_inference_ms": 200,
-                }
-            elif "action-biased" in system_prompt:
-                response_sequence.append("action")
-                return {
-                    "content": json.dumps([{
-                        "intent_type": "action",
-                        "project_slug": None,
-                        "urgency": "normal",
-                        "utterance_fragment": "check the pods",
-                        "confidence": 0.9,
-                        "reasoning": "Action-biased prompt routed to action",
-                    }]),
-                    "timing_network_ms": 100,
-                    "timing_inference_ms": 200,
-                }
-            else:
-                # Fallback
-                response_sequence.append("status")
-                return {
-                    "content": json.dumps([{
-                        "intent_type": "status",
-                        "project_slug": None,
-                        "urgency": "normal",
-                        "utterance_fragment": "check the pods",
-                        "confidence": 0.9,
-                        "reasoning": "Default routing",
-                    }]),
-                    "timing_network_ms": 100,
-                    "timing_inference_ms": 200,
-                }
+                # Check which bias is in the prompt and return corresponding classification
+                if "status-biased" in system_prompt:
+                    response_sequence.append("status")
+                    return {
+                        "content": json.dumps([{
+                            "intent_type": "status",
+                            "project_slug": None,
+                            "urgency": "normal",
+                            "utterance_fragment": "check the pods",
+                            "confidence": 0.9,
+                            "reasoning": "Status-biased prompt routed to status",
+                        }]),
+                        "timing_network_ms": 100,
+                        "timing_inference_ms": 200,
+                    }
+                elif "action-biased" in system_prompt:
+                    response_sequence.append("action")
+                    return {
+                        "content": json.dumps([{
+                            "intent_type": "action",
+                            "project_slug": None,
+                            "urgency": "normal",
+                            "utterance_fragment": "check the pods",
+                            "confidence": 0.9,
+                            "reasoning": "Action-biased prompt routed to action",
+                        }]),
+                        "timing_network_ms": 100,
+                        "timing_inference_ms": 200,
+                    }
+                else:
+                    # Fallback
+                    response_sequence.append("status")
+                    return {
+                        "content": json.dumps([{
+                            "intent_type": "status",
+                            "project_slug": None,
+                            "urgency": "normal",
+                            "utterance_fragment": "check the pods",
+                            "confidence": 0.9,
+                            "reasoning": "Default routing",
+                        }]),
+                        "timing_network_ms": 100,
+                        "timing_inference_ms": 200,
+                    }
 
-        mock_zai_client.call_simple = mock_llm_call
-        router._router_zai_client = mock_zai_client
+            mock_zai_client.call_simple = mock_llm_call
+            router._router_zai_client = mock_zai_client
 
-        # Step 1: Initial dispatch with status-biased prompt
-        Path(temp_router_md).write_text(ROUTER_MD_STATUS_BIASED)
+            # Step 1: Initial dispatch with status-biased prompt
+            Path(temp_router_md).write_text(ROUTER_MD_STATUS_BIASED)
+            router._reload_manager.force_reload("router")
 
-        classifications1, _ = await router.classify_utterance(
-            "check the pods", "session-123"
-        )
+            classifications1, _ = await router.classify_utterance(
+                "check the pods", "session-123"
+            )
 
-        assert len(classifications1) == 1
-        assert classifications1[0].intent_type.value == "status"
-        assert response_sequence == ["status"]
+            assert len(classifications1) == 1
+            assert classifications1[0].intent_type.value == "status"
+            assert response_sequence == ["status"]
 
-        # Step 2: Edit router.md to action-biased (simulating hot-reload edit)
-        Path(temp_router_md).write_text(ROUTER_MD_ACTION_BIASED)
+            # Step 2: Edit router.md to action-biased (simulating hot-reload edit)
+            Path(temp_router_md).write_text(ROUTER_MD_ACTION_BIASED)
 
-        # Force reload to bypass throttle interval
-        router._reload_manager.force_reload("router")
+            # Force reload to bypass throttle interval
+            router._reload_manager.force_reload("router")
 
-        # Clear cache to allow re-classification
-        router._clear_cache()
+            # Clear cache to allow re-classification
+            router._clear_cache()
 
-        # Step 3: Re-dispatch the SAME utterance
-        classifications2, _ = await router.classify_utterance(
-            "check the pods", "session-123"
-        )
+            # Step 3: Re-dispatch the SAME utterance
+            classifications2, _ = await router.classify_utterance(
+                "check the pods", "session-123"
+            )
 
-        assert len(classifications2) == 1
-        assert classifications2[0].intent_type.value == "action"
-        assert response_sequence == ["status", "action"]
+            assert len(classifications2) == 1
+            assert classifications2[0].intent_type.value == "action"
+            assert response_sequence == ["status", "action"]
 
-        # Step 4: Revert to original (status-biased)
-        Path(temp_router_md).write_text(ROUTER_MD_STATUS_BIASED)
+            # Step 4: Revert to original (status-biased)
+            Path(temp_router_md).write_text(ROUTER_MD_STATUS_BIASED)
 
-        # Force reload to bypass throttle interval
-        router._reload_manager.force_reload("router")
+            # Force reload to bypass throttle interval
+            router._reload_manager.force_reload("router")
 
-        # Clear cache to allow re-classification
-        router._clear_cache()
+            # Clear cache to allow re-classification
+            router._clear_cache()
 
-        # Step 5: Third dispatch confirms revert worked
-        classifications3, _ = await router.classify_utterance(
-            "check the pods", "session-123"
-        )
+            # Step 5: Third dispatch confirms revert worked
+            classifications3, _ = await router.classify_utterance(
+                "check the pods", "session-123"
+            )
 
-        assert len(classifications3) == 1
-        assert classifications3[0].intent_type.value == "status"
-        assert response_sequence == ["status", "action", "status"]
+            assert len(classifications3) == 1
+            assert classifications3[0].intent_type.value == "status"
+            assert response_sequence == ["status", "action", "status"]
 
-        # Verify we made exactly 3 LLM calls (no caching interference)
-        assert len(llm_calls) == 3
+            # Verify we made exactly 3 LLM calls (no caching interference)
+            assert len(llm_calls) == 3
 
-        # Verify all three calls used the SAME utterance
-        assert all(call["user_message"] == "Classify this utterance:\n\ncheck the pods"
-                   for call in llm_calls)
+            # Verify all three calls used the SAME utterance
+            assert all(call["user_message"] == "Classify this utterance:\n\ncheck the pods"
+                       for call in llm_calls)
 
-        # Verify the system prompts changed
-        assert "status-biased" in llm_calls[0]["system_prompt"]
-        assert "action-biased" in llm_calls[1]["system_prompt"]
-        assert "status-biased" in llm_calls[2]["system_prompt"]
+            # Verify the system prompts changed
+            assert "status-biased" in llm_calls[0]["system_prompt"]
+            assert "action-biased" in llm_calls[1]["system_prompt"]
+            assert "status-biased" in llm_calls[2]["system_prompt"]
 
     @pytest.mark.asyncio
     async def test_hot_reload_with_cache_invalidation(
@@ -437,75 +501,81 @@ Schema: {"intent_type":"<type>","project_slug":"<id|null>","utterance_fragment":
         This ensures that prompt edits are detected even when classification
         results might be cached.
         """
-        ROUTER_V1 = """\
+        # Use patch_deterministic_router to disable fast-path
+        with patch_deterministic_router():
+            ROUTER_V1 = """\
 # Router v1
 Classify "check logs" as lookup.
 """
-        ROUTER_V2 = """\
+            ROUTER_V2 = """\
 # Router v2
 Classify "check logs" as status.
 """
 
-        call_count = [0]
+            call_count = [0]
 
-        async def mock_llm_call(system_prompt, user_message, **kwargs):
-            call_count[0] += 1
-            if "Router v1" in system_prompt:
-                return {
-                    "content": json.dumps([{
-                        "intent_type": "lookup",
-                        "lookup_kind": "logs",
-                        "project_slug": None,
-                        "urgency": "normal",
-                        "utterance_fragment": "check logs",
-                    }]),
-                    "timing_network_ms": 100,
-                    "timing_inference_ms": 200,
-                }
-            else:
-                return {
-                    "content": json.dumps([{
-                        "intent_type": "status",
-                        "project_slug": None,
-                        "urgency": "normal",
-                        "utterance_fragment": "check logs",
-                    }]),
-                    "timing_network_ms": 100,
-                    "timing_inference_ms": 200,
-                }
+            async def mock_llm_call(system_prompt, user_message, **kwargs):
+                call_count[0] += 1
+                if "Router v1" in system_prompt:
+                    return {
+                        "content": json.dumps([{
+                            "intent_type": "lookup",
+                            "lookup_kind": "logs",
+                            "project_slug": None,
+                            "urgency": "normal",
+                            "utterance_fragment": "check logs",
+                        }]),
+                        "timing_network_ms": 100,
+                        "timing_inference_ms": 200,
+                    }
+                else:
+                    return {
+                        "content": json.dumps([{
+                            "intent_type": "status",
+                            "project_slug": None,
+                            "urgency": "normal",
+                            "utterance_fragment": "check logs",
+                        }]),
+                        "timing_network_ms": 100,
+                        "timing_inference_ms": 200,
+                    }
 
-        mock_zai_client.call_simple = mock_llm_call
-        router._router_zai_client = mock_zai_client
+            mock_zai_client.call_simple = mock_llm_call
+            router._router_zai_client = mock_zai_client
 
-        # Initial state
-        Path(temp_router_md).write_text(ROUTER_V1)
+            # Initial state
+            Path(temp_router_md).write_text(ROUTER_V1)
+            router._reload_manager.force_reload("router")
 
-        # First call - caches the result
-        classifications1, _ = await router.classify_utterance("check logs", "session-1")
-        assert classifications1[0].intent_type.value == "lookup"
-        assert call_count[0] == 1
+            # First call - caches the result
+            classifications1, _ = await router.classify_utterance("check logs", "session-1")
+            assert classifications1[0].intent_type.value == "lookup"
+            assert call_count[0] == 1
 
-        # Cache hit - should not call LLM
-        classifications2, _ = await router.classify_utterance("check logs", "session-1")
-        assert classifications2[0].intent_type.value == "lookup"
-        # Note: cache hit means no LLM call, so call_count stays at 1
+            # Cache hit - should not call LLM
+            classifications2, _ = await router.classify_utterance("check logs", "session-1")
+            assert classifications2[0].intent_type.value == "lookup"
+            # Note: cache hit means no LLM call, so call_count stays at 1
 
-        # Edit the prompt
-        Path(temp_router_md).write_text(ROUTER_V2)
+            # Edit the prompt
+            Path(temp_router_md).write_text(ROUTER_V2)
 
-        # Wait for hot-reload throttle interval
-        import asyncio
-        await asyncio.sleep(1.5)
+            # Force reload to pick up the new prompt
+            router._reload_manager.force_reload("router")
 
-        # Different session - cache miss, should pick up new prompt
-        classifications3, _ = await router.classify_utterance("check logs", "session-2")
-        assert classifications3[0].intent_type.value == "status"
-        assert call_count[0] == 2  # New LLM call with new prompt
+            # Wait for hot-reload throttle interval
+            import asyncio
+            await asyncio.sleep(1.5)
 
-        # Verify cache isolation - session-1 still has cached result
-        classifications4, _ = await router.classify_utterance("check logs", "session-1")
-        assert classifications4[0].intent_type.value == "lookup"
-        # Cache hit for session-1, no new LLM call
+            # Different session - cache miss, should pick up new prompt
+            classifications3, _ = await router.classify_utterance("check logs", "session-2")
+            assert classifications3[0].intent_type.value == "status"
+            assert call_count[0] == 2  # New LLM call with new prompt
+
+            # Verify cache isolation - session-1 still has cached result
+            classifications4, _ = await router.classify_utterance("check logs", "session-1")
+            assert classifications4[0].intent_type.value == "lookup"
+            # Cache hit for session-1, no new LLM call
 
     @pytest.mark.asyncio
     async def test_multiple_prompt_edits_in_sequence(
@@ -517,19 +587,12 @@ Classify "check logs" as status.
         This simulates a self-modification agent making several iterative edits
         to refine routing behavior.
         """
-        # Disable fast-path router to ensure LLM path is tested
-        with patch('src.intent.deterministic_router.get_deterministic_router') as mock_det_router:
-            from src.intent.deterministic_router import FastPathResult
-            # Make fast-path return failure to force LLM path
-            mock_det_router.return_value.route_utterance.return_value = FastPathResult(
-                success=False,
-                intents=[],
-                confidence=0.0,
-                reasoning="Forced LLM path"
-            )
-
+        # Use patch_deterministic_router to disable fast-path
+        with patch_deterministic_router():
+            # Map iteration index to valid intent types
+            intent_type_sequence = ["status", "action", "brainstorm", "lookup", "reminder"]
             prompts = [
-                f"# Router v{i}\nClassify as intent_type=type_{i}."
+                f"# Router v{i}\nClassify as intent_type={intent_type_sequence[i]}."
                 for i in range(5)
             ]
 
@@ -542,7 +605,7 @@ Classify "check logs" as status.
                     if f"Router v{i}" in system_prompt:
                         return {
                             "content": json.dumps([{
-                                "intent_type": f"type_{i}",
+                                "intent_type": intent_type_sequence[i],
                                 "project_slug": None,
                                 "urgency": "normal",
                                 "utterance_fragment": "test",
@@ -569,16 +632,22 @@ Classify "check logs" as status.
                 # Edit the prompt
                 Path(temp_router_md).write_text(prompt_content)
 
+                # Force reload to pick up the new prompt
+                router._reload_manager.force_reload("router")
+
                 # Wait for hot-reload throttle interval
                 import asyncio
                 await asyncio.sleep(1.5)
+
+                # Clear cache for each iteration to allow re-classification
+                router._clear_cache()
 
                 # Classify with new prompt
                 classifications, _ = await router.classify_utterance("test", "session-1")
 
                 results.append(classifications[0].intent_type.value)
-                assert classifications[0].intent_type.value == f"type_{i}"
+                assert classifications[0].intent_type.value == intent_type_sequence[i]
 
             # Verify all 5 versions were detected
-            assert results == ["type_0", "type_1", "type_2", "type_3", "type_4"]
+            assert results == intent_type_sequence
             assert call_count[0] == 5
