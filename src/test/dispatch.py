@@ -239,19 +239,10 @@ async def generate_synthetic_result(request: SyntheticResultRequest) -> Syntheti
     synthetic_utterance = request.test_data.get("utterance", "synthetic test utterance") if request.test_data else "synthetic test utterance"
     await store.create_utterance(session_id, synthetic_utterance, utterance_id)
 
-    # Create intent record
-    project_slug = request.test_data.get("project_slug") if request.test_data else None
-    intent_type = request.test_data.get("intent_type", "status") if request.test_data else "status"
-    intent_id_created = await store.create_intent(
-        utterance_id=utterance_id,
-        session_id=session_id,
-        project_slug=project_slug,
-        intent_type=intent_type,
-    )
-
-    # Create topic
+    # Create topic first (so intent can reference it)
     topic_label = request.test_data.get("topic_label", "Synthetic Test Topic") if request.test_data else "Synthetic Test Topic"
     topic_type = request.test_data.get("topic_type", "research") if request.test_data else "research"
+    project_slug = request.test_data.get("project_slug") if request.test_data else None
     project_slugs = [project_slug] if project_slug else []
 
     topic_id_created = await store.create_topic(
@@ -260,6 +251,16 @@ async def generate_synthetic_result(request: SyntheticResultRequest) -> Syntheti
         project_slugs=project_slugs,
         scope="session",
         session_id=session_id,
+    )
+
+    # Create intent record with topic linkage
+    intent_type = request.test_data.get("intent_type", "status") if request.test_data else "status"
+    intent_id_created = await store.create_intent(
+        utterance_id=utterance_id,
+        session_id=session_id,
+        project_slug=project_slug,
+        intent_type=intent_type,
+        topic_id=topic_id_created,  # Link intent to topic
     )
 
     # Create synthetic data structure matching /dispatch response
