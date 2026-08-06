@@ -1,16 +1,30 @@
-{
-  "query_metadata": {
-    "query_date": "2026-08-06",
-    "cluster": "iad-ci",
-    "workflow_template": "whisper-stt-build",
-    "target_period_start": "2026-07-07",
-    "target_period_end": "2026-08-06",
-    "days_queried": 30
+[
+  {
+    "name": "whisper-stt-847fd8d7b9",
+    "revision": "32",
+    "creationTimestamp": "2026-07-12T16:53:42Z",
+    "image": "ronaldraygun/whisper-stt:1.8.6",
+    "was_deployed": true
   },
-  "findings": {
-    "total_workflow_instances": 0,
-    "oldest_workflow_age_days": null,
-    "note": "No whisper-stt-build workflow instances found. Workflow retention policy appears to be ~9 days."
+  {
+    "name": "whisper-stt-6c497489fb",
+    "revision": "31",
+    "creationTimestamp": "2026-07-08T03:26:44Z",
+    "image": "ronaldraygun/whisper-stt:1.8.6",
+    "was_deployed": true
   },
-  "deployments": []
-}
+  {
+    "name": "whisper-stt-5b8558f478",
+    "revision": "30",
+    "creationTimestamp": "2026-07-08T03:16:13Z",
+    "image": "ronaldraygun/whisper-stt:1.8.4",
+    "was_deployed": true
+  },
+  {
+    "name": "whisper-stt-5dbff75cbd",
+    "revision": "29",
+    "creationTimestamp": "2026-07-08T03:09:35Z",
+    "image": "ronaldraygun/whisper-stt:1.8.2",
+    "was_deployed": true
+  }
+]

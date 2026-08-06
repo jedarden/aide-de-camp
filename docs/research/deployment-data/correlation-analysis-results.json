@@ -1,0 +1,88 @@
+{
+  "findings": {
+    "analysis_date": "2026-08-06T12:39:15.059388",
+    "total_pbx_events": 5,
+    "total_whisper_events": 3,
+    "total_events": 8,
+    "pbx_issues": 1,
+    "whisper_issues": 0,
+    "correlations_found": 0,
+    "correlation_windows_analyzed": [
+      5,
+      10,
+      15,
+      30,
+      60
+    ],
+    "key_findings": [
+      "No temporal correlation detected between pbx-web and whisper-stt deployments."
+    ]
+  },
+  "timeline": [
+    {
+      "timestamp": "2026-07-08T03:09:35+00:00",
+      "service": "whisper-stt",
+      "source": "whisper-stt",
+      "event_type": "replica_created",
+      "outcome": "inactive",
+      "details": "image: ronaldraygun/whisper-stt:1.8.2"
+    },
+    {
+      "timestamp": "2026-07-08T03:16:13+00:00",
+      "service": "whisper-stt",
+      "source": "whisper-stt",
+      "event_type": "replica_created",
+      "outcome": "inactive",
+      "details": "image: ronaldraygun/whisper-stt:1.8.4"
+    },
+    {
+      "timestamp": "2026-07-08T03:26:44+00:00",
+      "service": "whisper-stt",
+      "source": "whisper-stt",
+      "event_type": "replica_created",
+      "outcome": "inactive",
+      "details": "image: ronaldraygun/whisper-stt:1.8.6"
+    },
+    {
+      "timestamp": "2026-07-13T18:07:55+00:00",
+      "service": "pbx-web",
+      "source": "pbx-web",
+      "event_type": "deployment_rollback",
+      "outcome": "rolled_back",
+      "details": "Rolled back to 1.0.8 on same day"
+    },
+    {
+      "timestamp": "2026-07-13T18:18:07+00:00",
+      "service": "pbx-web",
+      "source": "pbx-web",
+      "event_type": "deployment_rollout",
+      "outcome": "success",
+      "details": "Initial deployment of revision 14"
+    },
+    {
+      "timestamp": "2026-07-15T03:24:40+00:00",
+      "service": "pbx-web",
+      "source": "pbx-web",
+      "event_type": "deployment_rollout",
+      "outcome": "success",
+      "details": "PBX rebuild relay deployment"
+    },
+    {
+      "timestamp": "2026-07-27T17:56:07+00:00",
+      "service": "pbx-web",
+      "source": "pbx-web",
+      "event_type": "deployment_rollout",
+      "outcome": "success",
+      "details": "Lab rebuild relay deployment"
+    },
+    {
+      "timestamp": "2026-07-28T17:26:12+00:00",
+      "service": "pbx-web",
+      "source": "pbx-web",
+      "event_type": "deployment_rollout",
+      "outcome": "success",
+      "details": "Current active deployment"
+    }
+  ],
+  "correlations": []
+}
