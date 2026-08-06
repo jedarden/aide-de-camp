@@ -91,7 +91,18 @@ Comprehensive query templates for:
 - Availability metrics (uptime, restarts, health checks)
 - Time-range modifiers and usage examples
 
-### 3. `metrics-access-guide.md`
+### 3. `query-patterns-and-time-ranges.md`
+**Complete reference for time range syntax and 30-day query patterns:**
+- ISO 8601 time range format and construction
+- Time zone considerations and UTC best practices
+- 30-day time range expressions (absolute and relative)
+- Error rate query patterns (HTTP, application, deployment, OOM)
+- Latency metric query patterns (response times, deployment duration)
+- Complete aggregation functions and examples
+- Time filtering for Kubernetes workflows and log entries
+- Testing and validation procedures
+
+### 4. `metrics-access-guide.md`
 Detailed access procedures including:
 - Authentication requirements
 - VPN and port-forward setup
