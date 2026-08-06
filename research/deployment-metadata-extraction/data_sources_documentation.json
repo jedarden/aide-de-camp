@@ -1,0 +1,52 @@
+{
+  "extraction_date": "2026-08-06T12:09:09.955164",
+  "analysis_period": "30_days (2026-07-07 to 2026-08-06)",
+  "data_sources": {
+    "pbx_web": {
+      "cluster": "ardenone-cluster",
+      "namespace": "pbx-web",
+      "query_parameters": {
+        "namespace": "pbx-web",
+        "field_selector": "metadata.namespace=pbx-web",
+        "since": "30 days"
+      },
+      "data_files": [
+        "kubernetes_replicasets_api",
+        "kubernetes_events_api"
+      ],
+      "raw_data_path": "research/pbx-web-30days/deployments-30days.json"
+    },
+    "whisper_stt": {
+      "cluster": "ardenone-cluster",
+      "namespace": "whisper-stt",
+      "query_parameters": {
+        "namespace": "whisper-stt",
+        "field_selector": "metadata.namespace=whisper-stt",
+        "since": "30 days"
+      },
+      "data_files": [
+        "kubernetes_replicasets_api",
+        "kubernetes_events_api",
+        "argo_workflows_api"
+      ],
+      "raw_data_path": "research/whisper-stt-30days/deployments-30days.json"
+    }
+  },
+  "query_methods": {
+    "kubectl_read_only": "kubectl --server=http://traefik-ardenone-cluster:8001 get pods -n <namespace>",
+    "replicasets_query": "kubectl --server=http://traefik-ardenone-cluster:8001 get replicasets -n <namespace>",
+    "events_query": "kubectl --server=http://traefik-ardenone-cluster:8001 get events -n <namespace> --sort-by='.lastTimestamp'"
+  },
+  "limitations": [
+    "Kubernetes does not retain detailed metadata for deleted pods",
+    "Historical pod deletion timestamps are estimated from ReplicaSet data",
+    "Deployment duration metrics require pod log analysis (not yet implemented)",
+    "Container image pull times are not captured in current data collection"
+  ],
+  "next_steps_for_enhanced_collection": [
+    "Extract pod logs for deployment duration metrics",
+    "Query Kubernetes events for ScalingReplicaSet and FailedCreate events",
+    "Analyze Argo Workflows for build pipeline execution history",
+    "Capture container image pull durations from pod events"
+  ]
+}

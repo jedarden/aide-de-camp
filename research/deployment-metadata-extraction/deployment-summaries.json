@@ -1,0 +1,75 @@
+{
+  "extraction_date": "2026-08-06T12:09:09.954791",
+  "summaries": [
+    {
+      "service": "pbx-web",
+      "deployment_name": "pbx-web",
+      "total_revisions_30_days": 4,
+      "deployment_frequency": "low",
+      "last_deployment_timestamp": "2026-07-13T18:18:07Z",
+      "days_since_last_deployment": 24,
+      "strategy": "RollingUpdate",
+      "current_status": "healthy",
+      "current_revision": 14,
+      "current_image": "ronaldraygun/pbx-web:latest",
+      "success_rate": 100.0,
+      "failures": 0
+    },
+    {
+      "service": "pbx-web",
+      "deployment_name": "pbx-rebuild-relay",
+      "total_revisions_30_days": 1,
+      "deployment_frequency": "very_low",
+      "last_deployment_timestamp": "2026-07-15T03:24:40Z",
+      "days_since_last_deployment": 22,
+      "strategy": "RollingUpdate",
+      "current_status": "healthy",
+      "current_revision": 5,
+      "current_image": "unknown",
+      "success_rate": 100.0,
+      "failures": 0
+    },
+    {
+      "service": "pbx-web",
+      "deployment_name": "lab-rebuild-relay",
+      "total_revisions_30_days": 1,
+      "deployment_frequency": "very_low",
+      "last_deployment_timestamp": "2026-07-27T17:56:07Z",
+      "days_since_last_deployment": 10,
+      "strategy": "RollingUpdate",
+      "current_status": "healthy",
+      "current_revision": 2,
+      "current_image": "unknown",
+      "success_rate": 100.0,
+      "failures": 0
+    },
+    {
+      "service": "whisper-stt",
+      "deployment_name": "whisper-stt",
+      "total_revisions_30_days": 10,
+      "deployment_frequency": "high",
+      "last_deployment_timestamp": "2026-07-12T16:53:42Z",
+      "days_since_last_deployment": 24,
+      "strategy": "Recreate",
+      "current_status": "healthy",
+      "current_revision": 32,
+      "current_image": "ronaldraygun/whisper-stt:1.8.6",
+      "success_rate": 100.0,
+      "failures": 0
+    },
+    {
+      "service": "whisper-stt",
+      "deployment_name": "whisper-openai",
+      "total_revisions_30_days": 5,
+      "deployment_frequency": "medium",
+      "last_deployment_timestamp": "2026-06-14T04:55:48Z",
+      "days_since_last_deployment": 53,
+      "strategy": "RollingUpdate",
+      "current_status": "healthy",
+      "current_revision": 24,
+      "current_image": "fedirz/faster-whisper-server:latest-cpu",
+      "success_rate": 100.0,
+      "failures": 0
+    }
+  ]
+}
