@@ -273,15 +273,17 @@ For each of the 4 pattern categories (`startup`, `oom_kill`, `error`, `performan
 ## Validation Summary
 
 ### Field Count by Type
-- **Strings**: 13 fields (pod_name, namespace, pod_phase, container_image, node_name, log_file_path, collection_date, log_type, analysis_file_path, analysis_date, first_log_entry, last_log_entry, collection_date)
-- **Integers**: 2 fields (restart_count, log_size_bytes, log_line_count)
-- **Objects**: 3 root objects (pod_identification, log_file_metadata, analysis_metadata, pattern_detection, temporal_boundaries)
+- **Strings**: 13 fields (pod_name, namespace, pod_phase, container_image, node_name, log_file_path, collection_date, log_type, analysis_file_path, analysis_date [2x], first_log_entry, last_log_entry)
+- **Integers**: 3 fields (restart_count, log_size_bytes, log_line_count)
+- **Objects**: 5 root objects (pod_identification, log_file_metadata, analysis_metadata, pattern_detection, temporal_boundaries)
 - **Arrays**: 8 arrays (4 timestamp arrays + 4 sample arrays)
+- **Pattern sub-objects**: 4 objects (startup, oom_kill, error, performance)
 
 ### Required vs Optional
-- **Required fields**: 28 (all top-level keys must be present)
-- **Nullable fields**: 8 (pod_phase, deletion_timestamp, container_image, node_name, log_line_count, log_type, analysis_file_path, analysis_date, first_log_entry, last_log_entry)
-- **Non-nullable fields**: 18 (pod_name, namespace, restart_count, log_file_path, log_size_bytes, collection_date, count fields, all array objects)
+- **Required top-level keys**: 5 (pod_identification, log_file_metadata, analysis_metadata, pattern_detection, temporal_boundaries)
+- **Total leaf fields**: 28 (all must be present in their respective objects)
+- **Nullable leaf fields**: 10 (pod_phase, deletion_timestamp, container_image, node_name, log_line_count, log_type, analysis_file_path, analysis_date [2x], first_log_entry, last_log_entry)
+- **Non-nullable leaf fields**: 18 (pod_name, namespace, restart_count, creation_timestamp, log_file_path, log_size_bytes, collection_date, all count fields, all array objects)
 
 ### Type-Specific Constraints
 - **ISO 8601 timestamps**: Must use UTC (Z suffix), except `analysis_date` allows microseconds
@@ -403,6 +405,272 @@ jsonschema.validate(entry, schema)
 
 ---
 
+## JSON Schema for Programmatic Validation
+
+Below is a complete JSON Schema (Draft 7) that can be used with `jsonschema` Python library or other JSON Schema validators to programmatically validate entries:
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aide-de-camp.ardenone.com/schemas/pod-logs-index-v1.json",
+  "title": "Pod Logs Index Entry",
+  "description": "Schema for individual pod-logs index JSONL entries",
+  "type": "object",
+  "required": [
+    "pod_identification",
+    "log_file_metadata",
+    "analysis_metadata",
+    "pattern_detection",
+    "temporal_boundaries"
+  ],
+  "properties": {
+    "pod_identification": {
+      "type": "object",
+      "required": [
+        "pod_name",
+        "namespace",
+        "pod_phase",
+        "restart_count",
+        "creation_timestamp",
+        "deletion_timestamp",
+        "container_image",
+        "node_name"
+      ],
+      "properties": {
+        "pod_name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "minLength": 1
+        },
+        "pod_phase": {
+          "type": ["string", "null"],
+          "enum": ["Pending", "Running", "Succeeded", "Failed", "Unknown", null]
+        },
+        "restart_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "creation_timestamp": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "format": "date-time"
+        },
+        "deletion_timestamp": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "format": "date-time"
+        },
+        "container_image": {
+          "type": ["string", "null"],
+          "pattern": "^([^/]+/)?[^:]+(:[^:]+)?$"
+        },
+        "node_name": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      }
+    },
+    "log_file_metadata": {
+      "type": "object",
+      "required": [
+        "log_file_path",
+        "log_size_bytes",
+        "log_line_count",
+        "collection_date",
+        "log_type"
+      ],
+      "properties": {
+        "log_file_path": {
+          "type": "string",
+          "pattern": "^[^/].*\\.log$",
+          "minLength": 1
+        },
+        "log_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "log_line_count": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "collection_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "format": "date"
+        },
+        "log_type": {
+          "type": ["string", "null"],
+          "enum": ["current", "previous", "stderr", null]
+        }
+      }
+    },
+    "analysis_metadata": {
+      "type": "object",
+      "required": [
+        "analysis_file_path",
+        "analysis_date"
+      ],
+      "properties": {
+        "analysis_file_path": {
+          "type": ["string", "null"],
+          "pattern": "^[^/].*-analysis\\.json$"
+        },
+        "analysis_date": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+          "format": "date-time"
+        }
+      }
+    },
+    "pattern_detection": {
+      "type": "object",
+      "required": ["startup", "oom_kill", "error", "performance"],
+      "properties": {
+        "startup": {
+          "$ref": "#/definitions/pattern_category"
+        },
+        "oom_kill": {
+          "$ref": "#/definitions/pattern_category"
+        },
+        "error": {
+          "$ref": "#/definitions/pattern_category"
+        },
+        "performance": {
+          "$ref": "#/definitions/pattern_category"
+        }
+      }
+    },
+    "temporal_boundaries": {
+      "type": "object",
+      "required": [
+        "first_log_entry",
+        "last_log_entry",
+        "analysis_date",
+        "collection_date"
+      ],
+      "properties": {
+        "first_log_entry": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+          "format": "date-time"
+        },
+        "last_log_entry": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+          "format": "date-time"
+        },
+        "analysis_date": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+          "format": "date-time"
+        },
+        "collection_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "format": "date"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "pattern_category": {
+      "type": "object",
+      "required": ["count", "timestamps", "samples"],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timestamps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\d+|^unknown$"
+          }
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Using the JSON Schema
+
+**Python validation example:**
+```python
+import json
+import jsonschema
+from jsonschema import validate, Draft7Validator
+
+# Load the schema
+with open('pod-logs-index-schema.json', 'r') as f:
+    schema = json.load(f)
+
+# Load a JSONL entry
+with open('pod-logs-index.jsonl', 'r') as f:
+    for line in f:
+        entry = json.loads(line)
+        
+        # Validate the entry
+        try:
+            validate(instance=entry, schema=schema)
+            print(f"✓ {entry['pod_identification']['pod_name']} is valid")
+        except jsonschema.ValidationError as e:
+            print(f"✗ Validation failed: {e.message}")
+
+# Or create a validator for better error messages
+validator = Draft7Validator(schema)
+for error in validator.iter_errors(entry):
+    print(f"Field: {'.'.join(str(p) for p in error.path)}, Error: {error.message}")
+```
+
+**JavaScript validation example:**
+```javascript
+const Ajv = require('ajv');
+const ajv = new Ajv(); // options can be passed, e.g. {allErrors: true}
+
+const schema = require('./pod-logs-index-schema.json');
+const validate = ajv.compile(schema);
+
+const fs = require('fs');
+const lines = fs.readFileSync('pod-logs-index.jsonl', 'utf8').split('\n');
+
+lines.forEach(line => {
+    if (!line) return;
+    const entry = JSON.parse(line);
+    const valid = validate(entry);
+    
+    if (valid) {
+        console.log(`✓ ${entry.pod_identification.pod_name} is valid`);
+    } else {
+        console.log(`✗ Validation failed:`, validate.errors);
+    }
+});
+```
+
+**Command-line validation with jq:**
+```bash
+# Check if a JSONL entry matches the schema structure
+jq -c 'select(.pod_identification and .log_file_metadata and .analysis_metadata and .pattern_detection and .temporal_boundaries)' pod-logs-index.jsonl > filtered.jsonl
+
+# Count valid entries
+wc -l filtered.jsonl
+```
+
+---
+
 ## Dependencies
 
 This schema definition is used by:
@@ -413,3 +681,4 @@ This schema definition is used by:
 
 ## Schema Version History
 - **v1.0** (2026-08-06): Initial schema definition based on adc-4q6sr requirements extraction
+- **v1.1** (2026-08-06): Added JSON Schema for programmatic validation, fixed field count inconsistencies
