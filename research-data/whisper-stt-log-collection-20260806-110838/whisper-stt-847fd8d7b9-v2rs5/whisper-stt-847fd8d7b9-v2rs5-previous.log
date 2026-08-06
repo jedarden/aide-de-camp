@@ -1,0 +1,9 @@
+# Log metadata
+# Pod: whisper-stt-847fd8d7b9-v2rs5
+# Namespace: whisper-stt
+# Cluster: ardenone-cluster
+# Fetched at: 2026-08-06T15:07:27Z
+# Log type: previous
+# ---
+Error from server (BadRequest): previous terminated container "whisper-stt" in pod "whisper-stt-847fd8d7b9-v2rs5" not found
+[INFO] No previous container logs (exit: 1)
