@@ -12,15 +12,49 @@ The Action Execution Model implements a step-based workflow system where:
 - **Progress streaming**: Each step outcome streams to canvas via SSE
 - **Failure handling**: Failed steps halt the workflow
 
+## Execution Flow
+
+```
+User Utterance
+    ↓
+Intent Classification (LLM)
+    ↓
+Action Intent → project_slug + workflow_name
+    ↓
+ExecutionContext Creation (intent_id, session_id, project_cfg)
+    ↓
+ActionResult Initialization (status: "running")
+    ↓
+┌─────────────────────────────────────────────────────┐
+│ For each step in workflow.steps:                    │
+│                                                       │
+│  1. Create StepResult (status: IN_PROGRESS)          │
+│  2. Broadcast SSE: ACTION_STEP_STARTED               │
+│  3. Execute step implementation                     │
+│  4. Update StepResult (status: COMPLETED/FAILED)     │
+│  5. Broadcast SSE: ACTION_STEP_COMPLETED             │
+│  6. If FAILED: halt workflow, broadcast ACTION_WORKFLOW_FAILED │
+│                                                       │
+└─────────────────────────────────────────────────────┘
+    ↓
+All Steps Completed
+    ↓
+ActionResult Finalization (status: "completed")
+    ↓
+Broadcast SSE: ACTION_WORKFLOW_COMPLETED
+    ↓
+Canvas Update (real-time UI feedback)
+```
+
 ## Step Types
 
 Steps are categorized into **mutating** (respect dry_run) and **read-only** operations.
 
-### Mutating Steps
+### Mutating Steps (3 types)
 
-These steps modify state and respect the `dry_run` flag in ExecutionContext.
+These steps modify state or control workflow execution flow.
 
-#### `ci_status`
+#### 1. ci_status
 
 **Purpose**: Check CI/workflow status. Gates the workflow if CI is not green.
 
@@ -43,22 +77,29 @@ These steps modify state and respect the `dry_run` flag in ExecutionContext.
 }
 ```
 
-**Example**:
-```yaml
-workflows:
-  deploy:
-    steps:
-      - ci_status  # Halts workflow if CI is not green
-```
+**Gate Behavior**:
+- **`phase == "Succeeded"`** → Workflow proceeds
+- **`phase != "Succeeded"`** → Workflow fails/blocks
+- **CI cluster not accessible** → Returns `status: "skipped"` (non-blocking)
+- **No workflows found** → Returns `status: "no_workflows"` (non-blocking)
 
-**Error cases**:
-- Kubeconfig not found → returns `{"status": "skipped"}`
-- kubectl command fails → returns `{"success": false, "error": "..."}`
-- No workflows found → returns `{"status": "no_workflows"}`
+**Implementation**: 
+- **Source**: `src/action/steps.py:execute_ci_status_step()`
+- **Command**: `kubectl --kubeconfig /home/coding/.kube/iad-ci.kubeconfig get workflows -n argo-workflows -l project={project_slug}`
+- **API**: Argo Workflows Kubernetes API in `iad-ci` cluster
+- **Filtering**: Most recent workflow by `metadata.creationTimestamp`
+
+**Dry Run Handling**: Still executes the CI status check (read-only), returns same result as normal mode.
+
+**Error Cases**:
+- Kubeconfig not found → Returns `status: "skipped"` with warning (non-blocking)
+- kubectl timeout → RuntimeError after 15 seconds
+- kubectl failure → RuntimeError from stderr
+- Workflow parse error → RuntimeError during JSON parsing
 
 ---
 
-#### `image_tag`
+#### 2. image_tag
 
 **Purpose**: Resolve image tag/digest from CI. Never returns `:latest` — always a specific tag or digest.
 
@@ -78,59 +119,80 @@ workflows:
 }
 ```
 
-**Example**:
-```yaml
-workflows:
-  deploy:
-    steps:
-      - ci_status
-      - image_tag  # Extracts image tag from CI workflow
-```
+**Current State**: Returns `{"status": "not_implemented"}` — requires CI-specific implementation.
 
-**Error cases**:
-- CI status not provided or failed → `{"success": false, "error": "..."}`
-- Tag would be `:latest` → Refuses and returns error
+**Planned Implementation**: Query Argo Workflows or container registry to resolve image references.
+
+**Dry Run Handling**: Executes normally (read-only query), no special handling needed.
+
+**Error Cases**:
+- Build not found → Returns error if build_id doesn't exist
+- CI API timeout → RuntimeError after timeout
+- No image published → RuntimeError if build completed but no image pushed
+- Not implemented → Returns `status: "not_implemented"` (current state)
 
 ---
 
-#### `gitops_commit`
+#### 3. gitops_commit
 
 **Purpose**: Templated declarative-config edit. The executor authors the edit (never LLM-authored), commits, and pushes.
 
 **Implementation**: Makes templated field substitutions in declarative-config, commits with standard git identity, pushes to origin.
 
 **Parameters** (from ExecutionContext):
-- `repo_path`: Path to repository
+- `repo_path`: Path to repository (required)
 - `dry_run`: If True, skips mutation
+- `template_file`: Path to manifest template within declarative-config
+- `substitutions`: Key-value pairs for template substitution
+- `commit_message`: Git commit message following project conventions
 
 **Returns**:
 ```python
 {
-    "status": "success" | "not_implemented",
-    "commit_hash": str | None,
+    "status": "success" | "not_implemented" | "skipped",
+    "commit": str | None,  # Commit hash if successful
     "repo_path": str
 }
 ```
 
-**Example**:
-```yaml
-workflows:
-  deploy:
-    steps:
-      - ci_status
-      - image_tag
-      - gitops_commit  # Updates image tag in manifest
-```
+**Mutation Behavior** (when implemented):
+1. Checkout target branch (default: `main`)
+2. Apply template substitutions to manifest file
+3. Stage changes with `git add`
+4. Commit with standard git identity (`github@jedarden.com`)
+5. Push to Forgejo `origin` (GitHub mirror syncs automatically)
 
-**Note**: Current implementation returns `{"status": "not_implemented"}` — requires declarative-config-specific implementation for templated substitutions.
+**Template Substitution**: Field-level substitution (never structural edits):
+- **Image tags**: `image: ronaldraygun/app:v1.0.0` → `image: ronaldraygun/app:v1.2.3`
+- **Replica counts**: `replicas: 3` → `replicas: 5`
+- **Resource limits**: `memory: "256Mi"` → `memory: "512Mi"`
+- **ConfigMap values**: `value: "prod"` → `value: "staging"`
+
+**Current State**: Returns `{"status": "not_implemented"}` — requires declarative-config-specific implementation.
+
+**Dry Run Handling**: Skips all git operations (no checkout, no edit, no commit, no push), returns `status: "skipped"` with planned changes in output.
+
+**Template Safety Constraints**:
+- **Field substitution only** - No structural YAML changes
+- **Type-preserving** - Numbers stay numbers, strings stay strings
+- **No LLM involvement** - Deterministic template engine
+- **File-scoped** - Edits only specified files, never multi-file refactors
+
+**Error Cases**:
+- repo_path not configured → ValueError if `project_cfg.repo_path` is None
+- Repository path does not exist → RuntimeError if path not on disk
+- Template file not found → RuntimeError if template_file doesn't exist
+- Git operation timeout → RuntimeError during git operations
+- Push rejected → RuntimeError if git push fails
+- Not implemented → Returns `status: "not_implemented"` (current state)
 
 ---
 
-### Read-Only Steps
+### Read-Only Steps (6 types)
 
 These steps query external systems without mutating any state.
 
-#### `argocd_sync_status`
+#### 1. argocd_sync_status
 
 **Purpose**: Poll ArgoCD until application is Synced/Healthy. Used to verify GitOps sync completion.
 
@@ -139,6 +201,8 @@ These steps query external systems without mutating any state.
 **Parameters** (from ExecutionContext):
 - `cluster`: Cluster name for logging
 - `argocd_app`: ArgoCD application name (defaults to project_slug)
+- `timeout`: Maximum poll duration (default: 300 seconds / 5 minutes)
+- `poll_interval`: Seconds between polls (default: 5 seconds)
 
 **Returns**:
 ```python
@@ -152,24 +216,26 @@ These steps query external systems without mutating any state.
 }
 ```
 
-**Example**:
-```yaml
-workflows:
-  deploy:
-    steps:
-      - gitops_commit
-      - argocd_sync_status  # Polls until Synced/Healthy
-```
-
 **Behavior**:
 - Polls every 5 seconds for up to 5 minutes
 - Returns `synced` when both sync and health are optimal
 - Returns `timeout` if sync doesn't complete in time
 - Returns `unknown` if app doesn't exist or is deleted
 
+**Implementation**: 
+- **Source**: `src/action/steps.py:execute_argocd_sync_status_step()`
+- **API**: ArgoCD read-only proxy at `https://argocd-ro-ardenone-manager-ts.ardenone.com:8444`
+- **Config**: ArgoCD base URL from `config/registry.yaml`
+
+**Error Cases**:
+- ArgoCD API timeout → Network/proxy connectivity issue
+- App not found → Returns `status: "unknown"` with `sync_status: "Unknown"`
+- Timeout exceeded → Returns `status: "timeout"` after 300 seconds
+- ArgoCD base URL not configured → RuntimeError from missing `config/registry.yaml`
+
 ---
 
-#### `pod_status`
+#### 2. pod_status
 
 **Purpose**: Get pod health via kubectl proxy. Used for post-sync verification.
 
@@ -178,44 +244,36 @@ workflows:
 **Parameters** (from ExecutionContext):
 - `namespace`: Kubernetes namespace (required)
 - `cluster`: Cluster name for proxy lookup
+- `proxy_url`: Override auto-detected proxy URL (optional)
+- `timeout`: HTTP request timeout (default: 10.0 seconds)
 
 **Returns**:
 ```python
 {
     "total_pods": int,
-    "phase_counts": {
-        "Running": int,
-        "Pending": int,
-        "Failed": int,
-        "Succeeded": int,
-        "Unknown": int
-    },
-    "pods": [
-        {
-            "name": str,
-            "phase": str,
-            "ready": int,
-            "total": int,
-            "ready_ratio": str  # e.g., "2/2"
-        }
-    ],
+    "running": int,
+    "pending": int,
+    "failed": int,
+    "pod_names": list[str],  # List of pod names
     "namespace": str,
     "cluster": str
 }
 ```
 
-**Example**:
-```yaml
-workflows:
-  deploy:
-    steps:
-      - argocd_sync_status
-      - pod_status  # Verifies pods are running post-sync
-```
+**Implementation**: 
+- **Source**: `src/action/steps.py:execute_pod_status_step()`
+- **API**: kubectl proxy at `{proxy_url}/api/v1/namespaces/{namespace}/pods`
+- **Config**: Cluster proxy from `config/clusters.yaml`
+
+**Error Cases**:
+- Namespace not configured → ValueError if `project_cfg.namespace` is None
+- Cluster proxy not found → ValueError if cluster lacks proxy in `config/clusters.yaml`
+- HTTP timeout → HTTPError from kubectl proxy
+- Malformed pod data → Exception during parsing
 
 ---
 
-#### `deployment_info`
+#### 3. deployment_info
 
 **Purpose**: Get deployment/statefulset details. Queries workload information without mutations.
 
@@ -224,6 +282,7 @@ workflows:
 **Parameters** (from ExecutionContext):
 - `namespace`: Kubernetes namespace (required)
 - `cluster`: Cluster name for proxy lookup
+- `timeout`: HTTP request timeout (default: 10.0 seconds)
 
 **Returns**:
 ```python
@@ -248,17 +307,22 @@ workflows:
 }
 ```
 
-**Example**:
-```yaml
-workflows:
-  status_check:
-    steps:
-      - deployment_info  # Get current workload state
-```
+**Implementation**: 
+- **Source**: `src/action/steps.py:execute_deployment_info_step()`
+- **API**: 
+  - Deployments: `{proxy_url}/apis/apps/v1/namespaces/{namespace}/deployments`
+  - StatefulSets: `{proxy_url}/apis/apps/v1/namespaces/{namespace}/statefulsets`
+- **Config**: Cluster proxy from `config/clusters.yaml`
+
+**Error Cases**:
+- Namespace not configured → ValueError if `project_cfg.namespace` is None
+- Cluster proxy not found → ValueError if cluster lacks proxy
+- HTTP timeout → HTTPError from kubectl proxy
+- RBAC denied → HTTPError 403 if proxy lacks permissions
 
 ---
 
-#### `git_log`
+#### 4. git_log
 
 **Purpose**: Get recent git history. Retrieves recent commits for audit trails.
 
@@ -266,6 +330,7 @@ workflows:
 
 **Parameters** (from ExecutionContext):
 - `repo_path`: Path to repository (required)
+- `commit_limit`: Number of commits to return (default: 10)
 
 **Returns**:
 ```python
@@ -281,17 +346,21 @@ workflows:
 }
 ```
 
-**Example**:
-```yaml
-workflows:
-  audit:
-    steps:
-      - git_log  # Get last 10 commits
-```
+**Implementation**: 
+- **Source**: `src/action/steps.py:execute_git_log_step()`
+- **Command**: `git -C {repo_path} log -{limit} --oneline`
+- **Parsing**: Splits line by space into hash + message
+- **Timeout**: 10 seconds on subprocess execution
+
+**Error Cases**:
+- repo_path not configured → ValueError if `project_cfg.repo_path` is None
+- Repository path does not exist → RuntimeError if path not on disk
+- git command timeout → RuntimeError after 10 seconds
+- git log failure → RuntimeError from stderr
 
 ---
 
-#### `argocd_apps`
+#### 5. argocd_apps
 
 **Purpose**: Get ArgoCD application status. Queries ArgoCD for application information.
 
@@ -300,6 +369,8 @@ workflows:
 **Parameters** (from ExecutionContext):
 - `project_slug`: Optional filter for specific application
 - `cluster`: Cluster name for logging
+- `argocd_app`: ArgoCD app name (defaults to `project_slug`)
+- `timeout`: HTTP request timeout (default: 10.0 seconds)
 
 **Returns**:
 ```python
@@ -317,24 +388,28 @@ workflows:
 }
 ```
 
-**Example**:
-```yaml
-workflows:
-  health_check:
-    steps:
-      - argocd_apps  # Check application sync/health status
-```
+**Implementation**: 
+- **Source**: `src/action/steps.py:execute_argocd_apps_step()`
+- **API**: `{argocd_base_url}/api/v1/applications`
+- **Config**: ArgoCD base URL from `config/registry.yaml`
+- **Filtering**: Client-side filter by `app.metadata.name == argocd_app_name`
+
+**Error Cases**:
+- ArgoCD base URL not configured → RuntimeError from missing `config/registry.yaml`
+- HTTP timeout → HTTPError from ArgoCD API
+- RBAC denied → HTTPError 403 if proxy token lacks permissions
+- App not found → Returns empty `applications` list (no error)
 
 ---
 
-#### `open_beads`
+#### 6. open_beads
 
 **Purpose**: Get open beads for project. Queries project tracking system via `bf` CLI.
 
 **Implementation**: Runs `bf list --status open --format json`.
 
 **Parameters** (from ExecutionContext):
-- `repo_path`: Repository path (defaults to aide-de-camp workspace)
+- `repo_path`: Repository path (defaults to `/home/coding/aide-de-camp`)
 - `project_slug`: Optional project filter
 
 **Returns**:
@@ -347,83 +422,94 @@ workflows:
 }
 ```
 
-**Example**:
-```yaml
-workflows:
-  project_status:
-    steps:
-      - open_beads  # List open tracking beads
-```
+**Implementation**: 
+- **Source**: `src/action/steps.py:execute_open_beads_step()`
+- **Command**: `bf list --status open --format json --project {project_slug}`
+- **Working Directory**: `cwd=repo_path`
+- **Parsing**: JSON parse of `bf list` output, falls back to empty list
 
-## ExecutionContext Fields
+**Error Cases**:
+- bf command not found → RuntimeError if `bf` not in PATH
+- bf list timeout → RuntimeError after 10 seconds
+- JSON parse error → Returns empty `open_beads` list (no error)
+- Repository path does not exist → RuntimeError if path not on disk
+
+---
+
+## Data Structures
+
+### ExecutionContext
 
 The `ExecutionContext` contains project configuration and runtime context needed for step execution.
 
-### Core Fields
+#### Required Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `intent_id` | str | Yes | Intent ID for tracking and SSE targeting |
-| `session_id` | str | Yes | Session ID for SSE targeting |
-| `project_slug` | str \| None | No | Project slug for registry lookup |
-| `project_cfg` | dict[str, Any] | No | Project configuration from registry |
-| `dry_run` | bool | No | If True, skip mutating operations (default: False) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `intent_id` | `str` | Intent ID for tracking and SSE targeting |
+| `session_id` | `str` | Session ID for SSE targeting |
 
-### Convenience Properties
+#### Optional Fields
 
-These properties extract common values from `project_cfg`:
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `project_slug` | `Optional[str]` | `None` | Project slug for registry lookup |
+| `project_cfg` | `dict[str, Any]` | `{}` | Project configuration from registry |
+| `dry_run` | `bool` | `False` | If True, skip mutating operations |
+
+#### Convenience Properties
 
 | Property | Type | Source | Description |
 |----------|------|--------|-------------|
-| `cluster` | str \| None | `project_cfg["cluster"]` | Cluster name |
-| `namespace` | str \| None | `project_cfg["namespace"]` | Kubernetes namespace |
-| `repo_path` | str \| None | `project_cfg["repo_path"]` | Repository filesystem path |
-| `argocd_app` | str \| None | `project_cfg["argocd_app"]` | ArgoCD application name |
+| `cluster` | `str \| None` | `project_cfg["cluster"]` | Cluster name |
+| `namespace` | `str \| None` | `project_cfg["namespace"]` | Kubernetes namespace |
+| `repo_path` | `str \| None` | `project_cfg["repo_path"]` | Repository filesystem path |
+| `argocd_app` | `str \| None` | `project_cfg["argocd_app"]` | ArgoCD application name |
 
-### Example
+#### Example Usage
 
 ```python
+from src.action.models import ExecutionContext
+
 ctx = ExecutionContext(
-    intent_id="intent-abc123",
-    session_id="session-xyz789",
-    project_slug="myapp",
+    intent_id="int-12345",
+    session_id="sess-67890",
+    project_slug="mta-my-way",
     project_cfg={
-        "cluster": "iad-ci",
-        "namespace": "production",
-        "repo_path": "/home/coding/myapp",
-        "argocd_app": "myapp-deployment"
+        "cluster": "rs-manager",
+        "namespace": "argocd",
+        "repo_path": "ardent/declarative-config",
+        "argocd_app": "mta-my-way-deploy"
     },
     dry_run=False
 )
 
 # Access convenience properties
-assert ctx.cluster == "iad-ci"
-assert ctx.namespace == "production"
+cluster = ctx.cluster  # "rs-manager"
+namespace = ctx.namespace  # "argocd"
 ```
 
----
-
-## StepResult Fields
+### StepResult
 
 The `StepResult` contains the outcome of a single workflow step execution.
 
-### Core Fields
+#### Fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `step_name` | str | Yes | Name of the step that was executed |
-| `status` | StepStatus | Yes | Execution status (see StepStatus below) |
-| `output` | dict[str, Any] | No | Step output data (default: {}) |
-| `error` | str \| None | No | Error message if step failed |
-| `started_at` | float | Yes | Unix timestamp when step started |
-| `completed_at` | float \| None | No | Unix timestamp when step completed |
-| `duration_ms` | float | No | Step execution duration in milliseconds (default: 0.0) |
+| `step_name` | `str` | Yes | Name of the step that was executed |
+| `status` | `StepStatus` | Yes | Execution status |
+| `output` | `dict[str, Any]` | No | Step output data (default: {}) |
+| `error` | `str \| None` | No | Error message if step failed |
+| `started_at` | `float` | Yes | Unix timestamp when step started |
+| `completed_at` | `float \| None` | No | Unix timestamp when step completed |
+| `duration_ms` | `float` | No | Step execution duration in milliseconds (default: 0.0) |
 
-### Methods
+#### Methods
 
 **`to_dict()`**: Converts result to dictionary for SSE broadcasting.
 
-### Example
+#### Example
 
 ```python
 result = StepResult(
@@ -443,9 +529,7 @@ result = StepResult(
 sse_data = result.to_dict()
 ```
 
----
-
-## StepStatus Enumeration
+### StepStatus Enumeration
 
 Step execution status follows a state progression:
 
@@ -457,56 +541,155 @@ Step execution status follows a state progression:
 | `StepStatus.FAILED` | `"failed"` | Step failed with error |
 | `StepStatus.SKIPPED` | `"skipped"` | Step was skipped (e.g., due to dry_run) |
 
-### Status Conventions
+#### Status Transition Diagram
 
-- **Initial state**: `PENDING` when step is created
-- **Execution**: Set to `IN_PROGRESS` when executor starts
-- **Success**: Set to `COMPLETED` with output data populated
-- **Failure**: Set to `FAILED` with error message populated
-- **Dry run**: Set to `SKIPPED` for mutating steps when `dry_run=True`
+```
+PENDING → IN_PROGRESS → COMPLETED
+                     → FAILED
+                     → SKIPPED
+```
 
-### Workflow Impact
+**Common transition patterns:**
+1. **Success:** `PENDING` → `IN_PROGRESS` → `COMPLETED`
+2. **Error:** `PENDING` → `IN_PROGRESS` → `FAILED`
+3. **Dry run:** `PENDING` → `SKIPPED`
+4. **Conditional skip:** `PENDING` → `SKIPPED` (e.g., gate not met)
+
+#### Workflow Impact
 
 - `FAILED`: Halts workflow immediately, subsequent steps not executed
 - `COMPLETED`: Proceeds to next step in sequence
 - `SKIPPED`: Proceeds to next step (no-op)
 - `IN_PROGRESS`: Step is still running (intermediate state)
 
----
-
-## ActionResult Fields
+### ActionResult
 
 The `ActionResult` contains the complete execution result for a workflow.
 
-### Core Fields
+#### Fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `intent_id` | str | Yes | Intent ID for tracking |
-| `session_id` | str | Yes | Session ID for SSE targeting |
-| `project_slug` | str \| None | No | Project slug that was executed |
-| `workflow_name` | str | Yes | Name of the workflow that was executed |
-| `status` | str | Yes | Final workflow status: `"running"`, `"completed"`, `"failed"`, `"cancelled"` |
-| `steps` | list[StepResult] | No | All step results in execution order (default: []) |
-| `started_at` | float | Yes | Unix timestamp when workflow started |
-| `completed_at` | float \| None | No | Unix timestamp when workflow completed |
-| `duration_ms` | float | No | Workflow execution duration in milliseconds (default: 0.0) |
-| `error` | str \| None | No | Error message if workflow failed |
+| `intent_id` | `str` | Yes | Intent ID for tracking |
+| `session_id` | `str` | Yes | Session ID for SSE targeting |
+| `project_slug` | `str \| None` | No | Project slug that was executed |
+| `workflow_name` | `str` | Yes | Name of the workflow that was executed |
+| `status` | `str` | Yes | Final workflow status |
+| `steps` | `list[StepResult]` | No | All step results in execution order (default: []) |
+| `started_at` | `float` | Yes | Unix timestamp when workflow started |
+| `completed_at` | `float \| None` | No | Unix timestamp when workflow completed |
+| `duration_ms` | `float` | No | Workflow execution duration in milliseconds (default: 0.0) |
+| `error` | `str \| None` | No | Error message if workflow failed |
 
-### Methods
+#### Methods
 
 **`add_step(step: StepResult)`**: Appends a step result to the steps list.
 
 **`to_dict()`**: Converts result to dictionary for SSE broadcasting.
 
-### Workflow Status Values
+#### Workflow Status Values
 
 | Status | Description |
 |--------|-------------|
-| `"running"` | Workflow is currently executing (initial state) |
+| `"running"` | Workflow is currently executing |
 | `"completed"` | All steps completed successfully |
 | `"failed"` | One or more steps failed, workflow halted |
 | `"cancelled"` | Workflow was cancelled before completion |
+
+---
+
+## Step Execution Contract
+
+### Step Executor Contract
+
+All step executors must:
+
+1. **Be deterministic** — no LLM calls, no randomness
+2. **Complete within timeout** — respect execution time limits
+3. **Return clear StepResult** — include status and output/error
+4. **Handle errors gracefully** — convert exceptions to StepResult with FAILED status
+5. **Respect dry_run flag** — skip mutations when `dry_run=True`
+
+### Execution Flow Detail
+
+For each step execution:
+
+1. ActionExecutor validates step is registered
+2. ActionExecutor creates StepResult with `status=IN_PROGRESS`
+3. ActionExecutor broadcasts `ACTION_STEP_STARTED` event via SSE
+4. Step executor runs implementation with ExecutionContext
+5. Step executor returns StepResult with updated status
+6. ActionExecutor broadcasts `ACTION_STEP_COMPLETED` event via SSE
+7. If step FAILED → workflow halts, broadcast `ACTION_WORKFLOW_FAILED`
+
+### Error Handling
+
+All errors are converted to StepResult with `status=StepStatus.FAILED` and `error` field populated:
+
+- **ValidationError**: Missing required fields in ExecutionContext (ValueError)
+- **RuntimeError**: Execution failures (kubectl timeout, git error, etc.)
+- **HTTPError**: External API failures (kubectl proxy, ArgoCD API)
+- **TimeoutError**: Operation exceeded time limits
+
+---
+
+## Best Practices
+
+### Workflow Design
+
+1. **Start with CI gates**: Use `ci_status` as the first step to block workflows on failed CI
+2. **End with verification**: Use `pod_status` or `deployment_info` as final steps to verify deployment health
+3. **Group related steps**: Place mutating steps (`gitops_commit`) immediately before their verification steps (`argocd_sync_status`)
+4. **Use read-only steps for monitoring**: Create workflows that only use read-only steps for health checks without side effects
+
+### Error Handling
+
+1. **Validate inputs early**: Check required `project_cfg` fields before starting workflow
+2. **Provide meaningful error messages**: Include context (cluster, namespace, step name) in error messages
+3. **Use timeouts appropriately**: Set reasonable timeouts for external API calls (10-30 seconds for most operations)
+4. **Handle missing infrastructure gracefully**: Return informative errors when clusters/namespaces don't exist
+
+### Configuration Management
+
+1. **Centralize configuration**: Store cluster proxy URLs and ArgoCD endpoints in `config/*.yaml` files
+2. **Use convenience properties**: Access `ctx.cluster`, `ctx.namespace` instead of `ctx.project_cfg["cluster"]`
+3. **Validate project configuration**: Ensure all required fields are present before step execution
+4. **Document required fields**: Clearly document which `project_cfg` fields each step requires
+
+### Dry Run Mode
+
+1. **Always respect dry_run**: Mutating steps must skip operations when `ctx.dry_run == True`
+2. **Return planned changes**: In dry-run mode, return what WOULD be done in the output
+3. **Use dry_run for validation**: Allow users to test workflows without side effects
+4. **Document dry_run behavior**: Clearly document which steps respect dry_run and how
+
+### Performance Considerations
+
+1. **Use async operations**: All step implementations should be async for concurrent operations
+2. **Set appropriate timeouts**: Balance between waiting for completion and detecting failures
+3. **Cache external queries**: Consider caching API responses when appropriate
+4. **Minimize external calls**: Batch queries when possible to reduce latency
+
+### Testing
+
+1. **Test step implementations independently**: Unit test each step execution function
+2. **Mock external APIs**: Use mock responses for kubectl, ArgoCD, git operations
+3. **Test error cases**: Verify error handling for timeouts, missing config, API failures
+4. **Test dry_run mode**: Ensure mutating steps skip operations correctly
+
+### GitOps Conventions
+
+1. **Use standard git identity**: All commits should use `github@jedarden.com` / `jedarden`
+2. **Follow commit message conventions**: Use conventional commit format (`chore:`, `fix:`, `feat:`)
+3. **Never force-push**: Reconcile with merge commits if needed
+4. **Push to Forgejo primary**: Target `git.ardenone.com` as source of truth, GitHub mirror syncs automatically
+
+### SSE Broadcasting
+
+1. **Broadcast step lifecycle**: Send events for step started, step completed, workflow started/completed/failed
+2. **Include timing information**: Always include `started_at`, `completed_at`, `duration_ms` in results
+3. **Target by session_id**: Use SSE targeting to send updates to the correct user session
+4. **Use structured data**: Convert results to dictionaries for consistent serialization
 
 ---
 
@@ -550,87 +733,6 @@ projects:
 
 ---
 
-## Step Execution Contract
-
-### Step Executor Contract
-
-All step executors must:
-
-1. **Be deterministic** — no LLM calls, no randomness
-2. **Complete within timeout** — respect execution time limits
-3. **Return clear StepResult** — include status and output/error
-4. **Handle errors gracefully** — convert exceptions to StepResult with FAILED status
-5. **Respect dry_run flag** — skip mutations when `dry_run=True`
-
-### Execution Flow
-
-For each step execution:
-
-1. ActionExecutor validates step is registered
-2. ActionExecutor broadcasts step started event via SSE
-3. Step executor runs implementation
-4. Step executor returns StepResult
-5. ActionExecutor broadcasts step completed event via SSE
-6. If step FAILED → workflow halts, subsequent steps not executed
-
-### Error Handling
-
-- **ValidationError**: Missing required fields in ExecutionContext
-- **RuntimeError**: Execution failures (kubectl timeout, git error, etc.)
-- **ValueError**: Invalid step type or configuration
-
-All errors are converted to StepResult with `status=StepStatus.FAILED` and `error` field populated.
-
-## Step Vocabulary Design Principles
-
-1. **Deterministic Execution**: No LLM calls during step execution
-2. **GitOps Mutations Only**: All mutations go through declarative-config commits
-3. **Read-Book Proxies**: All read operations use kubectl proxies or read-only APIs
-4. **Progress Streaming**: Each step completion broadcasts to canvas via SSE
-5. **Failure Halt**: Failed steps stop workflow execution immediately
-6. **Idempotent**: Steps can be safely retried without side effects
-
-## Workflow Definition Example
-
-Workflows are defined in project registry entries as sequences of step names:
-
-```yaml
-projects:
-  my-app:
-    cluster: iad-kalshi
-    namespace: production
-    repo_path: /home/coding/declarative-config
-    argocd_app: my-app-prod
-
-    workflows:
-      deploy:
-        description: "Deploy application to production"
-        steps:
-          - ci_status          # Gate: verify CI green
-          - image_tag          # Get image tag from CI
-          - gitops_commit      # Update declarative-config
-          - argocd_sync_status # Wait for ArgoCD sync
-          - pod_status         # Verify pod health
-
-      status_check:
-        description: "Check deployment status without changes"
-        steps:
-          - deployment_info    # Get deployment info
-          - argocd_apps        # Check ArgoCD status
-          - pod_status         # Check pod health
-          - open_beads         # Get open project beads
-```
-
-## Adding New Step Types
-
-When adding a new step type:
-
-1. **Add to step vocabulary**: Document the step in this file
-2. **Implement step executor**: Create execute function in `src/action/steps/`
-3. **Register in executor**: Add to `_step_executors` dict in `ActionExecutor`
-4. **Add to validation**: Add step type to `known_steps` set in registry.py
-5. **Write tests**: Add unit tests in `tests/test_action_*.py`
-
 ## Step Naming Convention
 
 Step names use snake_case and describe the operation:
@@ -639,9 +741,61 @@ Step names use snake_case and describe the operation:
 - **Verb phrases for actions**: `gitops_commit`, `argocd_sync_status`
 - **Compound names for specificity**: `argocd_apps`, `open_beads`
 
+---
+
+## Adding New Step Types
+
+When adding a new step type:
+
+1. **Add to step vocabulary**: Document the step in this file
+2. **Implement step executor**: Create execute function in `src/action/steps.py`
+3. **Register in executor**: Add to `_step_executors` dict in `ActionExecutor.__init__()`
+4. **Add to validation**: Add step type to `known_steps` set in `src/action/registry.py`
+5. **Write tests**: Add unit tests in `tests/test_action_*.py`
+
+---
+
+## Configuration Files
+
+Step implementations rely on configuration files:
+
+### Cluster Configuration (`config/clusters.yaml`)
+
+```yaml
+clusters:
+  rs-manager:
+    proxy: "http://traefik-rs-manager:8001"
+  
+  apexalgo-iad:
+    proxy: "http://traefik-apexalgo-iad:8001"
+  
+  ardenone-cluster:
+    proxy: "http://traefik-ardenone-cluster:8001"
+```
+
+### Registry Configuration (`config/registry.yaml`)
+
+```yaml
+projects:
+  myapp:
+    cluster: rs-manager
+    namespace: production
+    repo_path: /home/coding/declarative-config
+    argocd_app: myapp-deployment
+    
+argocd:
+  base_url: "https://argocd-ro-ardenone-manager-ts.ardenone.com:8444"
+```
+
+---
+
 ## Related Documentation
 
 - [Action Execution Model Plan](../../plan/plan.md#action-execution-model)
 - [Project Registry](../../config/registry.yaml)
+- [Mutating Step Types](mutating-step-types.md)
+- [Read-Only Step Types](read-only-step-types.md)
+- [Action Execution Data Structures](action-execution-data-structures.md)
 - [Action Executor Implementation](../src/action/executor.py)
 - [Action Models](../src/action/models.py)
+- [Performance Analysis: Locking Strategy](performance-analysis-locking-strategy.md)

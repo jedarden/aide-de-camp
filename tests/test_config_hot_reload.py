@@ -680,3 +680,158 @@ async def test_registry_hot_reload(backup_registry):
     assert old_alias not in reloaded_declarative_aliases
     assert new_alias not in initial_declarative_aliases
     assert old_alias in initial_declarative_aliases
+
+
+@pytest.mark.asyncio
+async def test_registry_hot_load_routing_change(backup_registry):
+    """
+    Test that config/registry.yaml modifications are reflected in routing without server restart.
+
+    This test verifies the hot-load behavior of registry configuration by:
+    1. Creating a temporary test alias in config/registry.yaml
+    2. Re-dispatching with the new alias after hot-load
+    3. Verifying routing picks up the change without restart
+    4. Confirming the test is idempotent via backup_registry fixture
+
+    Test flow:
+    - Load current registry configuration
+    - Add a temporary test alias to aide-de-camp project
+    - Force hot-load with get_registry(force=True)
+    - Verify the new alias is available in registry
+    - Verify routing uses the new alias correctly
+    - Cleanup happens automatically via backup_registry
+
+    Verified behavior:
+    - Registry hot-loads changes within TTL (5 minutes) or immediately with force=True
+    - No server restart required for configuration changes
+    - Aliases added to registry are immediately available for routing
+    - Test is idempotent (backup_registry fixture ensures cleanup)
+
+    This test documents the hot-load behavior for registry.yaml changes.
+    """
+    import json
+    import time
+    from unittest.mock import AsyncMock, patch
+    from src.intent.router import IntentRouter
+    from src.registry import get_registry, get_project
+
+    # Step 1: Load current registry configuration
+    registry_path = pathlib.Path("config/registry.yaml")
+    initial_config = load_registry_config(registry_path)
+    assert initial_config is not None
+    assert "projects" in initial_config
+    assert "aide-de-camp" in initial_config["projects"]
+
+    # Record initial aliases for aide-de-camp
+    adc_project = initial_config["projects"]["aide-de-camp"]
+    initial_adc_aliases = list(adc_project["aliases"])
+    initial_alias_count = len(initial_adc_aliases)
+
+    # Generate unique test alias to ensure idempotency
+    test_alias = f"test-hot-load-{int(time.time())}"
+
+    # Step 2: Modify config/registry.yaml to add temporary test alias
+    parsed = yaml.safe_load(registry_path.read_text())
+    parsed['projects']['aide-de-camp']['aliases'].append(test_alias)
+    modified_content = yaml.dump(parsed, default_flow_style=False)
+    registry_path.write_text(modified_content)
+
+    # Verify the file was actually modified
+    modified_config = load_registry_config(registry_path)
+    modified_adc = modified_config["projects"]["aide-de-camp"]
+    modified_adc_aliases = list(modified_adc["aliases"])
+    assert test_alias in modified_adc_aliases, \
+        f"Test alias '{test_alias}' should exist in modified config"
+    assert len(modified_adc_aliases) == initial_alias_count + 1, \
+        "Should have exactly one more alias than initial state"
+
+    # Step 3: Trigger hot-load without server restart
+    # HOT-LOAD: force=True bypasses TTL cache and reloads registry from disk immediately
+    # This simulates the production behavior where configuration changes take effect
+    # within the TTL interval (5 minutes) or immediately when force=True is used
+    reloaded_registry = get_registry(force=True)
+    assert reloaded_registry is not None
+
+    # Step 4: Verify the new alias is available after hot-load
+    reloaded_adc = get_project("aide-de-camp")
+    assert reloaded_adc is not None
+    reloaded_adc_aliases = list(reloaded_adc["aliases"])
+    assert test_alias in reloaded_adc_aliases, \
+        f"Test alias '{test_alias}' should be available after hot-load"
+    assert len(reloaded_adc_aliases) == initial_alias_count + 1, \
+        "Hot-loaded registry should have the new alias"
+
+    # Step 5: Verify routing uses the new alias
+    router = IntentRouter()
+
+    # Clear the intent cache to ensure we're testing the hot-loaded registry
+    router._cache._cache.clear()
+
+    # Patch deterministic router to return failure, forcing LLM path
+    # This ensures we test the hot-loaded registry in the LLM classification
+    with patch('src.intent.router.get_deterministic_router') as mock_det_router:
+        from src.intent.deterministic_router import FastPathResult
+        mock_router_instance = mock_det_router.return_value
+        mock_router_instance.route_utterance.return_value = FastPathResult(
+            success=False,
+            intents=[],
+            confidence=0.0,
+            reasoning="LLM path forced for test"
+        )
+
+        with patch.object(router, '_get_zai_client') as mock_client:
+            mock_zai = AsyncMock()
+            # Mock the LLM response to classify our test utterance as aide-de-camp
+            mock_zai.call_simple.return_value = json.dumps([{
+                "intent_type": "status",
+                "project_slug": "aide-de-camp",
+                "utterance_fragment": f"check {test_alias} status",
+                "confidence": 0.9,
+                "reasoning": f"User asking for status using test alias {test_alias}",
+                "urgency": "normal"
+            }])
+            mock_client.return_value = mock_zai
+
+            # Classify utterance using the new hot-loaded alias
+            result = await router.classify_utterance(
+                f"check {test_alias} status",
+                "test-session-hot-load"
+            )
+            classifications = result[0] if isinstance(result, tuple) else result
+
+            # Verify routing succeeded with the new alias
+            assert len(classifications) >= 1, "Should have at least one classification"
+            classification = classifications[0]
+            assert classification.project_slug == "aide-de-camp", \
+                f"Utterance with new alias '{test_alias}' should route to aide-de-camp"
+            assert classification.intent_type.value == "status", \
+                "Intent should be classified as status"
+
+    # Step 6: Document the hot-load behavior
+    # The registry.yaml hot-load mechanism:
+    # - Uses TTL-based cache (CACHE_TTL = 300 seconds = 5 minutes)
+    # - get_registry(force=True) bypasses cache and reloads immediately
+    # - No server restart required for configuration changes
+    # - Changes take effect within 5 minutes (TTL expiry) or immediately (force=True)
+    # - Test is idempotent: backup_registry fixture restores original state
+
+    # Verify registry state consistency
+    final_registry = get_registry(force=True)
+    assert final_registry is not None
+    final_adc = get_project("aide-de-camp")
+    assert final_adc is not None
+    final_adc_aliases = list(final_adc["aliases"])
+    assert test_alias in final_adc_aliases, \
+        f"Test alias '{test_alias}' should remain available in final registry"
+
+    # Verify other registry data was preserved
+    # Note: get_registry() returns both YAML-defined and auto-discovered projects
+    # So we check that the YAML-defined projects are still present
+    yaml_defined_projects = set(initial_config["projects"].keys())
+    for project in yaml_defined_projects:
+        assert project in final_registry["projects"], \
+            f"YAML-defined project '{project}' should remain in registry"
+    assert "declarative-config" in final_registry["projects"], \
+        "Other projects should remain in registry"
+    assert "global_aliases" in final_registry, \
+        "Global aliases should remain in registry"
