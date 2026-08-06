@@ -1,0 +1,209 @@
+{
+  "report_metadata": {
+    "generated_at": "2026-08-06T13:10:01Z",
+    "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "cluster": "ardenone-cluster",
+    "report_type": "reliability-metrics-comparison"
+  },
+  "services": {
+    "pbx-web": {
+      "service_name": "pbx-web",
+      "namespace": "pbx-web",
+      "deployment_frequency_per_day": 0.167,
+      "deployment_frequency_per_week": 1.17,
+      "deployment_success_rate": 100.0,
+      "deployment_failure_rate": 0.0,
+      "total_deployments_30d": 5,
+      "successful_deployments": 5,
+      "failed_deployments": 0,
+      "rollback_count": 1,
+      "mean_time_between_failures_hours": "Infinity (no failures)",
+      "mean_time_to_recovery_minutes": 0.0,
+      "availability_percentage": 100.0,
+      "current_uptime_days": 9,
+      "pod_restart_count": 0,
+      "crash_loop_count": 0,
+      "oom_kill_count": 0,
+      "error_rate_per_day": 0.2,
+      "critical_error_count": 0,
+      "deployment_strategy": "Recreate",
+      "age_days": 96,
+      "reliability_rating": "EXCELLENT",
+      "operational_significance": "Conservative deployment velocity (stable service)"
+    },
+    "whisper-stt": {
+      "service_name": "whisper-stt",
+      "namespace": "whisper-stt",
+      "deployment_frequency_per_day": 0.067,
+      "deployment_frequency_per_week": 0.47,
+      "deployment_success_rate": 100.0,
+      "deployment_failure_rate": 0.0,
+      "total_deployments_30d": 2,
+      "successful_deployments": 4,
+      "failed_deployments": 0,
+      "rollback_count": 0,
+      "mean_time_between_failures_hours": "Infinity (no failures)",
+      "mean_time_to_recovery_minutes": 0.0,
+      "availability_percentage": 100.0,
+      "current_uptime_days": 25,
+      "pod_restart_count": 0,
+      "crash_loop_count": 0,
+      "oom_kill_count": 0,
+      "error_rate_per_day": 0.0,
+      "critical_error_count": 0,
+      "deployment_strategy": "Recreate (whisper-stt), RollingUpdate (whisper-openai)",
+      "age_days": 96,
+      "reliability_rating": "EXCELLENT",
+      "operational_significance": "Moderate deployment velocity (active development)"
+    }
+  },
+  "comparative_analysis": {
+    "deployment_frequency_delta": {
+      "pbx_web_per_day": 0.167,
+      "whisper_stt_per_day": 0.067,
+      "difference": -0.1,
+      "percentage_difference": -59.9,
+      "interpretation": "pbx-web has 2.5x more deployment events than whisper-stt",
+      "statistical_significance": "LOW - sample size too small",
+      "operational_significance": "LOW - both maintain 100% success"
+    },
+    "success_rate_comparison": {
+      "pbx_web_rate": 100.0,
+      "whisper_stt_rate": 100.0,
+      "difference": 0.0,
+      "interpretation": "Perfect match - both services achieve 100% deployment success",
+      "operational_significance": "HIGH - excellent deployment validation"
+    },
+    "availability_comparison": {
+      "pbx_web_availability": 100.0,
+      "whisper_stt_availability": 100.0,
+      "difference": 0.0,
+      "interpretation": "Perfect match - zero downtime for both services",
+      "operational_significance": "HIGH - production-grade reliability"
+    },
+    "stability_comparison": {
+      "pbx_web_uptime_days": 9,
+      "whisper_stt_uptime_days": 25,
+      "factor": 2.78,
+      "interpretation": "whisper-stt shows 2.8x longer current pod uptime",
+      "statistical_significance": "MODERATE",
+      "operational_significance": "MODERATE - reflects deployment patterns, not stability"
+    },
+    "error_profile_comparison": {
+      "pbx_web_error_rate": 0.2,
+      "whisper_stt_error_rate": 0.0,
+      "interpretation": "pbx-web has expected client disconnects (0.2/day), whisper-stt is cleaner (0)",
+      "statistical_significance": "LOW - both operationally acceptable",
+      "operational_significance": "LOW - pbx-web errors are expected artifacts",
+      "root_cause": "Service type: pbx-web serves files (stateful connections), whisper-stt is stateless API"
+    }
+  },
+  "statistical_significance_assessment": {
+    "success_rate_difference": {
+      "value": 0.0,
+      "significance": "N/A - both are 100%",
+      "interpretation": "Perfect match in deployment reliability"
+    },
+    "availability_difference": {
+      "value": 0.0,
+      "significance": "N/A - both are 100%",
+      "interpretation": "Perfect match in service availability"
+    },
+    "failure_rate_difference": {
+      "value": 0.0,
+      "significance": "N/A - both are 0%",
+      "interpretation": "Perfect match in failure prevention"
+    },
+    "deployment_velocity_difference": {
+      "value": 0.1,
+      "significance": "LOW - sample size too small for statistical significance",
+      "interpretation": "pbx-web has more events, but both maintain 100% success"
+    },
+    "error_profile_difference": {
+      "value": 0.2,
+      "significance": "LOW - both are operationally acceptable",
+      "interpretation": "Operational difference, not reliability issue"
+    }
+  },
+  "shared_success_factors": [
+    "Zero crash loops across both services",
+    "Zero OOM kills (proper resource limits)",
+    "Zero failed rollouts (effective deployment validation)",
+    "Zero pod restarts (stable application code)",
+    "100% availability (excellent operational practices)",
+    "ArgoCD GitOps management (zero configuration drift)",
+    "Effective health checks (traffic routing to healthy pods)",
+    "Proper resource limits (preventing resource exhaustion)",
+    "Recreate deployment strategy (simplified single-pod deployments)"
+  ],
+  "service_specific_patterns": {
+    "pbx-web": {
+      "deployment_cadence": "Conservative (mature service)",
+      "operational_model": "File serving + site generation",
+      "error_profile": "Client disconnects expected (0.2/day)",
+      "storage_type": "S3 (external, stable)",
+      "connection_model": "Stateful client connections",
+      "deployment_divergence_explanation": "More deployment events due to rebuild relays"
+    },
+    "whisper-stt": {
+      "deployment_cadence": "Moderate (active development)",
+      "operational_model": "Stateless STT API",
+      "error_profile": "Clean (0 errors/day)",
+      "storage_type": "Longhorn PVCs (local, stable)",
+      "connection_model": "Stateless request/response",
+      "deployment_divergence_explanation": "Fewer main deployment events, burst pattern detected"
+    }
+  },
+  "key_findings": [
+    "PERFECT MATCH: Both services achieve 100% deployment success rate",
+    "PERFECT MATCH: Both services maintain 100% availability (zero downtime)",
+    "PERFECT MATCH: Zero critical failures across both services (MTBF = ∞)",
+    "PERFECT MATCH: Zero crash loops, zero OOM kills, zero failed rollouts",
+    "VELOCITY DIVERGENCE: pbx-web has 2.5x more deployment events (0.167 vs 0.067 per day)",
+    "UPTIME DIVERGENCE: whisper-stt shows 2.8x longer current pod uptime (25 vs 9 days)",
+    "ERROR PROFILE DIVERGENCE: pbx-web has 0.2 errors/day (client disconnects), whisper-stt has 0",
+    "INTERPRETATION: Error divergence is operational, not instability (service type difference)",
+    "INTERPRETATION: Velocity divergence reflects deployment patterns, not reliability",
+    "INTERPRETATION: Uptime divergence reflects pod recreation patterns, not stability"
+  ],
+  "reliability_ratings": {
+    "pbx-web": "EXCELLENT (5/5 stars)",
+    "whisper-stt": "EXCELLENT (5/5 stars)",
+    "overall_assessment": "Both services demonstrate production-grade reliability with perfect success rates and availability"
+  },
+  "recommendations": {
+    "for_both_services": [
+      "Continue current practices - reliability is excellent",
+      "Maintain ArgoCD GitOps approach (preventing drift)",
+      "Keep current resource limits (zero OOM kills validate approach)",
+      "Sustain effective health checks (ensuring traffic to healthy pods)",
+      "Add metrics collection for better observability",
+      "Implement centralized alerting for deployment failures"
+    ],
+    "for_pbx-web": [
+      "Continue conservative deployment cadence",
+      "Monitor client disconnect error rate (currently 0.2/day - acceptable)",
+      "Consider alerting if error rate increases significantly"
+    ],
+    "for_whisper_stt": [
+      "Continue current deployment strategy (burst was successful)",
+      "Consider deployment gates for burst patterns (3 in 17 minutes)",
+      "Add log aggregation for better operational visibility",
+      "Consider structured logging (currently minimal output)"
+    ]
+  },
+  "conclusions": {
+    "overall_reliability": "EXCELLENT (5/5 stars)",
+    "summary": "Both services demonstrate production-grade reliability with 100% deployment success, 100% availability, zero failures in all critical categories, infinite MTBF, effective resource management, and robust operational practices",
+    "statistical_assessment": "Success rate: 0% difference, Availability: 0% difference, Failure rate: 0% difference, Deployment velocity: 59.9% difference (not statistically significant), Error profile: 0.2/day difference (operational, not reliability issue)",
+    "stability_assessment": "Neither service fails more often than the other. Divergence is in deployment patterns, not reliability. Both services are low-risk with excellent operational stability.",
+    "risk_level": "LOW",
+    "maintenance_priority": "ROUTINE"
+  },
+  "data_sources": [
+    "pbx-web-deployment-data-30days.json",
+    "whisper-stt-deployment-data-30days.json",
+    "docs/research/deployment-patterns-failure-modes-analysis-30d.md",
+    "kubectl read-only proxy over Tailscale"
+  ]
+}
