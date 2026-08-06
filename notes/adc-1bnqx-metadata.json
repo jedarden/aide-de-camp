@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-08-06T13:32:33.974197",
+  "datasets": {
+    "pbx-web": {
+      "file": "/home/coding/aide-de-camp/pbx-web-deployment-data-30days.json",
+      "loaded": true,
+      "valid": true,
+      "record_count": 5
+    },
+    "whisper-stt": {
+      "file": "/home/coding/aide-de-camp/whisper-stt-deployment-data-30days.json",
+      "loaded": true,
+      "valid": true,
+      "record_count": 5
+    }
+  },
+  "ready_for_analysis": true
+}

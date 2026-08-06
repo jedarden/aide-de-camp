@@ -1,204 +1,315 @@
 #!/usr/bin/env python3
 """
-Load and validate pbx-web and whisper-stt deployment datasets.
+Load and validate deployment datasets for pbx-web and whisper-stt services.
+This script validates the data structure and completeness of both datasets.
 """
 
 import json
-import pickle
-import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from datetime import datetime
+from typing import Dict, Any, List, Tuple
+import sys
 
 
-class DatasetValidator:
-    """Validator for deployment dataset JSON files."""
+class DeploymentDataValidator:
+    """Validator for deployment dataset structure and completeness."""
 
-    def __init__(self, filepath: Path):
-        self.filepath = filepath
-        self.data: Dict[str, Any] = {}
-        self.errors = []
-        self.warnings = []
+    REQUIRED_PBX_FIELDS = [
+        'timestamp', 'event_type', 'outcome'
+    ]
 
-    def load(self) -> bool:
-        """Load JSON file."""
-        try:
-            with open(self.filepath, 'r') as f:
-                self.data = json.load(f)
-            return True
-        except json.JSONDecodeError as e:
-            self.errors.append(f"JSON decode error: {e}")
-            return False
-        except Exception as e:
-            self.errors.append(f"Load error: {e}")
-            return False
+    REQUIRED_WHISPER_FIELDS = [
+        'created', 'status', 'deployment', 'image'
+    ]
 
-    def validate_structure(self) -> bool:
-        """Validate the structure of the loaded JSON."""
-        required_sections = [
-            'report_metadata',
-            'current_status',
-            'deployment_history_30_days',
-            'pod_status',
-            'operational_metrics',
-            'argo_cd_integration',
-            'error_incidents',
-            'deployment_health_assessment',
-            'summary'
-        ]
-
-        for section in required_sections:
-            if section not in self.data:
-                self.errors.append(f"Missing required section: {section}")
-            elif not isinstance(self.data[section], dict):
-                self.errors.append(f"Section '{section}' is not a dict")
-
-        # Validate metadata
-        if 'report_metadata' in self.data:
-            metadata = self.data['report_metadata']
-            metadata_fields = [
-                'generated_at', 'time_range_start', 'time_range_end',
-                'cluster', 'service', 'namespace'
-            ]
-            for field in metadata_fields:
-                if field not in metadata:
-                    self.warnings.append(f"Missing metadata field: {field}")
-
-        return len(self.errors) == 0
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """Extract statistics from the dataset."""
-        stats = {
-            'service': self.data.get('report_metadata', {}).get('service', 'unknown'),
-            'namespace': self.data.get('report_metadata', {}).get('namespace', 'unknown'),
-            'cluster': self.data.get('report_metadata', {}).get('cluster', 'unknown'),
-            'time_range_start': self.data.get('report_metadata', {}).get('time_range_start'),
-            'time_range_end': self.data.get('report_metadata', {}).get('time_range_end'),
+    def __init__(self):
+        self.validation_results = {
+            'pbx-web': {'loaded': False, 'valid': False, 'errors': [], 'warnings': []},
+            'whisper-stt': {'loaded': False, 'valid': False, 'errors': [], 'warnings': []}
         }
 
-        # Deployment count
-        deployments = self.data.get('current_status', {}).get('deployments', {})
-        stats['deployment_count'] = len(deployments)
+    def load_json_file(self, filepath: Path) -> Dict[str, Any]:
+        """Load JSON file with error handling."""
+        try:
+            with open(filepath, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Data file not found: {filepath}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in {filepath}: {e}")
 
-        # ReplicaSet count
-        replicasets = self.data.get('deployment_history_30_days', {}).get('replicasets', [])
-        stats['replicaset_count'] = len(replicasets)
+    def validate_pbx_web_data(self, data: Dict[str, Any]) -> Tuple[bool, List[str], List[str]]:
+        """Validate pbx-web deployment dataset structure."""
+        errors = []
+        warnings = []
 
-        # Pod metrics
-        pod_metrics = self.data.get('pod_status', {}).get('pod_metrics', {})
-        stats.update({
-            'total_pods': pod_metrics.get('total_pods', 0),
-            'running_pods': pod_metrics.get('running_pods', 0),
-            'total_restarts': pod_metrics.get('total_restarts', 0),
-            'crashloops': pod_metrics.get('crashloops', 0),
-        })
+        # Check top-level structure
+        if 'metadata' not in data:
+            errors.append("Missing 'metadata' section")
+        else:
+            required_metadata = ['service', 'namespace', 'cluster', 'time_period']
+            for field in required_metadata:
+                if field not in data['metadata']:
+                    errors.append(f"Missing metadata field: {field}")
 
-        # Error incidents
-        error_incidents = self.data.get('error_incidents', {})
-        stats.update({
-            'total_incidents': error_incidents.get('total_incidents', 0),
-            'critical_incidents': error_incidents.get('critical_incidents', 0),
-        })
+        # Check deployment events
+        if 'deployment_events_last_30_days' not in data:
+            errors.append("Missing 'deployment_events_last_30_days' section")
+        else:
+            events = data['deployment_events_last_30_days']
+            if not isinstance(events, list):
+                errors.append("deployment_events_last_30_days must be a list")
+            else:
+                for i, event in enumerate(events):
+                    for field in self.REQUIRED_PBX_FIELDS:
+                        if field not in event:
+                            errors.append(f"Event {i}: Missing required field '{field}'")
 
-        # Health assessment
-        health = self.data.get('deployment_health_assessment', {})
-        stats['overall_health'] = health.get('overall_health', 'unknown')
+                    # Validate timestamp format
+                    if 'timestamp' in event:
+                        try:
+                            datetime.fromisoformat(event['timestamp'].replace('Z', '+00:00'))
+                        except ValueError:
+                            errors.append(f"Event {i}: Invalid timestamp format: {event['timestamp']}")
 
-        return stats
+        # Check for metrics section
+        if 'deployment_metrics' not in data:
+            warnings.append("Missing 'deployment_metrics' section - summary data not available")
 
-    def print_report(self):
-        """Print validation report."""
-        print(f"\n{'='*70}")
-        print(f"Dataset: {self.filepath.name}")
-        print(f"{'='*70}")
+        return len(errors) == 0, errors, warnings
 
-        if self.errors:
-            print(f"\n❌ ERRORS ({len(self.errors)}):")
-            for error in self.errors:
-                print(f"  - {error}")
+    def validate_whisper_stt_data(self, data: Dict[str, Any]) -> Tuple[bool, List[str], List[str]]:
+        """Validate whisper-stt deployment dataset structure."""
+        errors = []
+        warnings = []
 
-        if self.warnings:
-            print(f"\n⚠️  WARNINGS ({len(self.warnings)}):")
-            for warning in self.warnings:
-                print(f"  - {warning}")
+        # Check top-level structure
+        if 'report_metadata' not in data:
+            errors.append("Missing 'report_metadata' section")
+        else:
+            required_metadata = ['cluster', 'service', 'namespace', 'time_range_start', 'time_range_end']
+            for field in required_metadata:
+                if field not in data['report_metadata']:
+                    errors.append(f"Missing report_metadata field: {field}")
 
-        if not self.errors and not self.warnings:
-            print("\n✅ Validation passed with no errors or warnings")
+        # Check current status
+        if 'current_status' not in data:
+            errors.append("Missing 'current_status' section")
+        else:
+            if 'deployments' not in data['current_status']:
+                errors.append("Missing 'deployments' in current_status")
 
-        # Print statistics
-        stats = self.get_statistics()
-        print(f"\n📊 STATISTICS:")
-        print(f"  Service: {stats['service']}")
-        print(f"  Namespace: {stats['namespace']}")
-        print(f"  Cluster: {stats['cluster']}")
-        print(f"  Time range: {stats['time_range_start']} to {stats['time_range_end']}")
-        print(f"  Deployments: {stats['deployment_count']}")
-        print(f"  ReplicaSets (30d): {stats['replicaset_count']}")
-        print(f"  Total pods: {stats['total_pods']} ({stats['running_pods']} running)")
-        print(f"  Restarts: {stats['total_restarts']}")
-        print(f"  Crashloops: {stats['crashloops']}")
-        print(f"  Incidents: {stats['total_incidents']} ({stats['critical_incidents']} critical)")
-        print(f"  Overall health: {stats['overall_health']}")
+        # Check deployment history
+        if 'deployment_history_30_days' not in data:
+            errors.append("Missing 'deployment_history_30_days' section")
+        else:
+            history = data['deployment_history_30_days']
+            if 'replicasets' not in history:
+                errors.append("Missing 'replicasets' in deployment_history_30_days")
+            else:
+                replicasets = history['replicasets']
+                if not isinstance(replicasets, list):
+                    errors.append("replicasets must be a list")
+                else:
+                    for i, rs in enumerate(replicasets):
+                        for field in self.REQUIRED_WHISPER_FIELDS:
+                            if field not in rs:
+                                errors.append(f"ReplicaSet {i}: Missing required field '{field}'")
+
+                        # Validate timestamp format
+                        if 'created' in rs:
+                            try:
+                                datetime.fromisoformat(rs['created'].replace('Z', '+00:00'))
+                            except ValueError:
+                                errors.append(f"ReplicaSet {i}: Invalid timestamp format: {rs['created']}")
+
+        # Check for operational metrics
+        if 'operational_metrics' not in data:
+            warnings.append("Missing 'operational_metrics' section - resource data not available")
+
+        return len(errors) == 0, errors, warnings
+
+    def validate_dataset(self, service: str, filepath: Path) -> Dict[str, Any]:
+        """Load and validate a deployment dataset."""
+        print(f"\n{'='*60}")
+        print(f"Validating {service} deployment data")
+        print(f"{'='*60}")
+
+        try:
+            # Load data
+            print(f"Loading data from: {filepath}")
+            data = self.load_json_file(filepath)
+            self.validation_results[service]['loaded'] = True
+            print("✓ Data loaded successfully")
+
+            # Validate based on service type
+            if service == 'pbx-web':
+                is_valid, errors, warnings = self.validate_pbx_web_data(data)
+            else:  # whisper-stt
+                is_valid, errors, warnings = self.validate_whisper_stt_data(data)
+
+            self.validation_results[service]['valid'] = is_valid
+            self.validation_results[service]['errors'] = errors
+            self.validation_results[service]['warnings'] = warnings
+
+            # Report results
+            if errors:
+                print(f"\n❌ Validation failed with {len(errors)} error(s):")
+                for error in errors:
+                    print(f"  - {error}")
+            else:
+                print("\n✓ Structure validation passed")
+
+            if warnings:
+                print(f"\n⚠️  {len(warnings)} warning(s):")
+                for warning in warnings:
+                    print(f"  - {warning}")
+
+            # Extract key metrics
+            print(f"\n📊 Key Metrics:")
+            if service == 'pbx-web' and 'deployment_metrics' in data:
+                metrics = data['deployment_metrics']
+                print(f"  Total deployments (30d): {metrics.get('total_deployments_last_30_days', 'N/A')}")
+                print(f"  Success rate: {metrics.get('deployment_success_rate', 'N/A')}")
+                print(f"  Last deployment: {metrics.get('last_deployment', 'N/A')}")
+            elif service == 'whisper-stt' and 'summary' in data:
+                summary = data['summary']
+                print(f"  Total events (30d): {summary.get('total_deployment_events', 'N/A')}")
+                print(f"  Availability: {summary.get('availability', 'N/A')}")
+                print(f"  Overall status: {summary.get('overall_status', 'N/A')}")
+
+            return data
+
+        except Exception as e:
+            print(f"\n❌ Failed to validate {service}: {e}")
+            self.validation_results[service]['errors'].append(str(e))
+            return None
+
+    def generate_summary_report(self) -> str:
+        """Generate a summary validation report."""
+        report = []
+        report.append("\n" + "="*60)
+        report.append("DEPLOYMENT DATA VALIDATION SUMMARY")
+        report.append("="*60)
+
+        for service, results in self.validation_results.items():
+            status_icon = "✓" if results['valid'] else "❌"
+            loaded_status = "Loaded" if results['loaded'] else "Failed"
+            valid_status = "Valid" if results['valid'] else "Invalid"
+
+            report.append(f"\n{status_icon} {service.upper()}")
+            report.append(f"  Load Status: {loaded_status}")
+            report.append(f"  Validation: {valid_status}")
+
+            if results['errors']:
+                report.append(f"  Errors ({len(results['errors'])}):")
+                for error in results['errors']:
+                    report.append(f"    - {error}")
+
+            if results['warnings']:
+                report.append(f"  Warnings ({len(results['warnings'])}):")
+                for warning in results['warnings']:
+                    report.append(f"    - {warning}")
+
+        report.append("\n" + "="*60)
+
+        # Overall assessment
+        all_loaded = all(r['loaded'] for r in self.validation_results.values())
+        all_valid = all(r['valid'] for r in self.validation_results.values())
+
+        if all_loaded and all_valid:
+            report.append("✓ OVERALL: All datasets loaded and validated successfully")
+            report.append("✓ Data is ready for analysis by subsequent beads")
+        elif all_loaded:
+            report.append("⚠️  OVERALL: All datasets loaded but validation has issues")
+            report.append("⚠️  Review errors/warnings before proceeding with analysis")
+        else:
+            report.append("❌ OVERALL: Some datasets failed to load")
+            report.append("❌ Cannot proceed with analysis until all data is loaded")
+
+        report.append("="*60 + "\n")
+
+        return "\n".join(report)
 
 
 def main():
-    """Main validation entry point."""
-    base_path = Path('/home/coding/aide-de-camp/docs/research')
+    """Main execution function."""
+    print("Deployment Data Validation Script")
+    print("=" * 60)
 
-    datasets = [
-        base_path / 'pbx-web-deployments-30d.json',
-        base_path / 'whisper-stt-deployments-30d.json',
-    ]
+    # Define data paths
+    workspace = Path('/home/coding/aide-de-camp')
+    pbx_data_path = workspace / 'pbx-web-deployment-data-30days.json'
+    whisper_data_path = workspace / 'whisper-stt-deployment-data-30days.json'
 
-    all_data = {}
-    all_valid = True
+    # Initialize validator
+    validator = DeploymentDataValidator()
 
-    print("\n🔍 Loading and validating deployment datasets...")
-    print(f"Timestamp: {datetime.now().isoformat()}")
+    # Validate datasets
+    pbx_data = validator.validate_dataset('pbx-web', pbx_data_path)
+    whisper_data = validator.validate_dataset('whisper-stt', whisper_data_path)
 
-    for dataset_path in datasets:
-        if not dataset_path.exists():
-            print(f"\n❌ File not found: {dataset_path}")
-            all_valid = False
-            continue
+    # Generate and print summary report
+    summary = validator.generate_summary_report()
+    print(summary)
 
-        validator = DatasetValidator(dataset_path)
+    # Save validation report
+    report_path = workspace / 'notes' / 'adc-1bnqx-validation-report.md'
+    report_path.parent.mkdir(exist_ok=True)
 
-        if not validator.load():
-            print(f"\n❌ Failed to load: {dataset_path.name}")
-            all_valid = False
-            continue
+    with open(report_path, 'w') as f:
+        f.write("# Deployment Data Validation Report\n\n")
+        f.write(f"Generated: {datetime.now().isoformat()}\n\n")
+        f.write(summary)
+        f.write("\n## Data Files Validated\n\n")
+        f.write(f"- pbx-web: `{pbx_data_path}`\n")
+        f.write(f"- whisper-stt: `{whisper_data_path}`\n\n")
+        f.write("## Next Steps\n\n")
+        f.write("Both datasets are now available for analysis by subsequent beads:\n")
+        f.write("- Use `pbx-web-deployment-data-30days.json` for pbx-web analysis\n")
+        f.write("- Use `whisper-stt-deployment-data-30days.json` for whisper-stt analysis\n")
+        f.write("- Both datasets contain 30-day deployment history with timestamps, events, and metrics\n")
 
-        if not validator.validate_structure():
-            print(f"\n❌ Structure validation failed: {dataset_path.name}")
-            all_valid = False
+    print(f"\n✓ Validation report saved to: {report_path}")
 
-        validator.print_report()
+    # Save loaded data references for subsequent beads
+    metadata_path = workspace / 'notes' / 'adc-1bnqx-metadata.json'
+    metadata = {
+        'generated_at': datetime.now().isoformat(),
+        'datasets': {
+            'pbx-web': {
+                'file': str(pbx_data_path),
+                'loaded': validator.validation_results['pbx-web']['loaded'],
+                'valid': validator.validation_results['pbx-web']['valid'],
+                'record_count': len(pbx_data.get('deployment_events_last_30_days', [])) if pbx_data else 0
+            },
+            'whisper-stt': {
+                'file': str(whisper_data_path),
+                'loaded': validator.validation_results['whisper-stt']['loaded'],
+                'valid': validator.validation_results['whisper-stt']['valid'],
+                'record_count': len(whisper_data.get('deployment_history_30_days', {}).get('replicasets', [])) if whisper_data else 0
+            }
+        },
+        'ready_for_analysis': all([
+            validator.validation_results['pbx-web']['loaded'],
+            validator.validation_results['whisper-stt']['loaded'],
+            validator.validation_results['pbx-web']['valid'],
+            validator.validation_results['whisper-stt']['valid']
+        ])
+    }
 
-        # Store for next step
-        service_name = validator.data.get('report_metadata', {}).get('service', dataset_path.stem)
-        all_data[service_name] = validator.data
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
 
-    # Save combined data for next task
-    output_path = Path('/tmp/deployment_datasets.pkl')
-    with open(output_path, 'wb') as f:
-        pickle.dump(all_data, f)
+    print(f"✓ Data metadata saved to: {metadata_path}")
 
-    print(f"\n💾 Combined data saved to: {output_path}")
-
-    # Summary
-    print(f"\n{'='*70}")
-    print(f"SUMMARY")
-    print(f"{'='*70}")
-    print(f"  Total datasets processed: {len(datasets)}")
-    print(f"  Successful: {len(all_data)}")
-    print(f"  Failed: {len(datasets) - len(all_data)}")
-
-    if all_valid:
-        print(f"\n✅ All datasets loaded and validated successfully")
+    # Exit with appropriate code
+    if all([validator.validation_results['pbx-web']['valid'],
+            validator.validation_results['whisper-stt']['valid']]):
+        print("\n✓ All validation checks passed - data is ready for analysis")
         return 0
     else:
-        print(f"\n❌ Some datasets failed validation")
+        print("\n❌ Validation failed - review errors before proceeding")
         return 1
 
 
