@@ -1,32 +1,43 @@
-# Whisper-STT Build Workflow Query Results
+# whisper-stt-build Workflow Query Summary
 
-## Query Executed
-- **Date**: 2026-08-06
-- **Cluster**: iad-ci
-- **Namespace**: argo-workflows
-- **Template**: whisper-stt-build
-- **Expected Range**: 2026-07-07 to 2026-08-06 (last 30 days)
+**Query Date:** 2026-08-06  
+**Cluster:** iad-ci  
+**Namespace:** argo-workflows  
+**Time Range:** Last 30 days (since 2026-07-07)
 
-## Results
-**No workflow runs found.**
+## Findings
 
-### Key Findings
-1. The `whisper-stt-build` workflow template exists in the cluster
-2. The template was created 71 days ago (~2026-05-26)
-3. Despite the template existing, **zero workflow executions** have been recorded
-4. This means the whisper-stt-build workflow has never been run
+### Workflow Template Status
+- **Template exists:** ✅ `whisper-stt-build` workflow template is present in the cluster
+- **Workflow runs:** ❌ **ZERO** workflow runs found for this template
 
-### Possible Explanations
-1. **Manual execution only**: The workflow may require manual triggering and has never been invoked
-2. **Replaced by alternative build method**: Whisper STT may be built via a different CI/CD pipeline
-3. **Dormant service**: The whisper-stt service may not be actively maintained or deployed
-4. **Template-only**: The template may exist as a reference but not be integrated into active CI/CD
+### Query Results
+**Result:** Empty items array (no workflows match the selector)
 
-### Next Steps for Investigation
-1. Check the nixos-asterisk repository for whisper-stt build configuration
-2. Verify if whisper-stt container is being built and deployed
-3. Check if there's an alternative build process (e.g., direct container build, different workflow template)
-4. Review declarative-config for any whisper-stt deployment references
+### Cross-verification
+Searched all workflows in argo-workflows namespace and filtered by spec.workflowTemplateRef.name == "whisper-stt-build":
+- **Count:** 0 workflows
 
-## Data Source
-Raw workflow data saved in: `whisper-stt-raw-workflows.json`
+### Other Active Workflows (for context)
+The following workflow templates have active runs in the cluster:
+- seam-ci: 5 runs
+- needle-ci: 5 runs  
+- gribtract-ci: 3 runs
+- warden-build: 1 run
+- b2-usage-exporter-build: 1 run
+- armor-build: 1 run
+
+## Conclusion
+
+The whisper-stt-build workflow template exists but has never been executed (or no runs have occurred in the retention period). This suggests:
+
+1. New template: May have been recently deployed and not yet triggered
+2. Manual trigger only: May require manual workflow submission (no CI auto-trigger configured)
+3. Build not needed: May be part of a dormant or planned service
+
+## Raw Data
+Full workflow query output saved to: whisper-stt-raw-workflows.json (empty result)
+
+## Next Steps
+
+To trigger a whisper-stt-build workflow, use kubectl create with workflowTemplateRef.
