@@ -154,19 +154,19 @@ async def lifespan(app: FastAPI):
     await _background_processor.start()
     logger.info("Background analysis processor started")
 
-    # Check Telegram Bot API reachability
+    # Check Telegram bridge reachability
     try:
         telegram_fallback = get_telegram_fallback()
         telegram_available = await telegram_fallback.check_telegram_available()
         if telegram_available:
-            logger.info("Telegram Bot API reachable")
+            logger.info("Telegram bridge reachable")
         else:
             logger.warning(
-                "Telegram Bot API unreachable. "
+                "Telegram bridge unreachable at startup. "
                 "Telegram fallback will not be available."
             )
     except Exception as e:
-        logger.warning(f"Failed to check Telegram Bot API reachability: {e}")
+        logger.warning(f"Failed to check Telegram bridge reachability: {e}")
 
     # Warm up ZAI proxy connections proactively
     # This eliminates TLS handshake cost from the first actual LLM request
