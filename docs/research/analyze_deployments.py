@@ -16,11 +16,11 @@ def load_json(filepath: str) -> Dict:
         return json.load(f)
 
 
-def calculate_success_rate(deployments: int, successful: int) -> float:
+def calculate_success_rate(deployments: int, failed: int) -> float:
     """Calculate deployment success rate as percentage."""
     if deployments == 0:
-        return 0.0
-    return (successful / deployments) * 100
+        return 100.0
+    return ((deployments - failed) / deployments) * 100 if deployments > 0 else 100.0
 
 
 def analyze_deployment_frequency(events: List[Dict]) -> Dict[str, Any]:
