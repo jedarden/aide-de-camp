@@ -282,11 +282,13 @@ async def test_endpoint(request: dict):
 
     Mirrors the /dispatch interface for basic testing and verification.
     Stores the utterance to the session database and returns a test response.
+    Broadcasts SSE events to connected canvas surfaces when surface_id is provided.
 
     Request body:
     {
         "utterance": "test utterance here",
-        "session_id": "optional-session-id"
+        "session_id": "optional-session-id",
+        "surface_id": "optional-surface-id"  // If provided, broadcasts SSE event
     }
 
     Returns:
@@ -311,8 +313,9 @@ async def test_endpoint(request: dict):
 
     utterance = request.get("utterance", "")
     session_id = request.get("session_id", "")
+    surface_id = request.get("surface_id", "")
 
-    logger.info(f"[TEST] Received test request - utterance: {utterance[:100]}..., session_id: {session_id}")
+    logger.info(f"[TEST] Received test request - utterance: {utterance[:100]}..., session_id: {session_id}, surface_id: {surface_id}")
 
     # Get the session store
     store = await get_store()
@@ -364,6 +367,27 @@ async def test_endpoint(request: dict):
     )
 
     logger.info(f"[TEST] Stored test data - utterance_id: {utterance_id}, result_id: {result_id}")
+
+    # Broadcast SSE event if surface_id is provided (matches /dispatch pattern)
+    if surface_id and _broadcaster:
+        try:
+            await _broadcaster.broadcast(
+                SSEEvent(
+                    event_type=EventType.RESULT_CREATED,
+                    target_surface_id=surface_id,
+                    data={
+                        "intent_id": intent_id,
+                        "topic_id": topic_id,
+                        "result_id": result_id,
+                        "summary": f"Test result for: {utterance[:100]}",
+                        "urgency": "normal",
+                    },
+                )
+            )
+            logger.info(f"[TEST] Broadcast SSE event to surface {surface_id}")
+        except Exception as e:
+            logger.warning(f"[TEST] Failed to broadcast SSE event: {e}")
+            # Non-fatal: continue and return response
 
     return {
         "status": "test",
