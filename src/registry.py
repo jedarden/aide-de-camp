@@ -24,6 +24,14 @@ REGISTRY_PATH = Path(__file__).parent.parent / "config" / "registry.yaml"
 DISCOVERY_ROOT = Path("/home/coding")
 CACHE_TTL = 300  # 5 minutes
 
+# HOT-RELOAD MECHANISM: TTL-based cache invalidation
+# _cache stores the merged registry (YAML + discovered projects)
+# _cache_at tracks when the cache was last built (timestamp)
+# get_registry() checks if cache is stale (> CACHE_TTL seconds old)
+# If stale or force=True, rebuilds registry from disk by calling _build_registry()
+# This enables hot-reload without server restart: changes to registry.yaml take effect
+# within 5 minutes or immediately with force=True
+# Verified in test_registry_hot_reload (tests/test_config_hot_reload.py)
 _cache: dict | None = None
 _cache_at: float = 0
 
@@ -254,8 +262,38 @@ def _build_registry() -> dict:
 
 
 def get_registry(force: bool = False) -> dict:
-    """Return the merged registry, rebuilding if cache is stale."""
+    """
+    Return the merged registry with hot-reload support.
+
+    HOT-RELOAD MECHANISM: TTL-Based Cache Invalidation
+    ====================================================
+    This function implements hot-reload without requiring a server restart:
+
+    1. First call builds registry from disk (YAML + discovered projects)
+    2. Subsequent calls return cached registry if within TTL (5 minutes)
+    3. After TTL expires, next call rebuilds registry from disk
+    4. force=True bypasses cache and rebuilds immediately
+
+    This approach means:
+    - Changes to config/registry.yaml take effect within 5 minutes
+    - Or immediately with force=True (used in tests and manual reloads)
+    - No server restart required to pick up new projects/aliases
+    - Cache hit is very fast (no disk I/O or YAML parsing)
+    - Cache miss rebuilds entire registry (includes git repo discovery)
+
+    Args:
+        force: If True, bypass cache and rebuild registry immediately.
+               Used for testing and manual reload triggers.
+
+    Returns:
+        Merged registry dict with projects, clusters, argocd, global_aliases.
+
+    Verified in: test_registry_hot_reload (tests/test_config_hot_reload.py)
+    """
     global _cache, _cache_at
+    # HOT-RELOAD: Check if cache is stale or force reload requested
+    # If force=True or cache is None or TTL expired, rebuild from disk
+    # Otherwise return cached registry (fast path, no disk I/O)
     if force or _cache is None or (time.time() - _cache_at) > CACHE_TTL:
         _cache = _build_registry()
         _cache_at = time.time()
@@ -263,6 +301,21 @@ def get_registry(force: bool = False) -> dict:
 
 
 def get_project(slug: str) -> dict | None:
+    """
+    Get a single project entry from the registry.
+
+    HOT-RELOAD: This function calls get_registry() which implements TTL-based cache
+    invalidation. Changes to registry.yaml will be picked up within 5 minutes or
+    immediately with get_registry(force=True). No server restart required.
+
+    Args:
+        slug: Project slug to look up
+
+    Returns:
+        Project dict or None if not found
+
+    Verified in: test_registry_hot_reload (tests/test_config_hot_reload.py)
+    """
     return get_registry()["projects"].get(slug)
 
 
