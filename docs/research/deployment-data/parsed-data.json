@@ -1,0 +1,4881 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T22:56:28.820259Z",
+    "total_files_parsed": 19,
+    "source_directory": "/home/coding/aide-de-camp/docs/research/deployment-data"
+  },
+  "files": {
+    "correlation-analysis-results.json": {
+      "findings": {
+        "analysis_date": "2026-08-06T12:39:15.059388",
+        "total_pbx_events": 5,
+        "total_whisper_events": 3,
+        "total_events": 8,
+        "pbx_issues": 1,
+        "whisper_issues": 0,
+        "correlations_found": 0,
+        "correlation_windows_analyzed": [
+          5,
+          10,
+          15,
+          30,
+          60
+        ],
+        "key_findings": [
+          "No temporal correlation detected between pbx-web and whisper-stt deployments."
+        ]
+      },
+      "timeline": [
+        {
+          "timestamp": "2026-07-08T03:09:35+00:00",
+          "service": "whisper-stt",
+          "source": "whisper-stt",
+          "event_type": "replica_created",
+          "outcome": "inactive",
+          "details": "image: ronaldraygun/whisper-stt:1.8.2"
+        },
+        {
+          "timestamp": "2026-07-08T03:16:13+00:00",
+          "service": "whisper-stt",
+          "source": "whisper-stt",
+          "event_type": "replica_created",
+          "outcome": "inactive",
+          "details": "image: ronaldraygun/whisper-stt:1.8.4"
+        },
+        {
+          "timestamp": "2026-07-08T03:26:44+00:00",
+          "service": "whisper-stt",
+          "source": "whisper-stt",
+          "event_type": "replica_created",
+          "outcome": "inactive",
+          "details": "image: ronaldraygun/whisper-stt:1.8.6"
+        },
+        {
+          "timestamp": "2026-07-13T18:07:55+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollback",
+          "outcome": "rolled_back",
+          "details": "Rolled back to 1.0.8 on same day"
+        },
+        {
+          "timestamp": "2026-07-13T18:18:07+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollout",
+          "outcome": "success",
+          "details": "Initial deployment of revision 14"
+        },
+        {
+          "timestamp": "2026-07-15T03:24:40+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollout",
+          "outcome": "success",
+          "details": "PBX rebuild relay deployment"
+        },
+        {
+          "timestamp": "2026-07-27T17:56:07+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollout",
+          "outcome": "success",
+          "details": "Lab rebuild relay deployment"
+        },
+        {
+          "timestamp": "2026-07-28T17:26:12+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollout",
+          "outcome": "success",
+          "details": "Current active deployment"
+        }
+      ],
+      "correlations": []
+    },
+    "deployment-events-30days-comprehensive.json": {
+      "metadata": {
+        "generated_at": "2026-08-06T17:30:00Z",
+        "time_period_start": "2026-07-07T00:00:00Z",
+        "time_period_end": "2026-08-06T17:30:00Z",
+        "target_days": 30,
+        "data_sources": [
+          "Kubernetes ReplicaSets (ardenone-cluster)",
+          "ArgoCD sync history",
+          "CI/CD Workflows (iad-ci cluster)",
+          "Deployment events from existing 30-day analysis"
+        ],
+        "description": "Comprehensive deployment events for pbx-web and whisper-stt covering last 30 days"
+      },
+      "pbx-web": {
+        "service_name": "pbx-web",
+        "namespace": "pbx-web",
+        "cluster": "ardenone-cluster",
+        "current_status": {
+          "deployment": "pbx-web",
+          "revision": 14,
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "last_updated": "2026-07-28T17:26:12Z"
+        },
+        "deployment_events": [
+          {
+            "deployment_id": "pbx-web-revision-14",
+            "timestamp": "2026-07-28T17:26:12Z",
+            "date": "2026-07-28",
+            "event_type": "deployment_rollout",
+            "revision": 14,
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "outcome": "success",
+            "replicaSet": "pbx-web-5ff68464d",
+            "pod_name": "pbx-web-5ff68464d-mkn8n",
+            "source": "kubernetes_replicaset",
+            "notes": "Current active deployment"
+          },
+          {
+            "deployment_id": "lab-rebuild-relay-revision-2",
+            "timestamp": "2026-07-27T17:56:07Z",
+            "date": "2026-07-27",
+            "event_type": "deployment_rollout",
+            "deployment": "lab-rebuild-relay",
+            "revision": 2,
+            "image": "python:3-slim",
+            "outcome": "success",
+            "replicaSet": "lab-rebuild-relay-79957dbd4",
+            "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
+            "source": "kubernetes_replicaset",
+            "notes": "Lab rebuild relay deployment"
+          },
+          {
+            "deployment_id": "pbx-rebuild-relay-revision-5",
+            "timestamp": "2026-07-15T03:24:40Z",
+            "date": "2026-07-15",
+            "event_type": "deployment_rollout",
+            "deployment": "pbx-rebuild-relay",
+            "revision": 5,
+            "image": "python:3-slim",
+            "outcome": "success",
+            "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+            "source": "kubernetes_replicaset",
+            "notes": "PBX rebuild relay deployment"
+          },
+          {
+            "deployment_id": "pbx-web-revision-14-initial",
+            "timestamp": "2026-07-13T18:18:07Z",
+            "date": "2026-07-13",
+            "event_type": "deployment_rollout",
+            "revision": 14,
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "outcome": "success",
+            "replicaSet": "pbx-web-5ff68464d",
+            "source": "kubernetes_replicaset",
+            "notes": "Initial deployment of revision 14"
+          },
+          {
+            "deployment_id": "pbx-web-revision-11-rollback",
+            "timestamp": "2026-07-13T18:07:55Z",
+            "date": "2026-07-13",
+            "event_type": "deployment_rollback",
+            "revision": 11,
+            "image": "ronaldraygun/pbx-web:1.0.8",
+            "outcome": "rolled_back",
+            "replicaSet": "pbx-web-754f4cfdf7",
+            "source": "kubernetes_replicaset",
+            "notes": "Rolled back to 1.0.8 on same day"
+          }
+        ],
+        "coverage_analysis": {
+          "target_range": "2026-07-07 to 2026-08-06 (30 days)",
+          "actual_coverage": "2026-07-13 to 2026-07-28 (15 days)",
+          "coverage_days": 15,
+          "coverage_percentage": 50,
+          "gap_days": 15,
+          "gaps": [
+            "2026-07-07 to 2026-07-12 (6 days) - No deployment events",
+            "2026-07-29 to 2026-08-06 (9 days) - No deployment events"
+          ],
+          "deployment_frequency": {
+            "total_events": 5,
+            "rollouts": 4,
+            "rollbacks": 1,
+            "average_interval_days": 3.8
+          },
+          "success_rate": 100
+        },
+        "ci_cd_workflows": {
+          "workflow_template": "pbx-web-build",
+          "workflows_found_in_window": 0,
+          "most_recent_workflow": null,
+          "retention_policy": "Workflows appear to be cleaned up within hours/days"
+        },
+        "image_tags_used": [
+          "ronaldraygun/pbx-web:1.0.9",
+          "ronaldraygun/pbx-web:1.0.8",
+          "python:3-slim"
+        ]
+      },
+      "whisper-stt": {
+        "service_name": "whisper-stt",
+        "namespace": "whisper-stt",
+        "cluster": "ardenone-cluster",
+        "current_status": {
+          "deployment": "whisper-stt",
+          "revision": 32,
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "last_updated": "2026-07-12T16:54:57Z"
+        },
+        "deployment_events": [
+          {
+            "deployment_id": "whisper-stt-revision-32",
+            "timestamp": "2026-07-12T16:53:42Z",
+            "date": "2026-07-12",
+            "event_type": "deployment_rollout",
+            "revision": 32,
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "outcome": "success",
+            "replicaSet": "whisper-stt-847fd8d7b9",
+            "status": "active",
+            "source": "kubernetes_replicaset",
+            "notes": "Current active deployment"
+          },
+          {
+            "deployment_id": "whisper-stt-revision-31",
+            "timestamp": "2026-07-08T03:26:44Z",
+            "date": "2026-07-08",
+            "event_type": "deployment_rollout",
+            "revision": 31,
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "outcome": "success",
+            "replicaSet": "whisper-stt-6c497489fb",
+            "status": "inactive",
+            "source": "kubernetes_replicaset",
+            "notes": "Replaced by revision 32 same day"
+          },
+          {
+            "deployment_id": "whisper-stt-revision-30",
+            "timestamp": "2026-07-08T03:16:13Z",
+            "date": "2026-07-08",
+            "event_type": "deployment_rollout",
+            "revision": 30,
+            "image": "ronaldraygun/whisper-stt:1.8.4",
+            "outcome": "success",
+            "replicaSet": "whisper-stt-5b8558f478",
+            "status": "inactive",
+            "source": "kubernetes_replicaset",
+            "notes": "Rapid deployment sequence - version upgrade"
+          },
+          {
+            "deployment_id": "whisper-stt-revision-29",
+            "timestamp": "2026-07-08T03:09:35Z",
+            "date": "2026-07-08",
+            "event_type": "deployment_rollout",
+            "revision": 29,
+            "image": "ronaldraygun/whisper-stt:1.8.2",
+            "outcome": "success",
+            "replicaSet": "whisper-stt-5dbff75cbd",
+            "status": "inactive",
+            "source": "kubernetes_replicaset",
+            "notes": "Rapid deployment sequence - initial in series"
+          }
+        ],
+        "coverage_analysis": {
+          "target_range": "2026-07-07 to 2026-08-06 (30 days)",
+          "actual_coverage": "2026-07-08 to 2026-07-12 (4 days)",
+          "coverage_days": 4,
+          "coverage_percentage": 13.3,
+          "gap_days": 26,
+          "gaps": [
+            "2026-07-07 (1 day) - No deployment events",
+            "2026-07-13 to 2026-08-06 (25 days) - No deployment events"
+          ],
+          "deployment_frequency": {
+            "total_events": 4,
+            "rollouts": 4,
+            "rollbacks": 0,
+            "average_interval_days": 7.5,
+            "rapid_sequence": "3 deployments on 2026-07-08 (1.8.2 \u2192 1.8.4 \u2192 1.8.6)"
+          },
+          "success_rate": 100
+        },
+        "ci_cd_workflows": {
+          "workflow_template": "whisper-stt-build",
+          "workflows_found_in_window": 0,
+          "most_recent_workflow": null,
+          "retention_policy": "Workflows appear to be cleaned up within hours/days"
+        },
+        "image_tags_used": [
+          "ronaldraygun/whisper-stt:1.8.6",
+          "ronaldraygun/whisper-stt:1.8.4",
+          "ronaldraygun/whisper-stt:1.8.2"
+        ]
+      },
+      "summary": {
+        "total_services_analyzed": 2,
+        "total_deployment_events": 9,
+        "overall_coverage_analysis": {
+          "target_period": "2026-07-07 to 2026-08-06 (30 days)",
+          "pbx-web_coverage": "50% (15/30 days)",
+          "whisper-stt_coverage": "13.3% (4/30 days)",
+          "combined_coverage": "31.7% (19/60 service-days)",
+          "primary_limitation": "No CI/CD workflow history available due to aggressive cleanup policies"
+        },
+        "deployment_patterns": {
+          "pbx-web": {
+            "pattern": "Moderate deployment frequency with rebuild relay infrastructure",
+            "latest_deployment_age_days": 9,
+            "stability": "High - 100% success rate with 1 rollback"
+          },
+          "whisper-stt": {
+            "pattern": "Very stable - 25 days since last deployment",
+            "latest_deployment_age_days": 25,
+            "stability": "High - 100% success rate, rapid version iteration on 2026-07-08"
+          }
+        },
+        "data_completeness": {
+          "timestamp_format": "ISO 8601 - Validated \u2705",
+          "deployment_metadata": "Complete \u2705",
+          "image_information": "Complete \u2705",
+          "outcome_tracking": "Complete \u2705",
+          "ci_workflow_history": "Incomplete due to retention policy \u274c"
+        },
+        "recommendations": {
+          "monitoring": [
+            "Both services show excellent operational stability (100% success rate)",
+            "Long deployment intervals indicate mature, stable services",
+            "Consider increasing CI/CD workflow retention for historical analysis"
+          ],
+          "future_data_collection": [
+            "Query ArgoCD sync history as primary data source",
+            "Track git commits to declarative-config for deployment triggers",
+            "Monitor container registry for image build timestamps",
+            "Kubernetes ReplicaSets provide reliable production deployment history"
+          ]
+        },
+        "validation_status": {
+          "timestamps_valid": true,
+          "coverage_gaps_documented": true,
+          "deployment_frequency_calculated": true,
+          "success_rates_validated": true,
+          "missing_data_handled": true,
+          "ready_for_analysis": true
+        }
+      }
+    },
+    "failure-taxonomy.json": {
+      "generated_at": "2026-08-06T18:53:51.928732",
+      "data_directory": "docs/research/deployment-data",
+      "services_analyzed": [
+        "pbx-web",
+        "whisper-stt"
+      ],
+      "total_events_analyzed": 26,
+      "pattern_categories": {
+        "RollbackEvent": {
+          "description": "Deployment rollback events indicating issues with new deployments",
+          "severity": "medium",
+          "occurrences": 1,
+          "by_service": {
+            "pbx-web": 1
+          },
+          "examples": [
+            {
+              "service": "pbx-web",
+              "timestamp": "2026-07-13T18:07:55Z",
+              "date": "2026-07-13",
+              "image": "ronaldraygun/pbx-web:1.0.8",
+              "revision": 11,
+              "notes": "Rolled back to 1.0.8 on same day"
+            }
+          ]
+        },
+        "RapidDeploymentSequence": {
+          "description": "Multiple deployments occurring within a short time window (\u226415 minutes)",
+          "severity": "info",
+          "occurrences": 11,
+          "by_service": {
+            "pbx-web": 6,
+            "whisper-stt": 5
+          },
+          "examples": [
+            {
+              "service": "pbx-web",
+              "event1": "image_bump",
+              "event2": "deployment_rollback",
+              "timestamp1": "2026-07-13T14:15:32-04:00",
+              "timestamp2": "2026-07-13T18:07:55Z",
+              "time_diff_seconds": -457.0,
+              "image1": null,
+              "image2": "ronaldraygun/pbx-web:1.0.8"
+            },
+            {
+              "service": "pbx-web",
+              "event1": "deployment_rollback",
+              "event2": "deployment_rollout",
+              "timestamp1": "2026-07-13T18:07:55Z",
+              "timestamp2": "2026-07-13T18:18:07Z",
+              "time_diff_seconds": 612.0,
+              "image1": "ronaldraygun/pbx-web:1.0.8",
+              "image2": "ronaldraygun/pbx-web:1.0.9"
+            },
+            {
+              "service": "pbx-web",
+              "event1": "bugfix",
+              "event2": "deployment_rollout",
+              "timestamp1": "2026-07-14T23:21:50-04:00",
+              "timestamp2": "2026-07-15T03:24:40Z",
+              "time_diff_seconds": 170.0,
+              "image1": null,
+              "image2": "python:3-slim"
+            },
+            {
+              "service": "pbx-web",
+              "event1": "config_change",
+              "event2": "config_change",
+              "timestamp1": "2026-07-27T13:55:38-04:00",
+              "timestamp2": "2026-07-27T13:58:00-04:00",
+              "time_diff_seconds": 142.0,
+              "image1": null,
+              "image2": null
+            },
+            {
+              "service": "pbx-web",
+              "event1": "config_change",
+              "event2": "deployment_rollout",
+              "timestamp1": "2026-07-27T13:58:00-04:00",
+              "timestamp2": "2026-07-27T17:56:07Z",
+              "time_diff_seconds": -113.0,
+              "image1": null,
+              "image2": "python:3-slim"
+            }
+          ]
+        }
+      },
+      "kubernetes_failure_patterns": {
+        "ImagePullBackOff": {
+          "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
+          "severity": "high",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        },
+        "CrashLoopBackOff": {
+          "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
+          "severity": "critical",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        },
+        "OOMKilled": {
+          "description": "Container killed due to memory exhaustion (resource limits exceeded)",
+          "severity": "high",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        },
+        "ProbeFailure": {
+          "description": "Readiness or liveness probe failures (health check issues)",
+          "severity": "medium",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        },
+        "DependencyTimeout": {
+          "description": "Deployment timeout due to dependency unavailability",
+          "severity": "medium",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        }
+      },
+      "temporal_patterns": {
+        "deployment_gaps": [
+          {
+            "service": "pbx-web",
+            "gap_start": "2026-07-15",
+            "gap_end": null,
+            "gap_days": 12
+          },
+          {
+            "service": "pbx-web",
+            "gap_start": "2026-07-28",
+            "gap_end": null,
+            "gap_days": 7
+          },
+          {
+            "service": "whisper-stt",
+            "gap_start": "2026-07-12",
+            "gap_end": null,
+            "gap_days": 17
+          }
+        ],
+        "deployment_clusters": [
+          {
+            "service": "pbx-web",
+            "date": "2026-07-13",
+            "count": 2,
+            "event_types": [
+              "deployment_rollout",
+              "deployment_rollback"
+            ]
+          },
+          {
+            "service": "whisper-stt",
+            "date": "2026-07-08",
+            "count": 3,
+            "event_types": [
+              "deployment_rollout",
+              "deployment_rollout",
+              "deployment_rollout"
+            ]
+          }
+        ]
+      },
+      "summary": {
+        "total_pattern_categories": 2,
+        "kubernetes_pattern_types_searched": 5,
+        "services": [
+          "pbx-web",
+          "whisper-stt"
+        ],
+        "total_deployment_events": 26
+      }
+    },
+    "pbx-web-deployment-history-30days.json": {
+      "service": "pbx-web",
+      "data_source": "git_commit_logs",
+      "note": "No CI/CD workflow runs found in Argo Workflows (iad-ci). This data represents git commits to deployment manifests in declarative-config repo.",
+      "extracted_at": "2026-08-06T21:45:00Z",
+      "date_range": {
+        "start": "2026-07-08T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "target_days": 30,
+        "actual_days": 29
+      },
+      "total_events": 11,
+      "events": [
+        {
+          "timestamp": "2026-08-04T23:42:12-04:00",
+          "commit_hash": "816b043919e0d8229a7b33dffe78203a9f424d1e",
+          "author": "jedarden",
+          "message": "fix(ardenone-cluster): remove duplicate Applications that fought the ApplicationSet",
+          "event_type": "config_change",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/application.yaml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-28T13:24:42-04:00",
+          "commit_hash": "0fb7b127a910aa970bf76613ac2a071bec8a20af",
+          "author": "jedarden",
+          "message": "Revert \"feat(pbx-web): add WebRTC web client page behind Google OAuth\"",
+          "event_type": "rollback",
+          "files_changed": 4,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/pbx-web-configmap.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-deployment.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-internal-ingressroute.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-webphone-configmap.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-28T13:03:33-04:00",
+          "commit_hash": "7c3667ed6a4a9ae808bba4bf72bcfff128bf9e52",
+          "author": "jedarden",
+          "message": "feat(pbx-web): add WebRTC web client page behind Google OAuth",
+          "event_type": "feature_addition",
+          "files_changed": 4,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/pbx-web-configmap.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-deployment.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-internal-ingressroute.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-webphone-configmap.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-27T22:40:27-04:00",
+          "commit_hash": "0fbfa9aaeecf61947942e8440dc5f9192aede267",
+          "author": "jedarden",
+          "message": "eso/ardenone-manager: authenticate to OpenBao with Kubernetes auth",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-27T22:17:58-04:00",
+          "commit_hash": "fd0e735bbee741bd05409765973c477aa1c1347b",
+          "author": "jedarden",
+          "message": "openbao/ardenone-manager: let OpenBao review SA tokens, for ESO k8s auth",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-27T13:58:00-04:00",
+          "commit_hash": "3e906393b4668a0b0649d3b59c7ef5d45aeb89b0",
+          "author": "jedarden",
+          "message": "k8s: warn that multiple OpenBao instances hold overlapping paths",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-27T13:55:38-04:00",
+          "commit_hash": "42167a49fb553b3af9d9f5ee9c30781726064b03",
+          "author": "jedarden",
+          "message": "pbx-web: make lab-rebuild-relay pick up rotated secrets automatically",
+          "event_type": "config_change",
+          "files_changed": 2,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-deployment.yml",
+            "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-externalsecret.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-14T23:21:50-04:00",
+          "commit_hash": "25c11c891c91532dbd4c96fdfe9104aa61a4ecb7",
+          "author": "jedarden",
+          "message": "fix(pbx-web): force ESO resync + auto-restart on webhook secret rotation",
+          "event_type": "bugfix",
+          "files_changed": 2,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-deployment.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-externalsecret.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-14T15:38:37-04:00",
+          "commit_hash": "83af76cde01f463e98b9fa966cc73b80d320baaa",
+          "author": "jedarden",
+          "message": "fix(pbx-web): migrate secrets to OpenBao/ExternalSecret",
+          "event_type": "secret_migration",
+          "files_changed": 8,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/garage-pbx-creds-externalsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/garage-pbx-creds-secret.yml",
+            "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-externalsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-sealedsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-externalsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-sealedsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-auth-externalsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-auth-sealedsecret.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-13T14:15:32-04:00",
+          "commit_hash": "f20d55e5c3ad12eef64662bb795f8004492afda2",
+          "author": "jedarden",
+          "message": "feat(pbx-web): bump image to 1.0.9 (copy transcript now includes timestamps)",
+          "event_type": "image_bump",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/pbx-web-deployment.yml"
+          ],
+          "image_version": "1.0.9"
+        }
+      ]
+    },
+    "pbx-web-deployments-30days.json": {
+      "search_metadata": {
+        "query": "pbx-web deployment logs - last 30 days",
+        "search_period_start": "2026-07-07T00:00:00Z",
+        "search_period_end": "2026-08-06T23:59:59Z",
+        "workflow_template": "pbx-web-build",
+        "cluster": "iad-ci",
+        "namespace": "argo-workflows",
+        "queried_at": "2026-08-06T21:00:00Z"
+      },
+      "workflow_template_info": {
+        "name": "pbx-web-build",
+        "created": "2026-05-27T02:25:59Z",
+        "resource_version": "53851372",
+        "templates_count": 3,
+        "entrypoint": "build"
+      },
+      "deployment_runs": [],
+      "summary": {
+        "total_runs": 0,
+        "successful_runs": 0,
+        "failed_runs": 0,
+        "runs_last_30_days": 0,
+        "runs_last_7_days": 0,
+        "runs_last_24_hours": 0
+      },
+      "findings": [
+        "The pbx-web-build workflow template exists and was created on 2026-05-27",
+        "No workflow runs have been recorded for pbx-web-build in the iad-ci cluster",
+        "This indicates that pbx-web deployments are either:",
+        "  - Not automated via Argo Workflows",
+        "  - Deployed using a different method",
+        "  - Deployed to a different cluster",
+        "  - Not deployed within the last 30 days"
+      ],
+      "recommendations": [
+        "Verify if pbx-web is deployed via a different CI/CD system",
+        "Check if deployments go directly to nixos-asterisk cluster without iad-ci workflow",
+        "Investigate deployment logs in the target cluster directly",
+        "Consider implementing Argo Workflows-based deployment if desired"
+      ],
+      "raw_query_result": {
+        "apiVersion": "v1",
+        "items": [],
+        "kind": "List",
+        "metadata": {
+          "resourceVersion": ""
+        }
+      }
+    },
+    "pbx-web-deployments-structured.json": {
+      "service": "pbx-web",
+      "data_source": "replicaset_transformed",
+      "extracted_at": "2026-08-06T21:27:42.963867Z",
+      "total_deployments": 17,
+      "deployments": [
+        {
+          "timestamp": "2026-07-28T17:05:51Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.9",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-765bb76db8",
+          "revision": "13"
+        },
+        {
+          "timestamp": "2026-07-27T17:56:07Z",
+          "image_tag": "python:3-slim",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "lab-rebuild-relay-79957dbd4",
+          "revision": "2"
+        },
+        {
+          "timestamp": "2026-07-15T03:24:40Z",
+          "image_tag": "python:3-slim",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+          "revision": "5"
+        },
+        {
+          "timestamp": "2026-07-13T18:18:07Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.9",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-5ff68464d",
+          "revision": "14"
+        },
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.8",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-754f4cfdf7",
+          "revision": "11"
+        },
+        {
+          "timestamp": "2026-06-25T15:23:48Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.7",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-6d86477cdb",
+          "revision": "10"
+        },
+        {
+          "timestamp": "2026-06-23T18:55:52Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.6",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-66f79fd6f9",
+          "revision": "9"
+        },
+        {
+          "timestamp": "2026-06-23T18:37:39Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.5",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-5cc966f86d",
+          "revision": "8"
+        },
+        {
+          "timestamp": "2026-06-21T11:13:44Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.4",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-69794b7fcc",
+          "revision": "7"
+        },
+        {
+          "timestamp": "2026-06-15T18:11:38Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.2",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-9fc5b5f59",
+          "revision": "6"
+        },
+        {
+          "timestamp": "2026-05-11T18:17:51Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.2",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-85858b7dd4",
+          "revision": "5"
+        },
+        {
+          "timestamp": "2026-05-07T18:57:22Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.1",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-5cc44d5c4c",
+          "revision": "4"
+        },
+        {
+          "timestamp": "2026-05-07T18:40:16Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.0",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-5488fd45c8",
+          "revision": "3"
+        },
+        {
+          "timestamp": "2026-05-02T20:27:38Z",
+          "image_tag": "python:3-slim",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "lab-rebuild-relay-79d6d858bb",
+          "revision": "1"
+        },
+        {
+          "timestamp": "2026-05-02T20:27:37Z",
+          "image_tag": "python:3-slim",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-rebuild-relay-8596977857",
+          "revision": "4"
+        },
+        {
+          "timestamp": "2026-05-02T11:31:47Z",
+          "image_tag": "python:3-slim",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-rebuild-relay-5d6975d68d",
+          "revision": "3"
+        },
+        {
+          "timestamp": "2026-05-02T11:29:50Z",
+          "image_tag": "python:3-slim",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-rebuild-relay-7fbbb9bc7d",
+          "revision": "2"
+        }
+      ]
+    },
+    "pbx-web-deployments.json": {
+      "service": "pbx-web",
+      "namespace": "pbx-web",
+      "cluster": "ardenone-cluster",
+      "extracted_at": "2026-08-06T21:35:12.635059Z",
+      "total_deployments": 5,
+      "deployments": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "image_tag": "1.0.8",
+          "status": "failed",
+          "duration_seconds": null,
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "revision": 11,
+          "replicaSet": "pbx-web-754f4cfdf7",
+          "pod_name": null,
+          "event_type": "deployment_rollback",
+          "notes": "Rolled back to 1.0.8 on same day"
+        },
+        {
+          "timestamp": "2026-07-13T18:18:07Z",
+          "image_tag": "1.0.9",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "pod_name": null,
+          "event_type": "deployment_rollout",
+          "notes": "Initial deployment of revision 14"
+        },
+        {
+          "timestamp": "2026-07-15T03:24:40Z",
+          "image_tag": "3-slim",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "python:3-slim",
+          "revision": 5,
+          "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+          "pod_name": null,
+          "event_type": "deployment_rollout",
+          "notes": "PBX rebuild relay deployment"
+        },
+        {
+          "timestamp": "2026-07-27T17:56:07Z",
+          "image_tag": "3-slim",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "python:3-slim",
+          "revision": 2,
+          "replicaSet": "lab-rebuild-relay-79957dbd4",
+          "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
+          "event_type": "deployment_rollout",
+          "notes": "Lab rebuild relay deployment"
+        },
+        {
+          "timestamp": "2026-07-28T17:26:12Z",
+          "image_tag": "1.0.9",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "pod_name": "pbx-web-5ff68464d-mkn8n",
+          "event_type": "deployment_rollout",
+          "notes": "Current active deployment"
+        }
+      ]
+    },
+    "pbx-web-raw-workflows.json": {
+      "apiVersion": "v1",
+      "items": [],
+      "kind": "List",
+      "metadata": {
+        "resourceVersion": ""
+      }
+    },
+    "whisper-stt-deployment-history-30days.json": {
+      "service": "whisper-stt",
+      "data_source": "git_commit_logs",
+      "note": "No CI/CD workflow runs found in Argo Workflows (iad-ci). This data represents git commits to deployment manifests in declarative-config repo.",
+      "extracted_at": "2026-08-06T21:45:00Z",
+      "date_range": {
+        "start": "2026-07-07T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "target_days": 30,
+        "actual_days": 30
+      },
+      "total_events": 7,
+      "events": [
+        {
+          "timestamp": "2026-08-04T23:42:12-04:00",
+          "commit_hash": "816b043919e0d8229a7b33dffe78203a9f424d1e",
+          "author": "jedarden",
+          "message": "fix(ardenone-cluster): remove duplicate Applications that fought the ApplicationSet",
+          "event_type": "config_change",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/whisper-stt/whisper-stt-application.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-08-02T19:40:33-04:00",
+          "commit_hash": "6c2df52dcf5467119740121aff6a4f379c8644e8",
+          "author": "jedarden",
+          "message": "fix(security-scan): filter SealedSecrets by content, not filename",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-30T11:40:03-04:00",
+          "commit_hash": "254d6f45959f3075d9b6aef464ea164b84e49c9d",
+          "author": "jedarden",
+          "message": "Document cluster size and resource limits per cluster folder",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-12T12:52:51-04:00",
+          "commit_hash": "0829ee7d3bfd72522c03dc746b4642e4213ea79c",
+          "author": "jedarden",
+          "message": "fix(whisper-stt): prefer big-CPU nodes via soft nodeAffinity",
+          "event_type": "bugfix",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/whisper-stt/deployment.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-10T09:19:29-04:00",
+          "commit_hash": "8b24f3b6f7a746abd81ab33f7de1b18561f1cbe8",
+          "author": "jedarden",
+          "message": "Remove decommissioned whisper-transcription service in utilities",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-07T23:23:11-04:00",
+          "commit_hash": "6fc620d1f53f61f089cca88f50d965ef53f65986",
+          "author": "jedarden",
+          "message": "feat(whisper-stt): deploy 1.8.6, route /jobs/{id} + /jobs/chunked/* off Google auth",
+          "event_type": "version_deploy",
+          "files_changed": 2,
+          "files": [
+            "k8s/ardenone-cluster/whisper-stt/deployment.yml",
+            "k8s/ardenone-cluster/whisper-stt/ingressroute.yml"
+          ],
+          "image_version": "1.8.6"
+        },
+        {
+          "timestamp": "2026-07-07T23:15:31-04:00",
+          "commit_hash": "eab3f7e2170ae357d28c76007a41abfb7f4ffa70",
+          "author": "jedarden",
+          "message": "feat(whisper-stt): deploy 1.8.4 (bearer-auth chunked upload endpoints)",
+          "event_type": "version_deploy",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/whisper-stt/deployment.yml"
+          ],
+          "image_version": "1.8.4"
+        }
+      ]
+    },
+    "whisper-stt-deployments-structured.json": {
+      "service": "whisper-stt",
+      "data_source": "replicaset_transformed",
+      "extracted_at": "2026-08-06T21:27:42.964043Z",
+      "total_deployments": 22,
+      "deployments": [
+        {
+          "timestamp": "2026-07-12T16:53:42Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.8.6",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-847fd8d7b9",
+          "revision": "32"
+        },
+        {
+          "timestamp": "2026-07-08T03:26:44Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.8.6",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-6c497489fb",
+          "revision": "31"
+        },
+        {
+          "timestamp": "2026-07-08T03:16:13Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.8.4",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-5b8558f478",
+          "revision": "30"
+        },
+        {
+          "timestamp": "2026-07-08T03:09:35Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.8.2",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-5dbff75cbd",
+          "revision": "29"
+        },
+        {
+          "timestamp": "2026-07-02T02:20:33Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.7.0",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-6b96f4569c",
+          "revision": "28"
+        },
+        {
+          "timestamp": "2026-07-01T19:46:33Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.6.0",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-6464bdf67b",
+          "revision": "27"
+        },
+        {
+          "timestamp": "2026-06-26T16:33:34Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.5.1",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-5b884b75f4",
+          "revision": "26"
+        },
+        {
+          "timestamp": "2026-06-26T12:42:03Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.4.1",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-78bbf5f57f",
+          "revision": "25"
+        },
+        {
+          "timestamp": "2026-06-25T14:10:16Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.3.1",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-558c7cf44",
+          "revision": "24"
+        },
+        {
+          "timestamp": "2026-06-25T14:08:07Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.3.0",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-65fb7f8dd9",
+          "revision": "23"
+        },
+        {
+          "timestamp": "2026-06-24T20:55:36Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.2.5",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-75c848b8d6",
+          "revision": "22"
+        },
+        {
+          "timestamp": "2026-06-14T04:55:48Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-68966786fb",
+          "revision": "24"
+        },
+        {
+          "timestamp": "2026-06-14T04:52:13Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-6885fc878b",
+          "revision": "23"
+        },
+        {
+          "timestamp": "2026-06-14T04:48:36Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-6b75db654f",
+          "revision": "22"
+        },
+        {
+          "timestamp": "2026-06-14T04:27:44Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-85b44d79b4",
+          "revision": "21"
+        },
+        {
+          "timestamp": "2026-06-14T04:11:57Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-55bb9fb46f",
+          "revision": "20"
+        },
+        {
+          "timestamp": "2026-06-14T04:06:40Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-745d9c487d",
+          "revision": "19"
+        },
+        {
+          "timestamp": "2026-06-14T04:01:11Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-7b756c458",
+          "revision": "18"
+        },
+        {
+          "timestamp": "2026-06-14T03:56:31Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-7548956b49",
+          "revision": "17"
+        },
+        {
+          "timestamp": "2026-06-14T03:53:06Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-685c49f459",
+          "revision": "16"
+        },
+        {
+          "timestamp": "2026-06-14T03:50:27Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-7558965d58",
+          "revision": "15"
+        },
+        {
+          "timestamp": "2026-06-14T03:44:24Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-7ccf9f655b",
+          "revision": "14"
+        }
+      ]
+    },
+    "whisper-stt-deployments.json": {
+      "service": "whisper-stt",
+      "namespace": "whisper-stt",
+      "cluster": "ardenone-cluster",
+      "extracted_at": "2026-08-06T21:35:12.865216Z",
+      "total_deployments": 5,
+      "deployments": [
+        {
+          "timestamp": "2026-06-14T04:11:57Z",
+          "image_tag": "latest-cpu",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "fedirz/faster-whisper-server:latest-cpu",
+          "revision": 24,
+          "replicaSet": "whisper-openai-68966786fb",
+          "deployment": "whisper-openai",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "availableReplicas": 1
+        },
+        {
+          "timestamp": "2026-07-08T03:09:35Z",
+          "image_tag": "1.8.2",
+          "status": "failed",
+          "duration_seconds": null,
+          "image": "ronaldraygun/whisper-stt:1.8.2",
+          "revision": 29,
+          "replicaSet": "whisper-stt-5dbff75cbd",
+          "deployment": "whisper-stt",
+          "replicas": 0,
+          "readyReplicas": null,
+          "availableReplicas": null
+        },
+        {
+          "timestamp": "2026-07-08T03:16:13Z",
+          "image_tag": "1.8.4",
+          "status": "failed",
+          "duration_seconds": null,
+          "image": "ronaldraygun/whisper-stt:1.8.4",
+          "revision": 30,
+          "replicaSet": "whisper-stt-5b8558f478",
+          "deployment": "whisper-stt",
+          "replicas": 0,
+          "readyReplicas": null,
+          "availableReplicas": null
+        },
+        {
+          "timestamp": "2026-07-08T03:26:44Z",
+          "image_tag": "1.8.6",
+          "status": "failed",
+          "duration_seconds": null,
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "revision": 31,
+          "replicaSet": "whisper-stt-6c497489fb",
+          "deployment": "whisper-stt",
+          "replicas": 0,
+          "readyReplicas": null,
+          "availableReplicas": null
+        },
+        {
+          "timestamp": "2026-07-12T16:53:42Z",
+          "image_tag": "1.8.6",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "revision": 32,
+          "replicaSet": "whisper-stt-847fd8d7b9",
+          "deployment": "whisper-stt",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "availableReplicas": 1
+        }
+      ]
+    },
+    "whisper-stt-raw-workflows.json": {
+      "apiVersion": "v1",
+      "items": [],
+      "kind": "List",
+      "metadata": {
+        "resourceVersion": ""
+      }
+    }
+  },
+  "deployment_records": [
+    {
+      "source": "pbx-web-deployment-data-30days.json",
+      "data": {
+        "metadata": {
+          "service": "pbx-web",
+          "namespace": "pbx-web",
+          "cluster": "ardenone-cluster",
+          "data_collected_at": "2026-08-06T12:37:36Z",
+          "time_period": {
+            "start": "2026-07-07T00:00:00Z",
+            "end": "2026-08-06T12:37:36Z",
+            "description": "Last 30 days"
+          },
+          "managed_by": "ArgoCD",
+          "strategy": "Recreate"
+        },
+        "current_status": {
+          "deployment_name": "pbx-web",
+          "current_revision": 14,
+          "current_image": "ronaldraygun/pbx-web:1.0.9",
+          "generation": 36,
+          "replicas": 1,
+          "readyReplicas": 1,
+          "updatedReplicas": 1,
+          "availableReplicas": 1,
+          "current_pod": "pbx-web-5ff68464d-mkn8n",
+          "pod_created_at": "2026-07-28T17:26:12Z",
+          "conditions": [
+            {
+              "type": "Progressing",
+              "status": "True",
+              "reason": "NewReplicaSetAvailable",
+              "message": "ReplicaSet \"pbx-web-765bb76db8\" has successfully progressed.",
+              "lastTransitionTime": "2026-05-01T20:57:27Z"
+            },
+            {
+              "type": "Available",
+              "status": "True",
+              "reason": "MinimumReplicasAvailable",
+              "message": "Deployment has minimum availability.",
+              "lastTransitionTime": "2026-07-28T17:26:24Z"
+            }
+          ]
+        },
+        "deployment_events_last_30_days": [
+          {
+            "date": "2026-07-28",
+            "timestamp": "2026-07-28T17:26:12Z",
+            "event_type": "deployment_rollout",
+            "revision": 14,
+            "replicaSet": "pbx-web-5ff68464d",
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "outcome": "success",
+            "pod_name": "pbx-web-5ff68464d-mkn8n",
+            "pod_ready": true,
+            "restart_count": 0,
+            "notes": "Current active deployment"
+          },
+          {
+            "date": "2026-07-27",
+            "timestamp": "2026-07-27T17:56:07Z",
+            "event_type": "deployment_rollout",
+            "deployment": "lab-rebuild-relay",
+            "revision": 2,
+            "replicaSet": "lab-rebuild-relay-79957dbd4",
+            "image": "python:3-slim",
+            "outcome": "success",
+            "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
+            "pod_ready": true,
+            "restart_count": 0,
+            "notes": "Lab rebuild relay deployment"
+          },
+          {
+            "date": "2026-07-15",
+            "timestamp": "2026-07-15T03:24:40Z",
+            "event_type": "deployment_rollout",
+            "deployment": "pbx-rebuild-relay",
+            "revision": 5,
+            "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+            "image": "python:3-slim",
+            "outcome": "success",
+            "notes": "PBX rebuild relay deployment"
+          },
+          {
+            "date": "2026-07-13",
+            "timestamp": "2026-07-13T18:18:07Z",
+            "event_type": "deployment_rollout",
+            "revision": 14,
+            "replicaSet": "pbx-web-5ff68464d",
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "outcome": "success",
+            "notes": "Initial deployment of revision 14"
+          },
+          {
+            "date": "2026-07-13",
+            "timestamp": "2026-07-13T18:07:55Z",
+            "event_type": "deployment_rollback",
+            "revision": 11,
+            "replicaSet": "pbx-web-754f4cfdf7",
+            "image": "ronaldraygun/pbx-web:1.0.8",
+            "outcome": "rolled_back",
+            "notes": "Rolled back to 1.0.8 on same day"
+          }
+        ],
+        "historical_deployments_beyond_30_days": [
+          {
+            "date": "2026-06-25",
+            "timestamp": "2026-06-25T15:23:48Z",
+            "revision": 10,
+            "replicaSet": "pbx-web-6d86477cdb",
+            "image": "ronaldraygun/pbx-web:1.0.7",
+            "notes": "Prior to 30-day window"
+          },
+          {
+            "date": "2026-06-23",
+            "timestamp": "2026-06-23T18:55:52Z",
+            "revision": 9,
+            "replicaSet": "pbx-web-66f79fd6f9",
+            "image": "ronaldraygun/pbx-web:1.0.6",
+            "notes": "Prior to 30-day window"
+          },
+          {
+            "date": "2026-06-23",
+            "timestamp": "2026-06-23T18:37:39Z",
+            "revision": 8,
+            "replicaSet": "pbx-web-5cc966f86d",
+            "image": "ronaldraygun/pbx-web:1.0.5",
+            "notes": "Prior to 30-day window"
+          },
+          {
+            "date": "2026-06-21",
+            "timestamp": "2026-06-21T11:13:44Z",
+            "revision": 7,
+            "replicaSet": "pbx-web-69794b7fcc",
+            "image": "ronaldraygun/pbx-web:1.0.4",
+            "notes": "Prior to 30-day window"
+          },
+          {
+            "date": "2026-06-15",
+            "timestamp": "2026-06-15T18:11:38Z",
+            "revision": 6,
+            "replicaSet": "pbx-web-9fc5b5f59",
+            "image": "ronaldraygun/pbx-web:1.0.2",
+            "notes": "Prior to 30-day window"
+          }
+        ],
+        "deployment_metrics": {
+          "total_deployments_last_30_days": 5,
+          "successful_deployments": 5,
+          "failed_deployments": 0,
+          "deployment_frequency_days": 6,
+          "unique_images_deployed": 3,
+          "images_used_last_30_days": [
+            "ronaldraygun/pbx-web:1.0.9",
+            "ronaldraygun/pbx-web:1.0.8",
+            "python:3-slim"
+          ],
+          "current_uptime_days": 9,
+          "last_deployment": "2026-07-28T17:26:12Z",
+          "days_since_last_deployment": 9
+        },
+        "pod_health": {
+          "current_pod": {
+            "name": "pbx-web-5ff68464d-mkn8n",
+            "created_at": "2026-07-28T17:26:12Z",
+            "phase": "Running",
+            "ready": true,
+            "restart_count": 0,
+            "uptime_days": 9,
+            "containers": [
+              {
+                "name": "nginx",
+                "image": "localhost:7439/nginx:alpine",
+                "ready": true,
+                "restartCount": 0,
+                "running_since": "2026-07-28T17:26:13Z"
+              },
+              {
+                "name": "site-generator",
+                "image": "docker.io/ronaldraygun/pbx-web:1.0.9",
+                "ready": true,
+                "restartCount": 0,
+                "running_since": "2026-07-28T17:26:13Z"
+              }
+            ]
+          },
+          "health_indicators": {
+            "no_crashes": true,
+            "no_restart_loops": true,
+            "no_image_pull_errors": true,
+            "liveness_probes_passing": true,
+            "readiness_probes_passing": true
+          }
+        },
+        "operational_logs_sample": {
+          "recent_activity": "Pagefind search index rebuilding",
+          "last_rebuild": "2026-08-05T21:46:11.870571Z",
+          "rebuild_frequency": "triggered by bucket signature changes",
+          "search_index_stats": {
+            "indexed_pages": 197,
+            "indexed_words": 7592,
+            "languages": 1,
+            "build_time_avg_seconds": 2.0
+          },
+          "log_health": "normal - no errors or warnings in recent logs"
+        },
+        "infrastructure_details": {
+          "resource_limits": {
+            "site_generator": {
+              "cpu_limit": "500m",
+              "memory_limit": "512Mi",
+              "cpu_request": "10m",
+              "memory_request": "128Mi"
+            },
+            "nginx": {
+              "cpu_limit": "100m",
+              "memory_limit": "128Mi",
+              "cpu_request": "5m",
+              "memory_request": "32Mi"
+            }
+          },
+          "volumes": [
+            {
+              "name": "www",
+              "type": "emptyDir",
+              "purpose": "shared content between containers"
+            },
+            {
+              "name": "nginx-conf",
+              "type": "configMap",
+              "configMap": "pbx-web-nginx-conf"
+            },
+            {
+              "name": "nginx-cache",
+              "type": "emptyDir",
+              "medium": "Memory",
+              "sizeLimit": "16Mi"
+            },
+            {
+              "name": "nginx-run",
+              "type": "emptyDir",
+              "medium": "Memory",
+              "sizeLimit": "8Mi"
+            }
+          ],
+          "environment_variables": {
+            "S3_ENDPOINT": "http://garage.garage-operator.svc.cluster.local:3900",
+            "S3_BUCKET": "recordings",
+            "PYTHONUNBUFFERED": "1"
+          },
+          "secrets_used": [
+            "garage-pbx-creds",
+            "pbx-web-auth"
+          ],
+          "liveness_probes": {
+            "site_generator": {
+              "path": "/health",
+              "port": 9000,
+              "initialDelaySeconds": 10,
+              "periodSeconds": 30,
+              "timeoutSeconds": 5,
+              "failureThreshold": 3
+            },
+            "nginx": {
+              "path": "/",
+              "port": 80,
+              "initialDelaySeconds": 10,
+              "periodSeconds": 30,
+              "timeoutSeconds": 1,
+              "failureThreshold": 3
+            }
+          },
+          "readiness_probes": {
+            "site_generator": {
+              "path": "/health",
+              "port": 9000,
+              "initialDelaySeconds": 5,
+              "periodSeconds": 10,
+              "timeoutSeconds": 5,
+              "failureThreshold": 3
+            },
+            "nginx": {
+              "path": "/",
+              "port": 80,
+              "initialDelaySeconds": 3,
+              "periodSeconds": 10,
+              "timeoutSeconds": 1,
+              "failureThreshold": 3
+            }
+          }
+        },
+        "summary": {
+          "overall_health": "excellent",
+          "deployment_stability": "stable",
+          "uptime": "9 days continuous",
+          "issues_last_30_days": 0,
+          "rollbacks_last_30_days": 1,
+          "deployment_success_rate": "100%",
+          "recommendation": "Service is healthy with stable deployment pattern. Active rebuild relay infrastructure supports content updates."
+        }
+      }
+    },
+    {
+      "source": "whisper-stt-deployment-data-30days.json",
+      "data": {
+        "report_metadata": {
+          "generated_at": "2026-08-06T09:07:50Z",
+          "time_range_start": "2026-07-07T09:07:50Z",
+          "time_range_end": "2026-08-06T09:07:50Z",
+          "cluster": "ardenone-cluster",
+          "service": "whisper-stt",
+          "namespace": "whisper-stt",
+          "data_source": "kubectl read-only proxy",
+          "report_type": "30-day deployment analysis"
+        },
+        "current_status": {
+          "deployments": {
+            "whisper-stt": {
+              "name": "whisper-stt",
+              "namespace": "whisper-stt",
+              "creationTimestamp": "2026-05-01T17:26:49Z",
+              "age_days": 96,
+              "generation": 353,
+              "revision": 32,
+              "replicas": 1,
+              "readyReplicas": 1,
+              "availableReplicas": 1,
+              "updatedReplicas": 1,
+              "strategy": "Recreate",
+              "images": {
+                "whisper-stt": "ronaldraygun/whisper-stt:1.8.6"
+              },
+              "conditions": [
+                {
+                  "type": "Progressing",
+                  "status": "True",
+                  "reason": "NewReplicaSetAvailable",
+                  "message": "ReplicaSet \"whisper-stt-847fd8d7b9\" has successfully progressed.",
+                  "lastTransitionTime": "2026-07-12T16:54:57Z"
+                },
+                {
+                  "type": "Available",
+                  "status": "True",
+                  "reason": "MinimumReplicasAvailable",
+                  "message": "Deployment has minimum availability.",
+                  "lastTransitionTime": "2026-07-12T16:54:57Z"
+                }
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": "1",
+                  "memory": "4Gi"
+                },
+                "limits": {
+                  "cpu": "8",
+                  "memory": "8Gi"
+                }
+              }
+            },
+            "whisper-openai": {
+              "name": "whisper-openai",
+              "namespace": "whisper-stt",
+              "creationTimestamp": "2026-06-14T02:10:48Z",
+              "age_days": 53,
+              "generation": 25,
+              "revision": 24,
+              "replicas": 1,
+              "readyReplicas": 1,
+              "availableReplicas": 1,
+              "updatedReplicas": 1,
+              "strategy": "RollingUpdate",
+              "images": {
+                "whisper-openai": "fedirz/faster-whisper-server:latest-cpu"
+              },
+              "conditions": [
+                {
+                  "type": "Progressing",
+                  "status": "True",
+                  "reason": "NewReplicaSetAvailable",
+                  "message": "ReplicaSet \"whisper-openai-68966786fb\" has successfully progressed.",
+                  "lastTransitionTime": "2026-06-14T04:56:53Z"
+                },
+                {
+                  "type": "Available",
+                  "status": "True",
+                  "reason": "MinimumReplicasAvailable",
+                  "message": "Deployment has minimum availability.",
+                  "lastTransitionTime": "2026-06-14T03:50:27Z"
+                }
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": "1",
+                  "memory": "4Gi"
+                },
+                "limits": {
+                  "cpu": "8",
+                  "memory": "8Gi"
+                }
+              }
+            }
+          }
+        },
+        "deployment_history_30_days": {
+          "replicasets": [
+            {
+              "name": "whisper-stt-847fd8d7b9",
+              "created": "2026-07-12T16:53:42Z",
+              "status": "active",
+              "replicas": 1,
+              "readyReplicas": 1,
+              "availableReplicas": 1,
+              "revision": 32,
+              "deployment": "whisper-stt",
+              "image": "ronaldraygun/whisper-stt:1.8.6"
+            },
+            {
+              "name": "whisper-stt-6c497489fb",
+              "created": "2026-07-08T03:26:44Z",
+              "status": "inactive",
+              "replicas": 0,
+              "revision": 31,
+              "deployment": "whisper-stt",
+              "image": "ronaldraygun/whisper-stt:1.8.6"
+            },
+            {
+              "name": "whisper-stt-5b8558f478",
+              "created": "2026-07-08T03:16:13Z",
+              "status": "inactive",
+              "replicas": 0,
+              "revision": 30,
+              "deployment": "whisper-stt",
+              "image": "ronaldraygun/whisper-stt:1.8.4"
+            },
+            {
+              "name": "whisper-stt-5dbff75cbd",
+              "created": "2026-07-08T03:09:35Z",
+              "status": "inactive",
+              "replicas": 0,
+              "revision": 29,
+              "deployment": "whisper-stt",
+              "image": "ronaldraygun/whisper-stt:1.8.2"
+            },
+            {
+              "name": "whisper-openai-68966786fb",
+              "created": "2026-06-14T04:11:57Z",
+              "status": "active",
+              "replicas": 1,
+              "readyReplicas": 1,
+              "availableReplicas": 1,
+              "revision": 24,
+              "deployment": "whisper-openai",
+              "image": "fedirz/faster-whisper-server:latest-cpu"
+            }
+          ],
+          "deployment_events_summary": {
+            "total_deployments": 2,
+            "total_replicasets_in_30d": 5,
+            "failed_rollouts": 0,
+            "rollback_events": 0,
+            "successful_updates": 1,
+            "rapid_deployments_on_2026_07_08": 3,
+            "last_deployment_update": "2026-07-12T16:54:57Z"
+          }
+        },
+        "pod_status": {
+          "current_pods": [
+            {
+              "name": "whisper-stt-847fd8d7b9-v2rs5",
+              "created": "2026-07-12T16:53:42Z",
+              "age_days": 25,
+              "status": "Running",
+              "containers": [
+                {
+                  "name": "whisper-stt",
+                  "image": "ronaldraygun/whisper-stt:1.8.6",
+                  "ready": true,
+                  "restartCount": 0,
+                  "started": "2026-07-12T16:55:49Z"
+                }
+              ],
+              "totalRestartCount": 0,
+              "node": "k3s-agent-minisforum"
+            },
+            {
+              "name": "whisper-openai-68966786fb-jsb5d",
+              "created": "2026-06-14T04:55:49Z",
+              "age_days": 53,
+              "status": "Running",
+              "containers": [
+                {
+                  "name": "whisper-openai",
+                  "image": "fedirz/faster-whisper-server:latest-cpu",
+                  "ready": true,
+                  "restartCount": 0,
+                  "started": "2026-06-14T04:56:53Z"
+                }
+              ],
+              "totalRestartCount": 0,
+              "node": "k3s-agent-minisforum"
+            }
+          ],
+          "pod_metrics": {
+            "total_pods": 2,
+            "running_pods": 2,
+            "total_containers": 2,
+            "total_restarts": 0,
+            "crashloops": 0,
+            "oomkills": 0,
+            "failed_pods": 0,
+            "pending_pods": 0
+          }
+        },
+        "operational_metrics": {
+          "uptime": {
+            "whisper-stt": "25 days continuous",
+            "whisper-openai": "53 days continuous"
+          },
+          "restart_analysis": {
+            "total_restarts": 0,
+            "crash_loop_backoffs": 0,
+            "oom_killed": 0,
+            "evicted_pods": 0,
+            "error_state_pods": 0
+          },
+          "resource_limits": {
+            "whisper-stt": {
+              "cpu_requests": "1",
+              "cpu_limits": "8",
+              "memory_requests": "4Gi",
+              "memory_limits": "8Gi"
+            },
+            "whisper-openai": {
+              "cpu_requests": "1",
+              "cpu_limits": "8",
+              "memory_requests": "4Gi",
+              "memory_limits": "8Gi"
+            }
+          },
+          "storage": {
+            "whisper-model-cache": {
+              "capacity": "10Gi",
+              "storage_class": "longhorn",
+              "status": "Bound",
+              "age_days": 84
+            },
+            "whisper-openai-model-cache": {
+              "capacity": "10Gi",
+              "storage_class": "longhorn",
+              "status": "Bound",
+              "age_days": 53
+            },
+            "whisper-stt-jobs": {
+              "capacity": "1Gi",
+              "storage_class": "longhorn",
+              "status": "Bound",
+              "age_days": 42
+            }
+          }
+        },
+        "log_analysis": {
+          "whisper-openai": {
+            "log_period": "2026-07-12 to 2026-08-06",
+            "total_log_lines": 100,
+            "errors_detected": 0,
+            "primary_activities": [
+              "Health check responses (/health endpoint returning HTTP 200)",
+              "UVicorn server operational on port 8000",
+              "Normal operation - no error patterns detected"
+            ],
+            "status": "Normal operation"
+          },
+          "whisper-stt": {
+            "log_period": "2026-07-12 to 2026-08-06",
+            "note": "No recent log entries available - pod may be idle or using centralized logging",
+            "status": "Running with no logged errors"
+          }
+        },
+        "argo_cd_integration": {
+          "tracking_id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+          "reloader": "auto: true",
+          "sync_status": "Managed by ArgoCD",
+          "deployments": [
+            {
+              "deployment": "whisper-stt",
+              "tracking_id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt"
+            },
+            {
+              "deployment": "whisper-openai",
+              "tracking_id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai"
+            }
+          ]
+        },
+        "error_incidents": {
+          "total_incidents": 0,
+          "critical_incidents": 0,
+          "warning_incidents": 0,
+          "incident_details": []
+        },
+        "deployment_health_assessment": {
+          "overall_health": "healthy",
+          "deployment_stability": "high",
+          "uptime_percentage": "100%",
+          "zero_downtime_deployment": true,
+          "successful_deployment_rate": "100%",
+          "health_indicators": {
+            "all_pods_running": true,
+            "zero_crashloops": true,
+            "zero_oomkills": true,
+            "zero_timeouts": true,
+            "zero_failed_rollouts": true,
+            "minimal_errors": true
+          }
+        },
+        "comparison_with_previous_analysis": {
+          "notes": "Previous analysis data not available for comparison - this appears to be the first comprehensive collection"
+        },
+        "recommendations": [
+          "Continue current deployment strategy - stability is excellent",
+          "Both deployments show zero restarts and 100% availability",
+          "Rapid deployment sequence on 2026-07-08 (1.8.2 \u2192 1.8.4 \u2192 1.8.6) suggests iterative image improvements",
+          "Consider implementing log aggregation for better operational visibility",
+          "Current Recreate deployment strategy working well for whisper-stt single-pod deployment",
+          "RollingUpdate strategy for whisper-openai provides good availability during updates"
+        ],
+        "summary": {
+          "deployment_name": "whisper-stt (namespace)",
+          "namespace": "whisper-stt",
+          "cluster": "ardenone-cluster",
+          "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+          "deployments_in_namespace": 2,
+          "total_deployment_events": 4,
+          "successful_rollouts": 4,
+          "failed_rollouts": 0,
+          "rollback_events": 0,
+          "crashloops": 0,
+          "oomkills": 0,
+          "pod_restarts": 0,
+          "error_rate": "Zero (no errors detected in logs)",
+          "availability": "100%",
+          "overall_status": "EXCELLENT - Zero incidents, zero downtime, zero restarts, stable operation"
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "deployment-metrics-intermediate.json": {
+      "generated_at": "2026-08-06T12:33:01.558621",
+      "task": "adc-24gnb: calculate deployment success rates",
+      "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+      "services": {
+        "pbx-web": {
+          "service": "pbx-web",
+          "total_deployments": 5,
+          "successful_deployments": 5,
+          "failed_deployments": 0,
+          "success_rate": 100.0,
+          "failure_rate": 0.0,
+          "time_period": {},
+          "rollbacks": 1,
+          "current_uptime_days": 9,
+          "deployment_frequency": {
+            "deployments_per_day": 0.2327,
+            "days_per_deployment": 4.3,
+            "mean_time_between_deployments": {
+              "seconds": 412497.11,
+              "hours": 114.58,
+              "days": 4.77
+            },
+            "total_deployments_analyzed": 10,
+            "analysis_period_days": 42.97
+          }
+        },
+        "whisper-stt": {
+          "service": "whisper-stt",
+          "total_deployments": 2,
+          "successful_deployments": 2,
+          "failed_deployments": 0,
+          "success_rate": 100.0,
+          "failure_rate": 0.0,
+          "time_period": {
+            "start": "2026-07-07T09:07:50Z",
+            "end": "2026-08-06T09:07:50Z",
+            "description": "Last 30 days"
+          },
+          "rapid_deployment_incidents": 3,
+          "zero_downtime_achieved": true,
+          "availability": "100%",
+          "deployment_frequency": {
+            "deployments_per_day": 0.6169,
+            "days_per_deployment": 1.62,
+            "mean_time_between_deployments": {
+              "seconds": 154068.6,
+              "hours": 42.8,
+              "days": 1.78
+            },
+            "total_deployments_analyzed": 11,
+            "analysis_period_days": 17.83
+          }
+        }
+      },
+      "summary": {
+        "pbx_web_success_rate": "100.0%",
+        "whisper_stt_success_rate": "100.0%",
+        "pbx_web_deployment_frequency": "0.2327 deployments/day",
+        "whisper_stt_deployment_frequency": "0.6169 deployments/day",
+        "overall_assessment": "Both services showing 100% deployment success rates with stable deployment patterns"
+      },
+      "acceptance_criteria": {
+        "success_rate_pbx_web": "COMPLETED",
+        "success_rate_whisper_stt": "COMPLETED",
+        "deployment_frequency_metrics": "COMPLETED",
+        "intermediate_file_saved": "COMPLETED"
+      }
+    },
+    "frequency-metrics.json": {
+      "generated_at": "2026-08-06T11:57:40.234041",
+      "analysis_type": "deployment_frequency_and_timing_metrics",
+      "services": {
+        "pbx-web": {
+          "service": "pbx-web",
+          "total_deployments": 10,
+          "time_range": {
+            "start": "2026-06-15T18:11:38+00:00",
+            "end": "2026-07-28T17:26:12+00:00",
+            "total_days": 42.97
+          },
+          "deployment_frequency": {
+            "deployments_per_day": 0.2327,
+            "days_per_deployment": 4.3
+          },
+          "mean_time_between_deployments": {
+            "seconds": 412497.11,
+            "hours": 114.58,
+            "days": 4.77
+          },
+          "interval_range": {
+            "min_seconds": 612.0,
+            "max_seconds": 1565047.0
+          },
+          "note": null
+        },
+        "whisper-stt": {
+          "service": "whisper-stt",
+          "total_deployments": 11,
+          "time_range": {
+            "start": "2026-06-24T20:55:36+00:00",
+            "end": "2026-07-12T16:53:42+00:00",
+            "total_days": 17.83
+          },
+          "deployment_frequency": {
+            "deployments_per_day": 0.6169,
+            "days_per_deployment": 1.62
+          },
+          "mean_time_between_deployments": {
+            "seconds": 154068.6,
+            "hours": 42.8,
+            "days": 1.78
+          },
+          "interval_range": {
+            "min_seconds": 129.0,
+            "max_seconds": 521342.0
+          },
+          "note": null
+        }
+      },
+      "comparison": {
+        "pbx-web": {
+          "deployments_per_day": 0.2327,
+          "mean_days_between_deployments": 4.77
+        },
+        "whisper-stt": {
+          "deployments_per_day": 0.6169,
+          "mean_days_between_deployments": 1.78
+        }
+      }
+    },
+    "pbx-web-metrics.json": {
+      "service": "pbx-web",
+      "query_window": {
+        "start": "2026-07-07T17:50:21.053162",
+        "end": "2026-08-06T17:50:21.053162",
+        "days": 30
+      },
+      "events": {
+        "total": 2,
+        "warnings": 2,
+        "failed": 0,
+        "normal": 0,
+        "by_type": {
+          "Warning": 2
+        },
+        "by_reason": {
+          "ClusterIPNotAllocated": 1,
+          "deprecatedAnnotation": 1
+        },
+        "timeline": [
+          {
+            "type": "Warning",
+            "reason": "ClusterIPNotAllocated",
+            "message": "Cluster IP [IPv4]: 10.43.94.154 is not allocated; repairing",
+            "object": "Service/pbx-rebuild-egress",
+            "timestamp": "2026-08-06T21:55:08.065761+00:00"
+          },
+          {
+            "type": "Warning",
+            "reason": "deprecatedAnnotation",
+            "message": "Service uses deprecated annotation metallb.universe.tf/allow-shared-ip",
+            "object": "Service/pbx-web",
+            "timestamp": "2026-08-06T21:31:01+00:00"
+          }
+        ]
+      },
+      "pods": {
+        "total": 3,
+        "running": 3,
+        "failed": 0,
+        "pending": 0,
+        "succeeded": 0,
+        "unknown": 0,
+        "restart_counts": [
+          0,
+          0,
+          0
+        ],
+        "container_statuses": {
+          "total": 4,
+          "waiting": 0,
+          "running": 4,
+          "terminated": 0
+        },
+        "waiting_reasons": {},
+        "terminated_reasons": {},
+        "details": [
+          {
+            "name": "lab-rebuild-relay-79957dbd4-xsqhl",
+            "creation_timestamp": "2026-07-27T17:56:07",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-agent-minisforum",
+            "containers": [
+              {
+                "name": "relay",
+                "image": "localhost:7439/python:3-slim",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          },
+          {
+            "name": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+            "creation_timestamp": "2026-07-15T03:24:40",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-agent-minisforum",
+            "containers": [
+              {
+                "name": "relay",
+                "image": "localhost:7439/python:3-slim",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          },
+          {
+            "name": "pbx-web-5ff68464d-mkn8n",
+            "creation_timestamp": "2026-07-28T17:26:12",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-agent-minisforum",
+            "containers": [
+              {
+                "name": "site-generator",
+                "image": "ronaldraygun/pbx-web:1.0.9",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              },
+              {
+                "name": "nginx",
+                "image": "localhost:7439/nginx:alpine",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          }
+        ],
+        "restart_stats": {
+          "total_restarts": 0,
+          "max_restarts": 0,
+          "avg_restarts": 0.0,
+          "pods_with_restarts": 0
+        }
+      },
+      "failure_modes": {
+        "crash_loop_back_off": 0,
+        "oom_killed": 0,
+        "image_pull_backoff": 0,
+        "image_pull_error": 0,
+        "liveness_probe_failure": 0,
+        "readiness_probe_failure": 0,
+        "container_not_ready": 0,
+        "pod_not_ready": 0
+      },
+      "coverage": {
+        "earliest_data": "2026-07-15T03:24:40",
+        "expected_start": "2026-07-07T17:50:21.053162",
+        "has_full_coverage": false
+      }
+    },
+    "whisper-stt-metrics.json": {
+      "service": "whisper-stt",
+      "query_window": {
+        "start": "2026-07-07T17:50:21.053536",
+        "end": "2026-08-06T17:50:21.053536",
+        "days": 30
+      },
+      "events": {
+        "total": 0,
+        "warnings": 0,
+        "failed": 0,
+        "normal": 0,
+        "by_type": {},
+        "by_reason": {},
+        "timeline": []
+      },
+      "pods": {
+        "total": 2,
+        "running": 2,
+        "failed": 0,
+        "pending": 0,
+        "succeeded": 0,
+        "unknown": 0,
+        "restart_counts": [
+          0,
+          0
+        ],
+        "container_statuses": {
+          "total": 2,
+          "waiting": 0,
+          "running": 2,
+          "terminated": 0
+        },
+        "waiting_reasons": {},
+        "terminated_reasons": {},
+        "details": [
+          {
+            "name": "whisper-openai-68966786fb-jsb5d",
+            "creation_timestamp": "2026-06-14T04:55:49",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-lenovo-tiny",
+            "containers": [
+              {
+                "name": "whisper-openai",
+                "image": "localhost:7439/fedirz/faster-whisper-server:latest-cpu",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          },
+          {
+            "name": "whisper-stt-847fd8d7b9-v2rs5",
+            "creation_timestamp": "2026-07-12T16:53:42",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-agent-minisforum",
+            "containers": [
+              {
+                "name": "whisper-stt",
+                "image": "ronaldraygun/whisper-stt:1.8.6",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          }
+        ],
+        "restart_stats": {
+          "total_restarts": 0,
+          "max_restarts": 0,
+          "avg_restarts": 0.0,
+          "pods_with_restarts": 0
+        }
+      },
+      "failure_modes": {
+        "crash_loop_back_off": 0,
+        "oom_killed": 0,
+        "image_pull_backoff": 0,
+        "image_pull_error": 0,
+        "liveness_probe_failure": 0,
+        "readiness_probe_failure": 0,
+        "container_not_ready": 0,
+        "pod_not_ready": 0
+      },
+      "coverage": {
+        "earliest_data": "2026-06-14T04:55:49",
+        "expected_start": "2026-07-07T17:50:21.053536",
+        "has_full_coverage": true
+      }
+    }
+  },
+  "summaries": {
+    "coverage-report.json": {
+      "generated_at": "2026-08-06T12:23:55.485809",
+      "target_period": {
+        "start": "2026-07-07",
+        "end": "2026-08-06",
+        "total_days": 30
+      },
+      "services": {
+        "pbx-web": {
+          "timestamp_analysis": {
+            "service": "pbx-web",
+            "target_start": "2026-07-07T00:00:00Z",
+            "target_end": "2026-08-06T23:59:59Z",
+            "earliest_record": "2026-07-13T18:18:07Z",
+            "latest_record": "2026-07-28T17:26:12Z",
+            "coverage_days": 15,
+            "gaps_detected": false
+          },
+          "completeness": {
+            "service": "pbx-web",
+            "metadata_complete": true,
+            "findings_complete": true,
+            "extracted_data_complete": true,
+            "missing_fields": []
+          },
+          "statistics": {
+            "service": "pbx-web",
+            "total_deployments": 0,
+            "successful_deployments": 0,
+            "failed_deployments": 0,
+            "error_deployments": 0,
+            "data_source": "argo_workflows_ci + production_cluster",
+            "production_deployments_in_window": 2,
+            "workflows_found_in_ci": 0
+          }
+        },
+        "whisper-stt": {
+          "timestamp_analysis": {
+            "service": "whisper-stt",
+            "target_start": "2026-07-07T00:00:00Z",
+            "target_end": "2026-08-06T23:59:59Z",
+            "earliest_record": null,
+            "latest_record": null,
+            "coverage_days": 0,
+            "gaps_detected": false
+          },
+          "completeness": {
+            "service": "whisper-stt",
+            "metadata_complete": true,
+            "findings_complete": true,
+            "extracted_data_complete": true,
+            "missing_fields": []
+          },
+          "statistics": {
+            "service": "whisper-stt",
+            "total_deployments": 0,
+            "successful_deployments": 0,
+            "failed_deployments": 0,
+            "error_deployments": 0,
+            "data_source": "argo_workflows_ci",
+            "workflows_found_in_ci": 0
+          }
+        }
+      }
+    }
+  },
+  "raw_data": {
+    "correlation-analysis-results.json": {
+      "findings": {
+        "analysis_date": "2026-08-06T12:39:15.059388",
+        "total_pbx_events": 5,
+        "total_whisper_events": 3,
+        "total_events": 8,
+        "pbx_issues": 1,
+        "whisper_issues": 0,
+        "correlations_found": 0,
+        "correlation_windows_analyzed": [
+          5,
+          10,
+          15,
+          30,
+          60
+        ],
+        "key_findings": [
+          "No temporal correlation detected between pbx-web and whisper-stt deployments."
+        ]
+      },
+      "timeline": [
+        {
+          "timestamp": "2026-07-08T03:09:35+00:00",
+          "service": "whisper-stt",
+          "source": "whisper-stt",
+          "event_type": "replica_created",
+          "outcome": "inactive",
+          "details": "image: ronaldraygun/whisper-stt:1.8.2"
+        },
+        {
+          "timestamp": "2026-07-08T03:16:13+00:00",
+          "service": "whisper-stt",
+          "source": "whisper-stt",
+          "event_type": "replica_created",
+          "outcome": "inactive",
+          "details": "image: ronaldraygun/whisper-stt:1.8.4"
+        },
+        {
+          "timestamp": "2026-07-08T03:26:44+00:00",
+          "service": "whisper-stt",
+          "source": "whisper-stt",
+          "event_type": "replica_created",
+          "outcome": "inactive",
+          "details": "image: ronaldraygun/whisper-stt:1.8.6"
+        },
+        {
+          "timestamp": "2026-07-13T18:07:55+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollback",
+          "outcome": "rolled_back",
+          "details": "Rolled back to 1.0.8 on same day"
+        },
+        {
+          "timestamp": "2026-07-13T18:18:07+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollout",
+          "outcome": "success",
+          "details": "Initial deployment of revision 14"
+        },
+        {
+          "timestamp": "2026-07-15T03:24:40+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollout",
+          "outcome": "success",
+          "details": "PBX rebuild relay deployment"
+        },
+        {
+          "timestamp": "2026-07-27T17:56:07+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollout",
+          "outcome": "success",
+          "details": "Lab rebuild relay deployment"
+        },
+        {
+          "timestamp": "2026-07-28T17:26:12+00:00",
+          "service": "pbx-web",
+          "source": "pbx-web",
+          "event_type": "deployment_rollout",
+          "outcome": "success",
+          "details": "Current active deployment"
+        }
+      ],
+      "correlations": []
+    },
+    "coverage-report.json": {
+      "generated_at": "2026-08-06T12:23:55.485809",
+      "target_period": {
+        "start": "2026-07-07",
+        "end": "2026-08-06",
+        "total_days": 30
+      },
+      "services": {
+        "pbx-web": {
+          "timestamp_analysis": {
+            "service": "pbx-web",
+            "target_start": "2026-07-07T00:00:00Z",
+            "target_end": "2026-08-06T23:59:59Z",
+            "earliest_record": "2026-07-13T18:18:07Z",
+            "latest_record": "2026-07-28T17:26:12Z",
+            "coverage_days": 15,
+            "gaps_detected": false
+          },
+          "completeness": {
+            "service": "pbx-web",
+            "metadata_complete": true,
+            "findings_complete": true,
+            "extracted_data_complete": true,
+            "missing_fields": []
+          },
+          "statistics": {
+            "service": "pbx-web",
+            "total_deployments": 0,
+            "successful_deployments": 0,
+            "failed_deployments": 0,
+            "error_deployments": 0,
+            "data_source": "argo_workflows_ci + production_cluster",
+            "production_deployments_in_window": 2,
+            "workflows_found_in_ci": 0
+          }
+        },
+        "whisper-stt": {
+          "timestamp_analysis": {
+            "service": "whisper-stt",
+            "target_start": "2026-07-07T00:00:00Z",
+            "target_end": "2026-08-06T23:59:59Z",
+            "earliest_record": null,
+            "latest_record": null,
+            "coverage_days": 0,
+            "gaps_detected": false
+          },
+          "completeness": {
+            "service": "whisper-stt",
+            "metadata_complete": true,
+            "findings_complete": true,
+            "extracted_data_complete": true,
+            "missing_fields": []
+          },
+          "statistics": {
+            "service": "whisper-stt",
+            "total_deployments": 0,
+            "successful_deployments": 0,
+            "failed_deployments": 0,
+            "error_deployments": 0,
+            "data_source": "argo_workflows_ci",
+            "workflows_found_in_ci": 0
+          }
+        }
+      }
+    },
+    "deployment-events-30days-comprehensive.json": {
+      "metadata": {
+        "generated_at": "2026-08-06T17:30:00Z",
+        "time_period_start": "2026-07-07T00:00:00Z",
+        "time_period_end": "2026-08-06T17:30:00Z",
+        "target_days": 30,
+        "data_sources": [
+          "Kubernetes ReplicaSets (ardenone-cluster)",
+          "ArgoCD sync history",
+          "CI/CD Workflows (iad-ci cluster)",
+          "Deployment events from existing 30-day analysis"
+        ],
+        "description": "Comprehensive deployment events for pbx-web and whisper-stt covering last 30 days"
+      },
+      "pbx-web": {
+        "service_name": "pbx-web",
+        "namespace": "pbx-web",
+        "cluster": "ardenone-cluster",
+        "current_status": {
+          "deployment": "pbx-web",
+          "revision": 14,
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "last_updated": "2026-07-28T17:26:12Z"
+        },
+        "deployment_events": [
+          {
+            "deployment_id": "pbx-web-revision-14",
+            "timestamp": "2026-07-28T17:26:12Z",
+            "date": "2026-07-28",
+            "event_type": "deployment_rollout",
+            "revision": 14,
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "outcome": "success",
+            "replicaSet": "pbx-web-5ff68464d",
+            "pod_name": "pbx-web-5ff68464d-mkn8n",
+            "source": "kubernetes_replicaset",
+            "notes": "Current active deployment"
+          },
+          {
+            "deployment_id": "lab-rebuild-relay-revision-2",
+            "timestamp": "2026-07-27T17:56:07Z",
+            "date": "2026-07-27",
+            "event_type": "deployment_rollout",
+            "deployment": "lab-rebuild-relay",
+            "revision": 2,
+            "image": "python:3-slim",
+            "outcome": "success",
+            "replicaSet": "lab-rebuild-relay-79957dbd4",
+            "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
+            "source": "kubernetes_replicaset",
+            "notes": "Lab rebuild relay deployment"
+          },
+          {
+            "deployment_id": "pbx-rebuild-relay-revision-5",
+            "timestamp": "2026-07-15T03:24:40Z",
+            "date": "2026-07-15",
+            "event_type": "deployment_rollout",
+            "deployment": "pbx-rebuild-relay",
+            "revision": 5,
+            "image": "python:3-slim",
+            "outcome": "success",
+            "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+            "source": "kubernetes_replicaset",
+            "notes": "PBX rebuild relay deployment"
+          },
+          {
+            "deployment_id": "pbx-web-revision-14-initial",
+            "timestamp": "2026-07-13T18:18:07Z",
+            "date": "2026-07-13",
+            "event_type": "deployment_rollout",
+            "revision": 14,
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "outcome": "success",
+            "replicaSet": "pbx-web-5ff68464d",
+            "source": "kubernetes_replicaset",
+            "notes": "Initial deployment of revision 14"
+          },
+          {
+            "deployment_id": "pbx-web-revision-11-rollback",
+            "timestamp": "2026-07-13T18:07:55Z",
+            "date": "2026-07-13",
+            "event_type": "deployment_rollback",
+            "revision": 11,
+            "image": "ronaldraygun/pbx-web:1.0.8",
+            "outcome": "rolled_back",
+            "replicaSet": "pbx-web-754f4cfdf7",
+            "source": "kubernetes_replicaset",
+            "notes": "Rolled back to 1.0.8 on same day"
+          }
+        ],
+        "coverage_analysis": {
+          "target_range": "2026-07-07 to 2026-08-06 (30 days)",
+          "actual_coverage": "2026-07-13 to 2026-07-28 (15 days)",
+          "coverage_days": 15,
+          "coverage_percentage": 50,
+          "gap_days": 15,
+          "gaps": [
+            "2026-07-07 to 2026-07-12 (6 days) - No deployment events",
+            "2026-07-29 to 2026-08-06 (9 days) - No deployment events"
+          ],
+          "deployment_frequency": {
+            "total_events": 5,
+            "rollouts": 4,
+            "rollbacks": 1,
+            "average_interval_days": 3.8
+          },
+          "success_rate": 100
+        },
+        "ci_cd_workflows": {
+          "workflow_template": "pbx-web-build",
+          "workflows_found_in_window": 0,
+          "most_recent_workflow": null,
+          "retention_policy": "Workflows appear to be cleaned up within hours/days"
+        },
+        "image_tags_used": [
+          "ronaldraygun/pbx-web:1.0.9",
+          "ronaldraygun/pbx-web:1.0.8",
+          "python:3-slim"
+        ]
+      },
+      "whisper-stt": {
+        "service_name": "whisper-stt",
+        "namespace": "whisper-stt",
+        "cluster": "ardenone-cluster",
+        "current_status": {
+          "deployment": "whisper-stt",
+          "revision": 32,
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "last_updated": "2026-07-12T16:54:57Z"
+        },
+        "deployment_events": [
+          {
+            "deployment_id": "whisper-stt-revision-32",
+            "timestamp": "2026-07-12T16:53:42Z",
+            "date": "2026-07-12",
+            "event_type": "deployment_rollout",
+            "revision": 32,
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "outcome": "success",
+            "replicaSet": "whisper-stt-847fd8d7b9",
+            "status": "active",
+            "source": "kubernetes_replicaset",
+            "notes": "Current active deployment"
+          },
+          {
+            "deployment_id": "whisper-stt-revision-31",
+            "timestamp": "2026-07-08T03:26:44Z",
+            "date": "2026-07-08",
+            "event_type": "deployment_rollout",
+            "revision": 31,
+            "image": "ronaldraygun/whisper-stt:1.8.6",
+            "outcome": "success",
+            "replicaSet": "whisper-stt-6c497489fb",
+            "status": "inactive",
+            "source": "kubernetes_replicaset",
+            "notes": "Replaced by revision 32 same day"
+          },
+          {
+            "deployment_id": "whisper-stt-revision-30",
+            "timestamp": "2026-07-08T03:16:13Z",
+            "date": "2026-07-08",
+            "event_type": "deployment_rollout",
+            "revision": 30,
+            "image": "ronaldraygun/whisper-stt:1.8.4",
+            "outcome": "success",
+            "replicaSet": "whisper-stt-5b8558f478",
+            "status": "inactive",
+            "source": "kubernetes_replicaset",
+            "notes": "Rapid deployment sequence - version upgrade"
+          },
+          {
+            "deployment_id": "whisper-stt-revision-29",
+            "timestamp": "2026-07-08T03:09:35Z",
+            "date": "2026-07-08",
+            "event_type": "deployment_rollout",
+            "revision": 29,
+            "image": "ronaldraygun/whisper-stt:1.8.2",
+            "outcome": "success",
+            "replicaSet": "whisper-stt-5dbff75cbd",
+            "status": "inactive",
+            "source": "kubernetes_replicaset",
+            "notes": "Rapid deployment sequence - initial in series"
+          }
+        ],
+        "coverage_analysis": {
+          "target_range": "2026-07-07 to 2026-08-06 (30 days)",
+          "actual_coverage": "2026-07-08 to 2026-07-12 (4 days)",
+          "coverage_days": 4,
+          "coverage_percentage": 13.3,
+          "gap_days": 26,
+          "gaps": [
+            "2026-07-07 (1 day) - No deployment events",
+            "2026-07-13 to 2026-08-06 (25 days) - No deployment events"
+          ],
+          "deployment_frequency": {
+            "total_events": 4,
+            "rollouts": 4,
+            "rollbacks": 0,
+            "average_interval_days": 7.5,
+            "rapid_sequence": "3 deployments on 2026-07-08 (1.8.2 \u2192 1.8.4 \u2192 1.8.6)"
+          },
+          "success_rate": 100
+        },
+        "ci_cd_workflows": {
+          "workflow_template": "whisper-stt-build",
+          "workflows_found_in_window": 0,
+          "most_recent_workflow": null,
+          "retention_policy": "Workflows appear to be cleaned up within hours/days"
+        },
+        "image_tags_used": [
+          "ronaldraygun/whisper-stt:1.8.6",
+          "ronaldraygun/whisper-stt:1.8.4",
+          "ronaldraygun/whisper-stt:1.8.2"
+        ]
+      },
+      "summary": {
+        "total_services_analyzed": 2,
+        "total_deployment_events": 9,
+        "overall_coverage_analysis": {
+          "target_period": "2026-07-07 to 2026-08-06 (30 days)",
+          "pbx-web_coverage": "50% (15/30 days)",
+          "whisper-stt_coverage": "13.3% (4/30 days)",
+          "combined_coverage": "31.7% (19/60 service-days)",
+          "primary_limitation": "No CI/CD workflow history available due to aggressive cleanup policies"
+        },
+        "deployment_patterns": {
+          "pbx-web": {
+            "pattern": "Moderate deployment frequency with rebuild relay infrastructure",
+            "latest_deployment_age_days": 9,
+            "stability": "High - 100% success rate with 1 rollback"
+          },
+          "whisper-stt": {
+            "pattern": "Very stable - 25 days since last deployment",
+            "latest_deployment_age_days": 25,
+            "stability": "High - 100% success rate, rapid version iteration on 2026-07-08"
+          }
+        },
+        "data_completeness": {
+          "timestamp_format": "ISO 8601 - Validated \u2705",
+          "deployment_metadata": "Complete \u2705",
+          "image_information": "Complete \u2705",
+          "outcome_tracking": "Complete \u2705",
+          "ci_workflow_history": "Incomplete due to retention policy \u274c"
+        },
+        "recommendations": {
+          "monitoring": [
+            "Both services show excellent operational stability (100% success rate)",
+            "Long deployment intervals indicate mature, stable services",
+            "Consider increasing CI/CD workflow retention for historical analysis"
+          ],
+          "future_data_collection": [
+            "Query ArgoCD sync history as primary data source",
+            "Track git commits to declarative-config for deployment triggers",
+            "Monitor container registry for image build timestamps",
+            "Kubernetes ReplicaSets provide reliable production deployment history"
+          ]
+        },
+        "validation_status": {
+          "timestamps_valid": true,
+          "coverage_gaps_documented": true,
+          "deployment_frequency_calculated": true,
+          "success_rates_validated": true,
+          "missing_data_handled": true,
+          "ready_for_analysis": true
+        }
+      }
+    },
+    "deployment-metrics-intermediate.json": {
+      "generated_at": "2026-08-06T12:33:01.558621",
+      "task": "adc-24gnb: calculate deployment success rates",
+      "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+      "services": {
+        "pbx-web": {
+          "service": "pbx-web",
+          "total_deployments": 5,
+          "successful_deployments": 5,
+          "failed_deployments": 0,
+          "success_rate": 100.0,
+          "failure_rate": 0.0,
+          "time_period": {},
+          "rollbacks": 1,
+          "current_uptime_days": 9,
+          "deployment_frequency": {
+            "deployments_per_day": 0.2327,
+            "days_per_deployment": 4.3,
+            "mean_time_between_deployments": {
+              "seconds": 412497.11,
+              "hours": 114.58,
+              "days": 4.77
+            },
+            "total_deployments_analyzed": 10,
+            "analysis_period_days": 42.97
+          }
+        },
+        "whisper-stt": {
+          "service": "whisper-stt",
+          "total_deployments": 2,
+          "successful_deployments": 2,
+          "failed_deployments": 0,
+          "success_rate": 100.0,
+          "failure_rate": 0.0,
+          "time_period": {
+            "start": "2026-07-07T09:07:50Z",
+            "end": "2026-08-06T09:07:50Z",
+            "description": "Last 30 days"
+          },
+          "rapid_deployment_incidents": 3,
+          "zero_downtime_achieved": true,
+          "availability": "100%",
+          "deployment_frequency": {
+            "deployments_per_day": 0.6169,
+            "days_per_deployment": 1.62,
+            "mean_time_between_deployments": {
+              "seconds": 154068.6,
+              "hours": 42.8,
+              "days": 1.78
+            },
+            "total_deployments_analyzed": 11,
+            "analysis_period_days": 17.83
+          }
+        }
+      },
+      "summary": {
+        "pbx_web_success_rate": "100.0%",
+        "whisper_stt_success_rate": "100.0%",
+        "pbx_web_deployment_frequency": "0.2327 deployments/day",
+        "whisper_stt_deployment_frequency": "0.6169 deployments/day",
+        "overall_assessment": "Both services showing 100% deployment success rates with stable deployment patterns"
+      },
+      "acceptance_criteria": {
+        "success_rate_pbx_web": "COMPLETED",
+        "success_rate_whisper_stt": "COMPLETED",
+        "deployment_frequency_metrics": "COMPLETED",
+        "intermediate_file_saved": "COMPLETED"
+      }
+    },
+    "failure-taxonomy.json": {
+      "generated_at": "2026-08-06T18:53:51.928732",
+      "data_directory": "docs/research/deployment-data",
+      "services_analyzed": [
+        "pbx-web",
+        "whisper-stt"
+      ],
+      "total_events_analyzed": 26,
+      "pattern_categories": {
+        "RollbackEvent": {
+          "description": "Deployment rollback events indicating issues with new deployments",
+          "severity": "medium",
+          "occurrences": 1,
+          "by_service": {
+            "pbx-web": 1
+          },
+          "examples": [
+            {
+              "service": "pbx-web",
+              "timestamp": "2026-07-13T18:07:55Z",
+              "date": "2026-07-13",
+              "image": "ronaldraygun/pbx-web:1.0.8",
+              "revision": 11,
+              "notes": "Rolled back to 1.0.8 on same day"
+            }
+          ]
+        },
+        "RapidDeploymentSequence": {
+          "description": "Multiple deployments occurring within a short time window (\u226415 minutes)",
+          "severity": "info",
+          "occurrences": 11,
+          "by_service": {
+            "pbx-web": 6,
+            "whisper-stt": 5
+          },
+          "examples": [
+            {
+              "service": "pbx-web",
+              "event1": "image_bump",
+              "event2": "deployment_rollback",
+              "timestamp1": "2026-07-13T14:15:32-04:00",
+              "timestamp2": "2026-07-13T18:07:55Z",
+              "time_diff_seconds": -457.0,
+              "image1": null,
+              "image2": "ronaldraygun/pbx-web:1.0.8"
+            },
+            {
+              "service": "pbx-web",
+              "event1": "deployment_rollback",
+              "event2": "deployment_rollout",
+              "timestamp1": "2026-07-13T18:07:55Z",
+              "timestamp2": "2026-07-13T18:18:07Z",
+              "time_diff_seconds": 612.0,
+              "image1": "ronaldraygun/pbx-web:1.0.8",
+              "image2": "ronaldraygun/pbx-web:1.0.9"
+            },
+            {
+              "service": "pbx-web",
+              "event1": "bugfix",
+              "event2": "deployment_rollout",
+              "timestamp1": "2026-07-14T23:21:50-04:00",
+              "timestamp2": "2026-07-15T03:24:40Z",
+              "time_diff_seconds": 170.0,
+              "image1": null,
+              "image2": "python:3-slim"
+            },
+            {
+              "service": "pbx-web",
+              "event1": "config_change",
+              "event2": "config_change",
+              "timestamp1": "2026-07-27T13:55:38-04:00",
+              "timestamp2": "2026-07-27T13:58:00-04:00",
+              "time_diff_seconds": 142.0,
+              "image1": null,
+              "image2": null
+            },
+            {
+              "service": "pbx-web",
+              "event1": "config_change",
+              "event2": "deployment_rollout",
+              "timestamp1": "2026-07-27T13:58:00-04:00",
+              "timestamp2": "2026-07-27T17:56:07Z",
+              "time_diff_seconds": -113.0,
+              "image1": null,
+              "image2": "python:3-slim"
+            }
+          ]
+        }
+      },
+      "kubernetes_failure_patterns": {
+        "ImagePullBackOff": {
+          "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
+          "severity": "high",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        },
+        "CrashLoopBackOff": {
+          "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
+          "severity": "critical",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        },
+        "OOMKilled": {
+          "description": "Container killed due to memory exhaustion (resource limits exceeded)",
+          "severity": "high",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        },
+        "ProbeFailure": {
+          "description": "Readiness or liveness probe failures (health check issues)",
+          "severity": "medium",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        },
+        "DependencyTimeout": {
+          "description": "Deployment timeout due to dependency unavailability",
+          "severity": "medium",
+          "occurrences": 0,
+          "by_service": {},
+          "examples": [],
+          "searched": true,
+          "found": false
+        }
+      },
+      "temporal_patterns": {
+        "deployment_gaps": [
+          {
+            "service": "pbx-web",
+            "gap_start": "2026-07-15",
+            "gap_end": null,
+            "gap_days": 12
+          },
+          {
+            "service": "pbx-web",
+            "gap_start": "2026-07-28",
+            "gap_end": null,
+            "gap_days": 7
+          },
+          {
+            "service": "whisper-stt",
+            "gap_start": "2026-07-12",
+            "gap_end": null,
+            "gap_days": 17
+          }
+        ],
+        "deployment_clusters": [
+          {
+            "service": "pbx-web",
+            "date": "2026-07-13",
+            "count": 2,
+            "event_types": [
+              "deployment_rollout",
+              "deployment_rollback"
+            ]
+          },
+          {
+            "service": "whisper-stt",
+            "date": "2026-07-08",
+            "count": 3,
+            "event_types": [
+              "deployment_rollout",
+              "deployment_rollout",
+              "deployment_rollout"
+            ]
+          }
+        ]
+      },
+      "summary": {
+        "total_pattern_categories": 2,
+        "kubernetes_pattern_types_searched": 5,
+        "services": [
+          "pbx-web",
+          "whisper-stt"
+        ],
+        "total_deployment_events": 26
+      }
+    },
+    "frequency-metrics.json": {
+      "generated_at": "2026-08-06T11:57:40.234041",
+      "analysis_type": "deployment_frequency_and_timing_metrics",
+      "services": {
+        "pbx-web": {
+          "service": "pbx-web",
+          "total_deployments": 10,
+          "time_range": {
+            "start": "2026-06-15T18:11:38+00:00",
+            "end": "2026-07-28T17:26:12+00:00",
+            "total_days": 42.97
+          },
+          "deployment_frequency": {
+            "deployments_per_day": 0.2327,
+            "days_per_deployment": 4.3
+          },
+          "mean_time_between_deployments": {
+            "seconds": 412497.11,
+            "hours": 114.58,
+            "days": 4.77
+          },
+          "interval_range": {
+            "min_seconds": 612.0,
+            "max_seconds": 1565047.0
+          },
+          "note": null
+        },
+        "whisper-stt": {
+          "service": "whisper-stt",
+          "total_deployments": 11,
+          "time_range": {
+            "start": "2026-06-24T20:55:36+00:00",
+            "end": "2026-07-12T16:53:42+00:00",
+            "total_days": 17.83
+          },
+          "deployment_frequency": {
+            "deployments_per_day": 0.6169,
+            "days_per_deployment": 1.62
+          },
+          "mean_time_between_deployments": {
+            "seconds": 154068.6,
+            "hours": 42.8,
+            "days": 1.78
+          },
+          "interval_range": {
+            "min_seconds": 129.0,
+            "max_seconds": 521342.0
+          },
+          "note": null
+        }
+      },
+      "comparison": {
+        "pbx-web": {
+          "deployments_per_day": 0.2327,
+          "mean_days_between_deployments": 4.77
+        },
+        "whisper-stt": {
+          "deployments_per_day": 0.6169,
+          "mean_days_between_deployments": 1.78
+        }
+      }
+    },
+    "pbx-web-deployment-data-30days.json": {
+      "metadata": {
+        "service": "pbx-web",
+        "namespace": "pbx-web",
+        "cluster": "ardenone-cluster",
+        "data_collected_at": "2026-08-06T12:37:36Z",
+        "time_period": {
+          "start": "2026-07-07T00:00:00Z",
+          "end": "2026-08-06T12:37:36Z",
+          "description": "Last 30 days"
+        },
+        "managed_by": "ArgoCD",
+        "strategy": "Recreate"
+      },
+      "current_status": {
+        "deployment_name": "pbx-web",
+        "current_revision": 14,
+        "current_image": "ronaldraygun/pbx-web:1.0.9",
+        "generation": 36,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "updatedReplicas": 1,
+        "availableReplicas": 1,
+        "current_pod": "pbx-web-5ff68464d-mkn8n",
+        "pod_created_at": "2026-07-28T17:26:12Z",
+        "conditions": [
+          {
+            "type": "Progressing",
+            "status": "True",
+            "reason": "NewReplicaSetAvailable",
+            "message": "ReplicaSet \"pbx-web-765bb76db8\" has successfully progressed.",
+            "lastTransitionTime": "2026-05-01T20:57:27Z"
+          },
+          {
+            "type": "Available",
+            "status": "True",
+            "reason": "MinimumReplicasAvailable",
+            "message": "Deployment has minimum availability.",
+            "lastTransitionTime": "2026-07-28T17:26:24Z"
+          }
+        ]
+      },
+      "deployment_events_last_30_days": [
+        {
+          "date": "2026-07-28",
+          "timestamp": "2026-07-28T17:26:12Z",
+          "event_type": "deployment_rollout",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "outcome": "success",
+          "pod_name": "pbx-web-5ff68464d-mkn8n",
+          "pod_ready": true,
+          "restart_count": 0,
+          "notes": "Current active deployment"
+        },
+        {
+          "date": "2026-07-27",
+          "timestamp": "2026-07-27T17:56:07Z",
+          "event_type": "deployment_rollout",
+          "deployment": "lab-rebuild-relay",
+          "revision": 2,
+          "replicaSet": "lab-rebuild-relay-79957dbd4",
+          "image": "python:3-slim",
+          "outcome": "success",
+          "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
+          "pod_ready": true,
+          "restart_count": 0,
+          "notes": "Lab rebuild relay deployment"
+        },
+        {
+          "date": "2026-07-15",
+          "timestamp": "2026-07-15T03:24:40Z",
+          "event_type": "deployment_rollout",
+          "deployment": "pbx-rebuild-relay",
+          "revision": 5,
+          "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+          "image": "python:3-slim",
+          "outcome": "success",
+          "notes": "PBX rebuild relay deployment"
+        },
+        {
+          "date": "2026-07-13",
+          "timestamp": "2026-07-13T18:18:07Z",
+          "event_type": "deployment_rollout",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "outcome": "success",
+          "notes": "Initial deployment of revision 14"
+        },
+        {
+          "date": "2026-07-13",
+          "timestamp": "2026-07-13T18:07:55Z",
+          "event_type": "deployment_rollback",
+          "revision": 11,
+          "replicaSet": "pbx-web-754f4cfdf7",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "outcome": "rolled_back",
+          "notes": "Rolled back to 1.0.8 on same day"
+        }
+      ],
+      "historical_deployments_beyond_30_days": [
+        {
+          "date": "2026-06-25",
+          "timestamp": "2026-06-25T15:23:48Z",
+          "revision": 10,
+          "replicaSet": "pbx-web-6d86477cdb",
+          "image": "ronaldraygun/pbx-web:1.0.7",
+          "notes": "Prior to 30-day window"
+        },
+        {
+          "date": "2026-06-23",
+          "timestamp": "2026-06-23T18:55:52Z",
+          "revision": 9,
+          "replicaSet": "pbx-web-66f79fd6f9",
+          "image": "ronaldraygun/pbx-web:1.0.6",
+          "notes": "Prior to 30-day window"
+        },
+        {
+          "date": "2026-06-23",
+          "timestamp": "2026-06-23T18:37:39Z",
+          "revision": 8,
+          "replicaSet": "pbx-web-5cc966f86d",
+          "image": "ronaldraygun/pbx-web:1.0.5",
+          "notes": "Prior to 30-day window"
+        },
+        {
+          "date": "2026-06-21",
+          "timestamp": "2026-06-21T11:13:44Z",
+          "revision": 7,
+          "replicaSet": "pbx-web-69794b7fcc",
+          "image": "ronaldraygun/pbx-web:1.0.4",
+          "notes": "Prior to 30-day window"
+        },
+        {
+          "date": "2026-06-15",
+          "timestamp": "2026-06-15T18:11:38Z",
+          "revision": 6,
+          "replicaSet": "pbx-web-9fc5b5f59",
+          "image": "ronaldraygun/pbx-web:1.0.2",
+          "notes": "Prior to 30-day window"
+        }
+      ],
+      "deployment_metrics": {
+        "total_deployments_last_30_days": 5,
+        "successful_deployments": 5,
+        "failed_deployments": 0,
+        "deployment_frequency_days": 6,
+        "unique_images_deployed": 3,
+        "images_used_last_30_days": [
+          "ronaldraygun/pbx-web:1.0.9",
+          "ronaldraygun/pbx-web:1.0.8",
+          "python:3-slim"
+        ],
+        "current_uptime_days": 9,
+        "last_deployment": "2026-07-28T17:26:12Z",
+        "days_since_last_deployment": 9
+      },
+      "pod_health": {
+        "current_pod": {
+          "name": "pbx-web-5ff68464d-mkn8n",
+          "created_at": "2026-07-28T17:26:12Z",
+          "phase": "Running",
+          "ready": true,
+          "restart_count": 0,
+          "uptime_days": 9,
+          "containers": [
+            {
+              "name": "nginx",
+              "image": "localhost:7439/nginx:alpine",
+              "ready": true,
+              "restartCount": 0,
+              "running_since": "2026-07-28T17:26:13Z"
+            },
+            {
+              "name": "site-generator",
+              "image": "docker.io/ronaldraygun/pbx-web:1.0.9",
+              "ready": true,
+              "restartCount": 0,
+              "running_since": "2026-07-28T17:26:13Z"
+            }
+          ]
+        },
+        "health_indicators": {
+          "no_crashes": true,
+          "no_restart_loops": true,
+          "no_image_pull_errors": true,
+          "liveness_probes_passing": true,
+          "readiness_probes_passing": true
+        }
+      },
+      "operational_logs_sample": {
+        "recent_activity": "Pagefind search index rebuilding",
+        "last_rebuild": "2026-08-05T21:46:11.870571Z",
+        "rebuild_frequency": "triggered by bucket signature changes",
+        "search_index_stats": {
+          "indexed_pages": 197,
+          "indexed_words": 7592,
+          "languages": 1,
+          "build_time_avg_seconds": 2.0
+        },
+        "log_health": "normal - no errors or warnings in recent logs"
+      },
+      "infrastructure_details": {
+        "resource_limits": {
+          "site_generator": {
+            "cpu_limit": "500m",
+            "memory_limit": "512Mi",
+            "cpu_request": "10m",
+            "memory_request": "128Mi"
+          },
+          "nginx": {
+            "cpu_limit": "100m",
+            "memory_limit": "128Mi",
+            "cpu_request": "5m",
+            "memory_request": "32Mi"
+          }
+        },
+        "volumes": [
+          {
+            "name": "www",
+            "type": "emptyDir",
+            "purpose": "shared content between containers"
+          },
+          {
+            "name": "nginx-conf",
+            "type": "configMap",
+            "configMap": "pbx-web-nginx-conf"
+          },
+          {
+            "name": "nginx-cache",
+            "type": "emptyDir",
+            "medium": "Memory",
+            "sizeLimit": "16Mi"
+          },
+          {
+            "name": "nginx-run",
+            "type": "emptyDir",
+            "medium": "Memory",
+            "sizeLimit": "8Mi"
+          }
+        ],
+        "environment_variables": {
+          "S3_ENDPOINT": "http://garage.garage-operator.svc.cluster.local:3900",
+          "S3_BUCKET": "recordings",
+          "PYTHONUNBUFFERED": "1"
+        },
+        "secrets_used": [
+          "garage-pbx-creds",
+          "pbx-web-auth"
+        ],
+        "liveness_probes": {
+          "site_generator": {
+            "path": "/health",
+            "port": 9000,
+            "initialDelaySeconds": 10,
+            "periodSeconds": 30,
+            "timeoutSeconds": 5,
+            "failureThreshold": 3
+          },
+          "nginx": {
+            "path": "/",
+            "port": 80,
+            "initialDelaySeconds": 10,
+            "periodSeconds": 30,
+            "timeoutSeconds": 1,
+            "failureThreshold": 3
+          }
+        },
+        "readiness_probes": {
+          "site_generator": {
+            "path": "/health",
+            "port": 9000,
+            "initialDelaySeconds": 5,
+            "periodSeconds": 10,
+            "timeoutSeconds": 5,
+            "failureThreshold": 3
+          },
+          "nginx": {
+            "path": "/",
+            "port": 80,
+            "initialDelaySeconds": 3,
+            "periodSeconds": 10,
+            "timeoutSeconds": 1,
+            "failureThreshold": 3
+          }
+        }
+      },
+      "summary": {
+        "overall_health": "excellent",
+        "deployment_stability": "stable",
+        "uptime": "9 days continuous",
+        "issues_last_30_days": 0,
+        "rollbacks_last_30_days": 1,
+        "deployment_success_rate": "100%",
+        "recommendation": "Service is healthy with stable deployment pattern. Active rebuild relay infrastructure supports content updates."
+      }
+    },
+    "pbx-web-deployment-history-30days.json": {
+      "service": "pbx-web",
+      "data_source": "git_commit_logs",
+      "note": "No CI/CD workflow runs found in Argo Workflows (iad-ci). This data represents git commits to deployment manifests in declarative-config repo.",
+      "extracted_at": "2026-08-06T21:45:00Z",
+      "date_range": {
+        "start": "2026-07-08T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "target_days": 30,
+        "actual_days": 29
+      },
+      "total_events": 11,
+      "events": [
+        {
+          "timestamp": "2026-08-04T23:42:12-04:00",
+          "commit_hash": "816b043919e0d8229a7b33dffe78203a9f424d1e",
+          "author": "jedarden",
+          "message": "fix(ardenone-cluster): remove duplicate Applications that fought the ApplicationSet",
+          "event_type": "config_change",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/application.yaml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-28T13:24:42-04:00",
+          "commit_hash": "0fb7b127a910aa970bf76613ac2a071bec8a20af",
+          "author": "jedarden",
+          "message": "Revert \"feat(pbx-web): add WebRTC web client page behind Google OAuth\"",
+          "event_type": "rollback",
+          "files_changed": 4,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/pbx-web-configmap.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-deployment.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-internal-ingressroute.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-webphone-configmap.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-28T13:03:33-04:00",
+          "commit_hash": "7c3667ed6a4a9ae808bba4bf72bcfff128bf9e52",
+          "author": "jedarden",
+          "message": "feat(pbx-web): add WebRTC web client page behind Google OAuth",
+          "event_type": "feature_addition",
+          "files_changed": 4,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/pbx-web-configmap.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-deployment.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-internal-ingressroute.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-webphone-configmap.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-27T22:40:27-04:00",
+          "commit_hash": "0fbfa9aaeecf61947942e8440dc5f9192aede267",
+          "author": "jedarden",
+          "message": "eso/ardenone-manager: authenticate to OpenBao with Kubernetes auth",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-27T22:17:58-04:00",
+          "commit_hash": "fd0e735bbee741bd05409765973c477aa1c1347b",
+          "author": "jedarden",
+          "message": "openbao/ardenone-manager: let OpenBao review SA tokens, for ESO k8s auth",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-27T13:58:00-04:00",
+          "commit_hash": "3e906393b4668a0b0649d3b59c7ef5d45aeb89b0",
+          "author": "jedarden",
+          "message": "k8s: warn that multiple OpenBao instances hold overlapping paths",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-27T13:55:38-04:00",
+          "commit_hash": "42167a49fb553b3af9d9f5ee9c30781726064b03",
+          "author": "jedarden",
+          "message": "pbx-web: make lab-rebuild-relay pick up rotated secrets automatically",
+          "event_type": "config_change",
+          "files_changed": 2,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-deployment.yml",
+            "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-externalsecret.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-14T23:21:50-04:00",
+          "commit_hash": "25c11c891c91532dbd4c96fdfe9104aa61a4ecb7",
+          "author": "jedarden",
+          "message": "fix(pbx-web): force ESO resync + auto-restart on webhook secret rotation",
+          "event_type": "bugfix",
+          "files_changed": 2,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-deployment.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-externalsecret.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-14T15:38:37-04:00",
+          "commit_hash": "83af76cde01f463e98b9fa966cc73b80d320baaa",
+          "author": "jedarden",
+          "message": "fix(pbx-web): migrate secrets to OpenBao/ExternalSecret",
+          "event_type": "secret_migration",
+          "files_changed": 8,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/garage-pbx-creds-externalsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/garage-pbx-creds-secret.yml",
+            "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-externalsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/lab-rebuild-relay-sealedsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-externalsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-rebuild-relay-sealedsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-auth-externalsecret.yml",
+            "k8s/ardenone-cluster/pbx-web/pbx-web-auth-sealedsecret.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-13T14:15:32-04:00",
+          "commit_hash": "f20d55e5c3ad12eef64662bb795f8004492afda2",
+          "author": "jedarden",
+          "message": "feat(pbx-web): bump image to 1.0.9 (copy transcript now includes timestamps)",
+          "event_type": "image_bump",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/pbx-web/pbx-web-deployment.yml"
+          ],
+          "image_version": "1.0.9"
+        }
+      ]
+    },
+    "pbx-web-deployments-30days.json": {
+      "search_metadata": {
+        "query": "pbx-web deployment logs - last 30 days",
+        "search_period_start": "2026-07-07T00:00:00Z",
+        "search_period_end": "2026-08-06T23:59:59Z",
+        "workflow_template": "pbx-web-build",
+        "cluster": "iad-ci",
+        "namespace": "argo-workflows",
+        "queried_at": "2026-08-06T21:00:00Z"
+      },
+      "workflow_template_info": {
+        "name": "pbx-web-build",
+        "created": "2026-05-27T02:25:59Z",
+        "resource_version": "53851372",
+        "templates_count": 3,
+        "entrypoint": "build"
+      },
+      "deployment_runs": [],
+      "summary": {
+        "total_runs": 0,
+        "successful_runs": 0,
+        "failed_runs": 0,
+        "runs_last_30_days": 0,
+        "runs_last_7_days": 0,
+        "runs_last_24_hours": 0
+      },
+      "findings": [
+        "The pbx-web-build workflow template exists and was created on 2026-05-27",
+        "No workflow runs have been recorded for pbx-web-build in the iad-ci cluster",
+        "This indicates that pbx-web deployments are either:",
+        "  - Not automated via Argo Workflows",
+        "  - Deployed using a different method",
+        "  - Deployed to a different cluster",
+        "  - Not deployed within the last 30 days"
+      ],
+      "recommendations": [
+        "Verify if pbx-web is deployed via a different CI/CD system",
+        "Check if deployments go directly to nixos-asterisk cluster without iad-ci workflow",
+        "Investigate deployment logs in the target cluster directly",
+        "Consider implementing Argo Workflows-based deployment if desired"
+      ],
+      "raw_query_result": {
+        "apiVersion": "v1",
+        "items": [],
+        "kind": "List",
+        "metadata": {
+          "resourceVersion": ""
+        }
+      }
+    },
+    "pbx-web-deployments-structured.json": {
+      "service": "pbx-web",
+      "data_source": "replicaset_transformed",
+      "extracted_at": "2026-08-06T21:27:42.963867Z",
+      "total_deployments": 17,
+      "deployments": [
+        {
+          "timestamp": "2026-07-28T17:05:51Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.9",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-765bb76db8",
+          "revision": "13"
+        },
+        {
+          "timestamp": "2026-07-27T17:56:07Z",
+          "image_tag": "python:3-slim",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "lab-rebuild-relay-79957dbd4",
+          "revision": "2"
+        },
+        {
+          "timestamp": "2026-07-15T03:24:40Z",
+          "image_tag": "python:3-slim",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+          "revision": "5"
+        },
+        {
+          "timestamp": "2026-07-13T18:18:07Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.9",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-5ff68464d",
+          "revision": "14"
+        },
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.8",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-754f4cfdf7",
+          "revision": "11"
+        },
+        {
+          "timestamp": "2026-06-25T15:23:48Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.7",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-6d86477cdb",
+          "revision": "10"
+        },
+        {
+          "timestamp": "2026-06-23T18:55:52Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.6",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-66f79fd6f9",
+          "revision": "9"
+        },
+        {
+          "timestamp": "2026-06-23T18:37:39Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.5",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-5cc966f86d",
+          "revision": "8"
+        },
+        {
+          "timestamp": "2026-06-21T11:13:44Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.4",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-69794b7fcc",
+          "revision": "7"
+        },
+        {
+          "timestamp": "2026-06-15T18:11:38Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.2",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-9fc5b5f59",
+          "revision": "6"
+        },
+        {
+          "timestamp": "2026-05-11T18:17:51Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.2",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-85858b7dd4",
+          "revision": "5"
+        },
+        {
+          "timestamp": "2026-05-07T18:57:22Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.1",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-5cc44d5c4c",
+          "revision": "4"
+        },
+        {
+          "timestamp": "2026-05-07T18:40:16Z",
+          "image_tag": "ronaldraygun/pbx-web:1.0.0",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-web-5488fd45c8",
+          "revision": "3"
+        },
+        {
+          "timestamp": "2026-05-02T20:27:38Z",
+          "image_tag": "python:3-slim",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "lab-rebuild-relay-79d6d858bb",
+          "revision": "1"
+        },
+        {
+          "timestamp": "2026-05-02T20:27:37Z",
+          "image_tag": "python:3-slim",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-rebuild-relay-8596977857",
+          "revision": "4"
+        },
+        {
+          "timestamp": "2026-05-02T11:31:47Z",
+          "image_tag": "python:3-slim",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-rebuild-relay-5d6975d68d",
+          "revision": "3"
+        },
+        {
+          "timestamp": "2026-05-02T11:29:50Z",
+          "image_tag": "python:3-slim",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "pbx-rebuild-relay-7fbbb9bc7d",
+          "revision": "2"
+        }
+      ]
+    },
+    "pbx-web-deployments.json": {
+      "service": "pbx-web",
+      "namespace": "pbx-web",
+      "cluster": "ardenone-cluster",
+      "extracted_at": "2026-08-06T21:35:12.635059Z",
+      "total_deployments": 5,
+      "deployments": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "image_tag": "1.0.8",
+          "status": "failed",
+          "duration_seconds": null,
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "revision": 11,
+          "replicaSet": "pbx-web-754f4cfdf7",
+          "pod_name": null,
+          "event_type": "deployment_rollback",
+          "notes": "Rolled back to 1.0.8 on same day"
+        },
+        {
+          "timestamp": "2026-07-13T18:18:07Z",
+          "image_tag": "1.0.9",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "pod_name": null,
+          "event_type": "deployment_rollout",
+          "notes": "Initial deployment of revision 14"
+        },
+        {
+          "timestamp": "2026-07-15T03:24:40Z",
+          "image_tag": "3-slim",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "python:3-slim",
+          "revision": 5,
+          "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+          "pod_name": null,
+          "event_type": "deployment_rollout",
+          "notes": "PBX rebuild relay deployment"
+        },
+        {
+          "timestamp": "2026-07-27T17:56:07Z",
+          "image_tag": "3-slim",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "python:3-slim",
+          "revision": 2,
+          "replicaSet": "lab-rebuild-relay-79957dbd4",
+          "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
+          "event_type": "deployment_rollout",
+          "notes": "Lab rebuild relay deployment"
+        },
+        {
+          "timestamp": "2026-07-28T17:26:12Z",
+          "image_tag": "1.0.9",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "pod_name": "pbx-web-5ff68464d-mkn8n",
+          "event_type": "deployment_rollout",
+          "notes": "Current active deployment"
+        }
+      ]
+    },
+    "pbx-web-metrics.json": {
+      "service": "pbx-web",
+      "query_window": {
+        "start": "2026-07-07T17:50:21.053162",
+        "end": "2026-08-06T17:50:21.053162",
+        "days": 30
+      },
+      "events": {
+        "total": 2,
+        "warnings": 2,
+        "failed": 0,
+        "normal": 0,
+        "by_type": {
+          "Warning": 2
+        },
+        "by_reason": {
+          "ClusterIPNotAllocated": 1,
+          "deprecatedAnnotation": 1
+        },
+        "timeline": [
+          {
+            "type": "Warning",
+            "reason": "ClusterIPNotAllocated",
+            "message": "Cluster IP [IPv4]: 10.43.94.154 is not allocated; repairing",
+            "object": "Service/pbx-rebuild-egress",
+            "timestamp": "2026-08-06T21:55:08.065761+00:00"
+          },
+          {
+            "type": "Warning",
+            "reason": "deprecatedAnnotation",
+            "message": "Service uses deprecated annotation metallb.universe.tf/allow-shared-ip",
+            "object": "Service/pbx-web",
+            "timestamp": "2026-08-06T21:31:01+00:00"
+          }
+        ]
+      },
+      "pods": {
+        "total": 3,
+        "running": 3,
+        "failed": 0,
+        "pending": 0,
+        "succeeded": 0,
+        "unknown": 0,
+        "restart_counts": [
+          0,
+          0,
+          0
+        ],
+        "container_statuses": {
+          "total": 4,
+          "waiting": 0,
+          "running": 4,
+          "terminated": 0
+        },
+        "waiting_reasons": {},
+        "terminated_reasons": {},
+        "details": [
+          {
+            "name": "lab-rebuild-relay-79957dbd4-xsqhl",
+            "creation_timestamp": "2026-07-27T17:56:07",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-agent-minisforum",
+            "containers": [
+              {
+                "name": "relay",
+                "image": "localhost:7439/python:3-slim",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          },
+          {
+            "name": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+            "creation_timestamp": "2026-07-15T03:24:40",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-agent-minisforum",
+            "containers": [
+              {
+                "name": "relay",
+                "image": "localhost:7439/python:3-slim",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          },
+          {
+            "name": "pbx-web-5ff68464d-mkn8n",
+            "creation_timestamp": "2026-07-28T17:26:12",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-agent-minisforum",
+            "containers": [
+              {
+                "name": "site-generator",
+                "image": "ronaldraygun/pbx-web:1.0.9",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              },
+              {
+                "name": "nginx",
+                "image": "localhost:7439/nginx:alpine",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          }
+        ],
+        "restart_stats": {
+          "total_restarts": 0,
+          "max_restarts": 0,
+          "avg_restarts": 0.0,
+          "pods_with_restarts": 0
+        }
+      },
+      "failure_modes": {
+        "crash_loop_back_off": 0,
+        "oom_killed": 0,
+        "image_pull_backoff": 0,
+        "image_pull_error": 0,
+        "liveness_probe_failure": 0,
+        "readiness_probe_failure": 0,
+        "container_not_ready": 0,
+        "pod_not_ready": 0
+      },
+      "coverage": {
+        "earliest_data": "2026-07-15T03:24:40",
+        "expected_start": "2026-07-07T17:50:21.053162",
+        "has_full_coverage": false
+      }
+    },
+    "pbx-web-raw-workflows.json": {
+      "apiVersion": "v1",
+      "items": [],
+      "kind": "List",
+      "metadata": {
+        "resourceVersion": ""
+      }
+    },
+    "whisper-stt-deployment-data-30days.json": {
+      "report_metadata": {
+        "generated_at": "2026-08-06T09:07:50Z",
+        "time_range_start": "2026-07-07T09:07:50Z",
+        "time_range_end": "2026-08-06T09:07:50Z",
+        "cluster": "ardenone-cluster",
+        "service": "whisper-stt",
+        "namespace": "whisper-stt",
+        "data_source": "kubectl read-only proxy",
+        "report_type": "30-day deployment analysis"
+      },
+      "current_status": {
+        "deployments": {
+          "whisper-stt": {
+            "name": "whisper-stt",
+            "namespace": "whisper-stt",
+            "creationTimestamp": "2026-05-01T17:26:49Z",
+            "age_days": 96,
+            "generation": 353,
+            "revision": 32,
+            "replicas": 1,
+            "readyReplicas": 1,
+            "availableReplicas": 1,
+            "updatedReplicas": 1,
+            "strategy": "Recreate",
+            "images": {
+              "whisper-stt": "ronaldraygun/whisper-stt:1.8.6"
+            },
+            "conditions": [
+              {
+                "type": "Progressing",
+                "status": "True",
+                "reason": "NewReplicaSetAvailable",
+                "message": "ReplicaSet \"whisper-stt-847fd8d7b9\" has successfully progressed.",
+                "lastTransitionTime": "2026-07-12T16:54:57Z"
+              },
+              {
+                "type": "Available",
+                "status": "True",
+                "reason": "MinimumReplicasAvailable",
+                "message": "Deployment has minimum availability.",
+                "lastTransitionTime": "2026-07-12T16:54:57Z"
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "1",
+                "memory": "4Gi"
+              },
+              "limits": {
+                "cpu": "8",
+                "memory": "8Gi"
+              }
+            }
+          },
+          "whisper-openai": {
+            "name": "whisper-openai",
+            "namespace": "whisper-stt",
+            "creationTimestamp": "2026-06-14T02:10:48Z",
+            "age_days": 53,
+            "generation": 25,
+            "revision": 24,
+            "replicas": 1,
+            "readyReplicas": 1,
+            "availableReplicas": 1,
+            "updatedReplicas": 1,
+            "strategy": "RollingUpdate",
+            "images": {
+              "whisper-openai": "fedirz/faster-whisper-server:latest-cpu"
+            },
+            "conditions": [
+              {
+                "type": "Progressing",
+                "status": "True",
+                "reason": "NewReplicaSetAvailable",
+                "message": "ReplicaSet \"whisper-openai-68966786fb\" has successfully progressed.",
+                "lastTransitionTime": "2026-06-14T04:56:53Z"
+              },
+              {
+                "type": "Available",
+                "status": "True",
+                "reason": "MinimumReplicasAvailable",
+                "message": "Deployment has minimum availability.",
+                "lastTransitionTime": "2026-06-14T03:50:27Z"
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "1",
+                "memory": "4Gi"
+              },
+              "limits": {
+                "cpu": "8",
+                "memory": "8Gi"
+              }
+            }
+          }
+        }
+      },
+      "deployment_history_30_days": {
+        "replicasets": [
+          {
+            "name": "whisper-stt-847fd8d7b9",
+            "created": "2026-07-12T16:53:42Z",
+            "status": "active",
+            "replicas": 1,
+            "readyReplicas": 1,
+            "availableReplicas": 1,
+            "revision": 32,
+            "deployment": "whisper-stt",
+            "image": "ronaldraygun/whisper-stt:1.8.6"
+          },
+          {
+            "name": "whisper-stt-6c497489fb",
+            "created": "2026-07-08T03:26:44Z",
+            "status": "inactive",
+            "replicas": 0,
+            "revision": 31,
+            "deployment": "whisper-stt",
+            "image": "ronaldraygun/whisper-stt:1.8.6"
+          },
+          {
+            "name": "whisper-stt-5b8558f478",
+            "created": "2026-07-08T03:16:13Z",
+            "status": "inactive",
+            "replicas": 0,
+            "revision": 30,
+            "deployment": "whisper-stt",
+            "image": "ronaldraygun/whisper-stt:1.8.4"
+          },
+          {
+            "name": "whisper-stt-5dbff75cbd",
+            "created": "2026-07-08T03:09:35Z",
+            "status": "inactive",
+            "replicas": 0,
+            "revision": 29,
+            "deployment": "whisper-stt",
+            "image": "ronaldraygun/whisper-stt:1.8.2"
+          },
+          {
+            "name": "whisper-openai-68966786fb",
+            "created": "2026-06-14T04:11:57Z",
+            "status": "active",
+            "replicas": 1,
+            "readyReplicas": 1,
+            "availableReplicas": 1,
+            "revision": 24,
+            "deployment": "whisper-openai",
+            "image": "fedirz/faster-whisper-server:latest-cpu"
+          }
+        ],
+        "deployment_events_summary": {
+          "total_deployments": 2,
+          "total_replicasets_in_30d": 5,
+          "failed_rollouts": 0,
+          "rollback_events": 0,
+          "successful_updates": 1,
+          "rapid_deployments_on_2026_07_08": 3,
+          "last_deployment_update": "2026-07-12T16:54:57Z"
+        }
+      },
+      "pod_status": {
+        "current_pods": [
+          {
+            "name": "whisper-stt-847fd8d7b9-v2rs5",
+            "created": "2026-07-12T16:53:42Z",
+            "age_days": 25,
+            "status": "Running",
+            "containers": [
+              {
+                "name": "whisper-stt",
+                "image": "ronaldraygun/whisper-stt:1.8.6",
+                "ready": true,
+                "restartCount": 0,
+                "started": "2026-07-12T16:55:49Z"
+              }
+            ],
+            "totalRestartCount": 0,
+            "node": "k3s-agent-minisforum"
+          },
+          {
+            "name": "whisper-openai-68966786fb-jsb5d",
+            "created": "2026-06-14T04:55:49Z",
+            "age_days": 53,
+            "status": "Running",
+            "containers": [
+              {
+                "name": "whisper-openai",
+                "image": "fedirz/faster-whisper-server:latest-cpu",
+                "ready": true,
+                "restartCount": 0,
+                "started": "2026-06-14T04:56:53Z"
+              }
+            ],
+            "totalRestartCount": 0,
+            "node": "k3s-agent-minisforum"
+          }
+        ],
+        "pod_metrics": {
+          "total_pods": 2,
+          "running_pods": 2,
+          "total_containers": 2,
+          "total_restarts": 0,
+          "crashloops": 0,
+          "oomkills": 0,
+          "failed_pods": 0,
+          "pending_pods": 0
+        }
+      },
+      "operational_metrics": {
+        "uptime": {
+          "whisper-stt": "25 days continuous",
+          "whisper-openai": "53 days continuous"
+        },
+        "restart_analysis": {
+          "total_restarts": 0,
+          "crash_loop_backoffs": 0,
+          "oom_killed": 0,
+          "evicted_pods": 0,
+          "error_state_pods": 0
+        },
+        "resource_limits": {
+          "whisper-stt": {
+            "cpu_requests": "1",
+            "cpu_limits": "8",
+            "memory_requests": "4Gi",
+            "memory_limits": "8Gi"
+          },
+          "whisper-openai": {
+            "cpu_requests": "1",
+            "cpu_limits": "8",
+            "memory_requests": "4Gi",
+            "memory_limits": "8Gi"
+          }
+        },
+        "storage": {
+          "whisper-model-cache": {
+            "capacity": "10Gi",
+            "storage_class": "longhorn",
+            "status": "Bound",
+            "age_days": 84
+          },
+          "whisper-openai-model-cache": {
+            "capacity": "10Gi",
+            "storage_class": "longhorn",
+            "status": "Bound",
+            "age_days": 53
+          },
+          "whisper-stt-jobs": {
+            "capacity": "1Gi",
+            "storage_class": "longhorn",
+            "status": "Bound",
+            "age_days": 42
+          }
+        }
+      },
+      "log_analysis": {
+        "whisper-openai": {
+          "log_period": "2026-07-12 to 2026-08-06",
+          "total_log_lines": 100,
+          "errors_detected": 0,
+          "primary_activities": [
+            "Health check responses (/health endpoint returning HTTP 200)",
+            "UVicorn server operational on port 8000",
+            "Normal operation - no error patterns detected"
+          ],
+          "status": "Normal operation"
+        },
+        "whisper-stt": {
+          "log_period": "2026-07-12 to 2026-08-06",
+          "note": "No recent log entries available - pod may be idle or using centralized logging",
+          "status": "Running with no logged errors"
+        }
+      },
+      "argo_cd_integration": {
+        "tracking_id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+        "reloader": "auto: true",
+        "sync_status": "Managed by ArgoCD",
+        "deployments": [
+          {
+            "deployment": "whisper-stt",
+            "tracking_id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt"
+          },
+          {
+            "deployment": "whisper-openai",
+            "tracking_id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai"
+          }
+        ]
+      },
+      "error_incidents": {
+        "total_incidents": 0,
+        "critical_incidents": 0,
+        "warning_incidents": 0,
+        "incident_details": []
+      },
+      "deployment_health_assessment": {
+        "overall_health": "healthy",
+        "deployment_stability": "high",
+        "uptime_percentage": "100%",
+        "zero_downtime_deployment": true,
+        "successful_deployment_rate": "100%",
+        "health_indicators": {
+          "all_pods_running": true,
+          "zero_crashloops": true,
+          "zero_oomkills": true,
+          "zero_timeouts": true,
+          "zero_failed_rollouts": true,
+          "minimal_errors": true
+        }
+      },
+      "comparison_with_previous_analysis": {
+        "notes": "Previous analysis data not available for comparison - this appears to be the first comprehensive collection"
+      },
+      "recommendations": [
+        "Continue current deployment strategy - stability is excellent",
+        "Both deployments show zero restarts and 100% availability",
+        "Rapid deployment sequence on 2026-07-08 (1.8.2 \u2192 1.8.4 \u2192 1.8.6) suggests iterative image improvements",
+        "Consider implementing log aggregation for better operational visibility",
+        "Current Recreate deployment strategy working well for whisper-stt single-pod deployment",
+        "RollingUpdate strategy for whisper-openai provides good availability during updates"
+      ],
+      "summary": {
+        "deployment_name": "whisper-stt (namespace)",
+        "namespace": "whisper-stt",
+        "cluster": "ardenone-cluster",
+        "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+        "deployments_in_namespace": 2,
+        "total_deployment_events": 4,
+        "successful_rollouts": 4,
+        "failed_rollouts": 0,
+        "rollback_events": 0,
+        "crashloops": 0,
+        "oomkills": 0,
+        "pod_restarts": 0,
+        "error_rate": "Zero (no errors detected in logs)",
+        "availability": "100%",
+        "overall_status": "EXCELLENT - Zero incidents, zero downtime, zero restarts, stable operation"
+      }
+    },
+    "whisper-stt-deployment-history-30days.json": {
+      "service": "whisper-stt",
+      "data_source": "git_commit_logs",
+      "note": "No CI/CD workflow runs found in Argo Workflows (iad-ci). This data represents git commits to deployment manifests in declarative-config repo.",
+      "extracted_at": "2026-08-06T21:45:00Z",
+      "date_range": {
+        "start": "2026-07-07T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "target_days": 30,
+        "actual_days": 30
+      },
+      "total_events": 7,
+      "events": [
+        {
+          "timestamp": "2026-08-04T23:42:12-04:00",
+          "commit_hash": "816b043919e0d8229a7b33dffe78203a9f424d1e",
+          "author": "jedarden",
+          "message": "fix(ardenone-cluster): remove duplicate Applications that fought the ApplicationSet",
+          "event_type": "config_change",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/whisper-stt/whisper-stt-application.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-08-02T19:40:33-04:00",
+          "commit_hash": "6c2df52dcf5467119740121aff6a4f379c8644e8",
+          "author": "jedarden",
+          "message": "fix(security-scan): filter SealedSecrets by content, not filename",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-30T11:40:03-04:00",
+          "commit_hash": "254d6f45959f3075d9b6aef464ea164b84e49c9d",
+          "author": "jedarden",
+          "message": "Document cluster size and resource limits per cluster folder",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-12T12:52:51-04:00",
+          "commit_hash": "0829ee7d3bfd72522c03dc746b4642e4213ea79c",
+          "author": "jedarden",
+          "message": "fix(whisper-stt): prefer big-CPU nodes via soft nodeAffinity",
+          "event_type": "bugfix",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/whisper-stt/deployment.yml"
+          ],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-10T09:19:29-04:00",
+          "commit_hash": "8b24f3b6f7a746abd81ab33f7de1b18561f1cbe8",
+          "author": "jedarden",
+          "message": "Remove decommissioned whisper-transcription service in utilities",
+          "event_type": "config_change",
+          "files_changed": 0,
+          "files": [],
+          "image_version": null
+        },
+        {
+          "timestamp": "2026-07-07T23:23:11-04:00",
+          "commit_hash": "6fc620d1f53f61f089cca88f50d965ef53f65986",
+          "author": "jedarden",
+          "message": "feat(whisper-stt): deploy 1.8.6, route /jobs/{id} + /jobs/chunked/* off Google auth",
+          "event_type": "version_deploy",
+          "files_changed": 2,
+          "files": [
+            "k8s/ardenone-cluster/whisper-stt/deployment.yml",
+            "k8s/ardenone-cluster/whisper-stt/ingressroute.yml"
+          ],
+          "image_version": "1.8.6"
+        },
+        {
+          "timestamp": "2026-07-07T23:15:31-04:00",
+          "commit_hash": "eab3f7e2170ae357d28c76007a41abfb7f4ffa70",
+          "author": "jedarden",
+          "message": "feat(whisper-stt): deploy 1.8.4 (bearer-auth chunked upload endpoints)",
+          "event_type": "version_deploy",
+          "files_changed": 1,
+          "files": [
+            "k8s/ardenone-cluster/whisper-stt/deployment.yml"
+          ],
+          "image_version": "1.8.4"
+        }
+      ]
+    },
+    "whisper-stt-deployments-structured.json": {
+      "service": "whisper-stt",
+      "data_source": "replicaset_transformed",
+      "extracted_at": "2026-08-06T21:27:42.964043Z",
+      "total_deployments": 22,
+      "deployments": [
+        {
+          "timestamp": "2026-07-12T16:53:42Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.8.6",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-847fd8d7b9",
+          "revision": "32"
+        },
+        {
+          "timestamp": "2026-07-08T03:26:44Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.8.6",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-6c497489fb",
+          "revision": "31"
+        },
+        {
+          "timestamp": "2026-07-08T03:16:13Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.8.4",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-5b8558f478",
+          "revision": "30"
+        },
+        {
+          "timestamp": "2026-07-08T03:09:35Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.8.2",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-5dbff75cbd",
+          "revision": "29"
+        },
+        {
+          "timestamp": "2026-07-02T02:20:33Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.7.0",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-6b96f4569c",
+          "revision": "28"
+        },
+        {
+          "timestamp": "2026-07-01T19:46:33Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.6.0",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-6464bdf67b",
+          "revision": "27"
+        },
+        {
+          "timestamp": "2026-06-26T16:33:34Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.5.1",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-5b884b75f4",
+          "revision": "26"
+        },
+        {
+          "timestamp": "2026-06-26T12:42:03Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.4.1",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-78bbf5f57f",
+          "revision": "25"
+        },
+        {
+          "timestamp": "2026-06-25T14:10:16Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.3.1",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-558c7cf44",
+          "revision": "24"
+        },
+        {
+          "timestamp": "2026-06-25T14:08:07Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.3.0",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-65fb7f8dd9",
+          "revision": "23"
+        },
+        {
+          "timestamp": "2026-06-24T20:55:36Z",
+          "image_tag": "ronaldraygun/whisper-stt:1.2.5",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-stt-75c848b8d6",
+          "revision": "22"
+        },
+        {
+          "timestamp": "2026-06-14T04:55:48Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "success",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-68966786fb",
+          "revision": "24"
+        },
+        {
+          "timestamp": "2026-06-14T04:52:13Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-6885fc878b",
+          "revision": "23"
+        },
+        {
+          "timestamp": "2026-06-14T04:48:36Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-6b75db654f",
+          "revision": "22"
+        },
+        {
+          "timestamp": "2026-06-14T04:27:44Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-85b44d79b4",
+          "revision": "21"
+        },
+        {
+          "timestamp": "2026-06-14T04:11:57Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-55bb9fb46f",
+          "revision": "20"
+        },
+        {
+          "timestamp": "2026-06-14T04:06:40Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-745d9c487d",
+          "revision": "19"
+        },
+        {
+          "timestamp": "2026-06-14T04:01:11Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-7b756c458",
+          "revision": "18"
+        },
+        {
+          "timestamp": "2026-06-14T03:56:31Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-7548956b49",
+          "revision": "17"
+        },
+        {
+          "timestamp": "2026-06-14T03:53:06Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-685c49f459",
+          "revision": "16"
+        },
+        {
+          "timestamp": "2026-06-14T03:50:27Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-7558965d58",
+          "revision": "15"
+        },
+        {
+          "timestamp": "2026-06-14T03:44:24Z",
+          "image_tag": "fedirz/faster-whisper-server:latest-cpu",
+          "status": "unknown",
+          "duration_seconds": null,
+          "source": "replicaset",
+          "replicaSet": "whisper-openai-7ccf9f655b",
+          "revision": "14"
+        }
+      ]
+    },
+    "whisper-stt-deployments.json": {
+      "service": "whisper-stt",
+      "namespace": "whisper-stt",
+      "cluster": "ardenone-cluster",
+      "extracted_at": "2026-08-06T21:35:12.865216Z",
+      "total_deployments": 5,
+      "deployments": [
+        {
+          "timestamp": "2026-06-14T04:11:57Z",
+          "image_tag": "latest-cpu",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "fedirz/faster-whisper-server:latest-cpu",
+          "revision": 24,
+          "replicaSet": "whisper-openai-68966786fb",
+          "deployment": "whisper-openai",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "availableReplicas": 1
+        },
+        {
+          "timestamp": "2026-07-08T03:09:35Z",
+          "image_tag": "1.8.2",
+          "status": "failed",
+          "duration_seconds": null,
+          "image": "ronaldraygun/whisper-stt:1.8.2",
+          "revision": 29,
+          "replicaSet": "whisper-stt-5dbff75cbd",
+          "deployment": "whisper-stt",
+          "replicas": 0,
+          "readyReplicas": null,
+          "availableReplicas": null
+        },
+        {
+          "timestamp": "2026-07-08T03:16:13Z",
+          "image_tag": "1.8.4",
+          "status": "failed",
+          "duration_seconds": null,
+          "image": "ronaldraygun/whisper-stt:1.8.4",
+          "revision": 30,
+          "replicaSet": "whisper-stt-5b8558f478",
+          "deployment": "whisper-stt",
+          "replicas": 0,
+          "readyReplicas": null,
+          "availableReplicas": null
+        },
+        {
+          "timestamp": "2026-07-08T03:26:44Z",
+          "image_tag": "1.8.6",
+          "status": "failed",
+          "duration_seconds": null,
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "revision": 31,
+          "replicaSet": "whisper-stt-6c497489fb",
+          "deployment": "whisper-stt",
+          "replicas": 0,
+          "readyReplicas": null,
+          "availableReplicas": null
+        },
+        {
+          "timestamp": "2026-07-12T16:53:42Z",
+          "image_tag": "1.8.6",
+          "status": "success",
+          "duration_seconds": null,
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "revision": 32,
+          "replicaSet": "whisper-stt-847fd8d7b9",
+          "deployment": "whisper-stt",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "availableReplicas": 1
+        }
+      ]
+    },
+    "whisper-stt-metrics.json": {
+      "service": "whisper-stt",
+      "query_window": {
+        "start": "2026-07-07T17:50:21.053536",
+        "end": "2026-08-06T17:50:21.053536",
+        "days": 30
+      },
+      "events": {
+        "total": 0,
+        "warnings": 0,
+        "failed": 0,
+        "normal": 0,
+        "by_type": {},
+        "by_reason": {},
+        "timeline": []
+      },
+      "pods": {
+        "total": 2,
+        "running": 2,
+        "failed": 0,
+        "pending": 0,
+        "succeeded": 0,
+        "unknown": 0,
+        "restart_counts": [
+          0,
+          0
+        ],
+        "container_statuses": {
+          "total": 2,
+          "waiting": 0,
+          "running": 2,
+          "terminated": 0
+        },
+        "waiting_reasons": {},
+        "terminated_reasons": {},
+        "details": [
+          {
+            "name": "whisper-openai-68966786fb-jsb5d",
+            "creation_timestamp": "2026-06-14T04:55:49",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-lenovo-tiny",
+            "containers": [
+              {
+                "name": "whisper-openai",
+                "image": "localhost:7439/fedirz/faster-whisper-server:latest-cpu",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          },
+          {
+            "name": "whisper-stt-847fd8d7b9-v2rs5",
+            "creation_timestamp": "2026-07-12T16:53:42",
+            "phase": "Running",
+            "restart_count": 0,
+            "ready": true,
+            "node": "k3s-agent-minisforum",
+            "containers": [
+              {
+                "name": "whisper-stt",
+                "image": "ronaldraygun/whisper-stt:1.8.6",
+                "restart_count": 0,
+                "ready": true,
+                "started": true
+              }
+            ]
+          }
+        ],
+        "restart_stats": {
+          "total_restarts": 0,
+          "max_restarts": 0,
+          "avg_restarts": 0.0,
+          "pods_with_restarts": 0
+        }
+      },
+      "failure_modes": {
+        "crash_loop_back_off": 0,
+        "oom_killed": 0,
+        "image_pull_backoff": 0,
+        "image_pull_error": 0,
+        "liveness_probe_failure": 0,
+        "readiness_probe_failure": 0,
+        "container_not_ready": 0,
+        "pod_not_ready": 0
+      },
+      "coverage": {
+        "earliest_data": "2026-06-14T04:55:49",
+        "expected_start": "2026-07-07T17:50:21.053536",
+        "has_full_coverage": true
+      }
+    },
+    "whisper-stt-raw-workflows.json": {
+      "apiVersion": "v1",
+      "items": [],
+      "kind": "List",
+      "metadata": {
+        "resourceVersion": ""
+      }
+    }
+  }
+}
