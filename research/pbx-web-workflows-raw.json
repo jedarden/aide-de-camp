@@ -1,0 +1,56 @@
+{
+  "workflows": [],
+  "summary": {
+    "total_count": 0,
+    "by_phase": {},
+    "date_range": {
+      "earliest": null,
+      "latest": null
+    },
+    "parsing_errors": []
+  },
+  "metadata": {
+    "parsed_at": "2026-08-06T16:09:13.701653",
+    "input_format": "json",
+    "input_file": "/home/coding/scratch/pbx-web-workflows-approach-b.json"
+  },
+  "context": {
+    "query_status": "no_data_found",
+    "query_date": "2026-08-06",
+    "target_workflow": "pbx-web-build",
+    "requested_timeframe": "30_days",
+    "findings": {
+      "workflow_template_exists": true,
+      "template_created": "2026-05-27T02:25:59Z",
+      "actual_retention_period": "approximately_10_days",
+      "oldest_workflow_in_cluster": "2026-07-27T18:59:34Z",
+      "total_workflows_in_cluster": 34,
+      "pbx_web_build_runs_found": 0
+    },
+    "explanation": "The iad-ci cluster has a workflow retention policy that deletes workflows after approximately 7-10 days. The oldest workflow currently in the cluster is from 2026-07-27 (10 days ago). No pbx-web-build workflow runs exist in the cluster within the available retention window.",
+    "retention_analysis": {
+      "max_lookback_days": 10,
+      "requested_lookback_days": 30,
+      "data_available": false,
+      "cluster_retention_policy": "workflows are deleted after ~7-10 days"
+    },
+    "sample_cluster_workflows": {
+      "oldest": [
+        "gribtract-ci-manual-mbntt (9d, Error)",
+        "gribtract-ci-manual-s7vzg (9d, Error)",
+        "warden-build-manual-bxbqp (7d, Error)"
+      ],
+      "recent": [
+        "spaxel-build-9r2lx (Running, 120m)",
+        "armor-build-jnk7d (Running, 104m)",
+        "needle-ci-verify-xjbbm (Running, 86m)"
+      ]
+    },
+    "recommendations": [
+      "Check Argo Workflows retention policy settings in iad-ci cluster",
+      "Consider configuring longer TTL for pbx-web-build workflows if historical data is needed",
+      "Use external logging/storage for workflow run history beyond retention period",
+      "Alternative: Check if pbx-web-build logs are persisted elsewhere (e.g., Loki, Elasticsearch)"
+    ]
+  }
+}
