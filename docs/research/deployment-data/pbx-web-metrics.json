@@ -1,0 +1,119 @@
+{
+  "service": "pbx-web",
+  "query_window": {
+    "start": "2026-07-07T17:50:21.053162",
+    "end": "2026-08-06T17:50:21.053162",
+    "days": 30
+  },
+  "events": {
+    "total": 0,
+    "warnings": 0,
+    "failed": 0,
+    "normal": 0,
+    "by_type": {},
+    "by_reason": {},
+    "timeline": []
+  },
+  "pods": {
+    "total": 3,
+    "running": 3,
+    "failed": 0,
+    "pending": 0,
+    "succeeded": 0,
+    "unknown": 0,
+    "restart_counts": [
+      0,
+      0,
+      0
+    ],
+    "container_statuses": {
+      "total": 4,
+      "waiting": 0,
+      "running": 4,
+      "terminated": 0
+    },
+    "waiting_reasons": {},
+    "terminated_reasons": {},
+    "details": [
+      {
+        "name": "lab-rebuild-relay-79957dbd4-xsqhl",
+        "creation_timestamp": "2026-07-27T17:56:07",
+        "phase": "Running",
+        "restart_count": 0,
+        "ready": true,
+        "node": "k3s-agent-minisforum",
+        "containers": [
+          {
+            "name": "relay",
+            "image": "localhost:7439/python:3-slim",
+            "restart_count": 0,
+            "ready": true,
+            "started": true
+          }
+        ]
+      },
+      {
+        "name": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+        "creation_timestamp": "2026-07-15T03:24:40",
+        "phase": "Running",
+        "restart_count": 0,
+        "ready": true,
+        "node": "k3s-agent-minisforum",
+        "containers": [
+          {
+            "name": "relay",
+            "image": "localhost:7439/python:3-slim",
+            "restart_count": 0,
+            "ready": true,
+            "started": true
+          }
+        ]
+      },
+      {
+        "name": "pbx-web-5ff68464d-mkn8n",
+        "creation_timestamp": "2026-07-28T17:26:12",
+        "phase": "Running",
+        "restart_count": 0,
+        "ready": true,
+        "node": "k3s-agent-minisforum",
+        "containers": [
+          {
+            "name": "site-generator",
+            "image": "ronaldraygun/pbx-web:1.0.9",
+            "restart_count": 0,
+            "ready": true,
+            "started": true
+          },
+          {
+            "name": "nginx",
+            "image": "localhost:7439/nginx:alpine",
+            "restart_count": 0,
+            "ready": true,
+            "started": true
+          }
+        ]
+      }
+    ],
+    "restart_stats": {
+      "total_restarts": 0,
+      "max_restarts": 0,
+      "avg_restarts": 0.0,
+      "pods_with_restarts": 0
+    }
+  },
+  "failure_modes": {
+    "crash_loop_back_off": 0,
+    "oom_killed": 0,
+    "image_pull_backoff": 0,
+    "image_pull_error": 0,
+    "liveness_probe_failure": 0,
+    "readiness_probe_failure": 0,
+    "container_not_ready": 0,
+    "pod_not_ready": 0
+  },
+  "coverage": {
+    "earliest_data": "2026-07-15T03:24:40",
+    "expected_start": "2026-07-07T17:50:21.053162",
+    "has_full_coverage": false
+  }
+}

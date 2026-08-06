@@ -5,9 +5,64 @@ import json
 import sys
 from pathlib import Path
 from datetime import datetime
+from typing import Tuple, List, Dict, Any
 
 
-def validate_deployment_file(filepath: Path) -> bool:
+def validate_required_fields(deployments: List[Dict[str, Any]]) -> Tuple[bool, List[str]]:
+    """
+    Validate required fields in deployment entries.
+
+    Args:
+        deployments: List of deployment entry dictionaries
+
+    Returns:
+        Tuple of (is_valid: bool, errors: List[str])
+        - is_valid: True if all required fields are present in all entries
+        - errors: List of error messages for missing required fields
+
+    Required fields:
+    - date (timestamp): Deployment date/time
+    - environment: Deployment environment (e.g., production, staging)
+    - region: Deployment region (e.g., us-east-1, eu-west-1)
+    - deployment_id: Unique deployment identifier
+    - status: Deployment status (success, failed, unknown)
+    """
+    required_fields = ["date", "environment", "region", "deployment_id", "status"]
+    errors = []
+
+    for entry_idx, entry in enumerate(deployments):
+        entry_id = entry.get("deployment_id", f"entry_{entry_idx}")
+
+        for field in required_fields:
+            if field not in entry:
+                errors.append(f"Missing required field {field} in entry {entry_id}")
+
+    is_valid = len(errors) == 0
+    return is_valid, errors
+
+
+def map_deployment_to_standard_format(deployment: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Map deployment entry to standard format with required fields.
+
+    Maps existing deployment fields to the standard required field names:
+    - timestamp -> date
+    - cluster/namespace -> environment
+    - cluster -> region
+    - replicaSet/deployment -> deployment_id
+    - status -> status (unchanged)
+    """
+    standard_entry = {
+        "date": deployment.get("timestamp"),
+        "environment": f"{metadata.get('namespace', 'unknown')}/{metadata.get('cluster', 'unknown')}",
+        "region": metadata.get("cluster", "unknown"),
+        "deployment_id": deployment.get("replicaSet") or deployment.get("deployment") or f"deploy-{deployment.get('revision', 'unknown')}",
+        "status": deployment.get("status", "unknown")
+    }
+    return standard_entry
+
+
+def validate_deployment_file(filepath: Path, include_required_fields_validation: bool = True) -> bool:
     """Validate a deployment JSON file."""
     print(f"\nValidating {filepath.name}...")
 
@@ -54,6 +109,33 @@ def validate_deployment_file(filepath: Path) -> bool:
                 return False
 
         print("  ✓ All deployment records have valid structure")
+
+        # Test 4.5: Validate required fields (if enabled)
+        if include_required_fields_validation:
+            print("  ✓ Checking required fields (date, environment, region, deployment_id, status)...")
+
+            # Prepare metadata for field mapping
+            metadata = {
+                "service": data.get("service", "unknown"),
+                "namespace": data.get("namespace", "unknown"),
+                "cluster": data.get("cluster", "unknown")
+            }
+
+            # Map deployments to standard format and validate required fields
+            standard_deployments = [
+                map_deployment_to_standard_format(deployment, metadata)
+                for deployment in deployments
+            ]
+
+            is_valid, errors = validate_required_fields(standard_deployments)
+
+            if not is_valid:
+                print("  ✗ Required fields validation failed:")
+                for error in errors:
+                    print(f"    • {error}")
+                return False
+            else:
+                print("  ✓ All required fields present in all deployment entries")
 
         # Test 5: Check status mapping
         success_count = sum(1 for d in deployments if d["status"] == "success")
