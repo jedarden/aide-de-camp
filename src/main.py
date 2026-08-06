@@ -281,7 +281,7 @@ async def test_endpoint(request: dict):
     Test endpoint that accepts utterance and session_id.
 
     Mirrors the /dispatch interface for basic testing and verification.
-    Returns a test response with timestamp and received data.
+    Stores the utterance to the session database and returns a test response.
 
     Request body:
     {
@@ -297,15 +297,73 @@ async def test_endpoint(request: dict):
             "utterance": "...",
             "session_id": "..."
         },
-        "message": "Test endpoint received data successfully"
+        "stored": {
+            "utterance_id": "...",
+            "intent_id": "...",
+            "topic_id": "...",
+            "result_id": "..."
+        },
+        "message": "Test endpoint received and stored data successfully"
     }
     """
     from datetime import datetime
+    import uuid
 
     utterance = request.get("utterance", "")
     session_id = request.get("session_id", "")
 
     logger.info(f"[TEST] Received test request - utterance: {utterance[:100]}..., session_id: {session_id}")
+
+    # Get the session store
+    store = await get_store()
+
+    # Generate IDs
+    utterance_id = str(uuid.uuid4())
+
+    # Create or get session (pass session_id so sessions.id PK matches)
+    session = await store.get_session(session_id)
+    if not session:
+        await store.create_session(session_id)
+        logger.info(f"[TEST] Created new session: {session_id}")
+
+    # Create utterance record
+    await store.create_utterance(session_id, utterance, utterance_id)
+
+    # Create intent record (use returned intent_id)
+    intent_id = await store.create_intent(
+        utterance_id=utterance_id,
+        session_id=session_id,
+        project_slug="test",
+        intent_type="test",
+    )
+
+    # Create topic for the result
+    topic_id = await store.create_topic(
+        label=f"Test: {utterance[:50]}",
+        topic_type="personal",
+        project_slugs=[],
+        scope="session",
+        session_id=session_id,
+    )
+
+    # Create result record
+    result_data = {
+        "test_mode": True,
+        "utterance": utterance,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+
+    result_id = await store.create_result(
+        intent_id=intent_id,
+        topic_id=topic_id,
+        session_id=session_id,
+        summary=f"Test result for: {utterance[:100]}",
+        data=result_data,
+        urgency="normal",
+        result_type="test",
+    )
+
+    logger.info(f"[TEST] Stored test data - utterance_id: {utterance_id}, result_id: {result_id}")
 
     return {
         "status": "test",
@@ -314,7 +372,13 @@ async def test_endpoint(request: dict):
             "utterance": utterance,
             "session_id": session_id,
         },
-        "message": "Test endpoint received data successfully",
+        "stored": {
+            "utterance_id": utterance_id,
+            "intent_id": intent_id,
+            "topic_id": topic_id,
+            "result_id": result_id,
+        },
+        "message": "Test endpoint received and stored data successfully",
     }
 
 
