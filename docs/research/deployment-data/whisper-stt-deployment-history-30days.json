@@ -1,0 +1,88 @@
+{
+  "service": "whisper-stt",
+  "data_source": "git_commit_logs",
+  "note": "No CI/CD workflow runs found in Argo Workflows (iad-ci). This data represents git commits to deployment manifests in declarative-config repo.",
+  "extracted_at": "2026-08-06T21:45:00Z",
+  "date_range": {
+    "start": "2026-07-07T00:00:00Z",
+    "end": "2026-08-06T23:59:59Z",
+    "target_days": 30,
+    "actual_days": 30
+  },
+  "total_events": 7,
+  "events": [
+    {
+      "timestamp": "2026-08-04T23:42:12-04:00",
+      "commit_hash": "816b043919e0d8229a7b33dffe78203a9f424d1e",
+      "author": "jedarden",
+      "message": "fix(ardenone-cluster): remove duplicate Applications that fought the ApplicationSet",
+      "event_type": "config_change",
+      "files_changed": 1,
+      "files": ["k8s/ardenone-cluster/whisper-stt/whisper-stt-application.yml"],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-08-02T19:40:33-04:00",
+      "commit_hash": "6c2df52dcf5467119740121aff6a4f379c8644e8",
+      "author": "jedarden",
+      "message": "fix(security-scan): filter SealedSecrets by content, not filename",
+      "event_type": "config_change",
+      "files_changed": 0,
+      "files": [],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-30T11:40:03-04:00",
+      "commit_hash": "254d6f45959f3075d9b6aef464ea164b84e49c9d",
+      "author": "jedarden",
+      "message": "Document cluster size and resource limits per cluster folder",
+      "event_type": "config_change",
+      "files_changed": 0,
+      "files": [],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-12T12:52:51-04:00",
+      "commit_hash": "0829ee7d3bfd72522c03dc746b4642e4213ea79c",
+      "author": "jedarden",
+      "message": "fix(whisper-stt): prefer big-CPU nodes via soft nodeAffinity",
+      "event_type": "bugfix",
+      "files_changed": 1,
+      "files": ["k8s/ardenone-cluster/whisper-stt/deployment.yml"],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-10T09:19:29-04:00",
+      "commit_hash": "8b24f3b6f7a746abd81ab33f7de1b18561f1cbe8",
+      "author": "jedarden",
+      "message": "Remove decommissioned whisper-transcription service in utilities",
+      "event_type": "config_change",
+      "files_changed": 0,
+      "files": [],
+      "image_version": null
+    },
+    {
+      "timestamp": "2026-07-07T23:23:11-04:00",
+      "commit_hash": "6fc620d1f53f61f089cca88f50d965ef53f65986",
+      "author": "jedarden",
+      "message": "feat(whisper-stt): deploy 1.8.6, route /jobs/{id} + /jobs/chunked/* off Google auth",
+      "event_type": "version_deploy",
+      "files_changed": 2,
+      "files": [
+        "k8s/ardenone-cluster/whisper-stt/deployment.yml",
+        "k8s/ardenone-cluster/whisper-stt/ingressroute.yml"
+      ],
+      "image_version": "1.8.6"
+    },
+    {
+      "timestamp": "2026-07-07T23:15:31-04:00",
+      "commit_hash": "eab3f7e2170ae357d28c76007a41abfb7f4ffa70",
+      "author": "jedarden",
+      "message": "feat(whisper-stt): deploy 1.8.4 (bearer-auth chunked upload endpoints)",
+      "event_type": "version_deploy",
+      "files_changed": 1,
+      "files": ["k8s/ardenone-cluster/whisper-stt/deployment.yml"],
+      "image_version": "1.8.4"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "service": "pbx-web",
+  "time_range": {
+    "start": "2026-07-07T00:00:00Z",
+    "end": "2026-08-06T23:59:59Z",
+    "days": 30
+  },
+  "error_metrics": {
+    "http_errors": {
+      "http_5xx_errors": 42,
+      "http_4xx_errors": 158,
+      "http_total_requests": 12500,
+      "http_5xx_error_rate": 0.00336,
+      "http_4xx_error_rate": 0.01264
+    },
+    "application_errors": {
+      "total_pods_analyzed": 8,
+      "pods_with_errors": 1,
+      "total_error_count": 42,
+      "error_rate_per_pod": 5.25,
+      "error_rate_per_day": 1.4
+    },
+    "deployment_errors": {
+      "total_deployments": 24,
+      "successful_deployments": 22,
+      "failed_deployments": 2,
+      "deployment_error_rate": 0.08333333333333333,
+      "deployment_success_rate": 0.9166666666666666
+    }
+  },
+  "latency_metrics": {
+    "response_times": {
+      "response_time_stats": {
+        "count": 14,
+        "mean": 97.21428571428571,
+        "median": 53.5,
+        "p50": 55,
+        "p95": 312,
+        "min": 38,
+        "max": 312
+      }
+    },
+    "deployment_durations": {
+      "deployment_times": [
+        45.2,
+        52.1,
+        38.9,
+        61.5,
+        42.3,
+        48.7,
+        55.2
+      ],
+      "timing_stats": {
+        "count": 7,
+        "mean": 49.128571428571426,
+        "median": 48.7,
+        "p50": 48.7,
+        "p95": 61.5,
+        "min": 38.9,
+        "max": 61.5
+      }
+    }
+  },
+  "query_timestamp": "2026-08-06T17:46:56.779402"
+}
