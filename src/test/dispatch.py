@@ -39,6 +39,19 @@ class TestDispatchRequest(BaseModel):
         return stripped
 
 
+class SyntheticResultRequest(BaseModel):
+    """Request model for synthetic result generation."""
+    session_id: Optional[str] = None
+    surface_id: Optional[str] = None
+    test_data: Optional[dict] = None  # Optional custom test data
+
+    @field_validator('session_id')
+    @classmethod
+    def validate_session_id(cls, v: Optional[str]) -> str:
+        """Provide default session_id if not supplied."""
+        return v or str(uuid.uuid4())
+
+
 class TestDispatchResponse(BaseModel):
     """Response model for test dispatch."""
     status: str
@@ -48,6 +61,25 @@ class TestDispatchResponse(BaseModel):
     intent_ids: list[str]
     message: str
     results: Optional[list[dict]] = None  # Only if wait_for_results=True
+
+
+class SyntheticResultResponse(BaseModel):
+    """Response model for synthetic result generation."""
+    utterance_id: str
+    session_id: str
+    intent_id: str
+    topic_id: str
+    result_id: str
+    status: str
+    summary: str
+    data: dict
+    urgency: str
+    coverage: dict
+    caveats: list[str]
+    rendered_html: Optional[str] = None
+    component_id: Optional[str] = None
+    card_fallback: bool = True
+    message: str
 
 
 async def dispatch_test_utterance(request: TestDispatchRequest) -> TestDispatchResponse:
@@ -170,6 +202,124 @@ async def dispatch_test_utterance(request: TestDispatchRequest) -> TestDispatchR
     except Exception as e:
         logger.error(f"[TEST] Dispatch error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Dispatch error: {str(e)}")
+
+
+async def generate_synthetic_result(request: SyntheticResultRequest) -> SyntheticResultResponse:
+    """
+    Generate a synthetic result matching /dispatch structure.
+
+    This creates a controlled test result without going through the full
+    intent routing pipeline, allowing verification of storage and SSE behavior.
+
+    Args:
+        request: SyntheticResultRequest with session_id, surface_id, and optional test_data
+
+    Returns:
+        SyntheticResultResponse with mock result data
+    """
+    # Generate IDs
+    utterance_id = str(uuid.uuid4())
+    session_id = request.session_id or str(uuid.uuid4())
+    intent_id = str(uuid.uuid4())
+    topic_id = str(uuid.uuid4())
+    result_id = str(uuid.uuid4())
+
+    logger.info(f"[TEST] Generating synthetic result for session {session_id}")
+
+    # Initialize store
+    store = get_store()
+
+    # Create session if needed
+    session = await store.get_session(session_id)
+    if not session:
+        await store.create_session(session_id)
+        logger.info(f"[TEST] Created new session: {session_id}")
+
+    # Create utterance record with synthetic text
+    synthetic_utterance = request.test_data.get("utterance", "synthetic test utterance") if request.test_data else "synthetic test utterance"
+    await store.create_utterance(session_id, synthetic_utterance, utterance_id)
+
+    # Create intent record
+    project_slug = request.test_data.get("project_slug") if request.test_data else None
+    intent_type = request.test_data.get("intent_type", "status") if request.test_data else "status"
+    await store.create_intent(
+        utterance_id=utterance_id,
+        session_id=session_id,
+        project_slug=project_slug,
+        intent_type=intent_type,
+    )
+
+    # Create topic
+    topic_label = request.test_data.get("topic_label", "Synthetic Test Topic") if request.test_data else "Synthetic Test Topic"
+    topic_type = request.test_data.get("topic_type", "research") if request.test_data else "research"
+    project_slugs = [project_slug] if project_slug else []
+
+    topic_id_created = await store.create_topic(
+        label=topic_label,
+        topic_type=topic_type,
+        project_slugs=project_slugs,
+        scope="session",
+        session_id=session_id,
+    )
+
+    # Create synthetic data structure matching /dispatch response
+    synthetic_summary = request.test_data.get("summary", "Synthetic test result for verification") if request.test_data else "Synthetic test result for verification"
+    synthetic_data = request.test_data.get("data", {
+        "test_mode": True,
+        "synthetic": True,
+        "message": "This is a synthetic test result generated without LLM processing",
+    }) if request.test_data else {
+        "test_mode": True,
+        "synthetic": True,
+        "message": "This is a synthetic test result generated without LLM processing",
+    }
+    urgency = request.test_data.get("urgency", "normal") if request.test_data else "normal"
+    result_type = request.test_data.get("result_type", "status") if request.test_data else "status"
+
+    # Create result record
+    await store.create_result(
+        intent_id=intent_id,
+        topic_id=topic_id_created,
+        session_id=session_id,
+        summary=synthetic_summary,
+        data=synthetic_data,
+        urgency=urgency,
+        result_type=result_type,
+    )
+
+    # Broadcast SSE event if surface_id provided
+    if request.surface_id:
+        broadcaster = get_broadcaster()
+        await broadcaster.broadcast(
+            SSEEvent(
+                event_type="result_created",
+                target_surface_id=request.surface_id,
+                data={
+                    "intent_id": intent_id,
+                    "topic_id": topic_id_created,
+                    "summary": synthetic_summary,
+                    "urgency": urgency,
+                }
+            )
+        )
+
+    logger.info(f"[TEST] Generated synthetic result {result_id} for session {session_id}")
+
+    return SyntheticResultResponse(
+        utterance_id=utterance_id,
+        session_id=session_id,
+        intent_id=intent_id,
+        topic_id=topic_id_created,
+        result_id=result_id,
+        status="resolved",
+        summary=synthetic_summary,
+        data=synthetic_data,
+        urgency=urgency,
+        coverage={"sources_tested": 0, "sources_passed": 0},
+        caveats=["This is a synthetic test result"],
+        card_fallback=True,
+        message="Synthetic result generated successfully",
+    )
 
 
 async def _collect_results(intent_tasks, timeout_seconds: int) -> list[dict]:
@@ -338,6 +488,55 @@ async def api_v1_test_dispatch(request: TestDispatchRequest) -> TestDispatchResp
         500: Dispatch processing error
     """
     return await dispatch_test_utterance(request)
+
+
+@router.post("/test/dispatch-synthetic")
+async def api_v1_test_dispatch_synthetic(request: SyntheticResultRequest) -> SyntheticResultResponse:
+    """
+    Test endpoint for synthetic result generation.
+
+    Creates a controlled synthetic result matching the /dispatch structure
+    without going through the full intent routing pipeline. This allows
+    verification of storage, SSE behavior, and canvas rendering.
+
+    Request body:
+    {
+        "session_id": "optional-session-id",
+        "surface_id": "optional-surface-id",
+        "test_data": {
+            "utterance": "custom utterance text",
+            "project_slug": "test-project",
+            "intent_type": "status",
+            "topic_label": "Custom Topic",
+            "topic_type": "research",
+            "summary": "Custom summary",
+            "data": {"custom": "data"},
+            "urgency": "normal",
+            "result_type": "status"
+        }
+    }
+
+    Returns:
+    {
+        "utterance_id": "...",
+        "session_id": "...",
+        "intent_id": "...",
+        "topic_id": "...",
+        "result_id": "...",
+        "status": "resolved",
+        "summary": "...",
+        "data": {...},
+        "urgency": "normal",
+        "coverage": {...},
+        "caveats": [...],
+        "card_fallback": true,
+        "message": "..."
+    }
+
+    Error responses:
+        500: Storage or processing error
+    """
+    return await generate_synthetic_result(request)
 
 
 @router.post("/test/dispatch/{utterance_name}")

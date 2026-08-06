@@ -1,0 +1,2 @@
+error: invalid argument "30d" for "--since" flag: time: unknown unit "d" in duration "30d"
+See 'kubectl logs --help' for usage.

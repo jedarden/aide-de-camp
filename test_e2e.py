@@ -148,6 +148,38 @@ async def run_e2e_test(utterance: str) -> bool:
                 return False
 
         print(f"✓ All expected fields present")
+
+        # Run store-level assertions
+        print("\nRunning store-level assertions...")
+        intent_id = result_data.get("intent_id")
+        topic_id = result_data.get("topic_id")
+
+        import subprocess
+        import json
+        assertion_result = subprocess.run(
+            [
+                ".venv/bin/python",
+                "test_e2e_assertions.py",
+                session_id,
+                intent_id,
+                topic_id,
+                json.dumps(result_data)
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        # Print assertion output
+        if assertion_result.stdout:
+            print(assertment_result.stdout)
+
+        if assertion_result.returncode != 0:
+            print(f"✗ Store-level assertions failed")
+            if assertion_result.stderr:
+                print(f"  Error: {assertion_result.stderr}")
+            return False
+
         print("=" * 60)
         print("✓ E2E TEST PASSED")
         return True
