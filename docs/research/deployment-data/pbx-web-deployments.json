@@ -1,1 +1,28 @@
-[]
+{
+  "query_info": {
+    "workflow_template": "pbx-web-build",
+    "namespace": "argo-workflows",
+    "cluster": "iad-ci",
+    "query_date": "2026-08-06",
+    "query_window_start": "2026-07-07",
+    "query_window_days": 30
+  },
+  "workflow_template": {
+    "name": "pbx-web-build",
+    "created": "2026-05-27T02:25:59Z",
+    "exists": true,
+    "parameters": {
+      "git-repo": "jedarden/nixos-asterisk",
+      "branch": "main",
+      "container-path": "pbx-web"
+    }
+  },
+  "deployments": [],
+  "summary": {
+    "total_runs": 0,
+    "successful_runs": 0,
+    "failed_runs": 0,
+    "running_runs": 0,
+    "note": "WorkflowTemplate pbx-web-build exists but has never been executed. No deployment data available."
+  }
+}
