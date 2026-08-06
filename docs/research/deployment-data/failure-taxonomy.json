@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-06T18:41:31.061251",
+  "generated_at": "2026-08-06T18:53:51.928732",
   "data_directory": "docs/research/deployment-data",
   "services_analyzed": [
     "pbx-web",
@@ -87,6 +87,53 @@
       ]
     }
   },
+  "kubernetes_failure_patterns": {
+    "ImagePullBackOff": {
+      "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
+      "severity": "high",
+      "occurrences": 0,
+      "by_service": {},
+      "examples": [],
+      "searched": true,
+      "found": false
+    },
+    "CrashLoopBackOff": {
+      "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
+      "severity": "critical",
+      "occurrences": 0,
+      "by_service": {},
+      "examples": [],
+      "searched": true,
+      "found": false
+    },
+    "OOMKilled": {
+      "description": "Container killed due to memory exhaustion (resource limits exceeded)",
+      "severity": "high",
+      "occurrences": 0,
+      "by_service": {},
+      "examples": [],
+      "searched": true,
+      "found": false
+    },
+    "ProbeFailure": {
+      "description": "Readiness or liveness probe failures (health check issues)",
+      "severity": "medium",
+      "occurrences": 0,
+      "by_service": {},
+      "examples": [],
+      "searched": true,
+      "found": false
+    },
+    "DependencyTimeout": {
+      "description": "Deployment timeout due to dependency unavailability",
+      "severity": "medium",
+      "occurrences": 0,
+      "by_service": {},
+      "examples": [],
+      "searched": true,
+      "found": false
+    }
+  },
   "temporal_patterns": {
     "deployment_gaps": [
       {
@@ -132,6 +179,7 @@
   },
   "summary": {
     "total_pattern_categories": 2,
+    "kubernetes_pattern_types_searched": 5,
     "services": [
       "pbx-web",
       "whisper-stt"

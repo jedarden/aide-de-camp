@@ -24,6 +24,8 @@ from src.validation.completeness import (
 
 from src.validation.runner import validate_deployment_file
 
+from src.validation.integration import validate_all
+
 __all__ = [
     "validate_deployment_data",
     "validate_deployment_data_simple",
@@ -37,4 +39,5 @@ __all__ = [
     "validate_json_completeness",
     "validate_json_file_completeness",
     "validate_deployment_file",
+    "validate_all",
 ]
