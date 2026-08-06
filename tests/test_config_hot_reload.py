@@ -476,15 +476,13 @@ async def test_registry_hot_reload(backup_registry):
     This test verifies that changes to config/registry.yaml take effect without
     requiring a server restart. It follows the pattern:
     1. Load initial registry configuration
-    2. Test initial state (dispatch)
+    2. Test initial state with YAML registry cache
     3. Modify registry configuration
-    4. Test modified state (re-dispatch)
-    5. Verify changes took effect
+    4. Force cache reload
+    5. Verify changes are picked up by new registry instance
+    6. Cleanup happens automatically via backup_registry fixture
     """
-    from src.intent.router import get_router, clear_router_cache
-    from src.environment.discovery import get_registry
-    from unittest.mock import AsyncMock, MagicMock
-    import json
+    from src.registry import get_registry, get_project
 
     # Step 1: Load initial registry configuration
     initial_config = load_registry_config()
@@ -494,129 +492,58 @@ async def test_registry_hot_reload(backup_registry):
 
     # Verify initial aliases exist in config
     adc_project = initial_config["projects"]["aide-de-camp"]
-    assert "adc" in adc_project["aliases"]
-    assert "aide-de-camp" in adc_project["aliases"]
+    initial_aliases = list(adc_project["aliases"])  # Copy for comparison
+    assert "adc" in initial_aliases
+    assert "aide-de-camp" in initial_aliases
 
-    # Verify initial global aliases
-    assert "prod" in initial_config["global_aliases"]
-    assert initial_config["global_aliases"]["prod"] == "options-pipeline"
+    # Step 2: Test initial state with YAML registry cache
+    # Force initial load to populate cache
+    initial_registry = get_registry(force=True)
+    assert initial_registry is not None
 
-    # Step 2: Test initial state (dispatch with actual routing)
-    # Use a test utterance that references the aide-de-camp project via alias
-    test_utterance = "check the status of adc project"
-    test_session_id = "test-session-hot-reload"
-
-    # Mock the ZAI client to return a classification with aide-de-camp project
-    # This simulates what the LLM would return for this utterance
-    mock_zai_response = json.dumps([{
-        "intent_type": "status",
-        "project_slug": "aide-de-camp",  # LLM returns full slug
-        "urgency": "normal",
-        "utterance_fragment": "check the status of adc project",
-        "confidence": 0.95,
-        "reasoning": "status check for aide-de-camp project",
-    }])
-
-    # Get router and mock ZAI client
-    router = get_router()
-    clear_router_cache()  # Ensure clean state for test
-
-    # Mock the deterministic router to always return failure (force LLM path)
-    # This ensures we test the actual routing behavior, not fast-path bypass
-    from unittest.mock import patch
-    mock_det_router = MagicMock()
-    mock_det_router.route_utterance.return_value = MagicMock(
-        success=False,
-        intents=[],
-        confidence=0.0,
-        reasoning="LLM path forced for test"
-    )
-    mock_det_router.get_stats.return_value = {"hit_rate": 0.0, "total": 0, "hits": 0}
-
-    # Mock the ZAI client
-    mock_client = AsyncMock()
-    mock_client.call_simple = AsyncMock(return_value={
-        "content": mock_zai_response,
-        "timing_network_ms": 100,
-        "timing_inference_ms": 500,
-    })
-    router._router_zai_client = mock_client
-    router._zai_client = mock_client
-
-    # Perform initial dispatch (with deterministic router mocked)
-    with patch('src.intent.deterministic_router.get_deterministic_router', return_value=mock_det_router):
-        initial_classifications, initial_timing = await router.classify_utterance(
-            utterance=test_utterance,
-            session_id=test_session_id
-        )
-
-    # Verify initial routing
-    assert len(initial_classifications) == 1
-    initial_classification = initial_classifications[0]
-    assert initial_classification.intent_type.value == "status"
-    assert initial_classification.project_slug == "aide-de-camp"
-    assert initial_classification.confidence == 0.95
-
-    # Verify the registry resolution worked
-    # The registry should resolve "aide-de-camp" to the actual project path
-    registry = get_registry()
-    if registry:
-        aide_de_camp_entry = registry.lookup("aide-de-camp")
-        assert aide_de_camp_entry is not None, "aide-de-camp should be in registry"
-        assert aide_de_camp_entry.slug == "aide-de-camp"
+    # Verify we can look up aide-de-camp project
+    adc_project_cached = get_project("aide-de-camp")
+    assert adc_project_cached is not None
+    assert "adc" in adc_project_cached["aliases"]
+    initial_cached_aliases = list(adc_project_cached["aliases"])
 
     # Step 3: Modify registry configuration
     # Modify the "adc" alias to test hot-reload behavior
-    modify_registry_alias("adc", "test-alias-reloaded")
+    new_alias = "hot-reload-test-alias"
+    modify_registry_alias("adc", new_alias)
 
-    # Force reload the registry to simulate hot-reload
-    # In production, this would happen automatically via mtime checking or background refresh
-    from src.environment.discovery import refresh_registry
-    await refresh_registry()
+    # Verify the file was actually modified
+    modified_config = load_registry_config()
+    adc_project_modified = modified_config["projects"]["aide-de-camp"]
+    assert new_alias in adc_project_modified["aliases"]
+    assert "adc" not in adc_project_modified["aliases"]
 
-    # Step 4: Test modified state (re-dispatch)
-    # Reload config to verify alias change
-    reloaded_config = load_registry_config()
-    adc_project_reloaded = reloaded_config["projects"]["aide-de-camp"]
-    assert "test-alias-reloaded" in adc_project_reloaded["aliases"]
-    assert "adc" not in adc_project_reloaded["aliases"]
+    # Step 4: Force cache reload
+    # This simulates what happens when the cache TTL expires or mtime changes
+    reloaded_registry = get_registry(force=True)
+    assert reloaded_registry is not None
 
-    # Re-dispatch the same utterance with fresh registry
-    router2 = get_router()
-    clear_router_cache()  # Ensure clean state for second dispatch
+    # Step 5: Verify changes are picked up by new registry instance
+    # The reloaded registry should reflect the modified alias
+    reloaded_adc_project = get_project("aide-de-camp")
+    assert reloaded_adc_project is not None
+    reloaded_aliases = list(reloaded_adc_project["aliases"])
 
-    # Mock the ZAI client again for second call
-    mock_client2 = AsyncMock()
-    mock_client2.call_simple = AsyncMock(return_value={
-        "content": mock_zai_response,
-        "timing_network_ms": 100,
-        "timing_inference_ms": 500,
-    })
-    router2._router_zai_client = mock_client2
-    router2._zai_client = mock_client2
-
-    # Perform re-dispatch (with deterministic router mocked)
-    with patch('src.intent.deterministic_router.get_deterministic_router', return_value=mock_det_router):
-        reloaded_classifications, reloaded_timing = await router2.classify_utterance(
-            utterance=test_utterance,
-            session_id=test_session_id
-        )
-
-    # Step 5: Verify changes took effect
-    # The classification should still work (same project_slug from LLM)
-    assert len(reloaded_classifications) == 1
-    reloaded_classification = reloaded_classifications[0]
-    assert reloaded_classification.intent_type.value == "status"
-    assert reloaded_classification.project_slug == "aide-de-camp"
-
-    # Verify the registry still resolves the project correctly
-    registry2 = get_registry()
-    if registry2:
-        aide_de_camp_entry2 = registry2.lookup("aide-de-camp")
-        assert aide_de_camp_entry2 is not None, "aide-de-camp should still resolve"
-        assert aide_de_camp_entry2.slug == "aide-de-camp"
+    # Verify the alias changed from initial to reloaded state
+    assert "adc" not in reloaded_aliases, "Old alias 'adc' should not exist after reload"
+    assert new_alias in reloaded_aliases, f"New alias '{new_alias}' should exist after reload"
 
     # Verify other data was preserved in the config
-    assert len(reloaded_config["projects"]) == len(initial_config["projects"])
-    assert "declarative-config" in reloaded_config["projects"]
-    assert "global_aliases" in reloaded_config
+    assert len(reloaded_registry["projects"]) == len(initial_registry["projects"])
+    assert "declarative-config" in reloaded_registry["projects"]
+    assert "global_aliases" in reloaded_registry
+
+    # Verify that the old cached value was different from reloaded value
+    assert initial_cached_aliases != reloaded_aliases, \
+        "Cached aliases should differ after modification and reload"
+
+    # Verify specific change
+    assert "adc" in initial_cached_aliases
+    assert "adc" not in reloaded_aliases
+    assert new_alias in reloaded_aliases
+    assert new_alias not in initial_cached_aliases
