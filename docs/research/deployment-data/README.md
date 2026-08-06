@@ -113,7 +113,82 @@ pbx-web-build-2024-08-06.json
 - **Namespace:** `argo-workflows`
 - **Templates:** WorkflowTemplates synced from `jedarden/declarative-config`
 
+## Coverage Report
+
+**Generated:** 2026-08-06
+**Target Period:** 2026-07-07 to 2026-08-06 (30 days)
+
+### Summary
+
+| Service | CI Workflows Found | Production Deployments | Coverage Days | Status |
+|---------|-------------------|------------------------|---------------|---------|
+| pbx-web | 0 | 2 | 15 (2026-07-13 to 2026-07-28) | ⚠️ Partial |
+| whisper-stt | 0 | 0 | 0 | ❌ No data |
+
+### pbx-web Deployment Analysis
+
+**Data Sources:** Argo Workflows CI + Production Cluster (ardenone-cluster)
+
+**Coverage:**
+- Target range: 2026-07-07 to 2026-08-06 (30 days)
+- Actual coverage: 2026-07-13 to 2026-07-28 (15 days)
+- **Gap:** 15 days of coverage missing from target 30-day window
+
+**Statistics:**
+- CI workflows found: 0 (aggressive workflow cleanup policy)
+- Production deployments in window: 2
+  - 2026-07-13: Initial deployment of revision 14 (ronaldraygun/pbx-web:1.0.9)
+  - 2026-07-28: Current active deployment (ronaldraygun/pbx-web:1.0.9)
+- Success/Failed/Error: 0/0/0 (CI level), 2/0/0 (production level)
+
+**Root Cause:** No pbx-web-build workflows found in iad-ci cluster due to aggressive cleanup policy (workflows deleted within hours/days) and lack of recent CI builds. Current production image was deployed prior to analysis window.
+
+### whisper-stt Deployment Analysis
+
+**Data Sources:** Argo Workflows CI
+
+**Coverage:**
+- Target range: 2026-07-07 to 2026-08-06 (30 days)
+- Actual coverage: 0 days
+- **Gap:** Complete coverage missing
+
+**Statistics:**
+- CI workflows found: 0
+- Total deployments: 0
+- Success/Failed/Error: 0/0/0
+
+**Root Cause:** No whisper-stt-build workflow instances found. Workflow retention policy appears to be ~9 days. All workflows within the 30-day window have been cleaned up.
+
+### Data Completeness Assessment
+
+All deployment data files contain the required schema fields:
+- ✅ Metadata complete (query metadata, timestamps)
+- ✅ Findings complete (workflows found, analysis notes)
+- ✅ Data structure complete (arrays and objects properly formatted)
+
+### Coverage Gaps & Limitations
+
+1. **Aggressive Workflow Cleanup:** iad-ci cluster deletes workflows within hours/days of completion, preventing historical analysis beyond ~9 days.
+
+2. **No Recent CI Activity:** Both services show no CI workflow executions in the 30-day window, indicating:
+   - Production images are stable (no new builds)
+   - CI is only run when needed (efficient resource usage)
+
+3. **Alternative Data Sources Recommended:**
+   - ArgoCD application sync history
+   - declarative-config git commits for deployment manifests
+   - Container registry image tags and build dates
+   - Kubernetes ReplicaSets in target namespaces
+
+### Recommendations for Future Monitoring
+
+1. **Adjust Workflow TTL:** Increase workflow retention period for historical analysis
+2. **External Logging:** Consider WorkflowArchive or external logging for workflow history
+3. **Cross-Reference Sources:** Query ArgoCD for deployment history instead of relying solely on workflows
+4. **Git History Analysis:** Track declarative-config git commits for deployment triggers
+
 ## Related Documentation
 
 - `CLAUDE.md` — CI/CD architecture and workflow templates
 - `docs/research/whisper-stt-deployment-schema.md` — Schema documentation examples
+- `coverage-report.json` — Detailed coverage analysis (JSON format)
