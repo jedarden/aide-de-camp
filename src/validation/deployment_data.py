@@ -239,10 +239,118 @@ def validate_deployment_data_simple(data: dict) -> bool:
     return is_valid
 
 
+def validate_required_fields(data: dict) -> Tuple[bool, str]:
+    """
+    Validate that all required fields are present in deployment data.
+
+    This function focuses solely on field presence validation, without checking
+    data types or business constraints. It provides a lightweight validation
+    to ensure all expected fields exist in the data structure.
+
+    Args:
+        data: Dictionary containing deployment data. Can be either:
+              - A single deployment record with service/metrics fields
+              - A collection with nested structure (e.g., {"services": {...}})
+
+    Returns:
+        Tuple of (is_valid: bool, error_message: str)
+        Returns (True, "") if all required fields are present
+        Returns (False, error_message) if any required fields are missing
+
+    Examples:
+        >>> # Valid single deployment record
+        >>> data = {
+        ...     "service": "pbx-web",
+        ...     "period_days": 30,
+        ...     "total_deployments": 10,
+        ...     "successful_deployments": 8,
+        ...     "failed_deployments": 2,
+        ...     "success_rate": 80.0,
+        ...     "failure_rate": 20.0,
+        ...     "deployment_frequency_per_day": 0.33,
+        ...     "mean_time_between_deployments_hours": 72.0,
+        ...     "deployment_names": ["pbx-web"],
+        ...     "first_deployment": "2026-07-01T00:00:00Z",
+        ...     "last_deployment": "2026-07-30T23:59:59Z"
+        ... }
+        >>> is_valid, error = validate_required_fields(data)
+        >>> is_valid
+        True
+        >>> error
+        ''
+
+        >>> # Missing required field
+        >>> data = {"service": "pbx-web"}
+        >>> is_valid, error = validate_required_fields(data)
+        >>> is_valid
+        False
+        >>> "Missing required fields" in error
+        True
+    """
+    if not isinstance(data, dict):
+        return False, f"Data must be a dictionary, got {type(data).__name__}"
+
+    # Check if this is a collection (has 'services' field)
+    if "services" in data:
+        services = data["services"]
+        if not isinstance(services, dict):
+            return False, f"'services' must be a dictionary, got {type(services).__name__}"
+
+        # Validate each service's deployment data
+        for service_name, service_data in services.items():
+            if not isinstance(service_data, dict):
+                return False, f"Service '{service_name}' data must be a dictionary, got {type(service_data).__name__}"
+
+            is_valid, error = _validate_fields_in_record(service_data)
+            if not is_valid:
+                # Enhance error message with service context
+                enhanced_error = error if error else ""
+                if "Missing required fields" in enhanced_error:
+                    enhanced_error = f"Service '{service_name}': {enhanced_error}"
+                return False, enhanced_error
+
+        return True, ""
+
+    # For single deployment records, check field presence directly
+    return _validate_fields_in_record(data)
+
+
+def _validate_fields_in_record(data: dict) -> Tuple[bool, str]:
+    """
+    Internal helper to validate field presence in a single deployment record.
+
+    Args:
+        data: Dictionary containing deployment record data
+
+    Returns:
+        Tuple of (is_valid: bool, error_message: str)
+    """
+    if not isinstance(data, dict):
+        return False, f"Data must be a dictionary, got {type(data).__name__}"
+
+    # Check all required fields are present
+    missing_fields = []
+    for field_name in DEPLOYMENT_DATA_SCHEMA:
+        if field_name not in data:
+            missing_fields.append(field_name)
+
+    if missing_fields:
+        # Create clear, actionable error message
+        if len(missing_fields) == 1:
+            error = f"Missing required field: {missing_fields[0]}"
+        else:
+            # Group related fields for better readability
+            error = f"Missing required fields: {', '.join(missing_fields)}"
+        return False, error
+
+    return True, ""
+
+
 # Export the simple version as the main function for the task requirement
 __all__ = [
     "validate_deployment_data",
     "validate_deployment_data_simple",
     "validate_deployment_record",
-    "validate_timestamp"
+    "validate_timestamp",
+    "validate_required_fields",
 ]
