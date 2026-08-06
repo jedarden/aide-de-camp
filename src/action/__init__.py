@@ -16,7 +16,9 @@ from .models import (
 )
 from .registry import (
     get_workflow_definition,
+    list_available_workflows,
     list_workflows,
+    load_workflow_definition,
     reload_registry,
     validate_all_workflows,
     WorkflowValidationError,
@@ -47,6 +49,8 @@ __all__ = [
     # Registry
     "get_workflow_definition",
     "list_workflows",
+    "list_available_workflows",
+    "load_workflow_definition",
     "reload_registry",
     "validate_all_workflows",
     "WorkflowValidationError",

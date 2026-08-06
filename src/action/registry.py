@@ -264,3 +264,41 @@ def reload_registry() -> None:
     """
     get_registry(force=True)
     logger.info("Registry cache reloaded")
+
+
+# Alias functions for compatibility with acceptance criteria naming
+def load_workflow_definition(
+    project_slug: str,
+    workflow_name: str,
+) -> dict[str, Any]:
+    """
+    Alias for get_workflow_definition().
+
+    Args:
+        project_slug: Project slug to lookup
+        workflow_name: Workflow name to retrieve
+
+    Returns:
+        Workflow definition dictionary
+
+    Raises:
+        WorkflowValidationError: If workflow definition is invalid
+        ValueError: If project or workflow not found
+    """
+    return get_workflow_definition(project_slug, workflow_name)
+
+
+def list_available_workflows(project_slug: str) -> dict[str, dict[str, Any]]:
+    """
+    Alias for list_workflows().
+
+    Args:
+        project_slug: Project slug to lookup
+
+    Returns:
+        Dictionary mapping workflow names to their definitions
+
+    Raises:
+        ValueError: If project not found
+    """
+    return list_workflows(project_slug)
