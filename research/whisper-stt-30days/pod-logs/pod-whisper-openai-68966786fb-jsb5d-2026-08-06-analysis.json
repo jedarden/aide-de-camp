@@ -1,0 +1,40 @@
+{
+  "file": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06.log",
+  "file_name": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06.log",
+  "analysis_date": "2026-08-06T13:40:23.599807",
+  "total_lines": 1,
+  "patterns": {
+    "startup": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "oom_kill": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "error": {
+      "count": 1,
+      "timestamps": [
+        "unknown"
+      ],
+      "samples": [
+        "error: error from server (NotFound): namespaces \"whisper-stt\" not found in namespace \"whisper-stt\""
+      ]
+    },
+    "performance": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    }
+  },
+  "summary": [
+    {
+      "category": "error",
+      "count": 1,
+      "first_occurrence": "unknown",
+      "last_occurrence": "unknown"
+    }
+  ]
+}

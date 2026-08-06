@@ -1,0 +1,29 @@
+{
+  "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-pbx-rebuild-relay-8596977857-4292b.log",
+  "file_name": "pbx-web-pbx-rebuild-relay-8596977857-4292b.log",
+  "analysis_date": "2026-08-06T13:40:20.781745",
+  "total_lines": 500,
+  "patterns": {
+    "startup": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "oom_kill": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "error": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "performance": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    }
+  },
+  "summary": []
+}

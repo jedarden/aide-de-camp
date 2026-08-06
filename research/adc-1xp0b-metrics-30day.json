@@ -1,0 +1,181 @@
+{
+  "collection_metadata": {
+    "collected_at": "2026-08-06T13:34:24.568033",
+    "period_days": 30,
+    "services": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "pbx_web_metrics": {
+    "service_name": "pbx-web",
+    "collection_date": "2026-08-06T13:34:22.535874",
+    "period_days": 30,
+    "error_rate_events": [],
+    "pod_restart_counts": [
+      {
+        "pods_analyzed": 1,
+        "total_restarts": 0,
+        "crash_loop_pods": [],
+        "startup_times": [
+          {
+            "pod": "pbx-web-5ff68464d-mkn8n",
+            "container": "nginx",
+            "creation_time": "2026-07-28T17:26:12Z",
+            "ready_time": "2026-07-28T17:26:13Z",
+            "startup_seconds": 1.0
+          },
+          {
+            "pod": "pbx-web-5ff68464d-mkn8n",
+            "container": "site-generator",
+            "creation_time": "2026-07-28T17:26:12Z",
+            "ready_time": "2026-07-28T17:26:13Z",
+            "startup_seconds": 1.0
+          }
+        ],
+        "resource_usage": []
+      }
+    ],
+    "crash_loop_backoffs": [],
+    "pod_startup_times": [
+      {
+        "pod": "pbx-web-5ff68464d-mkn8n",
+        "container": "nginx",
+        "creation_time": "2026-07-28T17:26:12Z",
+        "ready_time": "2026-07-28T17:26:13Z",
+        "startup_seconds": 1.0
+      },
+      {
+        "pod": "pbx-web-5ff68464d-mkn8n",
+        "container": "site-generator",
+        "creation_time": "2026-07-28T17:26:12Z",
+        "ready_time": "2026-07-28T17:26:13Z",
+        "startup_seconds": 1.0
+      }
+    ],
+    "health_check_failures": [],
+    "current_resource_usage": {
+      "note": "Attempting to collect current resource usage",
+      "raw_output": "NAME                                 CPU(cores)   MEMORY(bytes)   \nlab-rebuild-relay-79957dbd4-xsqhl    1m           18Mi            \npbx-rebuild-relay-588d79c5b9-vmmlz   1m           23Mi            \npbx-web-5ff68464d-mkn8n              1m           76Mi            \n",
+      "parsed_metrics": [
+        {
+          "pod": "lab-rebuild-relay-79957dbd4-xsqhl",
+          "cpu": "1m",
+          "memory": "18Mi"
+        },
+        {
+          "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+          "cpu": "1m",
+          "memory": "23Mi"
+        },
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "cpu": "1m",
+          "memory": "76Mi"
+        }
+      ]
+    },
+    "resource_requests_vs_limits": {},
+    "metric_coverage": {
+      "error_events": "limited",
+      "pod_restart_counts": "available",
+      "resource_usage": "limited_current_only",
+      "deployment_alignment": "available"
+    },
+    "data_gaps": [],
+    "anomalies": []
+  },
+  "whisper_stt_metrics": {
+    "service_name": "whisper-stt",
+    "collection_date": "2026-08-06T13:34:24.567692",
+    "period_days": 30,
+    "error_rate_events": [],
+    "pod_restart_counts": [
+      {
+        "pods_analyzed": 2,
+        "total_restarts": 0,
+        "crash_loop_pods": [],
+        "startup_times": [
+          {
+            "pod": "whisper-openai-68966786fb-jsb5d",
+            "container": "whisper-openai",
+            "creation_time": "2026-06-14T04:55:49Z",
+            "ready_time": "2026-06-14T04:56:34Z",
+            "startup_seconds": 45.0
+          },
+          {
+            "pod": "whisper-stt-847fd8d7b9-v2rs5",
+            "container": "whisper-stt",
+            "creation_time": "2026-07-12T16:53:42Z",
+            "ready_time": "2026-07-12T16:53:55Z",
+            "startup_seconds": 13.0
+          }
+        ],
+        "resource_usage": []
+      }
+    ],
+    "crash_loop_backoffs": [],
+    "pod_startup_times": [
+      {
+        "pod": "whisper-openai-68966786fb-jsb5d",
+        "container": "whisper-openai",
+        "creation_time": "2026-06-14T04:55:49Z",
+        "ready_time": "2026-06-14T04:56:34Z",
+        "startup_seconds": 45.0
+      },
+      {
+        "pod": "whisper-stt-847fd8d7b9-v2rs5",
+        "container": "whisper-stt",
+        "creation_time": "2026-07-12T16:53:42Z",
+        "ready_time": "2026-07-12T16:53:55Z",
+        "startup_seconds": 13.0
+      }
+    ],
+    "health_check_failures": [],
+    "current_resource_usage": {
+      "note": "Attempting to collect current resource usage",
+      "raw_output": "NAME                              CPU(cores)   MEMORY(bytes)   \nwhisper-openai-68966786fb-jsb5d   5m           5569Mi          \nwhisper-stt-847fd8d7b9-v2rs5      1m           3137Mi          \n",
+      "parsed_metrics": [
+        {
+          "pod": "whisper-openai-68966786fb-jsb5d",
+          "cpu": "5m",
+          "memory": "5569Mi"
+        },
+        {
+          "pod": "whisper-stt-847fd8d7b9-v2rs5",
+          "cpu": "1m",
+          "memory": "3137Mi"
+        }
+      ]
+    },
+    "resource_requests_vs_limits": {},
+    "metric_coverage": {
+      "error_events": "limited",
+      "pod_restart_counts": "available",
+      "resource_usage": "limited_current_only",
+      "deployment_alignment": "available"
+    },
+    "data_gaps": [],
+    "anomalies": []
+  },
+  "summary": {
+    "total_error_events": 0,
+    "total_pods_analyzed": 1,
+    "data_gaps": [],
+    "anomalies": [],
+    "metric_availability": {
+      "pbx_web": {
+        "error_events": "limited",
+        "pod_restart_counts": "available",
+        "resource_usage": "limited_current_only",
+        "deployment_alignment": "available"
+      },
+      "whisper_stt": {
+        "error_events": "limited",
+        "pod_restart_counts": "available",
+        "resource_usage": "limited_current_only",
+        "deployment_alignment": "available"
+      }
+    }
+  }
+}

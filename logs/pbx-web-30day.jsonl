@@ -1,0 +1,16 @@
+{"namespace":"pbx-web","cluster":"ardenone-cluster","analysis_period":"last 30 days (2026-07-07 to 2026-08-06)","data_collection_timestamp":"2026-08-06T17:27:54Z","data_sources":["kubectl logs","kubectl describe","Victorialogs"]}
+{"pod_name":"pbx-web-5ff68464d-mkn8n","age_days":8,"restart_count":0,"image":"ronaldraygun/pbx-web:1.0.9","containers":["site-generator","nginx"],"status":"running","health_status":"All pods running with 0 restarts"}
+{"pod_name":"pbx-rebuild-relay-588d79c5b9-vmmlz","age_days":22,"restart_count":0,"image":"localhost:7439/python:3-slim","containers":["relay"],"status":"running","health_status":"All pods running with 0 restarts"}
+{"pod_name":"lab-rebuild-relay-79957dbd4-xsqhl","age_days":9,"restart_count":0,"image":"localhost:7439/python:3-slim","containers":["relay"],"status":"running","health_status":"All pods running with 0 restarts"}
+{"metric_type":"deployment_history","pbx_web_replica_sets":11,"oldest_replica_set_age_days":95,"current_deployment_age_days":23}
+{"error_type":"recording_fetch_errors","error_pattern":"[Errno 104] Connection reset by peer","severity":"intermittent","context":"Recording fetch failures from storage backend"}
+{"error_type":"recording_fetch_errors","error_pattern":"BrokenPipeError: [Errno 32] Broken pipe","severity":"intermittent","context":"Recording fetch failures from storage backend"}
+{"error_type":"http_server_errors","status_code":500,"severity":"intermittent","context":"Generated during recording fetch failures","frequency":"intermittent pattern in recent logs"}
+{"health_metric":"health_checks","value":6625,"status":"passing","time_period":"recent logs"}
+{"health_metric":"pod_restart_events","value":0,"severity":"none","period":"30-day analysis","oomkilled_events":0,"crashloopbackoff_events":0}
+{"log_coverage":"victorialogs","entries":10000,"start":"2026-08-06T09:58:00Z","end":"2026-08-06T16:52:00Z","duration_hours":7}
+{"log_coverage":"kubectl_logs","available":true,"period":"current pods only","limitation":"previous pod logs not accessible"}
+{"log_coverage":"pod_events","available":false,"limitation":"no events found for pbx-web namespace"}
+{"deployment_frequency":{"replica_sets_30_days":11,"avg_deployment_interval_days":2.7}}
+{"latency_indicator":{"type":"health_check_success_rate","value":"100%","context":"6625 health checks in recent logs, all passing"}}
+{"data_limitation_summary":{"victorialogs_retention":"<7 hours available","kubectl_logs":"8-22 days depending on pod","missing_data":"~29 days of 30-day period not covered","pod_restart_history":"not available for historical pods"}}

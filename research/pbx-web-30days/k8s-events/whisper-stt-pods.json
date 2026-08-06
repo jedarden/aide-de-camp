@@ -1,0 +1,506 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-06-14T04:56:12Z",
+                "generateName": "whisper-openai-68966786fb-",
+                "generation": 1,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "68966786fb"
+                },
+                "name": "whisper-openai-68966786fb-tng29",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "whisper-openai-68966786fb",
+                        "uid": "c0479f43-cd19-4f5e-a7a8-53a6e4bda03b"
+                    }
+                ],
+                "resourceVersion": "589386460",
+                "uid": "4994039a-b510-473c-96e3-9d6023aeaf4f"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "/root/faster-whisper-server/.venv/bin/python",
+                            "/root/.cache/huggingface/launch.py"
+                        ],
+                        "env": [
+                            {
+                                "name": "WHISPER__MODEL",
+                                "value": "large-v3-turbo"
+                            },
+                            {
+                                "name": "WHISPER__INFERENCE_DEVICE",
+                                "value": "cpu"
+                            },
+                            {
+                                "name": "HF_HOME",
+                                "value": "/root/.cache/huggingface"
+                            },
+                            {
+                                "name": "HF_HUB_OFFLINE",
+                                "value": "1"
+                            }
+                        ],
+                        "image": "fedirz/faster-whisper-server:latest-cpu",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 5,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 8000,
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "whisper-openai",
+                        "ports": [
+                            {
+                                "containerPort": 8000,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 8000,
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "8",
+                                "memory": "8Gi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "4Gi"
+                            }
+                        },
+                        "startupProbe": {
+                            "failureThreshold": 30,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 8000,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 10,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/root/.cache/huggingface",
+                                "name": "model-cache"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-zw4j6",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/root/faster-whisper-server"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "initContainers": [
+                    {
+                        "args": [
+                            "set -e\nVENV=\"/root/faster-whisper-server/.venv\"\nHF_CACHE=\"/root/.cache/huggingface/hub\"\n\nmkdir -p \"$HF_CACHE\"\n\nDEEPDML_DIR=\"$HF_CACHE/models--deepdml--faster-whisper-large-v3-turbo-ct2\"\nif [ -d \"$DEEPDML_DIR/snapshots\" ]; then\n  echo \"Model already cached, skipping download\"\nelse\n  echo \"Downloading deepdml/faster-whisper-large-v3-turbo-ct2...\"\n  \"$VENV/bin/python\" -c \"\nfrom huggingface_hub import snapshot_download\nresult = snapshot_download(\n    repo_id='deepdml/faster-whisper-large-v3-turbo-ct2',\n    cache_dir='$HF_CACHE',\n)\nprint('Downloaded to:', result)\n\"\nfi\n\n# Systran/faster-whisper-large-v3-turbo is gated. Symlink so offline\n# cache lookup for \"large-v3-turbo\" resolves to the deepdml model.\nSYSTRAN_DIR=\"$HF_CACHE/models--Systran--faster-whisper-large-v3-turbo\"\nif [ ! -e \"$SYSTRAN_DIR\" ]; then\n  ln -s \"models--deepdml--faster-whisper-large-v3-turbo-ct2\" \"$SYSTRAN_DIR\"\n  echo \"Created symlink Systran -\u003e deepdml\"\nelse\n  echo \"Systran symlink already present\"\nfi\n\n# Write launcher script via base64 to avoid YAML indentation issues.\n# Script patches _MODELS to accept \"large-v3-turbo\" (older faster-whisper\n# doesn't know this size; _MODELS is a tuple so we use concatenation).\necho 'aW1wb3J0IHN5cwpzeXMucGF0aC5pbnNlcnQoMCwgJy9yb290L2Zhc3Rlci13aGlzcGVyLXNlcnZlcicpCgppbXBvcnQgZmFzdGVyX3doaXNwZXIudXRpbHMgYXMgX2Z3X3V0aWxzCmlmICdsYXJnZS12My10dXJibycgbm90IGluIF9md191dGlscy5fTU9ERUxTOgogICAgX2Z3X3V0aWxzLl9NT0RFTFNbJ2xhcmdlLXYzLXR1cmJvJ10gPSAnU3lzdHJhbi9mYXN0ZXItd2hpc3Blci1sYXJnZS12My10dXJibycKICAgIHByaW50KCdQYXRjaGVkIF9NT0RFTFMgdG8gaW5jbHVkZSBsYXJnZS12My10dXJibycpCgppbXBvcnQgdXZpY29ybgp1dmljb3JuLnJ1bigKICAgICdmYXN0ZXJfd2hpc3Blcl9zZXJ2ZXIubWFpbjpjcmVhdGVfYXBwJywKICAgIGZhY3Rvcnk9VHJ1ZSwKICAgIGhvc3Q9JzAuMC4wLjAnLAogICAgcG9ydD04MDAwLAopCg==' | base64 -d \u003e /root/.cache/huggingface/launch.py\necho \"launch.py written\"\necho \"Init complete\"\n"
+                        ],
+                        "command": [
+                            "/bin/sh",
+                            "-c"
+                        ],
+                        "image": "fedirz/faster-whisper-server:latest-cpu",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "model-download",
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "2Gi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "512Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/root/.cache/huggingface",
+                                "name": "model-cache"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-zw4j6",
+                                "readOnly": true
+                            }
+                        ],
+                        "workingDir": "/root/faster-whisper-server"
+                    }
+                ],
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "model-cache",
+                        "persistentVolumeClaim": {
+                            "claimName": "whisper-openai-model-cache"
+                        }
+                    },
+                    {
+                        "name": "kube-api-access-zw4j6",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-06-14T04:56:13Z",
+                        "message": "0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.",
+                        "reason": "Unschedulable",
+                        "status": "False",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "phase": "Pending",
+                "qosClass": "Burstable"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-07-12T16:55:23Z",
+                "generateName": "whisper-stt-847fd8d7b9-",
+                "generation": 1,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "847fd8d7b9"
+                },
+                "name": "whisper-stt-847fd8d7b9-b8rsj",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "whisper-stt-847fd8d7b9",
+                        "uid": "c0869cfb-fd86-4db5-be0f-85b0ffb15a0c"
+                    }
+                ],
+                "resourceVersion": "600246760",
+                "uid": "1f420ce7-99a8-404e-99bb-0023815465a1"
+            },
+            "spec": {
+                "affinity": {
+                    "nodeAffinity": {
+                        "preferredDuringSchedulingIgnoredDuringExecution": [
+                            {
+                                "preference": {
+                                    "matchExpressions": [
+                                        {
+                                            "key": "kubernetes.io/hostname",
+                                            "operator": "In",
+                                            "values": [
+                                                "k3s-agent-minisforum"
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "weight": 100
+                            },
+                            {
+                                "preference": {
+                                    "matchExpressions": [
+                                        {
+                                            "key": "kubernetes.io/hostname",
+                                            "operator": "In",
+                                            "values": [
+                                                "k3s-lenovo-tiny"
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "weight": 90
+                            }
+                        ]
+                    }
+                },
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "POD",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "apiVersion": "v1",
+                                        "fieldPath": "metadata.name"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "NAMESPACE",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "apiVersion": "v1",
+                                        "fieldPath": "metadata.namespace"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "WHISPER_MODEL",
+                                "value": "distil-large-v3"
+                            }
+                        ],
+                        "envFrom": [
+                            {
+                                "secretRef": {
+                                    "name": "whisper-stt-secret"
+                                }
+                            }
+                        ],
+                        "image": "ronaldraygun/whisper-stt:1.8.6",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 8080,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 120,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "whisper-stt",
+                        "ports": [
+                            {
+                                "containerPort": 8080,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 8080,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 60,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "8",
+                                "memory": "8Gi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "4Gi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/root/.cache/huggingface",
+                                "name": "model-cache"
+                            },
+                            {
+                                "mountPath": "/data",
+                                "name": "jobs-data"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-pztq2",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "docker-hub-registry"
+                    }
+                ],
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "model-cache",
+                        "persistentVolumeClaim": {
+                            "claimName": "whisper-model-cache"
+                        }
+                    },
+                    {
+                        "name": "jobs-data",
+                        "persistentVolumeClaim": {
+                            "claimName": "whisper-stt-jobs"
+                        }
+                    },
+                    {
+                        "name": "kube-api-access-pztq2",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-12T16:55:23Z",
+                        "message": "0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.",
+                        "reason": "Unschedulable",
+                        "status": "False",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "phase": "Pending",
+                "qosClass": "Burstable"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

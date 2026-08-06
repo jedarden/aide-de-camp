@@ -1,0 +1,184 @@
+{
+    "apiVersion": "argoproj.io/v1alpha1",
+    "kind": "WorkflowTemplate",
+    "metadata": {
+        "annotations": {
+            "argocd.argoproj.io/tracking-id": "argo-workflows-ns-iad-ci:argoproj.io/WorkflowTemplate:argo-workflows/pbx-web-build",
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"argoproj.io/v1alpha1\",\"kind\":\"WorkflowTemplate\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"argo-workflows-ns-iad-ci:argoproj.io/WorkflowTemplate:argo-workflows/pbx-web-build\"},\"labels\":{\"app\":\"pbx-web-build\",\"argocd.argoproj.io/instance\":\"argo-workflows-ns-iad-ci\"},\"name\":\"pbx-web-build\",\"namespace\":\"argo-workflows\"},\"spec\":{\"arguments\":{\"parameters\":[{\"name\":\"git-repo\",\"value\":\"jedarden/nixos-asterisk\"},{\"name\":\"branch\",\"value\":\"main\"},{\"name\":\"container-path\",\"value\":\"pbx-web\"}]},\"entrypoint\":\"build\",\"serviceAccountName\":\"argo-workflow\",\"templates\":[{\"name\":\"build\",\"steps\":[[{\"name\":\"resolve-version\",\"template\":\"resolve-version\"}],[{\"arguments\":{\"parameters\":[{\"name\":\"version\",\"value\":\"{{steps.resolve-version.outputs.parameters.version}}\"}]},\"name\":\"docker-build\",\"template\":\"docker-build\"}]]},{\"activeDeadlineSeconds\":120,\"name\":\"resolve-version\",\"outputs\":{\"parameters\":[{\"name\":\"version\",\"valueFrom\":{\"path\":\"/tmp/version\"}}]},\"script\":{\"command\":[\"sh\"],\"env\":[{\"name\":\"GIT_CONFIG_COUNT\",\"value\":\"1\"},{\"name\":\"GIT_CONFIG_KEY_0\",\"value\":\"credential.helper\"},{\"name\":\"GIT_CONFIG_VALUE_0\",\"value\":\"!f() { test \\\"$1\\\" = get \\u0026\\u0026 echo \\\"username=x-access-token\\\" \\u0026\\u0026 echo \\\"password=$GH_TOKEN\\\"; }; f\"},{\"name\":\"GH_TOKEN\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"token\",\"name\":\"github-webhook-secret\"}}}],\"image\":\"alpine/git\",\"source\":\"set -e\\ngit clone --branch {{workflow.parameters.branch}} \\\\\\n  \\\"https://github.com/{{workflow.parameters.git-repo}}.git\\\" \\\\\\n  /tmp/repo\\ncd /tmp/repo/{{workflow.parameters.container-path}}\\n\\nVERSION_CHANGED=$(git -C /tmp/repo diff --name-only HEAD~1 HEAD -- {{workflow.parameters.container-path}}/VERSION | grep -c '^{{workflow.parameters.container-path}}/VERSION$' || true)\\n\\nif [ \\\"$VERSION_CHANGED\\\" -gt 0 ]; then\\n  VERSION=$(cat VERSION | tr -d '[:space:]')\\n  echo \\\"VERSION changed in commit — using ${VERSION}\\\"\\nelse\\n  CURRENT=$(cat VERSION | tr -d '[:space:]')\\n  MAJOR=$(echo \\\"$CURRENT\\\" | cut -d. -f1)\\n  MINOR=$(echo \\\"$CURRENT\\\" | cut -d. -f2)\\n  PATCH=$(echo \\\"$CURRENT\\\" | cut -d. -f3)\\n  PATCH=$((PATCH + 1))\\n  VERSION=\\\"${MAJOR}.${MINOR}.${PATCH}\\\"\\n  echo \\\"Auto-bumping ${CURRENT} → ${VERSION}\\\"\\n  echo \\\"$VERSION\\\" \\u003e VERSION\\n  git config user.email \\\"github@jedarden.com\\\"\\n  git config user.name \\\"jedarden\\\"\\n  git add VERSION\\n  git commit -m \\\"ci: auto-bump version to ${VERSION}\\\"\\n  git push\\nfi\\n\\necho \\\"$VERSION\\\" \\u003e /tmp/version\\necho \\\"Building version: ${VERSION}\\\"\\n\"}},{\"activeDeadlineSeconds\":1800,\"container\":{\"args\":[\"--context=git://github.com/{{workflow.parameters.git-repo}}.git#refs/heads/{{workflow.parameters.branch}}\",\"--context-sub-path={{workflow.parameters.container-path}}\",\"--dockerfile=Dockerfile\",\"--destination=ronaldraygun/pbx-web:{{inputs.parameters.version}}\",\"--destination=ronaldraygun/pbx-web:latest\",\"--build-arg=VERSION={{inputs.parameters.version}}\",\"--cache=true\",\"--cache-repo=ronaldraygun/cache\"],\"env\":[{\"name\":\"GIT_TOKEN\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"token\",\"name\":\"github-webhook-secret\"}}}],\"image\":\"gcr.io/kaniko-project/executor:latest\",\"resources\":{\"limits\":{\"cpu\":\"2000m\",\"memory\":\"4Gi\"},\"requests\":{\"cpu\":\"500m\",\"memory\":\"1Gi\"}},\"volumeMounts\":[{\"mountPath\":\"/kaniko/.docker\",\"name\":\"docker-config\"}]},\"inputs\":{\"parameters\":[{\"name\":\"version\"}]},\"name\":\"docker-build\",\"retryStrategy\":{\"backoff\":{\"duration\":\"30s\",\"factor\":\"2\"},\"limit\":\"2\",\"retryPolicy\":\"OnError\"}}],\"volumes\":[{\"name\":\"docker-config\",\"secret\":{\"items\":[{\"key\":\".dockerconfigjson\",\"path\":\"config.json\"}],\"secretName\":\"docker-hub-registry\"}}]}}\n"
+        },
+        "creationTimestamp": "2026-05-27T02:25:59Z",
+        "generation": 3,
+        "labels": {
+            "app": "pbx-web-build",
+            "argocd.argoproj.io/instance": "argo-workflows-ns-iad-ci"
+        },
+        "name": "pbx-web-build",
+        "namespace": "argo-workflows",
+        "resourceVersion": "53851372",
+        "uid": "681a3caa-30de-40e5-85a5-7dd5a0134e66"
+    },
+    "spec": {
+        "arguments": {
+            "parameters": [
+                {
+                    "name": "git-repo",
+                    "value": "jedarden/nixos-asterisk"
+                },
+                {
+                    "name": "branch",
+                    "value": "main"
+                },
+                {
+                    "name": "container-path",
+                    "value": "pbx-web"
+                }
+            ]
+        },
+        "entrypoint": "build",
+        "serviceAccountName": "argo-workflow",
+        "templates": [
+            {
+                "name": "build",
+                "steps": [
+                    [
+                        {
+                            "name": "resolve-version",
+                            "template": "resolve-version"
+                        }
+                    ],
+                    [
+                        {
+                            "arguments": {
+                                "parameters": [
+                                    {
+                                        "name": "version",
+                                        "value": "{{steps.resolve-version.outputs.parameters.version}}"
+                                    }
+                                ]
+                            },
+                            "name": "docker-build",
+                            "template": "docker-build"
+                        }
+                    ]
+                ]
+            },
+            {
+                "activeDeadlineSeconds": 120,
+                "name": "resolve-version",
+                "outputs": {
+                    "parameters": [
+                        {
+                            "name": "version",
+                            "valueFrom": {
+                                "path": "/tmp/version"
+                            }
+                        }
+                    ]
+                },
+                "script": {
+                    "command": [
+                        "sh"
+                    ],
+                    "env": [
+                        {
+                            "name": "GIT_CONFIG_COUNT",
+                            "value": "1"
+                        },
+                        {
+                            "name": "GIT_CONFIG_KEY_0",
+                            "value": "credential.helper"
+                        },
+                        {
+                            "name": "GIT_CONFIG_VALUE_0",
+                            "value": "!f() { test \"$1\" = get \u0026\u0026 echo \"username=x-access-token\" \u0026\u0026 echo \"password=$GH_TOKEN\"; }; f"
+                        },
+                        {
+                            "name": "GH_TOKEN",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "key": "token",
+                                    "name": "github-webhook-secret"
+                                }
+                            }
+                        }
+                    ],
+                    "image": "alpine/git",
+                    "source": "set -e\ngit clone --branch {{workflow.parameters.branch}} \\\n  \"https://github.com/{{workflow.parameters.git-repo}}.git\" \\\n  /tmp/repo\ncd /tmp/repo/{{workflow.parameters.container-path}}\n\nVERSION_CHANGED=$(git -C /tmp/repo diff --name-only HEAD~1 HEAD -- {{workflow.parameters.container-path}}/VERSION | grep -c '^{{workflow.parameters.container-path}}/VERSION$' || true)\n\nif [ \"$VERSION_CHANGED\" -gt 0 ]; then\n  VERSION=$(cat VERSION | tr -d '[:space:]')\n  echo \"VERSION changed in commit — using ${VERSION}\"\nelse\n  CURRENT=$(cat VERSION | tr -d '[:space:]')\n  MAJOR=$(echo \"$CURRENT\" | cut -d. -f1)\n  MINOR=$(echo \"$CURRENT\" | cut -d. -f2)\n  PATCH=$(echo \"$CURRENT\" | cut -d. -f3)\n  PATCH=$((PATCH + 1))\n  VERSION=\"${MAJOR}.${MINOR}.${PATCH}\"\n  echo \"Auto-bumping ${CURRENT} → ${VERSION}\"\n  echo \"$VERSION\" \u003e VERSION\n  git config user.email \"github@jedarden.com\"\n  git config user.name \"jedarden\"\n  git add VERSION\n  git commit -m \"ci: auto-bump version to ${VERSION}\"\n  git push\nfi\n\necho \"$VERSION\" \u003e /tmp/version\necho \"Building version: ${VERSION}\"\n"
+                }
+            },
+            {
+                "activeDeadlineSeconds": 1800,
+                "container": {
+                    "args": [
+                        "--context=git://github.com/{{workflow.parameters.git-repo}}.git#refs/heads/{{workflow.parameters.branch}}",
+                        "--context-sub-path={{workflow.parameters.container-path}}",
+                        "--dockerfile=Dockerfile",
+                        "--destination=ronaldraygun/pbx-web:{{inputs.parameters.version}}",
+                        "--destination=ronaldraygun/pbx-web:latest",
+                        "--build-arg=VERSION={{inputs.parameters.version}}",
+                        "--cache=true",
+                        "--cache-repo=ronaldraygun/cache"
+                    ],
+                    "env": [
+                        {
+                            "name": "GIT_TOKEN",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "key": "token",
+                                    "name": "github-webhook-secret"
+                                }
+                            }
+                        }
+                    ],
+                    "image": "gcr.io/kaniko-project/executor:latest",
+                    "resources": {
+                        "limits": {
+                            "cpu": "2000m",
+                            "memory": "4Gi"
+                        },
+                        "requests": {
+                            "cpu": "500m",
+                            "memory": "1Gi"
+                        }
+                    },
+                    "volumeMounts": [
+                        {
+                            "mountPath": "/kaniko/.docker",
+                            "name": "docker-config"
+                        }
+                    ]
+                },
+                "inputs": {
+                    "parameters": [
+                        {
+                            "name": "version"
+                        }
+                    ]
+                },
+                "name": "docker-build",
+                "retryStrategy": {
+                    "backoff": {
+                        "duration": "30s",
+                        "factor": "2"
+                    },
+                    "limit": "2",
+                    "retryPolicy": "OnError"
+                }
+            }
+        ],
+        "volumes": [
+            {
+                "name": "docker-config",
+                "secret": {
+                    "items": [
+                        {
+                            "key": ".dockerconfigjson",
+                            "path": "config.json"
+                        }
+                    ],
+                    "secretName": "docker-hub-registry"
+                }
+            }
+        ]
+    }
+}

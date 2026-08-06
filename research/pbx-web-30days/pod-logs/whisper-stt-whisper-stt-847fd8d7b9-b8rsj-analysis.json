@@ -1,0 +1,29 @@
+{
+  "file": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/whisper-stt-whisper-stt-847fd8d7b9-b8rsj.log",
+  "file_name": "whisper-stt-whisper-stt-847fd8d7b9-b8rsj.log",
+  "analysis_date": "2026-08-06T13:40:21.623353",
+  "total_lines": 0,
+  "patterns": {
+    "startup": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "oom_kill": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "error": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    },
+    "performance": {
+      "count": 0,
+      "timestamps": [],
+      "samples": []
+    }
+  },
+  "summary": []
+}

@@ -1,0 +1,1131 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-05-05T07:16:13Z",
+                "generateName": "lab-rebuild-relay-79d6d858bb-",
+                "generation": 1,
+                "labels": {
+                    "app": "lab-rebuild-relay",
+                    "app.kubernetes.io/name": "lab-rebuild-relay",
+                    "pod-template-hash": "79d6d858bb"
+                },
+                "name": "lab-rebuild-relay-79d6d858bb-lpqdb",
+                "namespace": "pbx-web",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "lab-rebuild-relay-79d6d858bb",
+                        "uid": "418d5447-b6f2-45ec-b2f7-7327e8bd37ec"
+                    }
+                ],
+                "resourceVersion": "610177596",
+                "uid": "20d08580-da3e-4c67-9f73-698e21134651"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "python3",
+                            "/scripts/relay.py"
+                        ],
+                        "env": [
+                            {
+                                "name": "GITHUB_WEBHOOK_SECRET",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "github-webhook-secret",
+                                        "name": "lab-rebuild-relay"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "PBX_REBUILD_TOKEN",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "lab-rebuild-token",
+                                        "name": "lab-rebuild-relay"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "PBX_REBUILD_URL",
+                                "value": "http://lab-rebuild-egress.pbx-web.svc.cluster.local:8761/rebuild"
+                            },
+                            {
+                                "name": "REPO_FILTER",
+                                "value": "declarative-config"
+                            },
+                            {
+                                "name": "WEBHOOK_PATH",
+                                "value": "/github-webhook-lab"
+                            },
+                            {
+                                "name": "PORT",
+                                "value": "9001"
+                            }
+                        ],
+                        "image": "python:3-slim",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 9001,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 10,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "relay",
+                        "ports": [
+                            {
+                                "containerPort": 9001,
+                                "name": "webhook",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 9001,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 5,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            },
+                            "requests": {
+                                "cpu": "5m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/scripts",
+                                "name": "scripts",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-gv96q",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "k3s-manager",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                    "runAsGroup": 1000,
+                    "runAsNonRoot": true,
+                    "runAsUser": 1000
+                },
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "configMap": {
+                            "defaultMode": 365,
+                            "name": "pbx-rebuild-relay-script"
+                        },
+                        "name": "scripts"
+                    },
+                    {
+                        "name": "kube-api-access-gv96q",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-08-05T12:46:57Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-05-05T07:17:51Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-08-05T12:47:07Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-08-05T12:47:07Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-05-05T07:17:43Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "5m",
+                            "memory": "32Mi"
+                        },
+                        "containerID": "containerd://309bd57d3f35b40b100ab37a10dc9d77bf5d27cd8c11beb61664cd6beb0b140d",
+                        "image": "docker.io/library/python:3-slim",
+                        "imageID": "docker.io/library/python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6",
+                        "lastState": {
+                            "terminated": {
+                                "containerID": "containerd://9106010b29a8b6392531fdee23c06b3d6b4c5adbb6116eeea84b2d225d9b560d",
+                                "exitCode": 255,
+                                "finishedAt": "2026-08-05T12:46:38Z",
+                                "reason": "Unknown",
+                                "startedAt": "2026-07-28T02:45:25Z"
+                            }
+                        },
+                        "name": "relay",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            },
+                            "requests": {
+                                "cpu": "5m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "restartCount": 1,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-08-05T12:46:51Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/scripts",
+                                "name": "scripts",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-gv96q",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.20.23.100",
+                "hostIPs": [
+                    {
+                        "ip": "10.20.23.100"
+                    },
+                    {
+                        "ip": "fd70:3734:5aaa:1273:98be:8bff:fed2:fd0f"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.0.21",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.21"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-05-05T07:17:51Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-05-02T11:45:00Z"
+                },
+                "creationTimestamp": "2026-05-05T07:17:38Z",
+                "generateName": "pbx-rebuild-relay-8596977857-",
+                "generation": 1,
+                "labels": {
+                    "app": "pbx-rebuild-relay",
+                    "app.kubernetes.io/name": "pbx-rebuild-relay",
+                    "pod-template-hash": "8596977857"
+                },
+                "name": "pbx-rebuild-relay-8596977857-4292b",
+                "namespace": "pbx-web",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "pbx-rebuild-relay-8596977857",
+                        "uid": "7cf20316-85ff-4982-b3b4-8c210c55ebb4"
+                    }
+                ],
+                "resourceVersion": "610177612",
+                "uid": "2e6f3ca3-e317-4d42-a280-09027ce567d8"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "python3",
+                            "/scripts/relay.py"
+                        ],
+                        "env": [
+                            {
+                                "name": "STAKATER_PBX_REBUILD_RELAY_SCRIPT_CONFIGMAP",
+                                "value": "a3d953c67c3a3f55b100df6996241ec8345b8f8f"
+                            },
+                            {
+                                "name": "GITHUB_WEBHOOK_SECRET",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "github-webhook-secret",
+                                        "name": "pbx-rebuild-relay"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "PBX_REBUILD_TOKEN",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "pbx-rebuild-token",
+                                        "name": "pbx-rebuild-relay"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "PBX_REBUILD_URL",
+                                "value": "http://pbx-rebuild-egress.pbx-web.svc.cluster.local:8761/rebuild"
+                            },
+                            {
+                                "name": "REPO_FILTER",
+                                "value": "nixos-asterisk"
+                            },
+                            {
+                                "name": "PORT",
+                                "value": "9001"
+                            }
+                        ],
+                        "image": "python:3-slim",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 9001,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 10,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "relay",
+                        "ports": [
+                            {
+                                "containerPort": 9001,
+                                "name": "webhook",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 9001,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 5,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            },
+                            "requests": {
+                                "cpu": "5m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/scripts",
+                                "name": "scripts",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-8j85r",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "k3s-manager",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                    "runAsGroup": 1000,
+                    "runAsNonRoot": true,
+                    "runAsUser": 1000
+                },
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "configMap": {
+                            "defaultMode": 365,
+                            "name": "pbx-rebuild-relay-script"
+                        },
+                        "name": "scripts"
+                    },
+                    {
+                        "name": "kube-api-access-8j85r",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-08-05T12:46:57Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-05-05T07:17:51Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-08-05T12:47:07Z",
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-08-05T12:47:07Z",
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-05-05T07:17:43Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "5m",
+                            "memory": "32Mi"
+                        },
+                        "containerID": "containerd://5748bbbbff6035c8be8bf9e08d5a258e51b7732d4963a72d9809c7d9ebafbb36",
+                        "image": "docker.io/library/python:3-slim",
+                        "imageID": "docker.io/library/python@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6",
+                        "lastState": {
+                            "terminated": {
+                                "containerID": "containerd://f1f0d2ffb2e1e5b834c3df8ea6fad679df112d5783e8b962c3c45775af0e0e64",
+                                "exitCode": 255,
+                                "finishedAt": "2026-08-05T12:46:38Z",
+                                "reason": "Unknown",
+                                "startedAt": "2026-07-28T02:45:13Z"
+                            }
+                        },
+                        "name": "relay",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            },
+                            "requests": {
+                                "cpu": "5m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "restartCount": 1,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-08-05T12:46:51Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/scripts",
+                                "name": "scripts",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-8j85r",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.20.23.100",
+                "hostIPs": [
+                    {
+                        "ip": "10.20.23.100"
+                    },
+                    {
+                        "ip": "fd70:3734:5aaa:1273:98be:8bff:fed2:fd0f"
+                    }
+                ],
+                "phase": "Running",
+                "podIP": "10.42.0.22",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.22"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-05-05T07:17:51Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": "2026-06-15T18:10:00Z"
+                },
+                "creationTimestamp": "2026-07-28T17:26:41Z",
+                "generateName": "pbx-web-5ff68464d-",
+                "generation": 1,
+                "labels": {
+                    "app": "pbx-web",
+                    "app.kubernetes.io/component": "web",
+                    "app.kubernetes.io/name": "pbx-web",
+                    "pod-template-hash": "5ff68464d"
+                },
+                "name": "pbx-web-5ff68464d-lcfcp",
+                "namespace": "pbx-web",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "pbx-web-5ff68464d",
+                        "uid": "bb897bcf-09a3-4b33-b795-8dca5a92d2b5"
+                    }
+                ],
+                "resourceVersion": "610771934",
+                "uid": "b792e42b-e860-44be-8c70-e1e4168a07c7"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "S3_ENDPOINT",
+                                "value": "http://garage.garage-operator.svc.cluster.local:3900"
+                            },
+                            {
+                                "name": "S3_BUCKET",
+                                "value": "recordings"
+                            },
+                            {
+                                "name": "S3_ACCESS_KEY",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "access-key",
+                                        "name": "garage-pbx-creds"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "S3_SECRET_KEY",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "secret-key",
+                                        "name": "garage-pbx-creds"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "REBUILD_API_TOKEN",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "api-token",
+                                        "name": "pbx-web-auth"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "PYTHONUNBUFFERED",
+                                "value": "1"
+                            }
+                        ],
+                        "image": "ronaldraygun/pbx-web:1.0.9",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 9000,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 10,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "name": "site-generator",
+                        "ports": [
+                            {
+                                "containerPort": 9000,
+                                "name": "rebuild",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health",
+                                "port": 9000,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 5,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 5
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "500m",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "runAsNonRoot": true,
+                            "runAsUser": 1000
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/www/calls",
+                                "name": "www"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bvnlj",
+                                "readOnly": true
+                            }
+                        ]
+                    },
+                    {
+                        "image": "nginx:alpine",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/",
+                                "port": 80,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 10,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "nginx",
+                        "ports": [
+                            {
+                                "containerPort": 80,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/",
+                                "port": 80,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 3,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            },
+                            "requests": {
+                                "cpu": "5m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "capabilities": {
+                                "add": [
+                                    "NET_BIND_SERVICE"
+                                ],
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "runAsNonRoot": true,
+                            "runAsUser": 101
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/www/calls",
+                                "name": "www"
+                            },
+                            {
+                                "mountPath": "/etc/nginx/conf.d",
+                                "name": "nginx-conf"
+                            },
+                            {
+                                "mountPath": "/var/cache/nginx",
+                                "name": "nginx-cache"
+                            },
+                            {
+                                "mountPath": "/var/run",
+                                "name": "nginx-run"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bvnlj",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "imagePullSecrets": [
+                    {
+                        "name": "docker-hub-registry"
+                    }
+                ],
+                "nodeName": "k3s-manager",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                    "fsGroup": 101
+                },
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "emptyDir": {},
+                        "name": "www"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "pbx-web-nginx-conf"
+                        },
+                        "name": "nginx-conf"
+                    },
+                    {
+                        "emptyDir": {
+                            "medium": "Memory",
+                            "sizeLimit": "16Mi"
+                        },
+                        "name": "nginx-cache"
+                    },
+                    {
+                        "emptyDir": {
+                            "medium": "Memory",
+                            "sizeLimit": "8Mi"
+                        },
+                        "name": "nginx-run"
+                    },
+                    {
+                        "name": "kube-api-access-bvnlj",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-08-05T12:47:14Z",
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-28T17:26:41Z",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-28T17:26:41Z",
+                        "message": "containers with unready status: [site-generator]",
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-28T17:26:41Z",
+                        "message": "containers with unready status: [site-generator]",
+                        "reason": "ContainersNotReady",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-07-28T17:26:41Z",
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "5m",
+                            "memory": "32Mi"
+                        },
+                        "containerID": "containerd://cc927ff1b9444505bd3c8f526e41cc90e6a8d67dad66cdd47c19e946146ee4db",
+                        "image": "docker.io/library/nginx:alpine",
+                        "imageID": "docker.io/library/nginx@sha256:e7257f1ef28ba17cf7c248cb8ccf6f0c6e0228ab9c315c152f9c203cd34cf6d1",
+                        "lastState": {
+                            "terminated": {
+                                "containerID": "containerd://f92d8e7a1971d06c04ad72ac1c6554e4918655becfcdafb93449a414cdc17d86",
+                                "exitCode": 255,
+                                "finishedAt": "2026-08-05T12:46:38Z",
+                                "reason": "Unknown",
+                                "startedAt": "2026-07-28T17:26:43Z"
+                            }
+                        },
+                        "name": "nginx",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            },
+                            "requests": {
+                                "cpu": "5m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "restartCount": 1,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-08-05T12:47:04Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 101,
+                                "supplementalGroups": [
+                                    101
+                                ],
+                                "uid": 101
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/www/calls",
+                                "name": "www"
+                            },
+                            {
+                                "mountPath": "/etc/nginx/conf.d",
+                                "name": "nginx-conf"
+                            },
+                            {
+                                "mountPath": "/var/cache/nginx",
+                                "name": "nginx-cache"
+                            },
+                            {
+                                "mountPath": "/var/run",
+                                "name": "nginx-run"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bvnlj",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    },
+                    {
+                        "image": "ronaldraygun/pbx-web:1.0.9",
+                        "imageID": "",
+                        "lastState": {},
+                        "name": "site-generator",
+                        "ready": false,
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "waiting": {
+                                "message": "Back-off pulling image \"ronaldraygun/pbx-web:1.0.9\": ErrImagePull: failed to pull and unpack image \"docker.io/ronaldraygun/pbx-web:1.0.9\": failed to resolve reference \"docker.io/ronaldraygun/pbx-web:1.0.9\": pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed",
+                                "reason": "ImagePullBackOff"
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/www/calls",
+                                "name": "www"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-bvnlj",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.20.23.100",
+                "hostIPs": [
+                    {
+                        "ip": "10.20.23.100"
+                    },
+                    {
+                        "ip": "fd70:3734:5aaa:1273:98be:8bff:fed2:fd0f"
+                    }
+                ],
+                "phase": "Pending",
+                "podIP": "10.42.0.69",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.69"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "startTime": "2026-07-28T17:26:41Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
