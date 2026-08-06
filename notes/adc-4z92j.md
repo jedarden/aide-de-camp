@@ -35,7 +35,7 @@ Successfully calculated percentage-based success and failure rates for pbx-web a
 3. whisper-stt success rate percentage calculated: **100.00%**
 4. whisper-stt failure rate percentage calculated: **0.00%**
 5. Percentages validated (success + failure = 100%): **CONFIRMED**
-6. Rate metrics stored for next bead: **Stored in `notes/adc-4z92j-rate-metrics.json`**
+6. Rate metrics stored for next bead: **Stored in `notes/adc-4z92j-rate-percentages.json`**
 
 ## Technical Notes
 - Formula used: `rate = (count / total) * 100`
@@ -45,7 +45,7 @@ Successfully calculated percentage-based success and failure rates for pbx-web a
 - All percentage calculations verified to sum to exactly 100% per service
 
 ## Data Files Generated
-- `notes/adc-4z92j-rate-metrics.json` - Structured rate metrics with validation
+- `notes/adc-4z92j-rate-percentages.json` - Structured rate metrics with validation
 - `notes/adc-4z92j.md` - This summary documentation
 
 ## Next Steps
