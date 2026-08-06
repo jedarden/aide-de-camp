@@ -1,0 +1,69 @@
+{
+  "analysis_metadata": {
+    "generated_at": "2026-08-06T14:35:00Z",
+    "analysis_bead": "adc-4z92j",
+    "source_bead": "adc-3c7q0",
+    "calculation_method": "percentage_based",
+    "formula": "rate = (count / total) * 100",
+    "rounding": "2_decimal_places"
+  },
+  "rate_metrics": {
+    "pbx-web": {
+      "total_deployments": 5,
+      "successful_deployments": 5,
+      "failed_deployments": 0,
+      "success_rate_percentage": 100.00,
+      "failure_rate_percentage": 0.00,
+      "validation": {
+        "sum_equals_100": true,
+        "success_plus_failure": 100.00
+      }
+    },
+    "whisper-stt": {
+      "total_deployments": 4,
+      "successful_deployments": 4,
+      "failed_deployments": 0,
+      "success_rate_percentage": 100.00,
+      "failure_rate_percentage": 0.00,
+      "validation": {
+        "sum_equals_100": true,
+        "success_plus_failure": 100.00
+      }
+    }
+  },
+  "summary_statistics": {
+    "total_services": 2,
+    "combined_deployments": 9,
+    "combined_successes": 9,
+    "combined_failures": 0,
+    "overall_success_rate_percentage": 100.00,
+    "overall_failure_rate_percentage": 0.00
+  },
+  "acceptance_criteria": {
+    "pbx-web_success_rate_percentage_calculated": true,
+    "pbx-web_failure_rate_percentage_calculated": true,
+    "whisper-stt_success_rate_percentage_calculated": true,
+    "whisper-stt_failure_rate_percentage_calculated": true,
+    "percentages_sum_to_100_per_service": true,
+    "metrics_stored_for_next_bead": true
+  },
+  "calculation_details": {
+    "pbx-web": {
+      "success_rate": "(5 / 5) * 100 = 100.00%",
+      "failure_rate": "(0 / 5) * 100 = 0.00%",
+      "edge_case_handling": "non-zero deployments - standard calculation applied"
+    },
+    "whisper-stt": {
+      "success_rate": "(4 / 4) * 100 = 100.00%",
+      "failure_rate": "(0 / 4) * 100 = 0.00%",
+      "edge_case_handling": "non-zero deployments - standard calculation applied"
+    }
+  },
+  "notes": [
+    "Both services maintained 100% success rate over the 30-day analysis period",
+    "No failure events recorded for either service",
+    "All percentages rounded to 2 decimal places for consistency",
+    "Zero-deployment edge case did not occur (both services had deployments)",
+    "Data sourced from validated deployment counts in adc-3c7q0"
+  ]
+}
