@@ -5,7 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=coding
 WorkingDirectory=/home/coding/aide-de-camp
 ExecStart=/home/coding/aide-de-camp/.venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 ExecStop=/bin/kill -2 $MAINPID
