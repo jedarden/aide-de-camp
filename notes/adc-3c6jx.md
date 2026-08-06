@@ -1,35 +1,43 @@
 # pbx-web Deployment Data Collection (adc-3c6jx)
 
-## Task
-Fetch pbx-web deployment logs for last 30 days (2026-06-24 to 2026-07-24).
+## Investigation Summary
+
+Task: Retrieve pbx-web deployment logs for the last 30 days.
 
 ## Findings
-**No pbx-web workflow executions found in the last 30 days.**
 
-### Investigation Details
-- **Cluster:** iad-ci
-- **Namespace:** argo-workflows
-- **Workflow Template:** `pbx-web-build` (exists, created 2026-05-27)
-- **Query Method:** kubectl workflow search by name and labels
+**Result: No deployment data available for the requested 30-day period.**
 
-### Results
-- Total deployments found: **0**
-- Template exists but has never been executed
+### Data Source
+- Arg o Workflows in iad-ci cluster
+- WorkflowTemplate: `pbx-web-build` (exists, created 2026-05-27)
+- Namespace: argo-workflows
 
-### Comparison Context
-The `whisper-stt-build` workflow template also exists (created same date as pbx-web-build) but similarly has no workflow runs in the last 30 days.
+### Retention Policy Discovery
+- Current retention window: approximately 9 days
+- Oldest workflow in system: `gribtract-ci-manual-mbntt` (9 days old, 2026-07-28)
+- Total workflows in namespace: 26
 
-## Deliverable
-Structured JSON data saved to: `~/scratch/pbx-web-deployments-30d.json`
+### Queries Attempted
+1. Label selector: `workflows.argoproj.io/workflow-template=pbx-web-build`
+   - Result: 0 workflows
+   
+2. Name pattern search: workflows starting with or containing "pbx-web"
+   - Result: 0 workflows
+   
+3. Broad search: any workflow containing "pbx"
+   - Result: 0 workflows
 
-The file contains:
-- Query metadata (date range, cluster, namespace)
-- Template information
-- Empty deployments array (no runs found)
-- Summary of findings
+### Conclusion
+The pbx-web-build WorkflowTemplate exists and was created on 2026-05-27, but **no workflow executions are retained** in the current Argo Workflows retention window. This suggests either:
+- No pbx-web deployments have been executed in the last 9 days
+- Any deployments that did occur have been garbage collected by the TTL policy
 
-## Implications
-For the comparative analysis between pbx-web and whisper-stt deployment patterns, both services have **zero deployment activity** in the last 30 days despite having workflow templates defined. This suggests:
-1. Manual deployment processes may be in use
-2. CI/CD automation may not be active for these services
-3. Deployment activity may occur outside the Argo Workflows system
+## Output
+Structured JSON saved to: `~/scratch/pbx-web-deployments-30d.json`
+
+## Recommendations for Future Data Collection
+1. Configure Argo Workflow retention policy to keep workflows longer (e.g., 30+ days)
+2. Set up external archival of workflow executions to a database or log system
+3. Check if workflow data is archived in a log aggregation system (ELK, Loki, etc.)
+4. Consider implementing a workflow execution export/logging mechanism in the CI pipeline
