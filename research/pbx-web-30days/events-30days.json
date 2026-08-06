@@ -1,0 +1,10 @@
+[
+  {
+    "type": "Normal",
+    "reason": "nodeAssigned",
+    "message": "announcing from node \"k3s-server-a\" with protocol \"layer2\"",
+    "source": "metallb-speaker",
+    "object": "Service/pbx-web",
+    "timestamp": "2026-08-06T14:12:33Z"
+  }
+]
