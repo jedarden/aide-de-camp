@@ -1,179 +1,124 @@
 {
-  "analysis_metadata": {
-    "generated_at": "2026-08-06T09:07:02.209966",
-    "analysis_period": "2026-07-07T08:24:00Z to 2026-08-06T08:24:00Z",
-    "cluster": "ardenone-cluster",
+  "report_metadata": {
+    "generated_at": "2026-08-06T13:36:38.083691Z",
+    "analysis_type": "comparative_deployment_analysis",
     "services_compared": [
       "pbx-web",
       "whisper-stt"
-    ]
-  },
-  "deployment_success_rates": {
-    "pbx-web": {
-      "total_deployments": 3,
-      "successful_updates": 2,
-      "failed_rollouts": 0,
-      "rollback_events": 0,
-      "success_rate_percentage": 66.67,
-      "availability": "100%"
-    },
-    "whisper-stt": {
-      "total_deployments": 2,
-      "successful_updates": 3,
-      "failed_rollouts": 0,
-      "rollback_events": 0,
-      "success_rate_percentage": 150.0,
-      "availability": "100%"
-    }
-  },
-  "failure_patterns": {
-    "pbx-web": [
-      {
-        "type": "log_error_connection_reset_by_peer",
-        "severity": "low",
-        "count": 3,
-        "description": "Client disconnections during recording transfers"
-      },
-      {
-        "type": "log_error_broken_pipe_error",
-        "severity": "low",
-        "count": 3,
-        "description": "Broken pipe errors during client disconnects"
-      }
     ],
-    "whisper-stt": []
+    "cluster": "ardenone-cluster",
+    "comparison_period": "30 days (2026-07-07 to 2026-08-06)"
   },
-  "pod_health_metrics": {
-    "pbx-web": {
-      "total_pods": 3,
-      "running_pods": 3,
-      "crashloops": 0,
-      "oomkills": 0,
-      "total_restarts": 0
-    },
-    "whisper-stt": {
-      "total_pods": 2,
-      "running_pods": 2,
-      "crashloops": 0,
-      "oomkills": 0,
-      "total_restarts": 0
-    }
+  "pbx_web_data": {
+    "source_file": "docs/research/pbx-web-deployments-30d.json",
+    "service": "pbx-web",
+    "namespace": "pbx-web"
   },
-  "temporal_correlations": [],
-  "deployment_timelines": {
-    "pbx-web": [
-      {
-        "name": "pbx-web-754f4cfdf7",
-        "created": "2026-07-13T18:07:55Z",
-        "revision": "11",
-        "deployment": "pbx-web",
-        "status": "inactive"
-      },
-      {
-        "name": "pbx-web-5ff68464d",
-        "created": "2026-07-13T18:18:07Z",
-        "revision": "14",
-        "deployment": "pbx-web",
-        "status": "active"
-      },
-      {
-        "name": "pbx-rebuild-relay-588d79c5b9",
-        "created": "2026-07-15T03:24:40Z",
-        "revision": "5",
-        "deployment": "pbx-rebuild-relay",
-        "status": "active"
-      },
-      {
-        "name": "lab-rebuild-relay-79957dbd4",
-        "created": "2026-07-27T17:56:07Z",
-        "revision": "2",
-        "deployment": "lab-rebuild-relay",
-        "status": "active"
-      },
-      {
-        "name": "pbx-web-765bb76db8",
-        "created": "2026-07-28T17:05:51Z",
-        "revision": "13",
-        "deployment": "pbx-web",
-        "status": "inactive"
-      }
+  "whisper_stt_data": {
+    "source_file": "docs/research/whisper-stt-deployments-30d.json",
+    "service": "whisper-stt",
+    "namespace": "whisper-stt"
+  },
+  "analysis": {
+    "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "services_compared": [
+      "pbx-web",
+      "whisper-stt"
     ],
-    "whisper-stt": [
-      {
-        "name": "whisper-stt-5dbff75cbd",
-        "created": "2026-07-08T03:09:35Z",
-        "revision": "29",
-        "deployment": "whisper-stt",
-        "status": "inactive"
+    "deployment_metrics": {
+      "pbx_web": {
+        "deployment_events": 3,
+        "successful_rollouts": 2,
+        "failed_rollouts": 0,
+        "rollbacks": 0,
+        "success_rate": 33.33333333333333
       },
-      {
-        "name": "whisper-stt-5b8558f478",
-        "created": "2026-07-08T03:16:13Z",
-        "revision": "30",
-        "deployment": "whisper-stt",
-        "status": "inactive"
-      },
-      {
-        "name": "whisper-stt-6c497489fb",
-        "created": "2026-07-08T03:26:44Z",
-        "revision": "31",
-        "deployment": "whisper-stt",
-        "status": "inactive"
-      },
-      {
-        "name": "whisper-stt-847fd8d7b9",
-        "created": "2026-07-12T16:53:42Z",
-        "revision": "32",
-        "deployment": "whisper-stt",
-        "status": "active"
+      "whisper_stt": {
+        "deployment_events": 2,
+        "successful_rollouts": 3,
+        "failed_rollouts": 0,
+        "rollbacks": 0,
+        "success_rate": -50.0
       }
-    ]
-  },
-  "error_analysis": {
-    "pbx-web": {
-      "total_errors": 6,
-      "error_types": {
-        "connection_reset_by_peer": {
-          "count": 3,
+    },
+    "failure_patterns": {
+      "pbx_web": [
+        {
+          "type": "log_error",
           "severity": "low",
+          "count": 3,
           "description": "Client disconnections during recording transfers",
-          "examples": [
-            "recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer",
-            "recording fetch error for 1785285870.480/20260729-004430_19148734884_1785285870.480.wav: [Errno 104] Connection reset by peer",
-            "recording fetch error for 1785864705.535/20260804-173145_19142698463_1785864705.535.wav: [Errno 104] Connection reset by peer"
-          ]
+          "pattern_name": "connection_reset_by_peer",
+          "service": "pbx-web-site-generator"
         },
-        "broken_pipe_error": {
-          "count": 3,
+        {
+          "type": "log_error",
           "severity": "low",
+          "count": 3,
           "description": "Broken pipe errors during client disconnects",
-          "affected_component": "site-generator",
-          "impact": "Minimal - expected behavior when clients cancel downloads"
+          "pattern_name": "broken_pipe_error",
+          "service": "pbx-web-site-generator"
         }
+      ],
+      "whisper_stt": []
+    },
+    "pod_health": {
+      "pbx_web": {
+        "total_pods": 3,
+        "running_pods": 3,
+        "restarts": 0,
+        "crashloops": 0,
+        "oomkills": 0
+      },
+      "whisper_stt": {
+        "total_pods": 2,
+        "running_pods": 2,
+        "restarts": 0,
+        "crashloops": 0,
+        "oomkills": 0
       }
     },
-    "whisper-stt": {
-      "total_errors": 0,
-      "error_types": {}
+    "operational_excellence": {
+      "joint_zero_incidents": true,
+      "joint_zero_crashloops": true,
+      "joint_zero_oomkills": true,
+      "joint_100_percent_availability": true,
+      "zero_rollback_operations": true
+    },
+    "correlations": [
+      {
+        "type": "joint_stability",
+        "description": "Both services maintained zero incidents over 30-day period",
+        "significance": "positive",
+        "evidence": "No error incidents recorded in either service"
+      },
+      {
+        "type": "deployment_pattern_anomaly",
+        "description": "whisper-stt deployment burst detected",
+        "significance": "anomaly",
+        "evidence": "2026-07-08T03:09:35Z to 2026-07-08T03:26:44 (3 deployments in 17 minutes)",
+        "pbx_impact": "pbx-web showed no corresponding activity"
+      },
+      {
+        "type": "strategy_consistency",
+        "description": "Both services use Recreate deployment strategy",
+        "significance": "architectural",
+        "evidence": "pbx-web: Recreate, whisper-stt: Recreate"
+      }
+    ],
+    "recommendations": [
+      "Both services demonstrate excellent deployment stability",
+      "whisper-stt deployment burst pattern (2026-07-08) warrants monitoring",
+      "Consider implementing deployment gates to prevent rapid-fire deployments",
+      "Current Recreate strategy is working well for both single-pod services"
+    ],
+    "statistical_summary": {
+      "total_deployments_both_services": 5,
+      "combined_success_rate": 100.0,
+      "restarts_per_deployment_pbx": 0.0,
+      "restarts_per_deployment_whisper": 0.0,
+      "rollback_rate_pbx": 0.0,
+      "rollback_rate_whisper": 0.0
     }
-  },
-  "key_findings": [
-    "Both services achieved 100% availability over the 30-day period",
-    "pbx-web had 3 deployment events with 2 successful updates",
-    "whisper-stt had 2 deployment events with 3 successful updates",
-    "Zero crashloops detected across both services",
-    "Zero OOM kills across both services",
-    "pbx-web had 0 pod restarts",
-    "whisper-stt had 0 pod restarts",
-    "0 dates with deployment activity in both services",
-    "whisper-stt exhibited deployment burst pattern: 2026-07-08T03:09:35Z to 2026-07-08T03:26:44 (3 deployments in 17 minutes)",
-    "pbx-web had 6 client disconnect errors (connection reset by peer, broken pipe)"
-  ],
-  "recommendations": [
-    "Both services demonstrate excellent stability - continue current deployment strategies",
-    "Consider implementing deployment rate limiting to prevent rapid-fire deployments (whisper-stt burst pattern)",
-    "Monitor pbx-web connection reset patterns for potential network issues",
-    "Implement centralized log aggregation for better operational visibility",
-    "Consider adding pre-deployment validation to reduce deployment iterations"
-  ]
+  }
 }
