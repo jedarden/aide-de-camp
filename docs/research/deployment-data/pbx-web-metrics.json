@@ -6,13 +6,33 @@
     "days": 30
   },
   "events": {
-    "total": 0,
-    "warnings": 0,
+    "total": 2,
+    "warnings": 2,
     "failed": 0,
     "normal": 0,
-    "by_type": {},
-    "by_reason": {},
-    "timeline": []
+    "by_type": {
+      "Warning": 2
+    },
+    "by_reason": {
+      "ClusterIPNotAllocated": 1,
+      "deprecatedAnnotation": 1
+    },
+    "timeline": [
+      {
+        "type": "Warning",
+        "reason": "ClusterIPNotAllocated",
+        "message": "Cluster IP [IPv4]: 10.43.94.154 is not allocated; repairing",
+        "object": "Service/pbx-rebuild-egress",
+        "timestamp": "2026-08-06T21:55:08.065761+00:00"
+      },
+      {
+        "type": "Warning",
+        "reason": "deprecatedAnnotation",
+        "message": "Service uses deprecated annotation metallb.universe.tf/allow-shared-ip",
+        "object": "Service/pbx-web",
+        "timestamp": "2026-08-06T21:31:01+00:00"
+      }
+    ]
   },
   "pods": {
     "total": 3,
