@@ -7,7 +7,7 @@ adc-65l3 (data structure), adc-2duz (storage), adc-5xuy (comprehensive thread-sa
 **Status:** Design-only. Answers this bead's four acceptance criteria:
 *(1) detection logic documented with pseudo-code/flow, (2) how "first" is determined,
 (3) why subsequent failures are ignored, (4) edge cases (intermittent failures, config changes).*
-**Date:** 2026-07-19
+**Date:** 2026-08-06 (updated for thread-safety design alignment)
 
 > **Scope boundary.** This document owns the *detection logic* — the predicate that decides
 > "is this the first failure," *when* that predicate is evaluated, and the edge cases around it.
