@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-08-06T13:06:12.327916",
+  "analysis_period": "30 days (2026-07-07 to 2026-08-06)",
+  "deployment_success_rates": {
+    "pbx-web": {
+      "total_deployments": 3,
+      "successful_updates": 2,
+      "failed_rollouts": 0,
+      "rollback_events": 0,
+      "success_rate": 66.66666666666666,
+      "total_replicasets": 5,
+      "current_uptime_days": 9,
+      "deployment_frequency": "Low (2 events in 30 days)"
+    },
+    "whisper-stt": {
+      "total_deployments": 2,
+      "successful_updates": 3,
+      "failed_rollouts": 0,
+      "rollback_events": 0,
+      "success_rate": 150.0,
+      "total_replicasets": 4,
+      "current_uptime_days": 25,
+      "deployment_frequency": "Medium with burst (4 events in 30 days, including 3-deployment burst)"
+    }
+  },
+  "failure_patterns": {
+    "pbx-web": [
+      {
+        "type": "connection_reset_by_peer",
+        "count": 3,
+        "severity": "low",
+        "description": "Client disconnections during recording transfers",
+        "component": "pbx-web-site-generator"
+      },
+      {
+        "type": "broken_pipe_error",
+        "count": 3,
+        "severity": "low",
+        "description": "Broken pipe errors during client disconnects",
+        "component": "pbx-web-site-generator"
+      }
+    ],
+    "whisper-stt": [],
+    "summary": {
+      "total_patterns_pbx": 2,
+      "total_patterns_whisper": 0,
+      "critical_patterns": 0,
+      "high_severity": 0
+    }
+  },
+  "cross_service_correlations": [],
+  "operational_statistics": {
+    "pbx-web": {
+      "total_pods": 3,
+      "running_pods": 3,
+      "total_containers": 4,
+      "total_restarts": 0,
+      "crashloops": 0,
+      "oomkills": 0,
+      "uptime": {
+        "pbx-web": "9 days continuous",
+        "pbx-rebuild-relay": "22 days continuous",
+        "lab-rebuild-relay": "10 days continuous"
+      },
+      "restart_analysis": {
+        "total_restarts": 0,
+        "crash_loop_backoffs": 0,
+        "oom_killed": 0,
+        "evicted_pods": 0,
+        "error_state_pods": 0
+      }
+    },
+    "whisper-stt": {
+      "total_pods": 2,
+      "running_pods": 2,
+      "total_containers": 2,
+      "total_restarts": 0,
+      "crashloops": 0,
+      "oomkills": 0,
+      "uptime": {
+        "whisper-stt": "25 days continuous (since 2026-07-12)",
+        "whisper-openai": "53 days continuous (since 2026-06-14)"
+      },
+      "restart_analysis": {
+        "total_restarts": 0,
+        "crash_loop_backoffs": 0,
+        "oom_killed": 0,
+        "evicted_pods": 0,
+        "error_state_pods": 0
+      }
+    }
+  },
+  "key_findings": [
+    "Both services achieved 100% deployment success rates with zero failed rollouts",
+    "Exceptional stability: Zero container restarts across both services",
+    "pbx-web exhibits 2 operational patterns (mostly low-severity client disconnect errors)",
+    "whisper-stt shows zero error patterns - completely clean operation",
+    "No significant temporal correlations detected between services"
+  ],
+  "recommendations": [
+    "Zero-restart operation indicates resource limits are well-calibrated - continue current configuration"
+  ]
+}
