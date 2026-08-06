@@ -1,0 +1,304 @@
+{
+  "service": "pbx-web",
+  "collection_date": "2026-08-06",
+  "period": "30_days",
+  "data_sources": [
+    "kubernetes_replicasets_api",
+    "kubernetes_events_api"
+  ],
+  "query_parameters": {
+    "namespace": "pbx-web",
+    "field_selector": "metadata.namespace=pbx-web",
+    "since": "30 days"
+  },
+  "deployments": {
+    "pbx-web": {
+      "current_status": "healthy",
+      "current_revision": 14,
+      "current_image": "ronaldraygun/pbx-web:latest",
+      "strategy": "RollingUpdate",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "deployment_events": [
+        {
+          "revision": 14,
+          "replicaset": "pbx-web-5ff68464d",
+          "timestamp": "2026-07-13T18:18:07Z",
+          "age_days": 24,
+          "status": "active",
+          "replicas": 1,
+          "available": 1,
+          "ready": 1,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 13,
+          "replicaset": "pbx-web-765bb76db8",
+          "timestamp": "2026-07-28T17:05:51Z",
+          "age_days": 9,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 11,
+          "replicaset": "pbx-web-754f4cfdf7",
+          "timestamp": "2026-07-13T18:07:55Z",
+          "age_days": 24,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 10,
+          "replicaset": "pbx-web-6d86477cdb",
+          "timestamp": "2026-06-25T15:23:48Z",
+          "age_days": 42,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 9,
+          "replicaset": "pbx-web-66f79fd6f9",
+          "timestamp": "2026-06-23T18:55:52Z",
+          "age_days": 44,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 8,
+          "replicaset": "pbx-web-5cc966f86d",
+          "timestamp": "2026-06-23T18:37:39Z",
+          "age_days": 44,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 7,
+          "replicaset": "pbx-web-69794b7fcc",
+          "timestamp": "2026-06-21T11:13:44Z",
+          "age_days": 46,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 6,
+          "replicaset": "pbx-web-9fc5b5f59",
+          "timestamp": "2026-06-15T18:11:38Z",
+          "age_days": 52,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 5,
+          "replicaset": "pbx-web-85858b7dd4",
+          "timestamp": "2026-05-11T18:17:51Z",
+          "age_days": 87,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 4,
+          "replicaset": "pbx-web-5cc44d5c4c",
+          "timestamp": "2026-05-07T18:57:22Z",
+          "age_days": 91,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 3,
+          "replicaset": "pbx-web-5488fd45c8",
+          "timestamp": "2026-05-07T18:40:16Z",
+          "age_days": 91,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        }
+      ]
+    },
+    "pbx-rebuild-relay": {
+      "current_status": "healthy",
+      "current_revision": 5,
+      "strategy": "RollingUpdate",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "deployment_events": [
+        {
+          "revision": 5,
+          "replicaset": "pbx-rebuild-relay-588d79c5b9",
+          "timestamp": "2026-07-15T03:24:40Z",
+          "age_days": 22,
+          "status": "active",
+          "replicas": 1,
+          "available": 1,
+          "ready": 1,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 4,
+          "replicaset": "pbx-rebuild-relay-8596977857",
+          "timestamp": "2026-05-02T20:27:37Z",
+          "age_days": 96,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 3,
+          "replicaset": "pbx-rebuild-relay-5d6975d68d",
+          "timestamp": "2026-05-02T11:31:47Z",
+          "age_days": 96,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 2,
+          "replicaset": "pbx-rebuild-relay-7fbbb9bc7d",
+          "timestamp": "2026-05-02T11:29:50Z",
+          "age_days": 96,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        }
+      ]
+    },
+    "lab-rebuild-relay": {
+      "current_status": "healthy",
+      "current_revision": 2,
+      "strategy": "RollingUpdate",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "deployment_events": [
+        {
+          "revision": 2,
+          "replicaset": "lab-rebuild-relay-79957dbd4",
+          "timestamp": "2026-07-27T17:56:07Z",
+          "age_days": 10,
+          "status": "active",
+          "replicas": 1,
+          "available": 1,
+          "ready": 1,
+          "deployment_duration_seconds": null,
+          "success": true
+        },
+        {
+          "revision": 1,
+          "replicaset": "lab-rebuild-relay-79d6d858bb",
+          "timestamp": "2026-05-02T20:27:38Z",
+          "age_days": 96,
+          "status": "scaled_down",
+          "replicas": 0,
+          "available": 0,
+          "ready": 0,
+          "deployment_duration_seconds": null,
+          "success": true
+        }
+      ]
+    }
+  },
+  "argo_workflows": {
+    "workflow_template": "pbx-web-build",
+    "executions_last_30_days": "unknown",
+    "status": "not_queried",
+    "note": "Argo Workflows data not yet collected for pbx-web"
+  },
+  "infrastructure_context": {
+    "cluster": "ardenone-cluster",
+    "namespace": "pbx-web",
+    "storage_classes": ["longhorn"],
+    "external_dependencies": [
+      "metallb-speaker (LoadBalancer)"
+    ]
+  },
+  "deployment_patterns": {
+    "pbx-web": {
+      "total_revisions_30_days": 4,
+      "deployment_frequency": "low",
+      "last_deployment": "2026-07-13T18:18:07Z",
+      "days_since_last_deployment": 24,
+      "strategy": "RollingUpdate",
+      "typical_duration_range": "unknown - pod logs needed"
+    },
+    "pbx-rebuild-relay": {
+      "total_revisions_30_days": 1,
+      "deployment_frequency": "very_low",
+      "last_deployment": "2026-07-15T03:24:40Z",
+      "days_since_last_deployment": 22,
+      "strategy": "RollingUpdate",
+      "typical_duration_range": "unknown - pod logs needed"
+    },
+    "lab-rebuild-relay": {
+      "total_revisions_30_days": 1,
+      "deployment_frequency": "very_low",
+      "last_deployment": "2026-07-27T17:56:07Z",
+      "days_since_last_deployment": 10,
+      "strategy": "RollingUpdate",
+      "typical_duration_range": "unknown - pod logs needed"
+    }
+  },
+  "missing_metrics": [
+    "pod_startup_times",
+    "container_pull_durations",
+    "health_check_latency",
+    "rollback_events",
+    "deployment_failure_reasons",
+    "argo_workflow_execution_history"
+  ],
+  "next_steps": [
+    "Extract pod logs for deployment duration metrics",
+    "Query Kubernetes events for ScalingReplicaSet and FailedCreate events",
+    "Query Argo Workflows for pbx-web-build execution history"
+  ]
+}
