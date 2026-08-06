@@ -280,6 +280,85 @@ def test_no_duplicate_for_different_text(store: MemoryStore) -> None:
     assert len(store._facts) == 3
 
 
+# --- comprehensive deduplication tests (bead adc-312mo) ----------------------
+
+
+def test_deduplicate_same_text_different_category_allowed(store: MemoryStore) -> None:
+    """Test that identical text with different categories are both stored."""
+    store.load()
+
+    result1 = store.add_fact("User loves Kubernetes", FactCategory.PREFERENCE, 0.9)
+    result2 = store.add_fact("User loves Kubernetes", FactCategory.CONTEXT, 0.8)
+
+    assert result1 is True, "First fact should be added"
+    assert result2 is True, "Same text with different category should be allowed"
+
+    assert len(store._facts) == 2
+    categories = {f.category for f in store._facts}
+    assert categories == {FactCategory.PREFERENCE, FactCategory.CONTEXT}
+
+
+def test_deduplicate_different_text_same_category_allowed(store: MemoryStore) -> None:
+    """Test that different text with same category are both stored."""
+    store.load()
+
+    result1 = store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.9)
+    result2 = store.add_fact("User prefers light mode", FactCategory.PREFERENCE, 0.8)
+
+    assert result1 is True, "First fact should be added"
+    assert result2 is True, "Different text with same category should be allowed"
+
+    assert len(store._facts) == 2
+    texts = {f.text for f in store._facts}
+    assert texts == {"User prefers dark mode", "User prefers light mode"}
+
+
+def test_deduplicate_exact_match_with_metadata(store: MemoryStore) -> None:
+    """Test deduplication considers text+category as the composite key."""
+    store.load()
+
+    # Add first fact with specific confidence
+    result1 = store.add_fact("User prefers async/await", FactCategory.PREFERENCE, 0.95)
+    assert result1 is True
+
+    # Try to add identical fact with different confidence (metadata)
+    result2 = store.add_fact("User prefers async/await", FactCategory.PREFERENCE, 0.7)
+    assert result2 is False, "Duplicate should be rejected regardless of confidence"
+
+    # Only one fact should exist
+    assert len(store._facts) == 1
+    # Original confidence should be preserved
+    assert store._facts[0].confidence == 0.95
+
+
+def test_deduplicate_similar_but_different_meaning(store: MemoryStore) -> None:
+    """Test that similar facts with different meanings are both stored."""
+    store.load()
+
+    # These are similar but express different preferences
+    result1 = store.add_fact("User prefers dark mode for IDEs", FactCategory.PREFERENCE, 0.9)
+    result2 = store.add_fact("User prefers light mode for terminals", FactCategory.PREFERENCE, 0.9)
+
+    assert result1 is True
+    assert result2 is True, "Different meanings should not be deduplicated"
+
+    assert len(store._facts) == 2
+
+
+def test_deduplicate_substring_not_duplicate(store: MemoryStore) -> None:
+    """Test that one fact being a substring of another doesn't trigger deduplication for short texts."""
+    store.load()
+
+    # Short facts (< 20 chars) should not trigger prefix matching
+    result1 = store.add_fact("Likes Python", FactCategory.PREFERENCE, 0.9)
+    result2 = store.add_fact("Likes Python programming", FactCategory.PREFERENCE, 0.9)
+
+    assert result1 is True
+    assert result2 is True, "Substring relationship in short texts should not deduplicate"
+
+    assert len(store._facts) == 2
+
+
 # --- fact limit and trimming tests ------------------------------------------
 
 
