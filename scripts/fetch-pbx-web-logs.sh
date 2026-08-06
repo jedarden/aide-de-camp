@@ -233,11 +233,13 @@ get_replica_history() {
 # Get pod events for OOMKilled, eviction, error detection
 get_pod_events() {
     local pod_name="$1"
+    local namespace="${2:-$NAMESPACE}"
+    local kubeconfig="${3:-$KUBECONFIG_CONTEXT}"
 
     log_debug "Fetching events for pod: $pod_name"
 
     local events
-    events=$(kubectl --server="$KUBECONFIG_CONTEXT" get events -n "$NAMESPACE" --field-selector=involvedObject.name="$pod_name" -o json 2>/dev/null || echo "")
+    events=$(kubectl --server="$kubeconfig" get events -n "$namespace" --field-selector=involvedObject.name="$pod_name" -o json 2>/dev/null || echo '{"items":[]}')
 
     echo "$events"
 }
@@ -247,11 +249,14 @@ fetch_pod_logs() {
     local pod_name="$1"
     local container="${2:-}"
     local previous="${3:-false}"
+    local namespace="${4:-$NAMESPACE}"
+    local kubeconfig="${5:-$KUBECONFIG_CONTEXT}"
+    local since_date="${6:-$SINCE_DATE}"
 
     local since_timestamp
-    since_timestamp=$(date_to_timestamp "$SINCE_DATE")
+    since_timestamp=$(date_to_timestamp "$since_date")
 
-    local cmd="kubectl --server='$KUBECONFIG_CONTEXT' logs '$pod_name' -n '$NAMESPACE'"
+    local cmd="kubectl --server='$kubeconfig' logs '$pod_name' -n '$namespace'"
 
     if [ "$previous" = true ]; then
         cmd="$cmd --previous=true"
@@ -268,9 +273,8 @@ fetch_pod_logs() {
 
     local output
     output=$(eval "$cmd" 2>&1) || true
-    local exit_code=$?
 
-    if [ $exit_code -eq 0 ] && [ -n "$output" ]; then
+    if [ -n "$output" ]; then
         echo "$output"
         return 0
     else
@@ -280,7 +284,7 @@ fetch_pod_logs() {
             echo ""
             return 0
         else
-            log_debug "Failed to fetch logs for $pod_name (exit code: $exit_code)"
+            log_debug "No logs returned for $pod_name"
             echo ""
             return 0
         fi

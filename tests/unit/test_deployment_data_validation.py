@@ -12,6 +12,7 @@ from src.validation.deployment_data import (
     validate_deployment_data_simple,
     validate_deployment_record,
     validate_timestamp,
+    validate_required_fields,
     DEPLOYMENT_DATA_SCHEMA
 )
 
