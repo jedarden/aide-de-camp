@@ -1,8 +1,9 @@
 """
 Telegram fallback surface integration.
 
-Integrates with telegram-claude-bridge to provide an always-available
-fallback surface for results and exceptions.
+Direct Telegram Bot API integration for delivering results and exceptions
+to a fixed chat_id. Per ADR-1 (2026-07-20), this is decoupled from
+telegram-claude-bridge and uses the Telegram Bot API directly.
 """
 
 import asyncio
@@ -17,20 +18,19 @@ logger = logging.getLogger(__name__)
 
 class TelegramFallback:
     """
-    Telegram surface integration using telegram-claude-bridge.
-
-    telegram-claude-bridge runs on the Tailscale mesh at:
-    http://telegram-claude-bridge:8000
+    Telegram Bot API integration for aide-de-camp.
 
     This module provides:
-    - Message sending to active sessions
+    - Message sending to a fixed chat_id
     - Result delivery when no other surface is available
     - Exception push for critical/high urgency items
+
+    Per ADR-1, this is a direct Telegram Bot API integration, not coupled
+    to telegram-claude-bridge. All messages go to one configured chat_id.
     """
 
-    # telegram-claude-bridge endpoint (Tailscale mesh)
-    # Configurable via ADC_TELEGRAM_BRIDGE_URL env var
-    DEFAULT_BRIDGE_URL = "http://telegram-claude-bridge:8000"
+    # Telegram Bot API endpoint
+    TELEGRAM_API_BASE = "https://api.telegram.org"
     # Minimum spacing (seconds) between repeated-failure DEBUG summaries, so a
     # sustained outage cannot spam the log. Configurable via the
     # ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS env var.
@@ -38,14 +38,17 @@ class TelegramFallback:
 
     def __init__(
         self,
-        bridge_url: str | None = None,
+        bot_token: str | None = None,
         failure_log_interval_seconds: float | None = None,
         chat_id: str | int | None = None,
     ):
         import os
-        self.bridge_url = bridge_url or os.getenv(
-            "ADC_TELEGRAM_BRIDGE_URL", self.DEFAULT_BRIDGE_URL
-        )
+        # Telegram bot token. Resolution order:
+        # constructor arg → ADC_TELEGRAM_BOT_TOKEN env var → None.
+        # None (default) means all push methods gracefully no-op with a WARNING
+        # rather than hard-failing, preserving the pre-config behavior.
+        self.bot_token = bot_token or os.getenv("ADC_TELEGRAM_BOT_TOKEN") or None
+
         # Telegram chat ID for the single user of this personal app (plan.md
         # Tech Stack: "single-user app"). There is intentionally NO multi-user
         # session→chat mapping -- one configured chat id is all the routing
@@ -57,6 +60,7 @@ class TelegramFallback:
             self.chat_id = chat_id
         else:
             self.chat_id = os.getenv("ADC_TELEGRAM_CHAT_ID") or None
+
         # Rate-limit window for repeated-failure DEBUG logs. Resolution order:
         # constructor arg → ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS env var
         # → DEFAULT_FAILURE_LOG_INTERVAL_SECONDS. Invalid env values fall back
@@ -76,7 +80,7 @@ class TelegramFallback:
         # When reachability was last determined (startup probe or a reactive
         # send success/failure). Mirrors every write to _is_reachable via
         # _set_reachable(); None until the first determination. Exposed in the
-        # /api/v1/status/telegram_bridge payload as ``last_check_time``.
+        # /api/v1/status/telegram payload as ``last_check_time``.
         self._last_check_time: Optional[datetime] = None
 
         # First-failure record: flat instance vars on the singleton, per-startup,
@@ -112,7 +116,7 @@ class TelegramFallback:
         parse_mode: str = "HTML",
     ) -> bool:
         """
-        Send a message to a Telegram chat.
+        Send a message to a Telegram chat via the Bot API.
 
         Args:
             chat_id: Telegram chat ID (int or str)
@@ -122,12 +126,19 @@ class TelegramFallback:
         Returns:
             True if successful, False otherwise.
         """
+        if self.bot_token is None:
+            logger.warning(
+                f"send_message() called - no Telegram bot token configured "
+                f"(set ADC_TELEGRAM_BOT_TOKEN). Message send skipped."
+            )
+            return False
+
         try:
             async with httpx.AsyncClient() as client:
-                # telegram-claude-bridge proxy API uses /send endpoint
-                # Contract: {chat_id, text, parse_mode?, thread_id?, reply_to_message_id?}
+                # Telegram Bot API sendMessage endpoint
+                # https://core.telegram.org/bots/api#sendmessage
                 response = await client.post(
-                    f"{self.bridge_url}/send",
+                    f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/sendMessage",
                     json={
                         "chat_id": int(chat_id) if isinstance(chat_id, str) else chat_id,
                         "text": message,
@@ -215,32 +226,19 @@ class TelegramFallback:
         message = self._format_workload_summary(summary)
         return await self.send_message(self.chat_id, message)
 
-    async def register_surface(self, session_id: str, telegram_chat_id: str) -> bool:
-        """
-        Register a Telegram surface for a session.
 
-        Called when a Telegram user starts a conversation.
+    async def check_telegram_available(self) -> bool:
+        """Check if Telegram Bot API is available."""
+        if self.bot_token is None:
+            self._set_reachable(False)
+            return False
 
-        NOTE: The /register_surface endpoint does NOT exist in telegram-claude-bridge.
-        This method is a no-op stub for API compatibility. telegram-claude-bridge
-        uses a pull-based architecture where it manages sessions internally per forum topic,
-        not a push-based model where external systems register delivery surfaces.
-
-        Returns True for compatibility (pretends registration succeeded).
-        """
-        logger.warning(
-            f"register_surface() called for session {session_id} - "
-            f"telegram-claude-bridge does not support surface registration. "
-            f"This is a no-op stub."
-        )
-        return True
-
-    async def check_bridge_available(self) -> bool:
-        """Check if telegram-claude-bridge is available."""
         try:
             async with httpx.AsyncClient() as client:
+                # Use getMe endpoint to verify bot token validity
+                # https://core.telegram.org/bots/api#getme
                 response = await client.get(
-                    f"{self.bridge_url}/health",
+                    f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/getMe",
                     timeout=5.0,
                 )
                 is_available = response.status_code == 200
@@ -266,16 +264,18 @@ class TelegramFallback:
         self._is_reachable = value
         self._last_check_time = now or datetime.now()
 
-    def get_bridge_status(self) -> dict:
+    def get_status(self) -> dict:
         """
-        Get the current bridge status.
+        Get the current Telegram integration status.
 
         Lock-free read: single-field atomic reads; monitoring tolerates staleness.
 
         Returns:
             Dict with keys:
             - reachable: bool or None (None = unknown yet)
-            - bridge_url: str
+            - bot_configured: bool (whether bot_token is set)
+            - chat_id_configured: bool (whether chat_id is set)
+            - chat_id: str or None
             - last_check_time: ISO-8601 string or None (when reachability was
               last determined, via the startup probe or a reactive send)
             - failure_count: int
@@ -290,7 +290,8 @@ class TelegramFallback:
         """
         return {
             "reachable": self._is_reachable,
-            "bridge_url": self.bridge_url,
+            "bot_configured": self.bot_token is not None,
+            "chat_id_configured": self.chat_id is not None,
             "chat_id": self.chat_id,
             "last_check_time": self._last_check_time.isoformat()
             if self._last_check_time else None,
@@ -398,7 +399,7 @@ class TelegramFallback:
             self._last_repeated_log_timestamp = now
             self._failures_since_last_log = 0
             logger.warning(
-                f"First Telegram send failure detected at {self.bridge_url}. "
+                f"First Telegram send failure detected. "
                 f"Error type: {error_type}. Error: {message}. "
                 f"Subsequent failures of the same type are rate-limited (one "
                 f"DEBUG summary per {self._failure_log_interval_seconds:g}s); "
@@ -415,8 +416,8 @@ class TelegramFallback:
             self._last_repeated_log_timestamp = now
             self._failures_since_last_log = 0
             logger.warning(
-                f"New Telegram send failure type during ongoing outage at "
-                f"{self.bridge_url}: {error_type}. Error: {message}. "
+                f"New Telegram send failure type during ongoing outage: "
+                f"{error_type}. Error: {message}. "
                 f"Logged independently of the "
                 f"{self._failure_log_interval_seconds:g}s same-type cooldown. "
                 f"(Total failures: {self._failure_count}; distinct failure "
@@ -431,7 +432,7 @@ class TelegramFallback:
             batch = self._failures_since_last_log  # failures accumulated since last log
             logger.debug(
                 f"Repeated Telegram send failures: {batch} failure(s) since last "
-                f"log (total {self._failure_count}) at {self.bridge_url}. "
+                f"log (total {self._failure_count}). "
                 f"Latest error type: {error_type}. Error: {message}."
             )
             self._last_repeated_log_timestamp = now
