@@ -274,21 +274,21 @@ def validate_30day_completeness(
     start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # Calculate expected duration
-    duration = (end_date - start_date).days
+    # Generate expected dates first (before checking duration)
+    expected_dates_list = generate_expected_dates(start_date, end_date)
+    expected_dates = set(expected_dates_list)
+    expected_count = len(expected_dates_list)
 
     # Check if duration is approximately 30 days (only if required)
-    if require_exact_30_days and (duration < 29 or duration > 31):
-        return False, f"Date range is {duration} days, expected ~30 days (from {start_date.date()} to {end_date.date()})"
+    # Use the count of expected dates, not the duration, since range is inclusive
+    if require_exact_30_days and (expected_count < 29 or expected_count > 31):
+        return False, f"Date range covers {expected_count} days, expected ~30 days (from {start_date.date()} to {end_date.date()})"
 
     # Extract actual dates from data
     actual_dates = extract_dates_from_data(data)
 
     if not actual_dates:
         return False, "No dates found in deployment data"
-
-    # Generate expected dates
-    expected_dates = set(generate_expected_dates(start_date, end_date))
 
     # Check for missing dates (gaps)
     missing_dates = expected_dates - actual_dates
