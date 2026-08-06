@@ -1,0 +1,57 @@
+{
+  "analysis_metadata": {
+    "generated_at": "2026-08-06T11:07:15.091214",
+    "analysis_period_days": 30,
+    "analysis_period": "2026-07-07 to 2026-08-06",
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "deployment_frequency_metrics": {
+    "pbx-web": {
+      "total_deployments": 5,
+      "deployment_frequency_per_day": 0.1667,
+      "deployment_frequency_days_per_deployment": 6.0,
+      "mean_time_between_deployments_hours": 89.7414,
+      "time_range_days": 14.9569,
+      "first_deployment": "2026-07-13T18:07:55+00:00",
+      "last_deployment": "2026-07-28T17:05:51+00:00",
+      "deployment_intervals_hours": [
+        0.17,
+        33.1092,
+        302.5242,
+        23.1622
+      ],
+      "analysis_period_days": 30
+    },
+    "whisper-stt": {
+      "total_deployments": 4,
+      "deployment_frequency_per_day": 0.1333,
+      "deployment_frequency_days_per_deployment": 7.5,
+      "mean_time_between_deployments_hours": 36.5784,
+      "time_range_days": 4.5723,
+      "first_deployment": "2026-07-08T03:09:35+00:00",
+      "last_deployment": "2026-07-12T16:53:42+00:00",
+      "deployment_intervals_hours": [
+        0.1106,
+        0.1753,
+        109.4494
+      ],
+      "analysis_period_days": 30
+    }
+  },
+  "comparative_analysis": {
+    "pbx_web_frequency_per_day": 0.1667,
+    "whisper_stt_frequency_per_day": 0.1333,
+    "pbx_web_mean_time_between_deployments_hours": 89.7414,
+    "whisper_stt_mean_time_between_deployments_hours": 36.5784,
+    "pbx_web_time_range_days": 14.9569,
+    "whisper_stt_time_range_days": 4.5723,
+    "interpretation": {
+      "frequency_comparison": "pbx-web deploys 1.25x more frequently than whisper-stt",
+      "time_between_deployments_comparison": "pbx-web has 0.41x shorter mean time between deployments than whisper-stt",
+      "overall_pattern": "Both services show relatively low deployment frequency, with pbx-web being slightly more active than whisper-stt"
+    }
+  }
+}
