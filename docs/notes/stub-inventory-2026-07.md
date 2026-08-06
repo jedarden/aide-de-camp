@@ -6,9 +6,11 @@
 ## Summary
 
 - **Total findings:** 5
-- **Golden path findings:** 0 (none of the identified stubs affect the hot path: utterance → router → fetch → synthesize → SSE)
-- **Background/async findings:** 5 (monitoring placeholder, kubectl/git command stubs, telegram registration stub, prefetch simplification)
-- **Zero findings result:** Not applicable — 5 legitimate findings documented below
+- **Resolved findings:** 1 (Finding #5 - realtime dispatch prefetch, fixed 2026-07-24)
+- **Active findings:** 4
+- **Golden path findings:** 0 (Finding #5 was ON golden path but is now resolved)
+- **Background/async findings:** 4 (monitoring placeholder, kubectl/git command stubs, telegram registration stub)
+- **Zero findings result:** Not applicable — 4 legitimate findings documented below (1 resolved)
 
 ---
 
@@ -70,17 +72,18 @@ async def register_surface(self, session_id: str, telegram_chat_id: str) -> bool
 **Description:** The `register_surface()` method is intentionally a no-op stub because telegram-claude-bridge uses a pull-based architecture. The method exists for API compatibility and returns True (pretends registration succeeded).
 **Fix scope:** None — documented architectural incompatibility. Remove only if telegram-claude-bridge adds surface registration support.
 
-### 5. Realtime dispatch prefetch simplification
+### 5. Realtime dispatch prefetch simplification ✅ RESOLVED
 
 **File:** `src/realtime/dispatch.py:109`
 **Class of stub:** Simplified placeholder implementation
 **Demo impact:** ON golden path (realtime dispatch is part of voice/text hot path)
-**Line:**
+**Original stub line:**
 ```python
 project_slugs = detected_topics  # Placeholder
 ```
 **Description:** The prefetch logic uses `detected_topics` directly as `project_slugs` instead of fetching from the topic. This is a simplification that may cause prefetch to operate on incomplete/incorrect project data.
 **Fix scope:** Fetch actual project slugs from the topic's registry entry or intent metadata.
+**Resolution:** Fixed in commit `4f9b856` on 2026-07-24. Added `SessionStore.get_topic()` method and updated dispatch.py to fetch actual project_slugs from topic database entry. Verified in task adc-53pk9 (2026-08-06).
 
 ---
 
