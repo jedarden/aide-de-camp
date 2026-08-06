@@ -68,9 +68,17 @@ KUBECTL_PROXIES: dict[str, str] = {
 }
 
 # Fetch configuration file path
-FETCH_CONFIG_PATH = Path(__file__).parent.parent.parent / "config" / "fetch.yaml"
+FETCH_CONFIG_PATH = Path(__file__).parent.parent / "config" / "fetch.yaml"
 
 # In-memory cache for fetch config
+# HOT-RELOAD MECHANISM: Mtime-based cache invalidation
+# _fetch_config_cache stores the parsed YAML config
+# _fetch_config_mtime tracks the file's last modification time
+# When _load_fetch_config() is called, it compares current mtime with _fetch_config_mtime
+# If they differ (or cache is None), the file is reloaded from disk
+# This enables hot-reload without server restart: changes to fetch.yaml take effect
+# on the next call to _load_fetch_config() (typically via get_source_timeout_ms())
+# Verified in test_registry_hot_reload (tests/test_config_hot_reload.py)
 _fetch_config_cache: dict | None = None
 _fetch_config_mtime: float = 0
 
@@ -120,17 +128,38 @@ def _validate_timeout_ms(value: Any, source_name: str) -> int | None:
 
 def _load_fetch_config() -> dict:
     """
-    Load fetch configuration from YAML file.
+    Load fetch configuration from YAML file with hot-reload support.
+
+    HOT-RELOAD MECHANISM: Mtime-Based Cache Invalidation
+    =====================================================
+    This function implements hot-reload without requiring a server restart:
+
+    1. On first call, loads YAML from disk and caches it with the file's mtime
+    2. On subsequent calls, checks if file mtime has changed
+    3. If mtime unchanged, returns cached config (fast path)
+    4. If mtime changed, reloads from disk and updates cache
+    5. If file missing, returns empty dict (graceful degradation)
+
+    This approach means:
+    - Changes to config/fetch.yaml take effect on next timeout lookup
+    - No server restart required to pick up new timeout values
+    - Cache hit is fast (only mtime comparison, no disk I/O)
+    - Cache miss is acceptable (YAML parse is fast for small files)
 
     Returns:
         Dictionary with source timeouts. Empty dict if file not found or invalid.
 
     Raises:
         FetchConfigValidationError: If config schema is invalid
+
+    Verified in: test_registry_hot_reload (tests/test_config_hot_reload.py)
     """
     global _fetch_config_cache, _fetch_config_mtime
 
     # Check if we need to reload (file modified or not loaded yet)
+    # HOT-RELOAD: Compare current file mtime with cached mtime
+    # If they match, return cached config (hot path, no disk I/O)
+    # If they differ, reload from disk (cold path, new config loaded)
     try:
         current_mtime = FETCH_CONFIG_PATH.stat().st_mtime
         if _fetch_config_cache is not None and current_mtime == _fetch_config_mtime:
@@ -140,6 +169,8 @@ def _load_fetch_config() -> dict:
         return {}
 
     # Load the YAML file
+    # HOT-RELOAD: This is the cold path - file has changed or cache is empty
+    # Parse YAML, validate schema, and update cache for next call
     try:
         config = yaml.safe_load(FETCH_CONFIG_PATH.read_text()) or {}
     except OSError:
@@ -168,6 +199,8 @@ def _load_fetch_config() -> dict:
         raise FetchConfigValidationError(errors)
 
     # Cache the validated config
+    # HOT-RELOAD: Store the parsed config and current mtime for next comparison
+    # Next call will compare new mtime against this _fetch_config_mtime
     _fetch_config_cache = config
     _fetch_config_mtime = current_mtime
 
@@ -178,7 +211,12 @@ def get_source_timeout_ms(source: FetchSource, project_slug: str | None = None) 
     """
     Get the configured timeout (in seconds) for a fetch source.
 
-    Checks the config file for timeout_ms value and converts to seconds.
+    HOT-RELOAD MECHANISM: Mtime-Based Cache Invalidation
+    ====================================================
+    This function calls _load_fetch_config() which implements mtime-based cache
+    invalidation. Changes to config/fetch.yaml are picked up on the next call
+    after the file is modified. No server restart required.
+
     Priority order:
     1. Project-specific override (if project_slug provided)
     2. Global source-specific timeout
@@ -193,6 +231,8 @@ def get_source_timeout_ms(source: FetchSource, project_slug: str | None = None) 
 
     Raises:
         FetchConfigValidationError: If config is invalid (on hot-reload)
+
+    Verified in: test_registry_hot_reload (tests/test_config_hot_reload.py)
     """
     try:
         config = _load_fetch_config()
@@ -232,6 +272,12 @@ def get_effective_timeout(spec: FetchCommandSpec, project_slug: str | None = Non
     """
     Get the effective timeout for a fetch command spec.
 
+    HOT-RELOAD MECHANISM: Mtime-Based Cache Invalidation
+    ====================================================
+    This function calls get_source_timeout_ms() which uses _load_fetch_config(),
+    implementing mtime-based cache invalidation. Changes to config/fetch.yaml
+    take effect on the next call after file modification. No server restart required.
+
     Priority order:
     1. Project-specific timeout_ms from config file (if project_slug provided and set)
     2. Global timeout_ms from config file (if set)
@@ -244,6 +290,8 @@ def get_effective_timeout(spec: FetchCommandSpec, project_slug: str | None = Non
 
     Returns:
         Timeout in seconds, or float('inf') for no timeout
+
+    Verified in: test_registry_hot_reload (tests/test_config_hot_reload.py)
     """
     # Check config file first
     config_timeout = get_source_timeout_ms(spec.source, project_slug)
