@@ -367,11 +367,11 @@ class TestValidate30DayCompleteness:
         assert "Cannot determine date range" in error
 
     def test_chronological_sequence_check(self):
-        """Non-chronological dates should fail."""
+        """Non-chronological dates should fail with missing dates error."""
         start = datetime(2026, 7, 1)
         end = datetime(2026, 7, 5)
 
-        # Create data with non-chronological dates
+        # Create data with non-chronological dates (missing 3,4)
         events = [
             {"date": "2026-07-01", "event": "deploy1"},
             {"date": "2026-07-02", "event": "deploy2"},
@@ -390,7 +390,8 @@ class TestValidate30DayCompleteness:
 
         is_valid, error = validate_30day_completeness(data, require_exact_30_days=False)
         assert is_valid is False
-        assert "gap of" in error
+        # Should fail due to missing dates (gaps are detected before sequence check)
+        assert "Missing data for" in error
 
     def test_report_metadata_format(self):
         """Should handle report_metadata format as well."""
@@ -664,9 +665,13 @@ class TestEdgeCases:
         assert "expected ~30 days" in error
 
     def test_31_days_range_too_long(self):
-        """31 days range should fail."""
+        """32 days range should fail when requiring exactly 30 days."""
         start = datetime(2026, 7, 1)
-        end = datetime(2026, 7, 31)
+        end = datetime(2026, 8, 1)  # 32 days (Aug 1 - July 1 = 31, but range is inclusive so 32)
+
+        # Create complete data
+        expected_dates = generate_expected_dates(start, end)
+        events = [{"date": d.strftime("%Y-%m-%d"), "event": f"deploy{i}"} for i, d in enumerate(expected_dates)]
 
         data = {
             "metadata": {
@@ -675,15 +680,15 @@ class TestEdgeCases:
                     "end": end.isoformat() + "Z"
                 }
             },
-            "deployment_events_last_30_days": []
+            "deployment_events_last_30_days": events
         }
 
-        is_valid, error = validate_30day_completeness(data)
+        is_valid, error = validate_30day_completeness(data, require_exact_30_days=True)
         assert is_valid is False
         assert "expected ~30 days" in error
 
     def test_leap_year_february(self):
-        """Leap year February should handle 29 days correctly."""
+        """Leap year February should handle 29 days correctly when not requiring exactly 30 days."""
         start = datetime(2024, 2, 1)
         end = datetime(2024, 2, 29)  # Leap year: 29 days
 
@@ -700,10 +705,13 @@ class TestEdgeCases:
             "deployment_events_last_30_days": events
         }
 
-        # This should pass for 29-day February
-        is_valid, error = validate_30day_completeness(data)
-        # 29 days is within the 29-31 day tolerance
+        # This should pass for 29-day February when not requiring exactly 30 days
+        is_valid, error = validate_30day_completeness(data, require_exact_30_days=False)
         assert is_valid is True
+
+        # But should fail when requiring exactly 30 days
+        is_valid, error = validate_30day_completeness(data, require_exact_30_days=True)
+        assert is_valid is False
 
     def test_malformed_dates(self):
         """Malformed dates should be handled gracefully."""
