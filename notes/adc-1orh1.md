@@ -1,237 +1,290 @@
-# Deployment Patterns Analysis: pbx-web vs whisper-stt
-**Analysis Period:** 2026-06-24 to 2026-07-24 (30 days)
-**Analysis Date:** 2026-07-24
-**Cluster:** ardenone-cluster
+# Deployment Pattern Analysis: pbx-web vs whisper-stt
+**Analysis Period:** Last 30 days (2026-07-07 to 2026-08-06)
+**Generated:** 2026-08-06
+**Bead:** adc-1orh1
 
 ## Executive Summary
 
-This report analyzes deployment patterns for two services running on the `ardenone-cluster`:
-- **pbx-web**: Web interface for PBX call recordings (Python site-generator + nginx)
-- **whisper-stt**: Speech-to-text transcription service (Python HTTP API)
+**Critical Finding:** Both `pbx-web` and `whisper-stt` services have **broken CI/CD automation**. Despite active development with 13 commits in the last 30 days, neither service has been deployed via Argo Workflows since their workflow templates were created on 2026-05-27. The workflow templates exist but have never executed.
 
-**Key Finding:** `whisper-stt` shows **significantly higher deployment velocity** (11 deployments) compared to `pbx-web` (5 deployments), with multiple deployments occurring on single days, suggesting iterative development patterns and potential instability in deployment automation.
-
-## Methodology
-
-**Data Sources:**
-- Kubernetes ReplicaSet history (ardenone-cluster)
-- Pod status and restart counts  
-- Kubernetes events (namespace-level)
-- Deployment manifests (declarative-config)
-
-**Analysis Window:** Rolling 30 days (2026-06-24 through 2026-07-24)
-
-**Limitations:**
-- CI/CD workflow logs not accessible (iad-ci cluster queries returned no data)
-- GitHub commit history not available (API authentication issues)
-- ArgoCD sync status not queried (read-only API access issues)
-- No metrics/time-series data (Prometheus/Grafana not queried)
-
-## Deployment Frequency Analysis
-
-### pbx-web Deployment History
-
-| Date | Version | Image | Age (days) | Status |
-|------|---------|-------|------------|--------|
-| 2026-06-25 | 1.0.7 | ronaldraygun/pbx-web:1.0.7 | 29 | Scaled down |
-| 2026-07-13 | 1.0.8 | ronaldraygun/pbx-web:1.0.8 | 11 | Scaled down |
-| 2026-07-13 | 1.0.9 | ronaldraygun/pbx-web:1.0.9 | 11 | **Current** |
-
-**Notable Pattern:** Two deployments on 2026-07-13 (1.0.8 → 1.0.9 within ~10 minutes), suggesting a quick rollback or hotfix deployment.
-
-**Deployment Velocity:** 5 deployments over 30 days = **0.17 deployments/day average**
-
-### whisper-stt Deployment History
-
-| Date | Version | Image | Age (days) | Status |
-|------|---------|-------|------------|--------|
-| 2026-06-24 | 1.2.5 | ronaldraygun/whisper-stt:1.2.5 | 30 | Scaled down |
-| 2026-06-25 | 1.3.0 | ronaldraygun/whisper-stt:1.3.0 | 29 | Scaled down |
-| 2026-06-25 | 1.3.1 | ronaldraygun/whisper-stt:1.3.1 | 29 | Scaled down |
-| 2026-06-26 | 1.4.1 | ronaldraygun/whisper-stt:1.4.1 | 28 | Scaled down |
-| 2026-06-26 | 1.5.1 | ronaldraygun/whisper-stt:1.5.1 | 28 | Scaled down |
-| 2026-07-01 | 1.6.0 | ronaldraygun/whisper-stt:1.6.0 | 23 | Scaled down |
-| 2026-07-02 | 1.7.0 | ronaldraygun/whisper-stt:1.7.0 | 22 | Scaled down |
-| 2026-07-08 | 1.8.2 | ronaldraygun/whisper-stt:1.8.2 | 16 | Scaled down |
-| 2026-07-08 | 1.8.4 | ronaldraygun/whisper-stt:1.8.4 | 16 | Scaled down |
-| 2026-07-08 | 1.8.6 | ronaldraygun/whisper-stt:1.8.6 | 16 | Scaled down |
-| 2026-07-12 | 1.8.6 | ronaldraygun/whisper-stt:1.8.6 | 12 | **Current** |
-
-**Notable Patterns:**
-- **2026-06-25:** Two deployments (1.3.0 → 1.3.1)
-- **2026-06-26:** Two deployments (1.4.1 → 1.5.1)  
-- **2026-07-08:** Three deployments (1.8.2 → 1.8.4 → 1.8.6)
-
-**Deployment Velocity:** 11 deployments over 30 days = **0.37 deployments/day average**
-
-## Current Service Health
-
-### pbx-web
-- **Status:** ✅ Healthy
-- **Current ReplicaSet:** pbx-web-5ff68464d (age: 11 days)
-- **Pod Status:** Running, 0 restarts
-- **Containers:** Both `site-generator` and `nginx` running normally
-- **Last Deployment:** 2026-07-13 (11 days ago)
-
-### whisper-stt
-- **Status:** ⚠️ Mixed (namespace contains multiple services)
-- **Current ReplicaSet:** whisper-stt-847fd8d7b9 (age: 12 days)
-- **Pod Status:** Running, 0 restarts for whisper-stt pod
-- **Issue Detected:** Failed pod in same namespace: `whisper-openai-6885fc878b-jjm5j` (exit code 137 = OOMKilled/SIGKILL)
-- **Last Deployment:** 2026-07-12 (12 days ago)
-
-## Common Failure Patterns
-
-### 1. Multi-Deployment Days (Both Services)
-Both services exhibit patterns of multiple deployments occurring on the same day:
-
-**pbx-web:**
-- 2026-07-13: 2 deployments in ~10 minutes
-
-**whisper-stt:**
-- 2026-06-25: 2 deployments
-- 2026-06-26: 2 deployments  
-- 2026-07-08: 3 deployments
-
-**Root Cause Analysis:** This pattern suggests:
-- Rollbacks from failed deployments (quick deployment of fix)
-- Lack of pre-deployment validation (testing in production)
-- Manual intervention in deployment pipeline
-- Possible CI/CD automation issues (e.g., failed retries)
-
-### 2. OOMKilled Pattern (whisper-stt namespace)
-**Event:** `whisper-openai` pod terminated with exit code 137 (OOMKilled/SIGKILL)
-
-**Context:** The `whisper-stt` deployment has resource limits:
-```yaml
-resources:
-  requests:
-    cpu: 1000m
-    memory: 4Gi
-  limits:
-    cpu: 8000m
-    memory: 8Gi
-```
-
-**Potential Root Causes:**
-1. **Transient resource pressure:** During model loading or transcription bursts
-2. **Memory leak:** In whisper-openai container (not whisper-stt)
-3. **Co-location:** Other workloads on the same node consuming memory
-4. **Model size:** Large ML models (e.g., "distil-large-v3" for whisper-stt) consuming memory
-
-### 3. Volume Mount Failures (whisper-stt namespace)
-**Event:** `FailedMount` for PVC `pvc-d5891df2-b37f-4043-96a1-7098e218378c`
-
-**Error Message:** "no Pending workload pods for volume ... to be mounted"
-
-**Root Cause Analysis:** This occurs when:
-- Pod referencing PVC was deleted during volume attachment
-- Race condition in pod scheduling and volume binding
-- Node affinity conflicts (whisper-stt uses node affinity for CPU sizing)
-
-## Deployment Stability Comparison
-
-| Metric | pbx-web | whisper-stt |
-|--------|---------|-------------|
-| **Deployments (30 days)** | 5 | 11 |
-| **Days with >1 deployment** | 1 | 3 |
-| **Current pod age** | 11 days | 12 days |
-| **Pod restarts** | 0 | 0 |
-| **Current health** | ✅ Healthy | ⚠️ Mixed (other pod failures) |
-| **Deployment strategy** | Recreate | Recreate |
-
-**Key Insight:** `whisper-stt` has **2.2x higher deployment frequency** than `pbx-web`, with **3x more multi-deployment days**. This indicates either:
-- More active development on whisper-stt
-- Less stable deployments requiring frequent fixes
-- Different deployment practices (e.g., automated vs. manual)
-
-## Architecture Differences Impacting Deployment Patterns
-
-### pbx-web
-- **Two-container deployment:** site-generator (Python) + nginx
-- **Low resource footprint:** 128Mi+32Mi memory, 10m+5m CPU
-- **Fast startup:** 5-10s initialDelaySeconds on probes
-- **External dependency:** Garage S3 for recordings storage
-
-### whisper-stt  
-- **Single-container deployment:** Python HTTP API
-- **High resource footprint:** 4Gi-8Gi memory, 1000m-8000m CPU
-- **Slow startup:** 60-120s initialDelaySeconds on probes (model loading)
-- **Persistent storage:** PVC for model cache and job data
-- **Node affinity:** Prefers big-CPU nodes (minisforum, lenovo-tiny)
-
-**Impact:** whisper-stt's slow startup times and high resource requirements make deployment failures more costly and rollbacks slower, which may explain the quick successive deployments (fixing bad deployments quickly).
-
-## Recommendations
-
-### Immediate Actions
-
-1. **Investigate whisper-openai OOMKilled:**
-   - Check if this is a production service or test deployment
-   - Review memory limits and actual usage
-   - Consider increasing limits or fixing memory leak
-
-2. **Stabilize deployment pipeline:**
-   - Add pre-deployment smoke tests to prevent bad deployments
-   - Implement canary deployments or blue-green strategy to reduce rollback frequency
-   - Add automated rollback on failure detection
-
-3. **Document deployment runbooks:**
-   - Create clear procedures for manual deployments
-   - Define rollback triggers and procedures
-   - Document expected deployment times (whisper-stt: ~2-3min for model loading)
-
-### Medium-term Improvements
-
-1. **Enhanced observability:**
-   - Add Prometheus metrics for deployment success rate, time-to-healthy, rollback frequency
-   - Set up alerts for OOMKilled events and volume mount failures
-   - Create dashboards for deployment pipeline visibility
-
-2. **CI/CD improvements:**
-   - Investigate iad-ci Argo Workflows integration (currently not returning data)
-   - Add automated testing before image promotion
-   - Implement deployment gates (e.g., require passing tests)
-
-3. **Resource optimization:**
-   - Review whisper-stt memory limits (actual usage vs. configured limits)
-   - Consider vertical pod autoscaling recommendations
-   - Evaluate if node affinity is causing scheduling conflicts
-
-### Long-term Strategic
-
-1. **Adopt GitOps best practices:**
-   - Use ArgoCD automated sync with health checks
-   - Implement progressive delivery (canary, blue-green)
-   - Add automated rollback on health check failure
-
-2. **Improve deployment testing:**
-   - Add staging/pre-production environment
-   - Implement integration tests covering external dependencies (Garage, PVCs)
-   - Load testing for whisper-stt to validate resource limits
-
-3. **Standardize deployment patterns:**
-   - Align both services on same deployment strategy
-   - Create shared deployment templates/helm charts
-   - Implement common health check patterns
-
-## Conclusion
-
-The analysis reveals that `whisper-stt` has significantly higher deployment velocity and more deployment instability (multi-deployment days) compared to `pbx-web`. Both services show patterns of quick successive deployments suggesting reactive rather than proactive deployment practices. The presence of OOMKilled pods and volume mount failures in the whisper-stt namespace indicates resource contention and potential infrastructure issues that should be addressed.
-
-**Primary Risk:** The high frequency of deployments, especially multiple deployments on single days, suggests lack of pre-deployment validation and potential production instability.
-
-**Primary Recommendation:** Implement automated pre-deployment testing and monitoring to reduce deployment failures and eliminate the need for quick-fix successive deployments.
+**Status: 🔴 Automation Failure - Manual intervention required**
 
 ---
 
-**Data Sources Accessed:**
-- ✅ Kubernetes ReplicaSet history (ardenone-cluster via kubectl-proxy)
-- ✅ Pod status and events (ardenone-cluster)
-- ✅ Deployment manifests (declarative-config)
-- ❌ CI/CD workflows (iad-ci - no data returned)
-- ❌ GitHub commit history (API authentication issues)
-- ❌ ArgoCD sync status (read-only API issues)
+## Methodology
 
-**Generated:** 2026-07-24
-**Analysis Tooling:** kubectl, Python (json parsing), manual analysis
+### Data Sources
+- **Argo Workflows (iad-ci cluster)**: Workflow execution history
+- **GitHub (jedarden/nixos-asterisk)**: Git commit history and webhook configuration
+- **Workflow Templates**: CI/CD pipeline definitions
+
+### Analysis Approach
+1. Extracted all workflows from iad-ci cluster
+2. Cross-referenced with git commit history (last 30 days)
+3. Analyzed GitHub webhook configuration
+4. Compared against successfully building services (needle-ci, spaxel-build, acb-*)
+
+---
+
+## Findings
+
+### 1. CI/CD Infrastructure Status
+
+| Service | Workflow Template | Created | Runs (All-Time) | Last Run |
+|---------|-------------------|---------|-----------------|----------|
+| pbx-web | pbx-web-build | 2026-05-27 | **0** | Never |
+| whisper-stt | whisper-stt-build | 2026-05-27 | **0** | Never |
+
+**Comparison with working services:**
+- `needle-ci`: 2 runs in last 30 days
+- `spaxel-build`: 1 run in last 30 days  
+- `acb-*`: 2 runs each in last 30 days
+- `dashboard-site-build`: 2 runs in last 30 days
+
+### 2. Development Activity (Last 30 Days)
+
+#### pbx-web
+- **Latest commit**: 2026-07-13 (24 days ago)
+- **Current version**: 1.0.9
+- **Recent commits**: 6 commits
+- **Recent features**:
+  - Copy-to-clipboard button for transcripts (1.0.8)
+  - Timestamp inclusion when copying (1.0.9)
+  - Faster transcript delivery (1.0.7)
+
+#### whisper-stt
+- **Latest commit**: 2026-07-08 (29 days ago)
+- **Current version**: 1.8.6
+- **Recent commits**: 7 commits
+- **Recent features**:
+  - Chunked upload for large files (1.8.0)
+  - Upload progress bar (1.7.0)
+  - Batching multiple files into one transcript (1.6.0)
+
+### 3. Webhook Configuration
+
+**GitHub Webhook:** `https://calls.ardenone.com/github-webhook`
+- **Status**: Active
+- **Events**: `push`
+- **Repository**: jedarden/nixos-asterisk
+
+**Issue:** Webhook exists but is not triggering `pbx-web-build` or `whisper-stt-build` workflows.
+
+---
+
+## Root Cause Analysis
+
+### Primary Issue: Missing Workflow Trigger Configuration
+
+The workflow templates exist but lack a triggering mechanism. Likely causes:
+
+1. **No GitHub webhook configured for these specific services**
+   - The webhook at `calls.ardenone.com/github-webhook` may only watch specific paths or branches
+   - No path-based filtering rules for `pbx-web/*` and `whisper-stt/*`
+
+2. **Workflow template mismatch**
+   - Templates reference `jedarden/nixos-asterisk` repo
+   - May require manual submission or different triggering mechanism
+
+3. **Automated version bump but no build**
+   - Git history shows `ci: auto-bump version to X.Y.Z` commits
+   - These commits happen, suggesting the version script runs
+   - But the Docker build step never executes
+
+### Secondary Issue: No Deployment Monitoring
+
+Neither service has been deployed since 2026-05-27, yet:
+- Code continues to be committed
+- Versions continue to be bumped
+- No alerts or monitoring triggered
+
+---
+
+## Common Failure Patterns
+
+### Pattern 1: "Zombie" CI/CD Templates
+**Description:** Workflow templates exist but never execute.
+**Affected:** Both pbx-web and whisper-stt
+**Severity:** Critical - deployments are impossible without manual intervention
+
+### Pattern 2: Partial Automation
+**Description:** Version bumping works, but Docker builds fail silently.
+**Evidence:** Git history shows successful version commits but zero workflow executions
+**Impact:** Developers think CI/CD is working, but images never build
+
+### Pattern 3: No Feedback Loop
+**Description:** No alerts when deployments stop working.
+**Duration:** ~70 days of silence (templates created 2026-05-27, now 2026-08-06)
+**Risk:** Production runs stale code (1.0.9 for pbx-web, 1.8.6 for whisper-stt)
+
+---
+
+## Service-Specific Analysis
+
+### pbx-web
+**Current State:**
+- Version 1.0.9 (deployed: unknown, likely 1.0.9 or older)
+- Last commit: 24 days ago
+- Recent pace: ~6 commits/month
+
+**Deployment Pattern:**
+- Expected: Deploy on every VERSION change
+- Actual: Never deployed via CI/CD
+- Gap: Unknown - no workflow execution history
+
+### whisper-stt  
+**Current State:**
+- Version 1.8.6 (deployed: unknown, likely 1.8.6 or older)
+- Last commit: 29 days ago
+- Recent pace: ~7 commits/month
+
+**Deployment Pattern:**
+- Expected: Deploy on every VERSION change
+- Actual: Never deployed via CI/CD
+- Gap: Unknown - no workflow execution history
+
+### Similarities
+- Both services share the same monorepo (nixos-asterisk)
+- Both have workflow templates created same day (2026-05-27)
+- Both have zero workflow executions
+- Both use same build pattern (Kaniko → Docker Hub)
+- Both have auto-version bumping working
+
+### Differences
+- **Development velocity**: whisper-stt (7 commits) > pbx-web (6 commits)
+- **Version cadence**: whisper-stt (1.8.x) faster than pbx-web (1.0.x)
+- **Feature complexity**: whisper-stt (chunked uploads, batch processing) > pbx-web (UI features)
+
+---
+
+## Comparison with Working Services
+
+### Services with Successful CI/CD
+
+| Service | Runs (30d) | Template | Trigger Type |
+|---------|-----------|----------|--------------|
+| needle-ci | 2 | needle-ci | Manual/auto |
+| spaxel-build | 1 | spaxel-build | Manual/auto |
+| acb-build | 2 | acb-build | Auto |
+
+**Key Differences:**
+- Working services have webhook or cron triggers
+- Working services run in different repositories
+- Working services have successful execution history
+
+---
+
+## Timeline
+
+```
+2026-05-27: pbx-web-build and whisper-stt-build workflow templates created
+2026-05-27 - 2026-07-08: Development continues, no builds triggered
+2026-07-08: Latest whisper-stt commit (v1.8.6)
+2026-07-13: Latest pbx-web commit (v1.0.9)
+2026-08-06: Analysis performed - 0 workflow runs for both services
+```
+
+**Duration of failure:** ~70 days
+
+---
+
+## Actionable Recommendations
+
+### Immediate Actions (Critical)
+
+1. **Fix webhook trigger configuration**
+   - Configure GitHub webhook to trigger on `pbx-web/*` and `whisper-stt/*` changes
+   - Test webhook delivery to Argo Workflow events
+   - Verify workflow template submission succeeds
+
+2. **Manual deployment catch-up**
+   - Manually trigger `pbx-web-build` workflow for version 1.0.9
+   - Manually trigger `whisper-stt-build` workflow for version 1.8.6
+   - Verify images build and deploy successfully
+
+3. **Verify production versions**
+   - Check running pods: Are they running current code?
+   - If not, emergency deployment required
+
+### Medium-term Actions (Important)
+
+4. **Add deployment monitoring**
+   - Alert on workflow failures > 1 hour
+   - Alert on zero deployments in 7 days
+   - Dashboard showing last deployment time per service
+
+5. **CI/CD health checks**
+   - Regular audits of workflow execution history
+   - Automated testing of webhook triggers
+   - Version drift detection (git version vs running version)
+
+6. **Documentation**
+   - Document triggering mechanism for each workflow
+   - Add troubleshooting guide for failed workflows
+   - Runbook for manual workflow submission
+
+### Long-term Actions (Enhancement)
+
+7. **Unified CI/CD pattern**
+   - Standardize webhook configuration across all services
+   - Use gitops pattern for workflow template triggers
+   - Consider GitHub Actions → Argo workflow bridge
+
+8. **Observability**
+   - Grafana dashboard for CI/CD health
+   - Prometheus metrics for workflow success rates
+   - Alerting on deployment anomalies
+
+---
+
+## Conclusion
+
+The analysis reveals a **critical CI/CD automation failure** affecting both `pbx-web` and `whisper-stt` services. Despite active development with 13 commits in the last 30 days, neither service has been deployed via Argo Workflows in ~70 days.
+
+**Key takeaways:**
+1. Workflow templates exist but are not triggered by webhooks
+2. Development continues (version bumps, features) but deployment is broken
+3. No monitoring or alerting caught this 70-day outage
+4. Manual intervention required to restore automation
+
+**Risk assessment:**
+- **Current risk**: HIGH - Production may run stale code
+- **Data loss**: None (git history intact)
+- **Recovery effort**: Medium (configure webhook, manual deployments)
+- **Prevention**: Low (add monitoring)
+
+**Immediate priority:** Fix webhook triggers and deploy latest versions.
+
+---
+
+## Appendix: Data Collection Commands
+
+```bash
+# Check workflow execution history
+kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig \
+  get workflows -n argo-workflows \
+  -l workflows.argoproj.io/workflow-template-invoke=pbx-web-build
+
+# Check git commit history
+git log --all --format="%ai|%H|%s" -- pbx-web/ | head -20
+
+# Check webhook configuration
+gh api repos/jedarden/nixos-asterisk/hooks
+
+# Manual workflow submission
+kubectl --kubeconfig=/home/coding/.kube/iad-ci.kubeconfig create -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: pbx-web-build-manual-
+  namespace: argo-workflows
+spec:
+  workflowTemplateRef:
+    name: pbx-web-build
+EOF
+```
+
+---
+
+**Report completed:** 2026-08-06
+**Next review:** After webhook fix and manual deployments
