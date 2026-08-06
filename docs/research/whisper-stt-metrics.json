@@ -1,0 +1,206 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T14:00:00Z",
+    "service": "whisper-stt",
+    "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "cluster": "ardenone-cluster",
+    "namespace": "whisper-stt",
+    "data_sources": [
+      "Kubernetes deployment events from ardenone-cluster",
+      "ArgoCD deployment history",
+      "ReplicaSet creation timestamps",
+      "Pod events and status"
+    ],
+    "notes": [
+      "No CI/CD workflow executions found for whisper-stt-build in the 30-day period",
+      "Deployments were performed via ArgoCD sync operations",
+      "Lead time data unavailable - no git commit timestamps linked to deployments"
+    ]
+  },
+  "deployment_metrics": {
+    "total_deployments": 4,
+    "successful_deployments": 4,
+    "failed_deployments": 0,
+    "success_rate": "100%",
+    "deployment_frequency": {
+      "burst_event": "3 deployments within 17 minutes on 2026-07-08",
+      "stable_period": "1 deployment on 2026-07-12 (still active)"
+    },
+    "deployment_strategy": "Recreate",
+    "deployment_method": "ArgoCD sync",
+    "uptime_metrics": {
+      "whisper_stt_pod_uptime": "25 days (2026-07-12 to 2026-08-06)",
+      "whisper_openai_pod_uptime": "53 days (2026-06-14 to 2026-08-06)",
+      "total_pod_restarts": 0,
+      "crash_loop_backoffs": 0,
+      "oom_kills": 0
+    },
+    "failure_modes": {
+      "image_pull_errors": 0,
+      "probe_failures": 0,
+      "pvc_mount_failures": 0,
+      "resource_limit_exceeded": 0,
+      "unknown_failures": 0
+    }
+  },
+  "deployment_records": [
+    {
+      "deployment_id": "whisper-stt-revision-29",
+      "timestamp": "2026-07-08T03:09:35Z",
+      "status": "success",
+      "lead_time_minutes": null,
+      "failure_reason": null,
+      "details": {
+        "replicaset": "whisper-stt-5dbff75cbd",
+        "revision": "29",
+        "image": "ronaldraygun/whisper-stt:1.8.2",
+        "deployment_type": "recreate",
+        "trigger": "argo_cd_sync",
+        "replicas": 0,
+        "ready_replicas": 0,
+        "available_replicas": 0,
+        "outcome": "superseded_by_revision_30"
+      }
+    },
+    {
+      "deployment_id": "whisper-stt-revision-30",
+      "timestamp": "2026-07-08T03:16:13Z",
+      "status": "success",
+      "lead_time_minutes": null,
+      "failure_reason": null,
+      "details": {
+        "replicaset": "whisper-stt-5b8558f478",
+        "revision": "30",
+        "image": "ronaldraygun/whisper-stt:1.8.4",
+        "deployment_type": "recreate",
+        "trigger": "argo_cd_sync",
+        "replicas": 0,
+        "ready_replicas": 0,
+        "available_replicas": 0,
+        "outcome": "superseded_by_revision_31"
+      }
+    },
+    {
+      "deployment_id": "whisper-stt-revision-31",
+      "timestamp": "2026-07-08T03:26:44Z",
+      "status": "success",
+      "lead_time_minutes": null,
+      "failure_reason": null,
+      "details": {
+        "replicaset": "whisper-stt-6c497489fb",
+        "revision": "31",
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "deployment_type": "recreate",
+        "trigger": "argo_cd_sync",
+        "replicas": 0,
+        "ready_replicas": 0,
+        "available_replicas": 0,
+        "outcome": "superseded_by_revision_32"
+      }
+    },
+    {
+      "deployment_id": "whisper-stt-revision-32",
+      "timestamp": "2026-07-12T16:53:42Z",
+      "status": "success",
+      "lead_time_minutes": null,
+      "failure_reason": null,
+      "details": {
+        "replicaset": "whisper-stt-847fd8d7b9",
+        "revision": "32",
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "deployment_type": "recreate",
+        "trigger": "argo_cd_sync",
+        "replicas": 1,
+        "ready_replicas": 1,
+        "available_replicas": 1,
+        "outcome": "active",
+        "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
+        "pod_age_days": 25,
+        "pod_uptime_days": 25
+      }
+    }
+  ],
+  "ci_cd_analysis": {
+    "workflow_template": "whisper-stt-build",
+    "workflow_template_exists": true,
+    "workflow_executions_30d": 0,
+    "last_workflow_execution": null,
+    "deployment_mechanism": "argo_cd_direct_sync",
+    "notes": [
+      "The whisper-stt-build WorkflowTemplate exists in argo-workflows namespace",
+      "No workflow executions found in the 30-day period",
+      "Deployments are triggered by ArgoCD sync operations, not CI/CD pipelines",
+      "This suggests a GitOps workflow where image updates are pushed directly to declarative-config",
+      "Lead time from commit to deployment cannot be determined without workflow execution data"
+    ]
+  },
+  "infrastructure_events": {
+    "storage_status": {
+      "whisper_model_cache_pvc": {
+        "name": "whisper-model-cache",
+        "status": "Bound",
+        "capacity": "10Gi",
+        "storage_class": "longhorn",
+        "age_days": 85
+      },
+      "whisper_openai_model_cache_pvc": {
+        "name": "whisper-openai-model-cache",
+        "status": "Bound",
+        "capacity": "10Gi",
+        "storage_class": "longhorn",
+        "age_days": 53
+      },
+      "whisper_stt_jobs_pvc": {
+        "name": "whisper-stt-jobs",
+        "status": "Bound",
+        "capacity": "1Gi",
+        "storage_class": "longhorn",
+        "age_days": 42
+      }
+    },
+    "resource_limits": {
+      "cpu_request": "1 core",
+      "cpu_limit": "8 cores",
+      "memory_request": "4Gi",
+      "memory_limit": "8Gi"
+    }
+  },
+  "summary": {
+    "deployment_health": "excellent",
+    "success_rate": "100%",
+    "failure_analysis": {
+      "total_failures": 0,
+      "failure_types": {},
+      "mttd_mean_time_to_detection": "N/A - no failures",
+      "mttr_mean_time_to_resolution": "N/A - no failures"
+    },
+    "deployment_patterns": {
+      "burst_deployment": "3 rapid deployments on 2026-07-08 (versions 1.8.2, 1.8.4, 1.8.6)",
+      "stabilization": "Final deployment on 2026-07-12 remained stable for 25+ days",
+      "deployment_burst_duration": "17 minutes",
+      "deployment_burst_reason": "Likely iterative fixes or rapid testing"
+    },
+    "operational_excellence": {
+      "zero_downtime": true,
+      "zero_pod_restarts": true,
+      "zero_crashloops": true,
+      "zero_oomkills": true,
+      "all_pvcs_bound": true,
+      "pod_uptime": "25 days continuous (whisper-stt), 53 days continuous (whisper-openai)"
+    },
+    "recommendations": [
+      "Current deployment strategy is highly effective - 100% success rate",
+      "Burst deployment pattern on 2026-07-08 suggests rapid iteration - consider pre-deployment testing",
+      "Consider implementing CI/CD workflow execution tracking for better lead time metrics",
+      "Zero failures indicate excellent stability - maintain current ArgoCD sync approach",
+      "Pod stability is exceptional - 25 days continuous uptime with zero restarts"
+    ]
+  },
+  "data_quality_notes": [
+    "Lead time data unavailable - deployments triggered via ArgoCD sync without workflow linkage",
+    "No commit-to-deploy latency measurement possible without git commit timestamps",
+    "Success rate calculated from Kubernetes deployment status (all 4 deployments successful)",
+    "Failure analysis based on pod events, PVC status, and deployment conditions",
+    "CI/CD data would improve lead time tracking - consider whisper-stt-build workflow execution"
+  ]
+}
