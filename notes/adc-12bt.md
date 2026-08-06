@@ -1,419 +1,444 @@
 # First-Failure Detection Logic Design
 
-**Bead:** adc-12bt
-**Parent:** adc-4vhr
-**Dependency:** adc-50ld (Thread-Safety Design)
+**Bead:** adc-12bt — "Design first-failure detection logic"
+**Child of:** adc-4vhr (Design first-failure tracking mechanism)
+**Status:** Complete
+**Date:** 2026-08-06
 
 ## Overview
 
-Design a mechanism to detect the **first failure** for async bead-backed tasks and trigger notifications **once per failure type**, suppressing redundant notifications for subsequent failures of the same type.
+This document specifies **HOW** to detect the first Telegram send failure versus subsequent failures, triggering notification exactly once per process startup. The detection is reactive (after failure) and uses a claim-and-set pattern to ensure exactly-once notification under concurrency.
 
-## Problem Statement
+---
 
-The async path creates NEEDLE beads for task-profile intents. These beads can fail in multiple ways:
+## 1. Detection Timing: When to Check
 
-1. **Refusal** - Bead comments contain `REFUSED:` indicating blocker
-2. **SLA breach** - Bead exceeds its time budget without resolution
-3. **Circuit breaker** - Bead hits refusal threshold (3 refusals or 24h age)
+### Decision: Reactive-Only (After Failure, Not Before Send)
 
-Without first-failure detection:
-- The system would emit a notification on **every** BeadWatcher tick
-- Users receive spam for the same underlying failure
-- No way to distinguish "new problem" from "existing problem"
+Detection occurs **only after a real send failure**, not proactively before attempting sends.
 
-## Design Goals
+**Why reactive-only:**
 
-1. **Notify once per failure type** - First time a bead hits a failure state, emit notification
-2. **Suppress subsequent notifications** - Same bead, same failure type = silence
-3. **Handle state transitions** - If bead recovers then fails again with NEW failure type, notify
-4. **Thread-safe** - Multiple watcher ticks must race safely (depends on adc-50ld design)
-5. **Config-aware** - If fetch config changes, reset suppression for affected sources
+1. **Avoids false positives.** A pre-send health check would fail during transient outages even if the actual send would succeed (race condition).
+2. **Minimizes overhead.** No redundant health-check calls before every send; we only react to actual failures.
+3. **Simpler state model.** One trigger point (failure path) instead of two (pre-send check + failure handler).
+4. **Matches the semantic.** "First send failure" means a send actually failed, not that we predict it will fail.
 
-## Core Concepts
+**What we DON'T do (proactive approaches rejected):**
 
-### Failure Type Taxonomy
+- ❌ Pre-send health check (`check_bridge_available()`) before each `send_message()` call
+- ❌ Separate "bridge down" detection thread polling independently
+- ❌ Timeout-based prediction (if health check takes > N seconds, mark as failed)
 
-Each failure maps to a distinct **failure type**:
+**What we DO (reactive approach):**
 
-| Failure Type | Trigger Condition | Notification Template |
-|--------------|-------------------|----------------------|
-| `refusal` | `bead_watch.last_refusal_reason IS NOT NULL` | "Bead {bead_ref} blocked: {reason}" |
-| `sla_flag` | `bead_watch.sla_flagged_at IS NOT NULL` | "Bead {bead_ref} exceeded SLA" |
-| `fenced` | `bead_watch.fenced_at IS NOT NULL` | "Bead {bead_ref} fenced (circuit breaker)" |
-| `dispatch_failed` | `intent.status = 'failed'` | "Intent {intent_id} dispatch failed" |
-| `fetch_terminal` | `fetch_result.terminal_failure = 'all_sources_failed'` | "All fetch sources failed for {project_slug}" |
+The moment `send_message()` encounters any of these failure modes:
+- HTTP non-2xx response (4xx, 5xx, etc.)
+- `httpx.RequestError` (network error, timeout, connection refused)
+- Any other `Exception` during the send
 
-### First-Failure State Tracking
+...we trigger `_handle_send_failure()` which performs the first-failure detection.
 
-**Key concept:** Track failure state **per bead** as a **bitfield** of emitted failure types.
+**Note:** The lifespan startup runs `check_bridge_available()` once at boot for `/health` status only, NOT for first-failure detection. That's a separate health-reporting concern.
 
-```python
-# bead_watch table schema (existing)
-CREATE TABLE bead_watch (
-    bead_ref           TEXT PRIMARY KEY,
-    refusal_count      INTEGER NOT NULL DEFAULT 0,
-    last_refusal_reason TEXT,
-    last_refusal_at    INTEGER,
-    comment_high_water INTEGER NOT NULL DEFAULT -1,
-    sla_deadline       INTEGER NOT NULL,
-    sla_flagged_at     INTEGER,
-    fenced_at          INTEGER,
-    created_at         INTEGER NOT NULL,
-    -- NEW COLUMN for first-failure tracking:
-    emitted_failures   INTEGER DEFAULT 0  -- Bitfield: 1=refusal, 2=sla, 4=fenced, 8=dispatch, 16=fetch
-);
-```
+---
 
-**Bitfield encoding:**
+## 2. Detection Logic: The Check Algorithm
+
+### Core Principle: Claim-and-Set with Boolean Flag
+
+The detection logic is a simple **read-then-write** pattern protected by a lock:
 
 ```python
-FAILURE_BITREFUSAL = 1      # 0b00001
-FAILURE_BIT_SLA = 2         # 0b00010
-FAILURE_BIT_FENCED = 4      # 0b00100
-FAILURE_BIT_DISPATCH = 8    # 0b01000
-FAILURE_BIT_FETCH = 16      # 0b10000
+# Pseudo-code inside the locked section
+if not self._has_logged_first_failure:
+    self._has_logged_first_failure = True
+    # This is the first failure
+    return True  # Triggers notification
+else:
+    # Already failed before
+    return False  # Suppress notification
 ```
 
-**State diagram:**
+### What Makes a Failure "First"?
+
+**"First" is defined by the claim, not by timestamp.**
+
+- The first coroutine to acquire the lock, observe `_has_logged_first_failure == False`, and flip it to `True` is "the first failure."
+- All subsequent coroutines see `True` and return `False` (subsequent failures).
+- This is a **claim-and-set** pattern, not a timestamp comparison.
+
+**Why not timestamp-based?**
+
+- Timestamp comparisons require sorting multiple failure timestamps and defining "first" as `min(timestamps)`.
+- That's more complex and requires storing all failure timestamps or a running minimum.
+- The claim-and-set pattern gives us a clear winner with O(1) state (one boolean).
+
+### Complete Detection Flow
 
 ```
-initial: emitted_failures = 0
-  |
-  v
-refusal detected → bit 0 set → emit "refusal" notification → emitted_failures = 1
-  |
-  v (subsequent ticks)
-refusal still true → bit 0 already set → suppress notification
-  |
-  v
-sla_flagged detected → bit 1 set → emit "sla" notification → emitted_failures = 3
-  |
-  v
-bead closed → row deleted → state reset
+send_message() attempts to send to Telegram bridge
+  │
+  ├─ SUCCESS (HTTP 200)
+  │  → _is_reachable = True
+  │  → return True
+  │  └─ (no detection involvement)
+  │
+  └─ FAILURE (non-2xx | RequestError | Exception)
+       ↓
+     await _handle_send_failure(error_context)
+       │
+       ├─ Acquire lock: async with self._first_failure_lock:
+       │    │
+       │    └─ Call _record_failure_locked(error_context)
+       │         │
+       │         ├─ Unconditional state updates:
+       │         │  - _is_reachable = False
+       │         │  - _failure_count += 1
+       │         │  - _last_failure_timestamp = now
+       │         │
+       │         ├─ if not _has_logged_first_failure:  # ← THE CHECK
+       │         │      self._has_logged_first_failure = True  # ← THE CLAIM
+       │         │      self._first_failure_timestamp = now
+       │         │      logger.warning("First Telegram send failure...")
+       │         │      return True  # "was_first" signal
+       │         │
+       │         └─ else:
+       │              logger.debug(f"Repeated failure #{_failure_count}...")
+       │              return False  # "was_first=False" signal
+       │
+       └─ Release lock
+            │
+            └─ if was_first:
+                 await _notify_first_failure(error_context)
+                 # Side-channel notification (NOT send_message)
 ```
 
-## Detection Logic
+### Key Points
 
-### Check Points
+1. **The check happens inside the lock.** No other coroutine can flip the flag between the read and the write.
+2. **The check is a simple boolean comparison.** `if not self._has_logged_first_failure` is all we need.
+3. **The flip is atomic with the check.** Under the lock, the read-then-write is one indivisible operation.
+4. **We return a signal (`was_first`).** The locked helper returns `True`/`False` to indicate whether this call was the first, so the caller can decide whether to notify.
+5. **Notification runs AFTER the lock releases.** The expensive I/O (`_notify_first_failure`) happens outside the lock to avoid holding it during slow operations.
 
-Two check points ensure comprehensive coverage:
+---
 
-#### 1. Pre-Escalation Check (Before Bead Creation)
+## 3. Why Subsequent Failures Are Ignored
 
-**Location:** `escalate/handler.py` - `escalate_intent()`
+### Mechanism: Boolean Flag Latch
 
-**Purpose:** Catch dispatch failures **before** bead is created
+Once `_has_logged_first_failure` is set to `True`:
 
-**Pseudo-code:**
+1. **All future failures see `True`** in the `if not self._has_logged_first_failure` check.
+2. **They return `False`** from `_record_failure_locked`, indicating "not the first."
+3. **The caller skips `await _notify_first_failure()`** because `was_first == False`.
+4. **They only log at DEBUG level** with the failure count.
+
+### No Reset Window (Per-Startup Semantic)
+
+The flag is **never reset** during the process lifetime. It only resets on:
+- Process restart (new `TelegramFallback()` instance created)
+- Explicit call to `reset_first_failure_state()` (test hook or future recovery-based reset)
+
+**Why no time-based reset?**
+
+- A time-based cooldown (e.g., "re-notify after 5 minutes of failures") would require tracking:
+  - Time of first failure
+  - Time of last failure
+  - A timer or comparison on every failure
+- The per-startup semantic is simpler: **one notification per process lifetime.**
+- If the bridge stays down across restarts, each restart correctly logs one WARNING.
+- Future extension: recovery-based reset (after N consecutive successes) can re-arm detection.
+
+### What Subsequent Failures Still Do
+
+Even though they're "ignored" for notification purposes, subsequent failures:
+1. **Increment `_failure_count`.** Diagnostic: total failures since startup.
+2. **Update `_last_failure_timestamp`.** "Last failed X seconds ago."
+3. **Log at DEBUG level.** Visible in logs but not spammy.
+
+This means we still have full observability of ongoing failures, just without repeated notifications.
+
+---
+
+## 4. Concurrency: Exactly One Notification Under Race Conditions
+
+### Scenario: N Simultaneous Failures
+
+When N coroutines all hit `_handle_send_failure()` at the same time (e.g., a burst of dispatches to a dead bridge):
+
+```
+Coroutine 1                Coroutine 2                ...  Coroutine N
+     │                          │                          │
+     ├─ await lock              ├─ await lock              ├─ await lock
+     │  (blocks)                │  (blocks)                │  (blocks)
+     │                          │                          │
+  [acquires lock]               │                          │
+     │                          │                          │
+     ├─ _has_logged... = False  │                          │
+     ├─ Flip to True            │                          │
+     ├─ Log WARNING              │                          │
+     └─ return True             │                          │
+  [releases lock]               │                          │
+                                │  [acquires lock]         │
+                                │                          │
+                                ├─ _has_logged... = True   │
+                                ├─ (already flipped)       │
+                                ├─ Log DEBUG               │
+                                └─ return False            │
+                             [releases lock]              │
+                                                          │
+                                                       [acquires lock]
+                                                          │
+                                                          ├─ _has_logged... = True
+                                                          ├─ Log DEBUG
+                                                          └─ return False
+                                                       [releases lock]
+```
+
+**Result:**
+- Exactly **one** WARNING log (from Coroutine 1)
+- Exactly **one** `_notify_first_failure()` call (from Coroutine 1)
+- **N** entries in `_failure_count` (each coroutine increments it)
+- **One** `_first_failure_timestamp` (set by Coroutine 1)
+- **One** `_last_failure_timestamp` (set by the last coroutine to finish)
+
+### Why This Works
+
+1. **The lock serializes access.** Only one coroutine at a time can be in `_record_failure_locked`.
+2. **The flip is atomic with the check.** Under the lock, no other coroutine can interleave a read between the `if` and the assignment.
+3. **The first coroutine wins.** The first to acquire the lock sees `False`, flips to `True`, and returns `True`.
+4. **All others lose.** Subsequent coroutines see `True` (already flipped) and return `False`.
+
+### Edge Case: Lock-Free Optimizations?
+
+**Could we skip the lock and rely on CPython's GIL?**
+
+- In the current code, `_handle_send_failure` is synchronous and await-free.
+- In CPython, the GIL ensures only one thread executes Python bytecode at a time.
+- asyncio switches tasks only at `await` points, so a sync function is atomic w.r.t. other coroutines.
+
+**BUT:** The moment someone adds an `await` inside the critical section (async logging, DB persist, inline notification), the atomicity evaporates silently.
+
+**We add the lock as defense-in-depth:**
+- Correctness survives future changes to the code.
+- The overhead is minimal (~0.32 µs for the locked section).
+- The structural rule (plain `def` helper, no `await`) makes yielding mechanically impossible.
+
+---
+
+## 5. Edge Cases and Their Handling
+
+### 5.1 Intermittent / Flapping Bridge
+
+**Scenario:** Bridge alternates between up and down repeatedly.
+
+**Behavior:**
+- First failure → notification sent, flag set to `True`.
+- Subsequent failures (even if bridge recovers and fails again) → no notification.
+- `_failure_count` continues climbing.
+- `_last_failure_timestamp` updates on each failure.
+
+**Why this is correct:**
+- Ongoing flap severity is visible via `_failure_count` and `_last_failure_timestamp` on the status endpoint.
+- Re-alerting on each flap is deliberately NOT done (one notification per startup).
+- Future extension: recovery-based reset (after N consecutive successes) can re-arm detection so the *next* degradation is a new "first."
+
+### 5.2 Config Change (ADC_TELEGRAM_BRIDGE_URL)
+
+**Scenario:** Environment variable changes at runtime.
+
+**Behavior:**
+- `bridge_url` is read once in `__init__` and cached.
+- Changing the env var has no effect until restart.
+- On restart, the flag resets to `False`, so the new URL's first failure triggers notification.
+
+**Why this is correct:**
+- The singleton lifecycle matches the process lifecycle.
+- A restart resets both config and detection state, keeping them consistent.
+- **Future rule:** Any hot-reload that mutates `bridge_url` on a live instance MUST also call `reset_first_failure_state()`, or the new URL's first failure is suppressed by a stale flag.
+
+### 5.3 4xx vs 5xx vs Transport Errors
+
+**Current behavior (v1):**
+- All three failure branches flip the flag identically:
+  - Non-2xx HTTP response (including 4xx per-message errors)
+  - `httpx.RequestError` (network/transport failures)
+  - Any other `Exception`
+
+**Sharp edge:** A single 400 (per-message error) can "use up" the one notification and suppress a later real outage.
+
+**Future enhancement:**
+- Scope "first failure" to reachability-class failures only:
+  - `httpx.RequestError` (network error, timeout, connection refused)
+  - 5xx/429 (bridge-side errors, rate limits)
+- Route 4xx to a per-message DEBUG path that does NOT touch the flag.
+
+### 5.4 Recovery-Based Reset (Future)
+
+**Scenario:** Bridge recovers and stays healthy for N consecutive sends.
+
+**Behavior (future):**
+- Add `_consecutive_success_count` field.
+- In `_handle_send_success`, increment the counter.
+- After threshold (e.g., 5 consecutive successes), flip `_has_logged_first_failure` back to `False`.
+- Next failure is treated as "first" again.
+
+**Why this is an extension:**
+- Out of scope for v1 (per-startup semantic is sufficient).
+- Requires adding a success path handler and threshold configuration.
+- Prevents "one notification per process" from becoming "one notification ever" for long-running processes.
+
+### 5.5 Notification Failure
+
+**Scenario:** `_notify_first_failure()` raises, times out, or is cancelled.
+
+**Behavior:**
+- The flag stays `True` (already set inside the lock before the notify runs).
+- Next failure sees `True` and does NOT re-notify.
+- The first notification is lost until reset/restart.
+
+**Why this is correct:**
+- Desired exactly-once property (no re-notify on subsequent failures).
+- If notification retry is needed, it's a notification-layer concern and must NOT un-set the flag.
+- Future extension: notification queue with retry logic.
+
+### 5.6 Concurrent First Failures (N Coroutines Race)
+
+**Scenario:** N coroutines all fail at once, all try to acquire the lock.
+
+**Behavior:** (covered in §4)
+- Exactly one WARNING log.
+- Exactly one `_notify_first_failure()` call.
+- All N failures increment `_failure_count`.
+
+**Why this is correct:**
+- The lock makes the claim atomic.
+- "First" is the winner of the claim, not the earliest timestamp.
+
+---
+
+## 6. Implementation Guidance
+
+### 6.1 Locked Helper (Plain `def`, No `await`)
 
 ```python
-async def escalate_intent(request: EscalateRequest) -> str:
+def _record_failure_locked(self, error_context: str) -> bool:
     """
-    Escalate intent to NEEDLE bead, with pre-flight failure detection.
+    Caller MUST hold _first_failure_lock.
+    Sync on purpose — no await (prevents yielding mid-check).
+
+    Returns True iff THIS call performed the _has_logged_first_failure
+    False→True flip, i.e. this is the first failure of the startup.
     """
-    # Check if we've already notified about a dispatch failure for this intent
-    store = get_store()
-    intent = await store.get_intent(request.intent_id)
+    now = datetime.now()
 
-    # Check for existing failure notification (by intent_id, not bead_ref yet)
-    # We use a separate table for intent-level failures because bead doesn't exist yet
-    emitted = await store.get_emitted_intent_failures(request.intent_id)
+    # Unconditional state updates
+    self._is_reachable = False
+    self._failure_count += 1
+    self._last_failure_timestamp = now
 
-    # If intent already failed and we notified, skip escalation
-    # (This prevents retry spam on truly dead dispatches)
-    if emitted & FAILURE_BIT_DISPATCH:
-        logger.warning(f"Intent {request.intent_id} already marked as dispatch-failed, skipping escalation")
-        return None
+    # THE CHECK: First vs Subsequent
+    if not self._has_logged_first_failure:
+        # THE CLAIM: Flip the flag
+        self._has_logged_first_failure = True
+        self._first_failure_timestamp = now
 
-    # ... rest of escalation logic ...
-
-    # If escalation fails (e.g., bf create fails):
-    # 1. Mark intent as failed
-    await store.update_intent_status(intent.id, "failed")
-    # 2. Check if we should notify
-    if not (emitted & FAILURE_BIT_DISPATCH):
-        # 3. Emit notification (broadcast to fallback surface)
-        await broadcast_first_failure(
-            intent_id=intent.id,
-            session_id=intent.session_id,
-            failure_type="dispatch_failed",
-            reason="Bead creation failed"
+        logger.warning(
+            f"First Telegram send failure detected at {self.bridge_url}. "
+            f"Error: {error_context or 'unknown error'}. "
+            f"Subsequent failures will be logged at DEBUG level only."
         )
-        # 4. Mark as notified
-        await store.mark_intent_failure_emitted(intent.id, FAILURE_BIT_DISPATCH)
-```
+        return True  # was_first → triggers notification
 
-#### 2. Post-Fetch Check (After Fetch Execution)
-
-**Location:** `intent/router.py` - `process_intent()` after `execute_fetch()`
-
-**Purpose:** Detect terminal fetch failures and notify
-
-**Pseudo-code:**
-
-```python
-async def process_intent(intent: RoutedIntent, context: FetchContext) -> None:
-    """
-    Process intent through fetch + synthesize strands with failure detection.
-    """
-    # Execute fetch
-    fetch_result = await execute_fetch(
-        request=FetchRequest(
-            intent_type=intent.intent_type,
-            context=context,
-            intent_id=intent.intent_id,
-            session_id=intent.session_id,
-        )
+    # Subsequent failure path
+    logger.debug(
+        f"Repeated Telegram send failure #{self._failure_count} "
+        f"at {self.bridge_url}. Error: {error_context or 'unknown error'}."
     )
-
-    # Check for terminal failure (all sources failed)
-    if fetch_result.terminal_failure == "all_sources_failed":
-        # Get or create bead watch row (even for hot-path intents, we track fetch failures)
-        store = get_store()
-        bead_watch = await store.get_bead_watch_by_intent(intent.intent_id)
-
-        # Check if we've already notified about fetch failure for this bead
-        emitted = bead_watch.get("emitted_failures", 0) if bead_watch else 0
-
-        if not (emitted & FAILURE_BIT_FETCH):
-            # First time seeing this failure → emit notification
-            await broadcast_first_failure(
-                intent_id=intent.intent_id,
-                session_id=intent.session_id,
-                failure_type="fetch_terminal",
-                reason=f"All {fetch_result.coverage.total_sources} fetch sources failed",
-                context={
-                    "timed_out": fetch_result.coverage.timed_out,
-                    "failed": fetch_result.coverage.failed,
-                }
-            )
-
-            # Update emitted_failures bitfield
-            await store.update_bead_watch_emitted_failures(
-                bead_ref=intent.bead_ref or f"intent:{intent.intent_id}",
-                failure_bit=FAILURE_BIT_FETCH
-            )
+    return False  # not_first → suppress notification
 ```
 
-#### 3. BeadWatcher Tick Check (During Background Polling)
-
-**Location:** New `bead/watcher.py` - `BeadWatcher.tick()`
-
-**Purpose:** Detect refusal, SLA, and fencing failures
-
-**Pseudo-code:**
+### 6.2 Reactive Handler (Acquires Lock, Calls Helper)
 
 ```python
-class BeadWatcher:
+async def _handle_send_failure(self, error_context: str = "") -> None:
     """
-    Watches open NEEDLE beads for failure conditions.
+    Reactive detection entry point.
+    Called only from send_message failure branches.
     """
+    was_first = False
 
-    async def tick(self) -> None:
-        """
-        Single tick: check all watched beads for failures, notify on first detection.
-        """
-        store = get_store()
-        watched_beads = await store.get_open_watched_beads()
+    # Serialize the critical section
+    async with self._first_failure_lock:
+        was_first = self._record_failure_locked(error_context)
 
-        for bead in watched_beads:
-            bead_ref = bead["bead_ref"]
-            emitted_failures = bead.get("emitted_failures", 0)
-
-            # Check 1: Refusal detection
-            if bead.get("last_refusal_reason") and not (emitted_failures & FAILURE_BIT_REFUSAL):
-                await self._handle_refusal(bead, emitted_failures)
-
-            # Check 2: SLA breach detection
-            elif bead.get("sla_flagged_at") and not (emitted_failures & FAILURE_BIT_SLA):
-                await self._handle_sla_breach(bead, emitted_failures)
-
-            # Check 3: Fencing detection (circuit breaker)
-            elif bead.get("fenced_at") and not (emitted_failures & FAILURE_BIT_FENCED):
-                await self._handle_fencing(bead, emitted_failures)
-
-    async def _handle_refusal(self, bead: dict, emitted_failures: int) -> None:
-        """Handle first refusal detection."""
-        bead_ref = bead["bead_ref"]
-        intent = await store.get_intent_by_bead_ref(bead_ref)
-
-        # Emit notification to fallback surface (Telegram)
-        await broadcast_first_failure(
-            intent_id=intent["id"] if intent else None,
-            session_id=intent["session_id"] if intent else None,
-            failure_type="refusal",
-            reason=bead["last_refusal_reason"],
-            context={
-                "bead_ref": bead_ref,
-                "refusal_count": bead["refusal_count"],
-            }
-        )
-
-        # Mark as notified
-        await store.update_bead_watch_emitted_failures(
-            bead_ref=bead_ref,
-            failure_bit=FAILURE_BIT_REFUSAL
-        )
-
-    async def _handle_sla_breach(self, bead: dict, emitted_failures: int) -> None:
-        """Handle first SLA breach detection."""
-        # Similar pattern to _handle_refusal
-        await store.update_bead_watch_emitted_failures(
-            bead_ref=bead["bead_ref"],
-            failure_bit=FAILURE_BIT_SLA
-        )
-
-    async def _handle_fencing(self, bead: dict, emitted_failures: int) -> None:
-        """Handle first fencing detection."""
-        # Similar pattern to _handle_refusal
-        await store.update_bead_watch_emitted_failures(
-            bead_ref=bead["bead_ref"],
-            failure_bit=FAILURE_BIT_FENCED
-        )
+    # Lock released; notification runs outside
+    if was_first:
+        await self._notify_first_failure(error_context)
 ```
 
-## Thread-Safety Considerations
-
-**Dependency:** adc-50ld (Thread-Safety Design)
-
-The detection logic relies on the thread-safety patterns designed in adc-50ld:
-
-1. **SQLite write locking** - `aiosqlite` with WAL mode allows concurrent reads, serialized writes
-2. **Compare-and-swap pattern** - Update emitted_failures only if bit not set:
-
-```sql
--- Atomic test-and-set for failure bit
-UPDATE bead_watch
-SET emitted_failures = emitted_failures | ?
-WHERE bead_ref = ? AND (emitted_failures & ?) = 0;
-```
-
-If `rowcount == 0`, another tick already set the bit → skip notification.
-
-3. **Intent-level lock** - For pre-escalation checks, use intent_id as lock key:
+### 6.3 Call Sites in `send_message`
 
 ```python
-async def check_and_notify_dispatch_failure(intent_id: str) -> bool:
-    """Check if dispatch failure already notified, emit if not. Returns True if notified."""
-    async with _intent_locks.setdefault(intent_id, asyncio.Lock()):
-        # Double-checked locking pattern
-        emitted = await store.get_emitted_intent_failures(intent_id)
-        if emitted & FAILURE_BIT_DISPATCH:
-            return False  # Already notified by another coroutine
-
-        # Emit notification
-        await broadcast_first_failure(...)
-        await store.mark_intent_failure_emitted(intent_id, FAILURE_BIT_DISPATCH)
-        return True
+# Inside send_message — three failure branches, all now awaited:
+#   non-2xx  → await self._handle_send_failure(error_msg)
+#   RequestError → await self._handle_send_failure(error_msg)
+#   other Exception → await self._handle_send_failure(error_msg)
 ```
 
-## Edge Cases
-
-### 1. Intermittent Failures
-
-**Scenario:** Bead is refused, user resolves the blocker, bead gets refused again later.
-
-**Handling:** Emitted failures persist **per bead watch row**. If bead is closed and reopened, state resets.
-
-**Flow:**
-```
-1. Bead refused → emitted_failures = 1 → notify
-2. User resolves → refusal cleared → emitted_failures stays 1 (no reset)
-3. Bead refused again → bit already set → suppress
-```
-
-**Rationale:** "First failure" means "first time we saw this failure type for this bead watch instance". If the same bead keeps failing with the same reason, the user already knows about it from the first notification.
-
-### 2. Config Changes
-
-**Scenario:** `config/fetch.yaml` changes, timeout adjusted, previously-failing source now succeeds.
-
-**Handling:** Emitted failures are **not** tied to config version. If a source starts working again, we don't auto-reset because the user may have already taken action based on the first notification.
-
-**Optional enhancement:** Add a config_version column to bead_watch and auto-reset on config change (future work).
-
-### 3. Bead Resolution Changes
-
-**Scenario:** Bead is reassigned to different intent, or bead_ref changes.
-
-**Handling:** `bead_ref` is the primary key. If bead_ref changes:
-1. Old row deleted (or manual update)
-2. New row created with `emitted_failures = 0`
-3. New failures trigger fresh notifications
-
-**User action:** Manual `bf update --bead-ref <new-id>` creates new watch row.
-
-### 4. Multiple Failure Types
-
-**Scenario:** Bead hits refusal, then SLA breach, then fencing.
-
-**Handling:** Each failure type is a separate bit:
-
-```
-emitted_failures = 0
-  → refusal detected → bit 0 set → emitted_failures = 1 → notify refusal
-  → SLA breached → bit 1 set → emitted_failures = 3 → notify SLA
-  → fenced → bit 2 set → emitted_failures = 7 → notify fencing
-```
-
-**Result:** User receives **three distinct notifications**, one per failure type.
-
-## Notification Payload
-
-**Structure:** `SSEEvent` with `event_type="first_failure"`
+### 6.4 Side-Channel Notification (No Recursive Send)
 
 ```python
-{
-    "event_type": "first_failure",
-    "data": {
-        "failure_type": "refusal" | "sla_flag" | "fenced" | "dispatch_failed" | "fetch_terminal",
-        "bead_ref": str,
-        "intent_id": str,
-        "session_id": str,
-        "reason": str,
-        "context": {
-            # Failure-specific metadata
-            "refusal_count": int,
-            "sla_deadline": int,
-            "timed_out_sources": list[str],
-            "failed_sources": list[str],
-        },
-        "notified_at": int,  # Unix timestamp
-    }
-}
+async def _notify_first_failure(self, error_context: str) -> None:
+    """
+    Deliver the once-per-startup alert over a SIDE CHANNEL.
+
+    MUST NOT call self.send_message(...): the bridge just failed for the
+    same reason, and a failure here would pollute _failure_count /
+    _last_failure_timestamp with self-failures.
+    """
+    # TODO(notification bead): choose the side channel.
+    # Options: stderr, structured log sink, separate transport.
+    return
 ```
 
-**Broadcast targets:**
-1. **Session surfaces** - All active surfaces for the session
-2. **Fallback surface** - Telegram (always, for critical failures)
+---
 
-## Implementation Checklist
+## 7. Verification
 
-- [ ] Add `emitted_failures INTEGER DEFAULT 0` column to `bead_watch` table migration
-- [ ] Add `intent_failures` table for pre-bead dispatch failure tracking
-- [ ] Implement `broadcast_first_failure()` in `src/sse/broadcaster.py`
-- [ ] Implement pre-escalation check in `src/escalate/handler.py`
-- [ ] Implement post-fetch check in `src/intent/router.py`
-- [ ] Implement BeadWatcher checks in new `src/bead/watcher.py`
-- [ ] Add thread-safety locks from adc-50ld design
-- [ ] Write tests for first-failure detection edge cases
-- [ ] Add logging for first-failure events (INFO level)
+### 7.1 Unit Tests
 
-## Why This Works
+- **Single first failure:** Call `_handle_send_failure` once → `_has_logged_first_failure == True`, WARNING logged, `_notify_first_failure` called.
+- **Subsequent suppression:** Call twice → second call sees `True`, logs DEBUG only, no `_notify_first_failure`.
+- **Concurrent failures:** `asyncio.gather(*[_handle_send_failure() for _ in range(10)])` → exactly one WARNING, `_failure_count == 10`, one `_first_failure_timestamp`.
+- **Counter accuracy:** 100 concurrent calls → `_failure_count == 100`.
+- **Reset re-arms:** `reset_first_failure_state()` → flag back to `False`, next failure is "first" again.
+- **Flag not reset on restart:** New `TelegramFallback()` instance → flag starts as `False`.
 
-1. **Bitfield state** enables efficient per-type tracking without separate columns
-2. **Atomic test-and-set** prevents duplicate notifications under concurrency
-3. **Separate check points** cover all failure entry points
-4. **Persistent state** survives watcher restarts
-5. **Graceful degradation** - if state is lost, worst case is duplicate notification (not silent failure)
+### 7.2 Structural Tests
 
-## Open Questions
+- **No I/O in locked section:** `assert inspect.iscoroutinefunction(_record_failure_locked) is False`.
+- **Notification outside lock:** `_notify_first_failure` is called AFTER the `async with` block exits.
 
-1. **State reset on bead close:** Should we auto-delete bead_watch row when bead closes, or keep for audit trail?
-   - **Recommendation:** Delete on close to avoid stale state accumulation
+---
 
-2. **Notification dedupe window:** Should we add a time-based dedupe window (e.g., "same failure type within 1 hour")?
-   - **Recommendation:** No - bitfield is simpler and sufficient
+## 8. Acceptance Criteria Mapping
 
-3. **Fetch failure granularity:** Should we track per-source failures, or only "all sources failed"?
-   - **Recommendation:** Only terminal failure for now; per-source tracking is future enhancement
+| Criterion | Where Addressed |
+|-----------|-----------------|
+| Detection logic documented with clear pseudo-code or flow | §2 (check algorithm), §6 (implementation guidance) |
+| Explains how "first" is determined | §2 (claim-and-set pattern) |
+| Explains why subsequent failures are ignored | §3 (boolean flag latch, no reset window) |
+| Depends on child bead adc-50ld completing thread-safety design | Thread-safety from adc-50ld integrated (lock pattern, await-free helper) |
+
+---
+
+## 9. References
+
+- **Comprehensive design:** `notes/adc-14la-first-failure-tracking-design.md` — end-to-end flow, state model, concurrency analysis
+- **Thread-safety:** `notes/adc-50ld-thread-safety-approach.md` — lock pattern, latent-vs-active race, performance
+- **Data structure:** `notes/adc-65l3-first-failure-state-structure.md` — field definitions, reset semantics
+- **Storage:** `notes/adc-2duz-state-storage-design.md` — flat instance vars, in-memory per-startup
+- **Current code:** `src/telegram/fallback.py` — `_handle_send_failure`, `send_message`
