@@ -1,0 +1,260 @@
+[
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/whisper-stt-whisper-openai-68966786fb-tng29.log",
+    "pod_name": "whisper-stt-whisper-openai-68966786fb-tng29",
+    "namespace": "pbx-web",
+    "analysis_file_path": "research/pbx-web-30days/pod-logs/whisper-stt-whisper-openai-68966786fb-tng29-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:21.623256",
+      "log_file": "whisper-stt-whisper-openai-68966786fb-tng29.log"
+    }
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pbx-web-current-nginx.log",
+    "pod_name": "pbx-web-current-nginx",
+    "namespace": "pbx-web",
+    "analysis_file_path": null,
+    "detected_patterns": [],
+    "key_timestamps": null
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb.log",
+    "pod_name": "pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb",
+    "namespace": "pbx-web",
+    "analysis_file_path": "research/pbx-web-30days/pod-logs/pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:20.770654",
+      "log_file": "pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb.log"
+    }
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pbx-web-5ff68464d-mkn8n-previous.log",
+    "pod_name": "pbx-web-5ff68464d-mkn8n-previous",
+    "namespace": "pbx-web",
+    "analysis_file_path": null,
+    "detected_patterns": [],
+    "key_timestamps": null
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pbx-web-pbx-web-5ff68464d-lcfcp.log",
+    "pod_name": "pbx-web-pbx-web-5ff68464d-lcfcp",
+    "namespace": "pbx-web",
+    "analysis_file_path": "research/pbx-web-30days/pod-logs/pbx-web-pbx-web-5ff68464d-lcfcp-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:20.792334",
+      "log_file": "pbx-web-pbx-web-5ff68464d-lcfcp.log"
+    }
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pod-pbx-web-5ff68464d-mkn8n-2026-08-06.log",
+    "pod_name": "pbx-web-5ff68464d-mkn8n",
+    "namespace": "pbx-web",
+    "analysis_file_path": "research/pbx-web-30days/pod-logs/pod-pbx-web-5ff68464d-mkn8n-2026-08-06-analysis.json",
+    "detected_patterns": [
+      "error"
+    ],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:21.580554",
+      "error_first": "1785277704",
+      "error_last": "unknown",
+      "log_file": "pod-pbx-web-5ff68464d-mkn8n-2026-08-06.log"
+    }
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log",
+    "pod_name": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+    "namespace": "pbx-web",
+    "analysis_file_path": "research/pbx-web-30days/pod-logs/pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:20.858349",
+      "log_file": "pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log"
+    }
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pbx-web-pbx-rebuild-relay-8596977857-4292b.log",
+    "pod_name": "pbx-web-pbx-rebuild-relay-8596977857-4292b",
+    "namespace": "pbx-web",
+    "analysis_file_path": "research/pbx-web-30days/pod-logs/pbx-web-pbx-rebuild-relay-8596977857-4292b-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:20.781745",
+      "log_file": "pbx-web-pbx-rebuild-relay-8596977857-4292b.log"
+    }
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/whisper-stt-whisper-stt-847fd8d7b9-b8rsj.log",
+    "pod_name": "whisper-stt-whisper-stt-847fd8d7b9-b8rsj",
+    "namespace": "pbx-web",
+    "analysis_file_path": "research/pbx-web-30days/pod-logs/whisper-stt-whisper-stt-847fd8d7b9-b8rsj-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:21.623353",
+      "log_file": "whisper-stt-whisper-stt-847fd8d7b9-b8rsj.log"
+    }
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06.log",
+    "pod_name": "lab-rebuild-relay-79957dbd4-xsqhl",
+    "namespace": "pbx-web",
+    "analysis_file_path": "research/pbx-web-30days/pod-logs/pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:20.792479",
+      "log_file": "pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06.log"
+    }
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pbx-web-current-site-generator.log",
+    "pod_name": "pbx-web-current-site-generator",
+    "namespace": "pbx-web",
+    "analysis_file_path": null,
+    "detected_patterns": [],
+    "key_timestamps": null
+  },
+  {
+    "log_file_path": "pbx-web-30days/pod-logs/pbx-web-5ff68464d-mkn8n-current.log",
+    "pod_name": "pbx-web-5ff68464d-mkn8n-current",
+    "namespace": "pbx-web",
+    "analysis_file_path": null,
+    "detected_patterns": [],
+    "key_timestamps": null
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-previous.log",
+    "pod_name": "whisper-openai-68966786fb-jsb5d",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-previous-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:23.588806",
+      "log_file": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-previous.log"
+    }
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-06-14.log",
+    "pod_name": "whisper-openai-68966786fb-jsb5d",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-06-14-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:21.623418",
+      "log_file": "pod-whisper-openai-68966786fb-jsb5d-2026-06-14.log"
+    }
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/whisper-stt-847fd8d7b9-v2rs5.log",
+    "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
+    "namespace": "whisper-stt",
+    "analysis_file_path": null,
+    "detected_patterns": [],
+    "key_timestamps": null
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06.log",
+    "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:23.600454",
+      "log_file": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06.log"
+    }
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-current.log",
+    "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-current-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:23.600239",
+      "log_file": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-current.log"
+    }
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/whisper-openai-68966786fb-jsb5d.log",
+    "pod_name": "whisper-openai-68966786fb-jsb5d",
+    "namespace": "whisper-stt",
+    "analysis_file_path": null,
+    "detected_patterns": [],
+    "key_timestamps": null
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-07-12.log",
+    "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-07-12-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:23.599911",
+      "log_file": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-07-12.log"
+    }
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current.log",
+    "pod_name": "whisper-openai-68966786fb-jsb5d",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current-analysis.json",
+    "detected_patterns": [
+      "error"
+    ],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:23.588450",
+      "error_first": "unknown",
+      "error_last": "unknown",
+      "log_file": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-current.log"
+    }
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous.log",
+    "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:23.600296",
+      "log_file": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-previous.log"
+    }
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-stderr.log",
+    "pod_name": "whisper-openai-68966786fb-jsb5d",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-stderr-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:23.588961",
+      "log_file": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06-stderr.log"
+    }
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06.log",
+    "pod_name": "whisper-openai-68966786fb-jsb5d",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-analysis.json",
+    "detected_patterns": [
+      "error"
+    ],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:23.599807",
+      "error_first": "unknown",
+      "error_last": "unknown",
+      "log_file": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06.log"
+    }
+  },
+  {
+    "log_file_path": "whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-stderr.log",
+    "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
+    "namespace": "whisper-stt",
+    "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-stderr-analysis.json",
+    "detected_patterns": [],
+    "key_timestamps": {
+      "analysis_date": "2026-08-06T13:40:23.600397",
+      "log_file": "pod-whisper-stt-847fd8d7b9-v2rs5-2026-08-06-stderr.log"
+    }
+  }
+]
