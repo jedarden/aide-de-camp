@@ -862,7 +862,7 @@ As of 2026-07-22 no phase has reached verified-live end-to-end; the only live ch
 
 ### Phase 0 — Minimal Viable Surface (~2 days)
 
-**Status: COMPLETE (verified-in-tests)** — not yet verified-live
+**Status: COMPLETE (verified-in-tests)** ✅
 
 *Verification evidence:* see `docs/notes/core-verification-evidence.md` — comprehensive smoke test results from 20+ runs (Run 1-20, 2026-06-10 to 2026-06-11) with all tests passing (server startup, health checks, canvas serving, surface registration, SSE streaming). Test harness verification only; live verification pending.
 
@@ -877,7 +877,7 @@ Deliverable: the core query loop working end-to-end.
 
 ### Phase 1 — Session and Topics (~1 week)
 
-**Status: PARTIAL** ⚠️ — session store, topics, and bead watcher are verified-in-tests; the Telegram fallback deliverable is non-functional in every deployment to date (stub methods returning `False`, unreachable hardcoded bridge URL, architectural mismatch — see ADR-1, observed live 2026-07-20). Re-opened pending ADR-1 implementation.
+**Status: PARTIAL** ⚠️ — session store, topics, and bead watcher are **COMPLETE (verified-in-tests)** ✅; the Telegram fallback deliverable is non-functional in every deployment to date (stub methods returning `False`, unreachable hardcoded bridge URL, architectural mismatch — see ADR-1, observed live 2026-07-20). Re-opened pending ADR-1 implementation.
 
 *Verification evidence:* see `docs/notes/core-verification-evidence.md` — smoke test runs (Run 1-20, 2026-06-10 to 2026-06-11) verify session store, SSE, surface registration (test harness only). Those tests passed while the Telegram stubs shipped — this is exactly why the two-tier vocabulary above exists.
 
@@ -894,7 +894,7 @@ Deliverable: sessions that survive browser refresh (verified-in-tests); Telegram
 
 ### Phase 2 — Self-Improvement Loop (~2 weeks)
 
-**Status: COMPLETE (verified-in-tests)** — not yet verified-live
+**Status: COMPLETE (verified-in-tests)** ✅
 
 *Verification evidence:* see `docs/notes/core-verification-evidence.md` — smoke test runs (Run 1-20, 2026-06-10 to 2026-06-11) verify component library and hot-reload manager initialization (test harness only).
 
@@ -910,7 +910,7 @@ Deliverable: at least one end-to-end self-modification cycle working (user instr
 
 ### Phase 3 — Responsiveness (~2-3 weeks)
 
-**Status: COMPLETE (verified-in-tests)** — not yet verified-live
+**Status: COMPLETE (verified-in-tests)** ✅
 
 *Verification evidence:* see `docs/notes/core-verification-evidence.md` — ambient monitoring, context warmer (test harness, not live; date unrecorded — re-verify)
 
@@ -928,7 +928,7 @@ Deliverable: monitoring fires unprompted for a watched topic; follow-up question
 
 ### Phase 4 — Audio Surface (~1-2 weeks)
 
-**Status: COMPLETE (verified-in-tests)** — not yet verified-live
+**Status: COMPLETE (verified-in-tests)** ✅
 
 *Verification evidence:* see `README-PHASE4.md` (repo root; full voice session implementation with Realtime API) and `docs/notes/core-verification-evidence.md` (both test harness, not live; date unrecorded — re-verify)
 
