@@ -1,0 +1,101 @@
+[
+  {
+    "name": "pbx-web-765bb76db8",
+    "creationTimestamp": "2026-07-28T17:05:51Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-5ff68464d",
+    "creationTimestamp": "2026-07-13T18:18:07Z",
+    "replicas": 1,
+    "availableReplicas": 1,
+    "readyReplicas": 1,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-754f4cfdf7",
+    "creationTimestamp": "2026-07-13T18:07:55Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-6d86477cdb",
+    "creationTimestamp": "2026-06-25T15:23:48Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-66f79fd6f9",
+    "creationTimestamp": "2026-06-23T18:55:52Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-5cc966f86d",
+    "creationTimestamp": "2026-06-23T18:37:39Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-69794b7fcc",
+    "creationTimestamp": "2026-06-21T11:13:44Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-9fc5b5f59",
+    "creationTimestamp": "2026-06-15T18:11:38Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-85858b7dd4",
+    "creationTimestamp": "2026-05-11T18:17:51Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-5cc44d5c4c",
+    "creationTimestamp": "2026-05-07T18:57:22Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  },
+  {
+    "name": "pbx-web-5488fd45c8",
+    "creationTimestamp": "2026-05-07T18:40:16Z",
+    "replicas": 0,
+    "availableReplicas": 0,
+    "readyReplicas": 0,
+    "updatedReplicas": 0,
+    "conditions": []
+  }
+]

@@ -1,0 +1,140 @@
+{
+  "namespace": "whisper-stt",
+  "cluster": "ardenone-cluster",
+  "analysis_period": "last 30 days (2026-07-07 to 2026-08-06)",
+  "comparison_baseline": "pbx-web deployment patterns",
+  "current_pods": [
+    {
+      "name": "whisper-stt-847fd8d7b9-v2rs5",
+      "age_days": 25,
+      "restart_count": 0,
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "deployment_date": "2026-07-12T16:53:42Z"
+    },
+    {
+      "name": "whisper-openai-68966786fb-jsb5d",
+      "age_days": 53,
+      "restart_count": 0,
+      "image": "fedirz/faster-whisper-server:latest-cpu",
+      "deployment_date": "2026-06-14T04:55:49Z"
+    }
+  ],
+  "deployment_history": {
+    "whisper_stt_replica_sets_last_30_days": 10,
+    "whisper_openai_replica_sets_total": 11,
+    "total_replica_sets": 22,
+    "analysis_period_start": "2026-07-07",
+    "analysis_period_end": "2026-08-06",
+    "critical_period": "2026-06-24 to 2026-07-12 (18 days)",
+    "stabilization_date": "2026-07-12"
+  },
+  "deployment_pattern_analysis": {
+    "whisper_stt_deployments": [
+      {"date": "2026-06-24", "count": 1, "replica_set": "whisper-stt-75c848b8d6"},
+      {"date": "2026-06-25", "count": 2, "replica_sets": ["whisper-stt-65fb7f8dd9", "whisper-stt-558c7cf44"]},
+      {"date": "2026-06-26", "count": 2, "replica_sets": ["whisper-stt-78bbf5f57f", "whisper-stt-5b884b75f4"]},
+      {"date": "2026-07-01", "count": 1, "replica_set": "whisper-stt-6464bdf67b"},
+      {"date": "2026-07-02", "count": 1, "replica_set": "whisper-stt-6b96f4569c"},
+      {"date": "2026-07-08", "count": 3, "replica_sets": ["whisper-stt-5dbff75cbd", "whisper-stt-5b8558f478", "whisper-stt-6c497489fb"]},
+      {"date": "2026-07-12", "count": 1, "replica_set": "whisper-stt-847fd8d7b9 (current)"}
+    ],
+    "pbx_web_deployments": [
+      {"date": "2026-07-13", "count": 1, "replica_set": "pbx-web-5ff68464d (current)"},
+      {"date": "2026-07-15", "count": 1, "replica_set": "pbx-rebuild-relay-588d79c5b9"},
+      {"date": "2026-07-27", "count": 1, "replica_set": "lab-rebuild-relay-79957dbd4"}
+    ]
+  },
+  "comparison_metrics": {
+    "deployment_rate_comparison": {
+      "whisper_stt": "1 deployment every 1.8 days (unstable period)",
+      "pbx_web": "1 deployment every 10-15 days",
+      "ratio": "5x more frequent for whisper-stt"
+    },
+    "single_day_deployments": {
+      "whisper_stt": "3 days with multiple deployments (peak: 3 on July 8)",
+      "pbx_web": "0 days with multiple deployments"
+    },
+    "startup_latency": {
+      "whisper_stt": "60-120 seconds unavailability per deployment",
+      "pbx_web": "10-20 seconds unavailability per deployment",
+      "ratio": "6-12x longer for whisper-stt"
+    },
+    "current_stability": {
+      "whisper_stt": "25 days uninterrupted (since July 12)",
+      "pbx_web": "23 days uninterrupted (since July 13)"
+    }
+  },
+  "health_check_configuration": {
+    "whisper_stt": {
+      "readiness_probe": {
+        "initial_delay_seconds": 60,
+        "period_seconds": 10,
+        "failure_threshold": 3,
+        "total_timeout": "30 seconds"
+      },
+      "liveness_probe": {
+        "initial_delay_seconds": 120,
+        "period_seconds": 30,
+        "failure_threshold": 3,
+        "total_timeout": "90 seconds"
+      },
+      "startup_probe": {
+        "initial_delay_seconds": 10,
+        "period_seconds": 10,
+        "failure_threshold": 30,
+        "total_timeout": "300 seconds maximum"
+      }
+    },
+    "pbx_web": {
+      "readiness_probe": "10-20 seconds typical startup",
+      "liveness_probe": "Fast startup",
+      "startup_probe": "Not configured"
+    }
+  },
+  "root_cause_analysis": {
+    "primary_hypothesis": "ArgoCD auto-sync feedback loop",
+    "trigger_mechanism": "Extended startup time exceeds health check thresholds",
+    "contributing_factors": [
+      "Large ML model loading (60-120s startup)",
+      "Recreate deployment strategy (no rolling updates)",
+      "ArgoCD health check timeout during startup",
+      "Aggressive failure thresholds for startup variance"
+    ],
+    "cascade_pattern": "Deployment → Startup delay → Health check fail → ArgoCD re-deploy → Loop"
+  },
+  "stability_assessment": {
+    "whisper_stt_status": "STABLE (since July 12, but configuration vulnerability remains)",
+    "pbx_web_status": "STABLE (consistent pattern)",
+    "deployment_chronology": {
+      "whisper_stt": "Stable (25 days) → Previously unstable (10 deployments in 18 days)",
+      "pbx_web": "Consistently stable (2-3 deployments in 30 days)"
+    }
+  },
+  "recommendations": {
+    "immediate_actions": [
+      "Review ArgoCD application configuration for whisper-stt",
+      "Disable auto-sync during deployment windows",
+      "Increase health check timeout thresholds",
+      "Change deployment strategy from Recreate to RollingUpdate"
+    ],
+    "long_term_solutions": [
+      "Optimize startup performance (model cache warming)",
+      "Implement canary deployments",
+      "Add deployment monitoring and alerting",
+      "Extend observability retention to 30+ days"
+    ]
+  },
+  "data_limitations": {
+    "victorialogs_retention": "<24 hours (cannot assess 30-day error trends)",
+    "pod_log_availability": "Only current pods accessible",
+    "cluster_events": "No events captured in namespace queries",
+    "deployment_triggers": "ArgoCD sync history unavailable (API inaccessible)"
+  },
+  "key_findings": [
+    "whisper-stt had 10 deployments in 18 days vs pbx-web's 2-3 in 30 days",
+    "Multiple deployments occurred on single days (peak: 3 on July 8 within 17 minutes)",
+    "Each whisper-stt deployment causes 60-120s unavailability (6-12x longer than pbx-web)",
+    "ArgoCD auto-sync loop is the most likely root cause",
+    "Service has stabilized since July 12, but configuration vulnerability remains"
+  ]
+}

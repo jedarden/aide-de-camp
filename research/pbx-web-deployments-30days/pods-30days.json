@@ -1,0 +1,44 @@
+[
+  {
+    "name": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+    "creationTimestamp": "2026-07-15T03:24:40Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "image": "localhost:7439/python:3-slim",
+    "node": "k3s-agent-minisforum",
+    "startedAt": "2026-07-15T03:24:40Z",
+    "state": {
+      "running": {
+        "startedAt": "2026-07-15T03:24:41Z"
+      }
+    }
+  },
+  {
+    "name": "lab-rebuild-relay-79957dbd4-xsqhl",
+    "creationTimestamp": "2026-07-27T17:56:07Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "image": "localhost:7439/python:3-slim",
+    "node": "k3s-agent-minisforum",
+    "startedAt": "2026-07-27T17:56:07Z",
+    "state": {
+      "running": {
+        "startedAt": "2026-07-27T17:56:08Z"
+      }
+    }
+  },
+  {
+    "name": "pbx-web-5ff68464d-mkn8n",
+    "creationTimestamp": "2026-07-28T17:26:12Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "image": "ronaldraygun/pbx-web:1.0.9",
+    "node": "k3s-agent-minisforum",
+    "startedAt": "2026-07-28T17:26:12Z",
+    "state": {
+      "running": {
+        "startedAt": "2026-07-28T17:26:13Z"
+      }
+    }
+  }
+]

@@ -1,0 +1,71 @@
+Name:             whisper-stt-847fd8d7b9-v2rs5
+Namespace:        whisper-stt
+Priority:         0
+Service Account:  default
+Node:             k3s-agent-minisforum/10.20.23.203
+Start Time:       Sun, 12 Jul 2026 12:53:42 -0400
+Labels:           app=whisper-stt
+                  kuik.enix.io/managed=true
+                  pod-template-hash=847fd8d7b9
+Annotations:      kuik.enix.io/rewrite-images: true
+Status:           Running
+IP:               10.42.6.3
+IPs:
+  IP:           10.42.6.3
+Controlled By:  ReplicaSet/whisper-stt-847fd8d7b9
+Containers:
+  whisper-stt:
+    Container ID:   containerd://1015ff49db7ab4ab7fa30d54e8d4071615f773b4786f9305ca739de02420cf95
+    Image:          ronaldraygun/whisper-stt:1.8.6
+    Image ID:       docker.io/ronaldraygun/whisper-stt@sha256:4bcbc8c6689259596995f78c8b3a60e2d4425a3e483aa6dd33ae47410b2e1f9e
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Sun, 12 Jul 2026 12:53:55 -0400
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     8
+      memory:  8Gi
+    Requests:
+      cpu:      1
+      memory:   4Gi
+    Liveness:   http-get http://:8080/health delay=120s timeout=1s period=30s #success=1 #failure=3
+    Readiness:  http-get http://:8080/health delay=60s timeout=1s period=10s #success=1 #failure=3
+    Environment Variables from:
+      whisper-stt-secret  Secret  Optional: false
+    Environment:
+      POD:            whisper-stt-847fd8d7b9-v2rs5 (v1:metadata.name)
+      NAMESPACE:      whisper-stt (v1:metadata.namespace)
+      WHISPER_MODEL:  distil-large-v3
+    Mounts:
+      /data from jobs-data (rw)
+      /root/.cache/huggingface from model-cache (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qd849 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  model-cache:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  whisper-model-cache
+    ReadOnly:   false
+  jobs-data:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  whisper-stt-jobs
+    ReadOnly:   false
+  kube-api-access-qd849:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>
