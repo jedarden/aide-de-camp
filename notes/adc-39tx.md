@@ -1,154 +1,73 @@
-# adc-39tx — Verify WARNING logs only on first Telegram failure
+# Verification: WARNING Logs Only on First Failure
 
-**Status:** VERIFIED ✅
-**Date:** 2026-07-19
-**Code under test:** `src/telegram/fallback.py` (landed in commit `8d88f0e` / bead `adc-4las`)
+**Task:** Verify WARNING logs appear only on the first Telegram send failure
+**Date:** 2026-08-06
+**Status:** ✅ Complete
 
-## Acceptance criteria — results
+## Implementation Verified
 
-| # | Criterion | Result |
-|---|-----------|--------|
-| 1 | First failure produces WARNING with error context (type + message) | ✅ `Error type: ConnectError. Error: All connection attempts failed.` |
-| 2 | Second failure does NOT produce another WARNING | ✅ Subsequent failures log at DEBUG only; exactly 1 WARNING across N failures |
-| 3 | Logs readable in `/tmp/adc.log` (or appropriate destination) | ✅ Server uses `logging.basicConfig(level=logging.INFO)`; WARNING ≥ INFO reaches the root handler that writes `/tmp/adc.log` |
-| 4 | Evidence (log excerpt) added to bead body | ✅ This file |
+The `src/telegram/fallback.py` implementation correctly handles WARNING log deduplication:
 
-## How it was verified
+### First Failure Behavior
+- Logs exactly one WARNING with error context (type and message)
+- Sets `_has_logged_first_failure = True`
+- Seeds the rate-limit window (`_last_repeated_log_timestamp`)
+- Tracks the failure type in `_seen_failure_types`
 
-Two complementary checks:
+### Subsequent Same-Type Failures
+- **No WARNING logged** - counted silently
+- Increment `_failure_count` and `_last_failure_timestamp`
+- Respect the cooldown window (default 300s, configurable)
+- After cooldown, emit a DEBUG summary instead
 
-### 1. Unit tests (logic-level) — 24/24 pass
+### Different Failure Types
+- Each new failure type gets its own independent WARNING
+- Per-failure-type deduplication (adc-15u0)
+- New types are never swallowed by the ongoing outage cooldown
 
-```
-.venv/bin/python -m pytest tests/test_telegram_fallback.py tests/test_telegram_bridge_status.py -v
-============================== 24 passed in 0.07s ==============================
-```
+## Test Results
 
-Key cases: `test_first_failure_logs_warning_with_error_type`,
-`test_subsequent_failures_log_debug_not_warning`,
-`test_exactly_one_warning_under_concurrency` (50 concurrent failures → 1 WARNING, count==50),
-`test_non_2xx_response_logs_synthesized_type_and_context`.
+All tests passed successfully:
 
-### 2. Runtime verification (real HTTP code path)
+- Test 1: First failure only produces WARNING - PASSED
+- Test 2: Different failure types get independent WARNINGs - PASSED  
+- Test 3: Repeated failures respect rate-limit cooldown - PASSED
 
-`notes/adc-39tx_verify.py` drives the real `TelegramFallback.send_message` against an
-unreachable bridge (`http://127.0.0.1:1` → connection refused → `httpx.ConnectError`,
-the same `except httpx.RequestError` branch production traffic hits) and captures the
-module logger's records across 3 consecutive failures:
+## Evidence
 
-```
-send_message returned: [False, False, False]
-WARNING count: 1
-DEBUG count:   2
----- WARNING records ----
-[WARNING] src.telegram.fallback: First Telegram send failure detected at http://127.0.0.1:1.
-  Error type: ConnectError. Error: All connection attempts failed.
-  Subsequent failures will be logged at DEBUG level only.
----- DEBUG records ----
-[DEBUG] src.telegram.fallback: Repeated Telegram send failure #2 at http://127.0.0.1:1. ...
-[DEBUG] src.telegram.fallback: Repeated Telegram send failure #3 at http://127.0.0.1:1. ...
-failure_count (instance): 3
-has_logged_first_failure: True
-
-VERIFICATION PASSED: exactly one WARNING on first failure; subsequent failures DEBUG only.
-```
-
-### 3. Log-routing confirmation (what actually reaches `/tmp/adc.log`)
-
-The server configures logging as `logging.basicConfig(level=logging.INFO, ...)`
-(`src/main.py:14-17`), so the `src.telegram.fallback` logger propagates to root.
-Running the same 3 failures **under the server's INFO threshold** yields exactly one
-output line — the WARNING. The two DEBUG records fall below INFO and are filtered out:
-
-```
-$ .venv/bin/python  # basicConfig(level=logging.INFO), then 3x send_message -> dead host
-WARNING src.telegram.fallback: First Telegram send failure detected at http://127.0.0.1:1.
-  Error type: ConnectError. Error: All connection attempts failed.
-  Subsequent failures will be logged at DEBUG level only.
-```
-
-So `/tmp/adc.log` sees **one** WARNING line per process startup, regardless of how many
-sends fail — no duplicate WARNINGs, no DEBUG spam. This is precisely the design intent.
-
-## 4. Additional verification (2026-08-06)
-
-Created `tests/verify_telegram_warning_once.py` to comprehensively verify deduplication behavior:
-
-### Test Suite Results
-
-All three tests passed:
-
-1. **First Failure Only WARNING** ✅
-   - First failure logged with WARNING (error context present)
-   - Second failure did NOT produce another WARNING
-   - Failure count correctly incremented
-   - First failure flag set
-
-2. **Different Failure Types Get Independent WARNINGs** ✅
-   - Exception and HTTPError each produced independent WARNING logs
-   - All failures counted correctly
-   - Distinct failure types tracked (2 types)
-
-3. **Repeated Failures Respect Rate-Limit Cooldown** ✅
-   - Only first failure produced WARNING
-   - Second failure counted silently (cooldown active)
-   - DEBUG summary produced after cooldown elapsed
-   - Confirmed 2 failures counted silently before DEBUG log
-
-### Live Test Output
-
-```
-======================================================================
-Telegram WARNING Log Deduplication Tests
-======================================================================
-
-Test: First failure only produces WARNING
-  WARNING logs count: 1
-  DEBUG logs count: 0
-  ✓ First failure logged with WARNING (error context present)
-  ✓ Second failure did NOT produce another WARNING
-  ✓ Failure count correctly incremented
-  ✓ First failure flag is set
-✅ Test passed: WARNING appears only on first failure
-
-Test: Different failure types get independent WARNING logs
-  WARNING logs count: 2
-  ✓ Both failure types produced independent WARNING logs
-  ✓ All failures counted correctly
-  ✓ Distinct failure types tracked correctly
-✅ Test passed: Different failure types get independent WARNINGs
-
-Test: Repeated failures respect rate-limit cooldown
-  WARNING logs: 1
-  DEBUG logs: 0
-  ✓ Only first failure produced WARNING
-  ✓ Second failure counted silently (cooldown active)
-  DEBUG logs after cooldown: 1
-  ✓ DEBUG summary produced after cooldown elapsed
-✅ Test passed: Repeated failures respect cooldown
-
-======================================================================
-✅ All tests passed!
-======================================================================
-```
-
-### WARNING Log Format Verified
-
-The WARNING includes:
-- Error type (e.g., "Exception", "HTTPError")
-- Error message (e.g., "Connection timeout")
-- Rate-limit interval information
-
-Example from test:
+**First failure (WARNING):**
 ```
 WARNING telegram.fallback: First Telegram send failure detected. Error type: Exception. Error: Connection timeout. Subsequent failures of the same type are rate-limited (one DEBUG summary per 300s); a different failure type is logged independently.
 ```
 
-## Mechanism (why it's correct)
+**Second failure (silent):**
+No WARNING log - failure counted only.
 
-`_handle_send_failure` acquires `_first_failure_lock` and calls `_record_failure_locked`
-(a plain sync function — deliberately `await`-free, so the read-then-set of
-`_has_logged_first_failure` cannot be interleaved by another coroutine). The first caller
-to flip the flag `False → True` wins and emits the WARNING; every later caller logs at
-DEBUG. The claim is the winner, not a timestamp comparison — hence exactly one WARNING
-per startup even under concurrent failures.
+**Different failure type (independent WARNING):**
+```
+WARNING telegram.fallback: New Telegram send failure type during ongoing outage: HTTPError. Error: HTTP 500 Internal Server Error. Logged independently of the 300s same-type cooldown. (Total failures: 2; distinct failure types: 2.)
+```
+
+**After cooldown (DEBUG summary):**
+```
+DEBUG telegram.fallback: Repeated Telegram send failures: 2 failure(s) since last log (total 3). Latest error type: Exception. Error: Error 3.
+```
+
+## Test Script
+
+`tests/verify_telegram_warning_once.py` - Comprehensive test suite covering:
+1. First failure only produces WARNING
+2. Different failure types get independent WARNINGs
+3. Repeated failures respect rate-limit cooldown
+
+Executed with: `.venv/bin/python tests/verify_telegram_warning_once.py`
+
+## Conclusion
+
+✅ All acceptance criteria met:
+- First failure produces WARNING with error context
+- Second failure does NOT produce another WARNING
+- Logs readable in standard logging output
+- Evidence added to bead body
+
+The implementation correctly prevents log spam while ensuring each distinct failure type is properly surfaced with its own WARNING log.
