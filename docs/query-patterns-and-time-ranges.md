@@ -626,14 +626,190 @@ else:
     print(f"Query successful with {results['data_gaps_count']} data gaps")
 ```
 
+## Time Zone Considerations
+
+### UTC as Standard Time Zone
+
+All timestamps in the aide-de-camp system use **UTC (Coordinated Universal Time)** as the standard time zone:
+
+```python
+from datetime import datetime, timezone
+
+# Always use UTC for timestamp creation
+utc_now = datetime.now(timezone.utc)
+utc_timestamp = utc_now.strftime("%Y-%m-%dT%H:%M:%SZ")  # 2026-08-06T14:30:00Z
+```
+
+### ISO 8601 UTC Timestamp Format
+
+The system uses ISO 8601 format with `Z` suffix to indicate UTC:
+
+```
+Format: YYYY-MM-DDTHH:MM:SSZ
+Example: 2026-08-06T14:30:00Z
+```
+
+The `Z` suffix explicitly indicates UTC time zone (zero offset from UTC).
+
+### Time Zone-Aware datetime Objects
+
+When working with datetime objects in Python, always use timezone-aware objects:
+
+```python
+from datetime import datetime, timezone
+
+# CORRECT: timezone-aware datetime
+utc_datetime = datetime.now(timezone.utc)
+timestamp = utc_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+# INCORRECT: naive datetime (no timezone info)
+naive_datetime = datetime.now()  # Missing timezone information
+```
+
+### Parsing ISO 8601 Timestamps with Time Zone
+
+When parsing timestamps from data sources, explicitly handle timezone information:
+
+```python
+from datetime import datetime, timezone
+
+# Parse ISO 8601 timestamp and ensure UTC
+def parse_utc_timestamp(timestamp_str: str) -> datetime:
+    """
+    Parse ISO 8601 timestamp string and ensure UTC timezone.
+    
+    Args:
+        timestamp_str: ISO 8601 timestamp (e.g., "2026-08-06T14:30:00Z")
+    
+    Returns:
+        timezone-aware datetime object in UTC
+    """
+    # Remove 'Z' suffix if present
+    ts_clean = timestamp_str.rstrip('Z')
+    
+    # Parse and explicitly set UTC timezone
+    dt = datetime.fromisoformat(ts_clean)
+    return dt.replace(tzinfo=timezone.utc)
+
+# Example usage
+timestamp = "2026-08-06T14:30:00Z"
+dt = parse_utc_timestamp(timestamp)
+print(dt)  # 2026-08-06 14:30:00+00:00
+```
+
+### Handling Timezone-Aware Comparisons
+
+When comparing timestamps, ensure both datetime objects are timezone-aware:
+
+```python
+from datetime import datetime, timezone
+
+def filter_by_time_range(data: list, start_ts: str, end_ts: str) -> list:
+    """
+    Filter data entries by time range with timezone-aware comparisons.
+    
+    Args:
+        data: List of entries with 'timestamp' field
+        start_ts: ISO 8601 start timestamp (UTC)
+        end_ts: ISO 8601 end timestamp (UTC)
+    
+    Returns:
+        Filtered list of entries
+    """
+    start_dt = parse_utc_timestamp(start_ts)
+    end_dt = parse_utc_timestamp(end_ts)
+    
+    filtered = []
+    for entry in data:
+        ts = entry.get('timestamp')
+        if ts:
+            # Parse timestamp with timezone
+            entry_dt = parse_utc_timestamp(ts)
+            
+            # Compare timezone-aware datetime objects
+            if start_dt <= entry_dt <= end_dt:
+                filtered.append(entry)
+    
+    return filtered
+```
+
+### Time Zone Best Practices
+
+1. **Always use UTC for storage** - Store all timestamps in UTC timezone
+2. **Use timezone-aware datetime objects** - Never use naive datetime objects
+3. **Explicitly parse with timezone** - When reading timestamps, always ensure timezone info
+4. **Include 'Z' suffix** - When formatting timestamps, use 'Z' to indicate UTC
+5. **Validate timezone before comparisons** - Ensure both objects have timezone info before comparing
+
+### Common Time Zone Pitfalls
+
+**Pitfall 1: Comparing naive and aware datetime objects**
+```python
+# INCORRECT: This will raise TypeError
+naive_dt = datetime.now()
+aware_dt = datetime.now(timezone.utc)
+if naive_dt < aware_dt:  # TypeError: can't compare offset-naive and offset-aware datetimes
+    pass
+```
+
+**Pitfall 2: Losing timezone information during parsing**
+```python
+# INCORRECT: Loses timezone information
+ts = "2026-08-06T14:30:00Z"
+dt = datetime.fromisoformat(ts)  # No timezone info after parsing 'Z'
+
+# CORRECT: Preserve timezone information
+ts = "2026-08-06T14:30:00Z"
+dt = datetime.fromisoformat(ts.rstrip('Z')).replace(tzinfo=timezone.utc)
+```
+
+### Kubernetes Time Zone Handling
+
+Kubernetes timestamps are returned in UTC by default:
+
+```python
+# Kubernetes creationTimestamp format
+creation_timestamp = "2026-08-06T14:30:00Z"
+
+# Parse with timezone
+dt = parse_utc_timestamp(creation_timestamp)
+```
+
+### Time Zone Testing
+
+Always test timestamp parsing and comparison logic with timezone-aware objects:
+
+```python
+def test_timezone_handling():
+    """Test timezone-aware timestamp handling."""
+    from datetime import datetime, timezone
+    
+    # Create timezone-aware datetime
+    utc_dt = datetime.now(timezone.utc)
+    timestamp_str = utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    
+    # Parse and verify timezone preservation
+    parsed_dt = parse_utc_timestamp(timestamp_str)
+    
+    # Verify timezone info is present
+    assert parsed_dt.tzinfo == timezone.utc
+    assert parsed_dt == utc_dt
+    
+    print("Timezone handling test passed")
+
+test_timezone_handling()
+```
+
 ## Summary
 
 - **Time Range**: ISO 8601 format with explicit start/end timestamps
+- **Time Zone**: All timestamps use UTC with 'Z' suffix
 - **Error Rates**: Calculate as ratios (count / total) for various error types
 - **Latency Metrics**: Use percentile calculations (p50, p95) for timing data
 - **Aggregation Functions**: `rate()`, `avg()`, `percentile()`, `median()`
 - **Data Sources**: Pod logs, nginx logs, deployment files
 - **Query Execution**: Use collector classes or direct query functions
 - **Validation**: Always verify data availability before running queries
+- **Time Zone Safety**: Always use timezone-aware datetime objects
 
 This system provides comprehensive 30-day error rate and latency analysis for infrastructure monitoring and reliability assessment.
