@@ -120,6 +120,21 @@ This sequence guarantees:
 - `origin/main` is integrated into local history
 - The merge commit is visible in the git log for attribution
 
+### Post-sync verification
+
+After syncing, especially when the live server is running, verify the service:
+
+```bash
+# Verify health endpoint responds
+curl -s http://localhost:8000/health | jq .
+
+# If needed, restart the service to pick up any changes
+systemctl --user restart aide-de-camp
+
+# Check service status
+systemctl --user status aide-de-camp
+```
+
 ### Handling .beads/ uncommitted changes
 
 `.beads/` is git-ignored but contains live state (`beads.db`, `events.jsonl`). Before any sync:
