@@ -130,6 +130,32 @@ class TestExecutionContext:
         )
         assert ctx.argocd_app == "my-app-deployment"
 
+    def test_dry_run_default(self):
+        """dry_run defaults to False."""
+        ctx = ExecutionContext(
+            intent_id="i1",
+            session_id="s1",
+        )
+        assert ctx.dry_run is False
+
+    def test_dry_run_explicit_true(self):
+        """dry_run can be set to True."""
+        ctx = ExecutionContext(
+            intent_id="i1",
+            session_id="s1",
+            dry_run=True,
+        )
+        assert ctx.dry_run is True
+
+    def test_dry_run_explicit_false(self):
+        """dry_run can be explicitly set to False."""
+        ctx = ExecutionContext(
+            intent_id="i1",
+            session_id="s1",
+            dry_run=False,
+        )
+        assert ctx.dry_run is False
+
 
 class TestStepResult:
     """Test StepResult model."""

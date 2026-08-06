@@ -34,11 +34,13 @@ class ExecutionContext(BaseModel):
     - Project identification (slug, repo path)
     - Cluster configuration (cluster name, namespace)
     - Tracking identifiers (intent_id, session_id)
+    - Execution flags (dry_run)
     """
     intent_id: str = Field(..., description="Intent ID for tracking and SSE targeting")
     session_id: str = Field(..., description="Session ID for SSE targeting")
     project_slug: Optional[str] = Field(None, description="Project slug for registry lookup")
     project_cfg: dict[str, Any] = Field(default_factory=dict, description="Project configuration from registry")
+    dry_run: bool = Field(default=False, description="If True, skip mutating operations")
 
     # Cluster configuration (extracted from project_cfg for convenience)
     @property
