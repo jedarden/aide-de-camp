@@ -1,0 +1,161 @@
+{
+  "service": "pbx-web",
+  "data_source": "replicaset_transformed",
+  "extracted_at": "2026-08-06T21:27:42.963867Z",
+  "total_deployments": 17,
+  "deployments": [
+    {
+      "timestamp": "2026-07-28T17:05:51Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.9",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-765bb76db8",
+      "revision": "13"
+    },
+    {
+      "timestamp": "2026-07-27T17:56:07Z",
+      "image_tag": "python:3-slim",
+      "status": "success",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "lab-rebuild-relay-79957dbd4",
+      "revision": "2"
+    },
+    {
+      "timestamp": "2026-07-15T03:24:40Z",
+      "image_tag": "python:3-slim",
+      "status": "success",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+      "revision": "5"
+    },
+    {
+      "timestamp": "2026-07-13T18:18:07Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.9",
+      "status": "success",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-5ff68464d",
+      "revision": "14"
+    },
+    {
+      "timestamp": "2026-07-13T18:07:55Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.8",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-754f4cfdf7",
+      "revision": "11"
+    },
+    {
+      "timestamp": "2026-06-25T15:23:48Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.7",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-6d86477cdb",
+      "revision": "10"
+    },
+    {
+      "timestamp": "2026-06-23T18:55:52Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.6",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-66f79fd6f9",
+      "revision": "9"
+    },
+    {
+      "timestamp": "2026-06-23T18:37:39Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.5",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-5cc966f86d",
+      "revision": "8"
+    },
+    {
+      "timestamp": "2026-06-21T11:13:44Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.4",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-69794b7fcc",
+      "revision": "7"
+    },
+    {
+      "timestamp": "2026-06-15T18:11:38Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.2",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-9fc5b5f59",
+      "revision": "6"
+    },
+    {
+      "timestamp": "2026-05-11T18:17:51Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.2",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-85858b7dd4",
+      "revision": "5"
+    },
+    {
+      "timestamp": "2026-05-07T18:57:22Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.1",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-5cc44d5c4c",
+      "revision": "4"
+    },
+    {
+      "timestamp": "2026-05-07T18:40:16Z",
+      "image_tag": "ronaldraygun/pbx-web:1.0.0",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-web-5488fd45c8",
+      "revision": "3"
+    },
+    {
+      "timestamp": "2026-05-02T20:27:38Z",
+      "image_tag": "python:3-slim",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "lab-rebuild-relay-79d6d858bb",
+      "revision": "1"
+    },
+    {
+      "timestamp": "2026-05-02T20:27:37Z",
+      "image_tag": "python:3-slim",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-rebuild-relay-8596977857",
+      "revision": "4"
+    },
+    {
+      "timestamp": "2026-05-02T11:31:47Z",
+      "image_tag": "python:3-slim",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-rebuild-relay-5d6975d68d",
+      "revision": "3"
+    },
+    {
+      "timestamp": "2026-05-02T11:29:50Z",
+      "image_tag": "python:3-slim",
+      "status": "unknown",
+      "duration_seconds": null,
+      "source": "replicaset",
+      "replicaSet": "pbx-rebuild-relay-7fbbb9bc7d",
+      "revision": "2"
+    }
+  ]
+}
