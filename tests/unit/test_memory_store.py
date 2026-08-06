@@ -436,3 +436,472 @@ def test_save_overwrites_existing_file(store: MemoryStore) -> None:
     assert len(saved_data["facts"]) == 2
     assert saved_data["facts"][0]["text"] == "First fact"
     assert saved_data["facts"][1]["text"] == "Second fact"
+
+
+# --- load() from existing JSON tests (bead adc-ow8jx) --------------------------------
+
+
+def test_load_reads_existing_json_file(store: MemoryStore) -> None:
+    """Test that fresh load() reads existing JSON file correctly."""
+    import json
+
+    # Create a pre-existing JSON file with facts
+    preexisting_facts = [
+        {
+            "text": "User prefers dark mode",
+            "category": "preference",
+            "confidence": 0.9,
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "last_referenced": "2024-01-01T12:00:00+00:00"
+        },
+        {
+            "text": "User lives in Berlin",
+            "category": "personal",
+            "confidence": 0.95,
+            "created_at": "2024-01-02T14:30:00+00:00",
+            "last_referenced": "2024-01-02T14:30:00+00:00"
+        }
+    ]
+
+    # Write the pre-existing file
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": preexisting_facts,
+            "updated_at": "2024-01-02T14:30:00+00:00"
+        }, f)
+
+    # Create a NEW store instance and load from the file
+    new_store = MemoryStore(
+        session_id=store.session_id,
+        memory_dir=str(store.memory_dir),
+        logger=MagicMock()
+    )
+    new_store.load()
+
+    # Verify facts were loaded correctly
+    assert len(new_store._facts) == 2
+    assert new_store._facts[0].text == "User prefers dark mode"
+    assert new_store._facts[0].category == FactCategory.PREFERENCE
+    assert new_store._facts[0].confidence == 0.9
+    assert new_store._facts[1].text == "User lives in Berlin"
+    assert new_store._facts[1].category == FactCategory.PERSONAL
+    assert new_store._facts[1].confidence == 0.95
+
+
+def test_load_with_empty_json_file(store: MemoryStore) -> None:
+    """Test load() with existing but empty JSON file."""
+    import json
+
+    # Create an empty JSON file
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": []
+        }, f)
+
+    # Load from the empty file
+    store.load()
+
+    # Verify we have empty facts list
+    assert len(store._facts) == 0
+    assert isinstance(store._facts, list)
+
+
+def test_load_with_malformed_fact_entry(store: MemoryStore) -> None:
+    """Test that load() skips malformed fact entries gracefully."""
+    import json
+
+    # Create a file with one valid and one malformed fact
+    mixed_facts = [
+        {
+            "text": "Valid fact",
+            "category": "preference",
+            "confidence": 0.8,
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "last_referenced": "2024-01-01T12:00:00+00:00"
+        },
+        {
+            "text": "Malformed fact",
+            "category": "preference",
+            # Missing confidence field
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "last_referenced": "2024-01-01T12:00:00+00:00"
+        }
+    ]
+
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": mixed_facts
+        }, f)
+
+    # Load - should skip the malformed fact
+    store.load()
+
+    # Verify only the valid fact was loaded
+    assert len(store._facts) == 1
+    assert store._facts[0].text == "Valid fact"
+
+
+def test_load_with_missing_facts_field(store: MemoryStore) -> None:
+    """Test that load() handles missing 'facts' field gracefully."""
+    import json
+
+    # Create a file without 'facts' field
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id
+        }, f)
+
+    # Load - should initialize with empty facts
+    store.load()
+
+    # Verify we have empty facts list
+    assert len(store._facts) == 0
+    assert store._data["facts"] == []
+
+
+def test_load_with_missing_session_id(store: MemoryStore) -> None:
+    """Test that load() adds missing session_id."""
+    import json
+
+    # Create a file without session_id
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({"facts": []}, f)
+
+    # Load - should add session_id
+    store.load()
+
+    # Verify session_id was added
+    assert store._data["session_id"] == store.session_id
+
+
+# --- _is_duplicate() tests (bead adc-ow8jx) -----------------------------------
+
+
+def test_is_duplicate_detects_exact_match(store: MemoryStore) -> None:
+    """Test that _is_duplicate() detects exact duplicate facts."""
+    store.load()
+
+    # Add a fact
+    store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.9)
+
+    # Check if the same text is detected as duplicate
+    is_dup = store._is_duplicate("User prefers dark mode", FactCategory.PREFERENCE)
+    assert is_dup is True
+
+
+def test_is_duplicate_detects_normalized_match(store: MemoryStore) -> None:
+    """Test that _is_duplicate() detects duplicates with different whitespace/case."""
+    store.load()
+
+    # Add a fact
+    store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.9)
+
+    # Check if variations are detected as duplicates
+    assert store._is_duplicate("User prefers dark mode", FactCategory.PREFERENCE) is True
+    assert store._is_duplicate("User  prefers  dark  mode", FactCategory.PREFERENCE) is True
+    assert store._is_duplicate("user prefers dark mode", FactCategory.PREFERENCE) is True
+    assert store._is_duplicate("USER PREFERS DARK MODE", FactCategory.PREFERENCE) is True
+
+
+def test_is_duplicate_different_category_not_duplicate(store: MemoryStore) -> None:
+    """Test that _is_duplicate() only checks within same category."""
+    store.load()
+
+    # Add a fact as PREFERENCE
+    store.add_fact("User likes coding", FactCategory.PREFERENCE, 0.9)
+
+    # Same text in different category should not be duplicate
+    is_dup = store._is_duplicate("User likes coding", FactCategory.CONTEXT)
+    assert is_dup is False
+
+
+def test_is_duplicate_detects_long_text_overlap(store: MemoryStore) -> None:
+    """Test that _is_duplicate() detects duplicates with long text overlap."""
+    store.load()
+
+    # Add a long fact
+    long_fact = "User works extensively with Kubernetes clusters and has extensive experience with ArgoCD"
+    store.add_fact(long_fact, FactCategory.CONTEXT, 0.9)
+
+    # Check if a slightly different but overlapping text is detected
+    overlapping_fact = "User works extensively with Kubernetes clusters and has extensive experience with ArgoCD deployments"
+    is_dup = store._is_duplicate(overlapping_fact, FactCategory.CONTEXT)
+
+    # Should detect as duplicate due to prefix overlap (>20 chars)
+    assert is_dup is True
+
+
+def test_is_duplicate_short_text_no_overlap(store: MemoryStore) -> None:
+    """Test that _is_duplicate() doesn't detect overlap for short text."""
+    store.load()
+
+    # Add a short fact
+    store.add_fact("Likes cats", FactCategory.PREFERENCE, 0.9)
+
+    # Similar but different short text should not be duplicate
+    is_dup = store._is_duplicate("Likes dogs", FactCategory.PREFERENCE)
+    assert is_dup is False
+
+
+def test_is_duplicate_no_facts(store: MemoryStore) -> None:
+    """Test that _is_duplicate() returns False when no facts exist."""
+    store.load()
+
+    # With no facts, nothing should be duplicate
+    is_dup = store._is_duplicate("Any text", FactCategory.PREFERENCE)
+    assert is_dup is False
+
+
+# --- deduplication on add_fact() tests (bead adc-ow8jx) -------------------------
+
+
+def test_add_fact_skips_duplicate_exact_match(store: MemoryStore) -> None:
+    """Test that add_fact() skips duplicate facts (exact match)."""
+    store.load()
+
+    # Add a fact
+    result1 = store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.9)
+    assert result1 is True
+    assert len(store._facts) == 1
+
+    # Try to add the same fact again
+    result2 = store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.9)
+    assert result2 is False
+    assert len(store._facts) == 1, "Duplicate should not be added"
+
+
+def test_add_fact_skips_duplicate_normalized_match(store: MemoryStore) -> None:
+    """Test that add_fact() skips duplicates with different whitespace/case."""
+    store.load()
+
+    # Add a fact
+    result1 = store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.9)
+    assert result1 is True
+    assert len(store._facts) == 1
+
+    # Try to add variations - all should be rejected
+    result2 = store.add_fact("User  prefers  dark  mode", FactCategory.PREFERENCE, 0.9)
+    assert result2 is False
+    assert len(store._facts) == 1
+
+    result3 = store.add_fact("user prefers dark mode", FactCategory.PREFERENCE, 0.9)
+    assert result3 is False
+    assert len(store._facts) == 1
+
+
+def test_add_fact_allows_same_text_different_category(store: MemoryStore) -> None:
+    """Test that add_fact() allows same text in different categories."""
+    store.load()
+
+    # Add a fact as PREFERENCE
+    result1 = store.add_fact("User likes coding", FactCategory.PREFERENCE, 0.9)
+    assert result1 is True
+    assert len(store._facts) == 1
+
+    # Same text as CONTEXT should be allowed
+    result2 = store.add_fact("User likes coding", FactCategory.CONTEXT, 0.9)
+    assert result2 is True
+    assert len(store._facts) == 2
+
+
+def test_add_fact_after_load_from_persisted_file(store: MemoryStore) -> None:
+    """Test that add_fact() skips duplicates when loading from persisted file."""
+    import json
+
+    # Create a pre-existing file with facts
+    preexisting_facts = [
+        {
+            "text": "User prefers dark mode",
+            "category": "preference",
+            "confidence": 0.9,
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "last_referenced": "2024-01-01T12:00:00+00:00"
+        }
+    ]
+
+    store.file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(store.file_path, "w") as f:
+        json.dump({
+            "session_id": store.session_id,
+            "facts": preexisting_facts
+        }, f)
+
+    # Load from file
+    store.load()
+    assert len(store._facts) == 1
+
+    # Try to add the same fact - should be skipped
+    result = store.add_fact("User prefers dark mode", FactCategory.PREFERENCE, 0.9)
+    assert result is False
+    assert len(store._facts) == 1, "Duplicate should not be added after load"
+
+    # Add a different fact - should work
+    result2 = store.add_fact("User lives in Berlin", FactCategory.PERSONAL, 0.95)
+    assert result2 is True
+    assert len(store._facts) == 2
+
+
+# --- round-trip persistence tests (bead adc-ow8jx) --------------------------------
+
+
+def test_round_trip_save_load_preserves_facts(store: MemoryStore) -> None:
+    """Test round-trip: save → load → facts match original."""
+    import json
+
+    store.load()
+
+    # Add multiple facts
+    original_facts = [
+        ("User prefers dark mode", FactCategory.PREFERENCE, 0.9),
+        ("User lives in Berlin", FactCategory.PERSONAL, 0.95),
+        ("User works on Kubernetes", FactCategory.CONTEXT, 0.85),
+    ]
+
+    for text, category, confidence in original_facts:
+        store.add_fact(text, category, confidence)
+
+    # Save to disk
+    store.save()
+
+    # Create a NEW store instance and load from disk
+    new_store = MemoryStore(
+        session_id=store.session_id,
+        memory_dir=str(store.memory_dir),
+        logger=MagicMock()
+    )
+    new_store.load()
+
+    # Verify facts match
+    assert len(new_store._facts) == len(original_facts)
+
+    for i, (text, category, confidence) in enumerate(original_facts):
+        assert new_store._facts[i].text == text
+        assert new_store._facts[i].category == category
+        assert new_store._facts[i].confidence == confidence
+
+
+def test_round_trip_preserves_metadata(store: MemoryStore) -> None:
+    """Test that round-trip preserves timestamps and metadata."""
+    store.load()
+
+    # Add a fact
+    store.add_fact("Test fact", FactCategory.PREFERENCE, 0.9)
+
+    # Get the original timestamp
+    original_created_at = store._facts[0].created_at
+    original_last_referenced = store._facts[0].last_referenced
+
+    # Save
+    store.save()
+
+    # Load into new store
+    new_store = MemoryStore(
+        session_id=store.session_id,
+        memory_dir=str(store.memory_dir),
+        logger=MagicMock()
+    )
+    new_store.load()
+
+    # Verify metadata is preserved
+    assert new_store._facts[0].created_at == original_created_at
+    assert new_store._facts[0].last_referenced == original_last_referenced
+    assert new_store._facts[0].text == "Test fact"
+    assert new_store._facts[0].category == FactCategory.PREFERENCE
+    assert new_store._facts[0].confidence == 0.9
+
+
+def test_round_trip_with_empty_facts(store: MemoryStore) -> None:
+    """Test round-trip with empty facts list."""
+    store.load()
+    store.save()
+
+    # Load into new store
+    new_store = MemoryStore(
+        session_id=store.session_id,
+        memory_dir=str(store.memory_dir),
+        logger=MagicMock()
+    )
+    new_store.load()
+
+    # Verify empty facts list
+    assert len(new_store._facts) == 0
+    assert isinstance(new_store._facts, list)
+
+
+def test_round_trip_preserves_session_id(store: MemoryStore) -> None:
+    """Test that round-trip preserves session_id."""
+    test_session_id = "round-trip-test-session"
+    custom_store = MemoryStore(
+        session_id=test_session_id,
+        memory_dir=str(store.memory_dir),
+        logger=MagicMock()
+    )
+
+    custom_store.load()
+    custom_store.add_fact("Test fact", FactCategory.CONTEXT, 0.8)
+
+    # Load into new store
+    new_store = MemoryStore(
+        session_id=test_session_id,
+        memory_dir=str(store.memory_dir),
+        logger=MagicMock()
+    )
+    new_store.load()
+
+    # Verify session_id is preserved
+    assert new_store._data["session_id"] == test_session_id
+    assert new_store.session_id == test_session_id
+
+
+def test_round_trip_multiple_cycles(store: MemoryStore) -> None:
+    """Test multiple save/load cycles preserve facts correctly."""
+    store.load()
+
+    # First cycle: add facts and save
+    store.add_fact("Fact 1", FactCategory.PREFERENCE, 0.9)
+    store.add_fact("Fact 2", FactCategory.PERSONAL, 0.85)
+    store.save()
+
+    # Second cycle: load, add more, save
+    store.load()
+    store.add_fact("Fact 3", FactCategory.CONTEXT, 0.8)
+    store.save()
+
+    # Third cycle: load and verify
+    store.load()
+    assert len(store._facts) == 3
+    assert store._facts[0].text == "Fact 1"
+    assert store._facts[1].text == "Fact 2"
+    assert store._facts[2].text == "Fact 3"
+
+
+def test_round_trip_preserves_fact_order(store: MemoryStore) -> None:
+    """Test that round-trip preserves fact insertion order."""
+    store.load()
+
+    # Add facts in specific order
+    facts_order = ["First", "Second", "Third", "Fourth"]
+    for fact_text in facts_order:
+        store.add_fact(fact_text, FactCategory.CONTEXT, 0.8)
+
+    store.save()
+
+    # Load into new store
+    new_store = MemoryStore(
+        session_id=store.session_id,
+        memory_dir=str(store.memory_dir),
+        logger=MagicMock()
+    )
+    new_store.load()
+
+    # Verify order is preserved
+    loaded_texts = [f.text for f in new_store._facts]
+    assert loaded_texts == facts_order
