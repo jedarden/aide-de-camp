@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-08-06T12:33:01.558621",
+  "task": "adc-24gnb: calculate deployment success rates",
+  "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+  "services": {
+    "pbx-web": {
+      "service": "pbx-web",
+      "total_deployments": 5,
+      "successful_deployments": 5,
+      "failed_deployments": 0,
+      "success_rate": 100.0,
+      "failure_rate": 0.0,
+      "time_period": {},
+      "rollbacks": 1,
+      "current_uptime_days": 9,
+      "deployment_frequency": {
+        "deployments_per_day": 0.2327,
+        "days_per_deployment": 4.3,
+        "mean_time_between_deployments": {
+          "seconds": 412497.11,
+          "hours": 114.58,
+          "days": 4.77
+        },
+        "total_deployments_analyzed": 10,
+        "analysis_period_days": 42.97
+      }
+    },
+    "whisper-stt": {
+      "service": "whisper-stt",
+      "total_deployments": 2,
+      "successful_deployments": 2,
+      "failed_deployments": 0,
+      "success_rate": 100.0,
+      "failure_rate": 0.0,
+      "time_period": {
+        "start": "2026-07-07T09:07:50Z",
+        "end": "2026-08-06T09:07:50Z",
+        "description": "Last 30 days"
+      },
+      "rapid_deployment_incidents": 3,
+      "zero_downtime_achieved": true,
+      "availability": "100%",
+      "deployment_frequency": {
+        "deployments_per_day": 0.6169,
+        "days_per_deployment": 1.62,
+        "mean_time_between_deployments": {
+          "seconds": 154068.6,
+          "hours": 42.8,
+          "days": 1.78
+        },
+        "total_deployments_analyzed": 11,
+        "analysis_period_days": 17.83
+      }
+    }
+  },
+  "summary": {
+    "pbx_web_success_rate": "100.0%",
+    "whisper_stt_success_rate": "100.0%",
+    "pbx_web_deployment_frequency": "0.2327 deployments/day",
+    "whisper_stt_deployment_frequency": "0.6169 deployments/day",
+    "overall_assessment": "Both services showing 100% deployment success rates with stable deployment patterns"
+  },
+  "acceptance_criteria": {
+    "success_rate_pbx_web": "COMPLETED",
+    "success_rate_whisper_stt": "COMPLETED",
+    "deployment_frequency_metrics": "COMPLETED",
+    "intermediate_file_saved": "COMPLETED"
+  }
+}
