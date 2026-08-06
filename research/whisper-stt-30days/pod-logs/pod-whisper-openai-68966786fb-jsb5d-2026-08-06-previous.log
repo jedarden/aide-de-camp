@@ -1,0 +1,1 @@
+Error from server (BadRequest): previous terminated container "model-download" in pod "whisper-openai-68966786fb-jsb5d" not found
