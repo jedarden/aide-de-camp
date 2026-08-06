@@ -1,0 +1,35 @@
+[
+  {
+    "name": "pbx-web-5ff68464d-mkn8n",
+    "created": "2026-07-28T17:26:12Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "ready": true,
+    "started": true,
+    "state": "running",
+    "image": "localhost:7439/nginx:alpine",
+    "imageID": "localhost:7439/nginx@sha256:75ce1f7e18835ec0b8a765f6bae3a4e65a7bd8daca74d150868fe2dc9cc85e9f"
+  },
+  {
+    "name": "lab-rebuild-relay-79957dbd4-xsqhl",
+    "created": "2026-07-27T17:56:07Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "ready": true,
+    "started": true,
+    "state": "running",
+    "image": "localhost:7439/python:3-slim",
+    "imageID": "localhost:7439/python@sha256:5b3879b6f3cb77e712644d50262d05a7c146b7312d784a18eff7ff5462e77033"
+  },
+  {
+    "name": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+    "created": "2026-07-15T03:24:40Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "ready": true,
+    "started": true,
+    "state": "running",
+    "image": "localhost:7439/python:3-slim",
+    "imageID": "localhost:7439/python@sha256:5b3879b6f3cb77e712644d50262d05a7c146b7312d784a18eff7ff5462e77033"
+  }
+]

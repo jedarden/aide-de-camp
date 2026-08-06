@@ -1,0 +1,24 @@
+[
+  {
+    "name": "whisper-stt-847fd8d7b9-v2rs5",
+    "created": "2026-07-12T16:53:42Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "ready": true,
+    "started": true,
+    "state": "running",
+    "image": "docker.io/ronaldraygun/whisper-stt:1.8.6",
+    "imageID": "docker.io/ronaldraygun/whisper-stt@sha256:4bcbc8c6689259596995f78c8b3a60e2d4425a3e483aa6dd33ae47410b2e1f9e"
+  },
+  {
+    "name": "whisper-openai-68966786fb-jsb5d",
+    "created": "2026-06-14T04:55:49Z",
+    "phase": "Running",
+    "restartCount": 0,
+    "ready": true,
+    "started": true,
+    "state": "running",
+    "image": "docker.io/fedirz/faster-whisper-server:latest-cpu",
+    "imageID": "docker.io/fedirz/faster-whisper-server@sha256:760e5e43d427dc6cfbbc4731934b908b7de9c7e6d5309c6a1f0c8c923a5b6030"
+  }
+]
