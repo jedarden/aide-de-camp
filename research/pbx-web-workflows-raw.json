@@ -1,33 +1,446 @@
 {
-  "workflows": [],
+  "workflows": [
+    {
+      "metadata": {
+        "name": "gribtract-ci-manual-mbntt",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-07-27T18:59:34Z",
+        "labels": {
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/phase": "Error"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "52233857"
+        }
+      },
+      "status": {
+        "phase": "Error",
+        "startedAt": "2026-07-27T18:59:34Z",
+        "finishedAt": "2026-07-27T18:59:34Z",
+        "message": "workflowtemplates.argoproj.io \"gribtract-ci\" not found"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "gribtract-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "gribtract-ci-manual-s7vzg",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-07-27T19:03:27Z",
+        "labels": {
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/phase": "Error"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "52235497"
+        }
+      },
+      "status": {
+        "phase": "Error",
+        "startedAt": "2026-07-27T19:03:27Z",
+        "finishedAt": "2026-07-27T19:03:27Z",
+        "message": "workflowtemplates.argoproj.io \"gribtract-ci\" not found"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "gribtract-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "gribtract-ci-manual-7f4dr",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-07-27T19:06:18Z",
+        "labels": {
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/phase": "Error"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "52236784"
+        }
+      },
+      "status": {
+        "phase": "Error",
+        "startedAt": "2026-07-27T19:06:18Z",
+        "finishedAt": "2026-07-27T19:06:18Z",
+        "message": "workflowtemplates.argoproj.io \"gribtract-ci\" not found"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "gribtract-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "warden-build-manual-bxbqp",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-07-29T17:35:17Z",
+        "labels": {
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/phase": "Error"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "53353213"
+        }
+      },
+      "status": {
+        "phase": "Error",
+        "startedAt": "2026-07-29T17:35:17Z",
+        "finishedAt": "2026-07-29T17:35:17Z",
+        "message": "workflowtemplates.argoproj.io \"warden-build\" not found"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "warden-build"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "b2-usage-exporter-build-manual-blsn7",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-05T17:41:27Z",
+        "labels": {
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/phase": "Error"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57193967"
+        }
+      },
+      "status": {
+        "phase": "Error",
+        "startedAt": "2026-08-05T17:41:27Z",
+        "finishedAt": "2026-08-05T17:41:27Z",
+        "message": "workflowtemplates.argoproj.io \"b2-usage-exporter-build\" not found"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "b2-usage-exporter-build"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "needle-ci-x2wx2",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-06T00:52:29Z",
+        "labels": {
+          "events.argoproj.io/action-timestamp": "1785977548897",
+          "events.argoproj.io/sensor": "needle-ci-sensor",
+          "events.argoproj.io/trigger": "needle-ci-trigger",
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/creator": "system-serviceaccount-argo-events-default",
+          "workflows.argoproj.io/phase": "Failed"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57365821",
+          "workflows.argoproj.io/pod-name-format": "v2"
+        }
+      },
+      "status": {
+        "phase": "Failed",
+        "startedAt": "2026-08-06T00:52:29Z",
+        "finishedAt": "2026-08-06T01:45:58Z",
+        "message": "Max duration limit exceeded"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "needle-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "needle-ci-vnmhd",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-06T02:35:28Z",
+        "labels": {
+          "events.argoproj.io/action-timestamp": "1785983727195",
+          "events.argoproj.io/sensor": "needle-ci-sensor",
+          "events.argoproj.io/trigger": "needle-ci-trigger",
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/creator": "system-serviceaccount-argo-events-default",
+          "workflows.argoproj.io/phase": "Failed"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57397957",
+          "workflows.argoproj.io/pod-name-format": "v2"
+        }
+      },
+      "status": {
+        "phase": "Failed",
+        "startedAt": "2026-08-06T02:35:28Z",
+        "finishedAt": "2026-08-06T03:01:01Z",
+        "message": "Max duration limit exceeded"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "needle-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "needle-ci-f46kr",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-06T11:24:57Z",
+        "labels": {
+          "events.argoproj.io/action-timestamp": "1786015496351",
+          "events.argoproj.io/sensor": "needle-ci-sensor",
+          "events.argoproj.io/trigger": "needle-ci-trigger",
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/creator": "system-serviceaccount-argo-events-default",
+          "workflows.argoproj.io/phase": "Failed"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57723078",
+          "workflows.argoproj.io/pod-name-format": "v2"
+        }
+      },
+      "status": {
+        "phase": "Failed",
+        "startedAt": "2026-08-06T11:24:57Z",
+        "finishedAt": "2026-08-06T17:03:27Z",
+        "message": "Max duration limit exceeded"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "needle-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "needle-ci-verify-xjbbm",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-06T13:14:22Z",
+        "labels": {
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/phase": "Failed"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57691787",
+          "workflows.argoproj.io/pod-name-format": "v2"
+        }
+      },
+      "status": {
+        "phase": "Failed",
+        "startedAt": "2026-08-06T13:14:23Z",
+        "finishedAt": "2026-08-06T15:34:12Z",
+        "message": "Max duration limit exceeded"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "needle-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "needle-ci-zr2cx",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-06T17:14:32Z",
+        "labels": {
+          "events.argoproj.io/action-timestamp": "1786036471117",
+          "events.argoproj.io/sensor": "needle-ci-sensor",
+          "events.argoproj.io/trigger": "needle-ci-trigger",
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/creator": "system-serviceaccount-argo-events-default",
+          "workflows.argoproj.io/phase": "Failed"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57738451",
+          "workflows.argoproj.io/pod-name-format": "v2"
+        }
+      },
+      "status": {
+        "phase": "Failed",
+        "startedAt": "2026-08-06T17:14:32Z",
+        "finishedAt": "2026-08-06T17:38:49Z",
+        "message": "Max duration limit exceeded"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "needle-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "seam-ci-lnzps",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-06T19:36:49Z",
+        "labels": {
+          "events.argoproj.io/action-timestamp": "1786045009067",
+          "events.argoproj.io/sensor": "seam-ci-sensor",
+          "events.argoproj.io/trigger": "seam-ci",
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/creator": "system-serviceaccount-argo-events-default",
+          "workflows.argoproj.io/phase": "Failed"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57790222",
+          "workflows.argoproj.io/pod-name-format": "v2"
+        }
+      },
+      "status": {
+        "phase": "Failed",
+        "startedAt": "2026-08-06T19:36:49Z",
+        "finishedAt": "2026-08-06T19:37:10Z",
+        "message": "main: Error (exit code 1)"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "seam-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "seam-ci-gn5rh",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-06T19:45:41Z",
+        "labels": {
+          "events.argoproj.io/action-timestamp": "1786045541750",
+          "events.argoproj.io/sensor": "seam-ci-sensor",
+          "events.argoproj.io/trigger": "seam-ci",
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/creator": "system-serviceaccount-argo-events-default",
+          "workflows.argoproj.io/phase": "Failed"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57793597",
+          "workflows.argoproj.io/pod-name-format": "v2"
+        }
+      },
+      "status": {
+        "phase": "Failed",
+        "startedAt": "2026-08-06T19:45:42Z",
+        "finishedAt": "2026-08-06T19:46:02Z",
+        "message": "main: Error (exit code 1)"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "seam-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "seam-ci-bsd9q",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-06T20:09:46Z",
+        "labels": {
+          "events.argoproj.io/action-timestamp": "1786046986644",
+          "events.argoproj.io/sensor": "seam-ci-sensor",
+          "events.argoproj.io/trigger": "seam-ci",
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/creator": "system-serviceaccount-argo-events-default",
+          "workflows.argoproj.io/phase": "Failed"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57802589",
+          "workflows.argoproj.io/pod-name-format": "v2"
+        }
+      },
+      "status": {
+        "phase": "Failed",
+        "startedAt": "2026-08-06T20:09:46Z",
+        "finishedAt": "2026-08-06T20:10:06Z",
+        "message": "main: Error (exit code 1)"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "seam-ci"
+        },
+        "arguments": {}
+      }
+    },
+    {
+      "metadata": {
+        "name": "seam-ci-9sh2z",
+        "namespace": "argo-workflows",
+        "creationTimestamp": "2026-08-06T20:33:52Z",
+        "labels": {
+          "events.argoproj.io/action-timestamp": "1786048432246",
+          "events.argoproj.io/sensor": "seam-ci-sensor",
+          "events.argoproj.io/trigger": "seam-ci",
+          "workflows.argoproj.io/completed": "true",
+          "workflows.argoproj.io/creator": "system-serviceaccount-argo-events-default",
+          "workflows.argoproj.io/phase": "Failed"
+        },
+        "annotations": {
+          "workflows.argoproj.io/last-seen-version": "57811316",
+          "workflows.argoproj.io/pod-name-format": "v2"
+        }
+      },
+      "status": {
+        "phase": "Failed",
+        "startedAt": "2026-08-06T20:33:52Z",
+        "finishedAt": "2026-08-06T20:34:12Z",
+        "message": "main: Error (exit code 1)"
+      },
+      "spec": {
+        "workflowTemplateRef": {
+          "name": "seam-ci"
+        },
+        "arguments": {}
+      }
+    }
+  ],
   "summary": {
-    "total_count": 0,
-    "by_phase": {},
+    "total_count": 14,
+    "pbx_web_count": 0,
+    "by_phase": {
+      "Error": 5,
+      "Failed": 9
+    },
     "date_range": {
-      "earliest": null,
-      "latest": null
+      "earliest": "2026-07-27T18:59:34Z",
+      "latest": "2026-08-06T20:33:52Z"
     },
     "parsing_errors": []
   },
   "metadata": {
-    "parsed_at": "2026-08-06T16:09:13.701653",
+    "parsed_at": "2026-08-06T20:48:03.602238Z",
+    "source_cluster": "iad-ci",
+    "namespace": "argo-workflows",
     "input_format": "json",
-    "input_file": "/home/coding/scratch/pbx-web-workflows-approach-b.json"
+    "input_source": "kubectl get workflows -n argo-workflows -o json"
   },
   "context": {
-    "query_status": "no_data_found",
+    "query_status": "no_pbx_web_workflows_found",
     "query_date": "2026-08-06",
     "target_workflow": "pbx-web-build",
-    "requested_timeframe": "30_days",
+    "requested_timeframe": "available_retention_window",
     "findings": {
       "workflow_template_exists": true,
       "template_created": "2026-05-27T02:25:59Z",
       "actual_retention_period": "approximately_10_days",
       "oldest_workflow_in_cluster": "2026-07-27T18:59:34Z",
-      "total_workflows_in_cluster": 34,
-      "pbx_web_build_runs_found": 0
+      "total_workflows_in_cluster": 14,
+      "pbx_web_build_runs_found": 0,
+      "retention_window_days": 10
     },
-    "explanation": "The iad-ci cluster has a workflow retention policy that deletes workflows after approximately 7-10 days. The oldest workflow currently in the cluster is from 2026-07-27 (10 days ago). No pbx-web-build workflow runs exist in the cluster within the available retention window.",
+    "explanation": "The iad-ci cluster has a workflow retention policy that deletes workflows after approximately 7-10 days. No pbx-web-build workflow runs exist in the cluster within the available retention window (2026-07-27 to 2026-08-06).",
     "retention_analysis": {
       "max_lookback_days": 10,
       "requested_lookback_days": 30,
@@ -35,22 +448,25 @@
       "cluster_retention_policy": "workflows are deleted after ~7-10 days"
     },
     "sample_cluster_workflows": {
-      "oldest": [
-        "gribtract-ci-manual-mbntt (9d, Error)",
-        "gribtract-ci-manual-s7vzg (9d, Error)",
-        "warden-build-manual-bxbqp (7d, Error)"
-      ],
-      "recent": [
-        "spaxel-build-9r2lx (Running, 120m)",
-        "armor-build-jnk7d (Running, 104m)",
-        "needle-ci-verify-xjbbm (Running, 86m)"
-      ]
+      "total_available": 14,
+      "templates_found": {
+        "needle-ci": 5,
+        "seam-ci": 4,
+        "gribtract-ci": 3,
+        "warden-build": 1,
+        "b2-usage-exporter-build": 1
+      },
+      "phases": {
+        "Error": 5,
+        "Failed": 9
+      }
     },
     "recommendations": [
       "Check Argo Workflows retention policy settings in iad-ci cluster",
       "Consider configuring longer TTL for pbx-web-build workflows if historical data is needed",
       "Use external logging/storage for workflow run history beyond retention period",
-      "Alternative: Check if pbx-web-build logs are persisted elsewhere (e.g., Loki, Elasticsearch)"
+      "Alternative: Check if pbx-web-build logs are persisted elsewhere (e.g., Loki, Elasticsearch)",
+      "Manual trigger may be required for pbx-web-build workflows"
     ]
   }
 }
