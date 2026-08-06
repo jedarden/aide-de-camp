@@ -717,3 +717,6 @@
 {"bead":"adc-3cbzi","duration_ms":461898,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-06T14:58:18.947302397+00:00","worker":"bravo"}
 {"bead":"adc-63f3u","event":"claim","strand":"auto","ts":"2026-08-06T14:58:18.994357561+00:00","worker":"bravo"}
 {"adapter":"claude-code-glm-4.7","bead":"adc-63f3u","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-06T14:58:18.997216781+00:00","worker":"bravo"}
+{"bead":"adc-4p96u","duration_ms":198653,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-06T15:00:46.562171171+00:00","worker":"alpha"}
+{"bead":"adc-3mmf8","event":"claim","strand":"auto","ts":"2026-08-06T15:00:46.617778426+00:00","worker":"alpha"}
+{"adapter":"claude-code-glm-4.7","bead":"adc-3mmf8","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-06T15:00:46.621807990+00:00","worker":"alpha"}

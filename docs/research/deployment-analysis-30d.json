@@ -1,124 +1,176 @@
 {
-  "report_metadata": {
-    "generated_at": "2026-08-06T13:36:38.083691Z",
-    "analysis_type": "comparative_deployment_analysis",
-    "services_compared": [
+  "analysis_metadata": {
+    "generated_at": "2026-08-06T11:01:01.714355",
+    "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "services_analyzed": [
       "pbx-web",
       "whisper-stt"
     ],
     "cluster": "ardenone-cluster",
-    "comparison_period": "30 days (2026-07-07 to 2026-08-06)"
+    "data_sources": [
+      "pbx-web-deployment-data-30days.json",
+      "whisper-stt-deployment-data-30days.json"
+    ]
   },
-  "pbx_web_data": {
-    "source_file": "docs/research/pbx-web-deployments-30d.json",
-    "service": "pbx-web",
-    "namespace": "pbx-web"
-  },
-  "whisper_stt_data": {
-    "source_file": "docs/research/whisper-stt-deployments-30d.json",
-    "service": "whisper-stt",
-    "namespace": "whisper-stt"
-  },
-  "analysis": {
-    "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
-    "services_compared": [
-      "pbx-web",
-      "whisper-stt"
-    ],
-    "deployment_metrics": {
+  "comparative_metrics": {
+    "deployment_activity": {
       "pbx_web": {
-        "deployment_events": 3,
-        "successful_rollouts": 2,
-        "failed_rollouts": 0,
-        "rollbacks": 0,
-        "success_rate": 33.33333333333333
+        "total_deployments": 5,
+        "deployment_frequency_days": 6,
+        "images_deployed": 3
       },
       "whisper_stt": {
-        "deployment_events": 2,
-        "successful_rollouts": 3,
-        "failed_rollouts": 0,
-        "rollbacks": 0,
-        "success_rate": -50.0
+        "total_deployments": 2,
+        "deployment_frequency_days": 15.0,
+        "images_deployed": 3
+      },
+      "ratio_whisper_to_pbx": 0.4
+    },
+    "reliability_metrics": {
+      "pbx_web": {
+        "success_rate": "100%",
+        "availability": "100%",
+        "current_uptime_days": 9,
+        "rollback_events": 1
+      },
+      "whisper_stt": {
+        "success_rate": "100%",
+        "availability": "100%",
+        "current_uptime_days": 53,
+        "rollback_events": 0
       }
     },
-    "failure_patterns": {
-      "pbx_web": [
+    "deployment_patterns": {
+      "pbx_web": 6,
+      "whisper_stt": 15.0,
+      "interpretation": "pbx-web deploys less frequently but with more stability"
+    },
+    "resource_requirements": {
+      "pbx_web": "low_resource_footprint",
+      "whisper_stt": "high_resource_requirements_4-8Gi_memory",
+      "interpretation": "whisper-stt requires 16-32x more memory resources"
+    },
+    "operational_stability": {
+      "pbx_web": {
+        "uptime": 9,
+        "restarts": 0,
+        "crashloops": 0
+      },
+      "whisper_stt": {
+        "uptime": 53,
+        "restarts": 0,
+        "crashloops": 0
+      }
+    }
+  },
+  "failure_patterns": {
+    "total_patterns_identified": 2,
+    "patterns_by_category": {
+      "deployment_rollback": [
         {
-          "type": "log_error",
-          "severity": "low",
-          "count": 3,
-          "description": "Client disconnections during recording transfers",
-          "pattern_name": "connection_reset_by_peer",
-          "service": "pbx-web-site-generator"
-        },
-        {
-          "type": "log_error",
-          "severity": "low",
-          "count": 3,
-          "description": "Broken pipe errors during client disconnects",
-          "pattern_name": "broken_pipe_error",
-          "service": "pbx-web-site-generator"
+          "category": "deployment_rollback",
+          "count": 1,
+          "severity": "medium",
+          "description": "Same-day rollback to previous version",
+          "affected_service": "pbx-web",
+          "timestamp": "2026-07-13T18:07:55Z",
+          "root_cause": "Configuration or deployment issue requiring rollback"
         }
       ],
-      "whisper_stt": []
+      "rapid_deployment_churn": [
+        {
+          "category": "rapid_deployment_churn",
+          "count": 3,
+          "severity": "medium",
+          "description": "3 deployments in single day suggests iterative image improvements",
+          "affected_service": "whisper-stt",
+          "timestamp": "2026-07-08",
+          "root_cause": "Iterative development with rapid version updates"
+        }
+      ]
     },
-    "pod_health": {
-      "pbx_web": {
-        "total_pods": 3,
-        "running_pods": 3,
-        "restarts": 0,
-        "crashloops": 0,
-        "oomkills": 0
+    "detailed_patterns": [
+      {
+        "category": "deployment_rollback",
+        "count": 1,
+        "severity": "medium",
+        "description": "Same-day rollback to previous version",
+        "affected_service": "pbx-web",
+        "timestamp": "2026-07-13T18:07:55Z",
+        "root_cause": "Configuration or deployment issue requiring rollback"
       },
-      "whisper_stt": {
-        "total_pods": 2,
-        "running_pods": 2,
-        "restarts": 0,
-        "crashloops": 0,
-        "oomkills": 0
+      {
+        "category": "rapid_deployment_churn",
+        "count": 3,
+        "severity": "medium",
+        "description": "3 deployments in single day suggests iterative image improvements",
+        "affected_service": "whisper-stt",
+        "timestamp": "2026-07-08",
+        "root_cause": "Iterative development with rapid version updates"
       }
+    ]
+  },
+  "stability_differences": {
+    "config_drift_susceptibility": {
+      "pbx_web": "high - evidenced by same-day rollback events",
+      "whisper_stt": "low - stable deployment pattern with rapid iterative updates",
+      "analysis": "pbx-web has experienced configuration-based rollbacks, suggesting config drift vulnerability"
     },
-    "operational_excellence": {
-      "joint_zero_incidents": true,
-      "joint_zero_crashloops": true,
-      "joint_zero_oomkills": true,
-      "joint_100_percent_availability": true,
-      "zero_rollback_operations": true
+    "memory_pressure_susceptibility": {
+      "pbx_web": "minimal - 512Mi limit, no OOM events",
+      "whisper_stt": "moderate - 8Gi limit with 4Gi request, but no OOM events observed",
+      "analysis": "whisper-stt has higher memory headroom but requires significantly more resources"
     },
-    "correlations": [
-      {
-        "type": "joint_stability",
-        "description": "Both services maintained zero incidents over 30-day period",
-        "significance": "positive",
-        "evidence": "No error incidents recorded in either service"
-      },
-      {
-        "type": "deployment_pattern_anomaly",
-        "description": "whisper-stt deployment burst detected",
-        "significance": "anomaly",
-        "evidence": "2026-07-08T03:09:35Z to 2026-07-08T03:26:44 (3 deployments in 17 minutes)",
-        "pbx_impact": "pbx-web showed no corresponding activity"
-      },
-      {
-        "type": "strategy_consistency",
-        "description": "Both services use Recreate deployment strategy",
-        "significance": "architectural",
-        "evidence": "pbx-web: Recreate, whisper-stt: Recreate"
-      }
-    ],
-    "recommendations": [
-      "Both services demonstrate excellent deployment stability",
-      "whisper-stt deployment burst pattern (2026-07-08) warrants monitoring",
-      "Consider implementing deployment gates to prevent rapid-fire deployments",
-      "Current Recreate strategy is working well for both single-pod services"
-    ],
-    "statistical_summary": {
-      "total_deployments_both_services": 5,
-      "combined_success_rate": 100.0,
-      "restarts_per_deployment_pbx": 0.0,
-      "restarts_per_deployment_whisper": 0.0,
-      "rollback_rate_pbx": 0.0,
-      "rollback_rate_whisper": 0.0
+    "deployment_churn_impact": {
+      "pbx_web": "low churn - 5 deployments in 30 days",
+      "whisper_stt": "high churn - rapid deployment sequence on 2026-07-08",
+      "analysis": "whisper-stt exhibits higher deployment velocity which could indicate iterative development or instability"
+    },
+    "runtime_stability": {
+      "pbx_web": "excellent - zero restarts, 100% availability",
+      "whisper_stt": "excellent - zero restarts, 100% availability",
+      "analysis": "Both services show strong runtime stability despite different deployment patterns"
     }
-  }
+  },
+  "statistical_summary": {
+    "pbx_web": {
+      "mean_time_between_failures_hours": 144,
+      "deployment_success_rate_trend": "stable - 100% success rate",
+      "availability_percentage": 100.0,
+      "crashloop_backoffs": 0,
+      "oom_kills": 0,
+      "pod_restarts": 0
+    },
+    "whisper_stt": {
+      "mean_time_between_failures_hours": 360.0,
+      "deployment_success_rate_trend": "stable - 100% success rate",
+      "availability_percentage": 100.0,
+      "crashloop_backoffs": 0,
+      "oom_kills": 0,
+      "pod_restarts": 0
+    },
+    "combined_analysis": {
+      "overall_platform_health": "excellent",
+      "systemic_issues": "minimal - both services show high availability",
+      "service_specific_patterns": "pbx-web: config drift issues; whisper-stt: iterative deployment pattern",
+      "recommended_focus_areas": [
+        "pbx-web: investigate root cause of same-day rollback",
+        "whisper-stt: evaluate rapid deployment necessity vs stability"
+      ]
+    }
+  },
+  "key_findings": [
+    "Both services achieve 100% availability despite different deployment patterns",
+    "whisper-stt shows 0.4x higher deployment activity than pbx-web",
+    "pbx-web experienced rollback events suggesting configuration drift susceptibility",
+    "whisper-stt exhibits rapid deployment churn (3 deployments on 2026-07-08) but maintains stability",
+    "Resource requirements differ significantly: whisper-stt uses 16-32x more memory than pbx-web",
+    "Zero OOM kills and crash loops across both services indicate proper resource sizing"
+  ],
+  "recommendations": [
+    "pbx-web: Investigate root cause of 2026-07-13 same-day rollback to prevent recurrence",
+    "whisper-stt: Evaluate whether rapid deployment pattern is necessary or could be consolidated",
+    "Both services: Continue current resource sizing as no OOM events observed",
+    "Platform: Consider implementing deployment log aggregation for better failure analysis"
+  ]
 }
