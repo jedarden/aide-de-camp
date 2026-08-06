@@ -1,0 +1,24 @@
+{
+  "pbx-web": {
+    "total_deployments": 4,
+    "success_count": 4,
+    "failure_count": 0,
+    "success_rate": 100.0,
+    "failure_rate": 0.0,
+    "deployment_strategy": "RollingUpdate",
+    "current_status": "healthy",
+    "current_revision": 14,
+    "deployment_frequency": "low"
+  },
+  "whisper-stt": {
+    "total_deployments": 10,
+    "success_count": 10,
+    "failure_count": 0,
+    "success_rate": 100.0,
+    "failure_rate": 0.0,
+    "deployment_strategy": "Recreate",
+    "current_status": "healthy",
+    "current_revision": 32,
+    "deployment_frequency": "high"
+  }
+}

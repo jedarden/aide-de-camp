@@ -1,0 +1,2 @@
+Defaulted container "site-generator" out of: site-generator, nginx
+Error from server (BadRequest): previous terminated container "site-generator" in pod "pbx-web-5ff68464d-mkn8n" not found
