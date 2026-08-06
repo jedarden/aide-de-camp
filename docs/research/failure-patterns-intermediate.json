@@ -1,0 +1,294 @@
+{
+  "metadata": {
+    "extraction_date": "2026-08-06T12:35:44.959855",
+    "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "cluster": "ardenone-cluster"
+  },
+  "failure_categories": {
+    "technical_failures": {
+      "description": "Deployment failures due to technical issues",
+      "patterns": [
+        {
+          "type": "Health Check/Probe Failure",
+          "service": "pbx-web",
+          "count": 1,
+          "severity": "high",
+          "description": "Probable health check failure preventing pod readiness",
+          "date": "2026-07-28T17:05:51Z",
+          "resolution": "Automatic rollback to previous ReplicaSet",
+          "root_cause": "Likely readiness/liveness probe failure or startup crash",
+          "evidence": "Deployment failed on 2026-07-28T17:05:51Z with high severity. Probable health check failure preventing pod readiness"
+        }
+      ]
+    },
+    "configuration_issues": {
+      "description": "Failures related to configuration drift or mismatches",
+      "patterns": [
+        {
+          "type": "Configuration Drift/Same-Day Rollback",
+          "service": "pbx-web",
+          "count": 1,
+          "severity": "medium",
+          "description": "Same-day rollback to previous version",
+          "date": "2026-07-13T18:07:55Z",
+          "resolution": "Manual rollback to 1.0.8",
+          "root_cause": "Configuration or functional issue requiring rollback",
+          "evidence": "Same-day rollback on 2026-07-13T18:07:55Z within 10 minutes, indicating medium severity configuration issue."
+        }
+      ]
+    },
+    "operational_patterns": {
+      "description": "Deployment velocity and operational patterns",
+      "patterns": [
+        {
+          "type": "Rapid Deployment Churn",
+          "service": "whisper-stt",
+          "count": 3,
+          "severity": "low",
+          "description": "3 deployments in 17 minutes suggests iterative improvements",
+          "date": "2026-07-08T03:09-03:26Z",
+          "versions": [
+            "1.8.2",
+            "1.8.4",
+            "1.8.6"
+          ],
+          "root_cause": "Rapid iterative fixes, configuration tuning, or image build corrections",
+          "evidence": "3 deployments in 17 minutes (1.8.2 \u2192 1.8.4 \u2192 1.8.6) suggesting iterative fixes or configuration tuning."
+        },
+        {
+          "type": "Steady rhythm deployments",
+          "service": "pbx-web",
+          "category": "deployment_velocity",
+          "severity": "info",
+          "description": "Consistent every ~3 days deployment cadence",
+          "count": 1,
+          "evidence": "Consistent every ~3 days deployment cadence"
+        }
+      ]
+    },
+    "positive_patterns": {
+      "description": "Patterns indicating stability and reliability",
+      "patterns": [
+        {
+          "type": "Zero deployment failures",
+          "service": "whisper-stt",
+          "category": "reliability",
+          "severity": "positive",
+          "description": "100% deployment success rate in analysis period",
+          "count": 1,
+          "evidence": "100% deployment success rate in analysis period"
+        }
+      ]
+    },
+    "absent_failure_modes": {
+      "description": "Failure types that did not occur (indicating good practices)",
+      "patterns": [
+        {
+          "type": "No out-of-memory kills across both services",
+          "services": [
+            "pbx-web",
+            "whisper-stt"
+          ],
+          "pbx_web_count": 0,
+          "whisper_stt_count": 0,
+          "analysis": "Resource sizing is adequate for both services despite 16x difference in allocation",
+          "evidence": "Across both services: pbx-web=0 events, whisper-stt=0 events. Resource sizing is adequate for both services despite 16x difference in allocation"
+        },
+        {
+          "type": "No pods entered CrashLoopBackOff state",
+          "services": [
+            "pbx-web",
+            "whisper-stt"
+          ],
+          "pbx_web_count": 0,
+          "whisper_stt_count": 0,
+          "analysis": "Deployment automation effectively prevents unhealthy pods from running",
+          "evidence": "Across both services: pbx-web=0 events, whisper-stt=0 events. Deployment automation effectively prevents unhealthy pods from running"
+        },
+        {
+          "type": "No container registry authentication or manifest failures",
+          "services": [
+            "pbx-web",
+            "whisper-stt"
+          ],
+          "pbx_web_count": 0,
+          "whisper_stt_count": 0,
+          "analysis": "Mature image pipeline with consistent versioning",
+          "evidence": "Across both services: pbx-web=0 events, whisper-stt=0 events. Mature image pipeline with consistent versioning"
+        }
+      ]
+    }
+  },
+  "rankings": {
+    "by_frequency": [
+      {
+        "category": "operational_patterns",
+        "type": "Rapid Deployment Churn",
+        "service": "whisper-stt",
+        "count": 3,
+        "severity": "low",
+        "description": "3 deployments in 17 minutes suggests iterative improvements",
+        "date": "2026-07-08T03:09-03:26Z",
+        "versions": [
+          "1.8.2",
+          "1.8.4",
+          "1.8.6"
+        ],
+        "root_cause": "Rapid iterative fixes, configuration tuning, or image build corrections",
+        "evidence": "3 deployments in 17 minutes (1.8.2 \u2192 1.8.4 \u2192 1.8.6) suggesting iterative fixes or configuration tuning."
+      },
+      {
+        "category": "technical_failures",
+        "type": "Health Check/Probe Failure",
+        "service": "pbx-web",
+        "count": 1,
+        "severity": "high",
+        "description": "Probable health check failure preventing pod readiness",
+        "date": "2026-07-28T17:05:51Z",
+        "resolution": "Automatic rollback to previous ReplicaSet",
+        "root_cause": "Likely readiness/liveness probe failure or startup crash",
+        "evidence": "Deployment failed on 2026-07-28T17:05:51Z with high severity. Probable health check failure preventing pod readiness"
+      },
+      {
+        "category": "configuration_issues",
+        "type": "Configuration Drift/Same-Day Rollback",
+        "service": "pbx-web",
+        "count": 1,
+        "severity": "medium",
+        "description": "Same-day rollback to previous version",
+        "date": "2026-07-13T18:07:55Z",
+        "resolution": "Manual rollback to 1.0.8",
+        "root_cause": "Configuration or functional issue requiring rollback",
+        "evidence": "Same-day rollback on 2026-07-13T18:07:55Z within 10 minutes, indicating medium severity configuration issue."
+      },
+      {
+        "category": "deployment_velocity",
+        "type": "Steady rhythm deployments",
+        "service": "pbx-web",
+        "severity": "info",
+        "description": "Consistent every ~3 days deployment cadence",
+        "count": 1,
+        "evidence": "Consistent every ~3 days deployment cadence"
+      },
+      {
+        "category": "reliability",
+        "type": "Zero deployment failures",
+        "service": "whisper-stt",
+        "severity": "positive",
+        "description": "100% deployment success rate in analysis period",
+        "count": 1,
+        "evidence": "100% deployment success rate in analysis period"
+      },
+      {
+        "category": "absent_failure_modes",
+        "type": "No out-of-memory kills across both services",
+        "services": [
+          "pbx-web",
+          "whisper-stt"
+        ],
+        "pbx_web_count": 0,
+        "whisper_stt_count": 0,
+        "analysis": "Resource sizing is adequate for both services despite 16x difference in allocation",
+        "evidence": "Across both services: pbx-web=0 events, whisper-stt=0 events. Resource sizing is adequate for both services despite 16x difference in allocation"
+      },
+      {
+        "category": "absent_failure_modes",
+        "type": "No pods entered CrashLoopBackOff state",
+        "services": [
+          "pbx-web",
+          "whisper-stt"
+        ],
+        "pbx_web_count": 0,
+        "whisper_stt_count": 0,
+        "analysis": "Deployment automation effectively prevents unhealthy pods from running",
+        "evidence": "Across both services: pbx-web=0 events, whisper-stt=0 events. Deployment automation effectively prevents unhealthy pods from running"
+      },
+      {
+        "category": "absent_failure_modes",
+        "type": "No container registry authentication or manifest failures",
+        "services": [
+          "pbx-web",
+          "whisper-stt"
+        ],
+        "pbx_web_count": 0,
+        "whisper_stt_count": 0,
+        "analysis": "Mature image pipeline with consistent versioning",
+        "evidence": "Across both services: pbx-web=0 events, whisper-stt=0 events. Mature image pipeline with consistent versioning"
+      }
+    ],
+    "by_severity": {
+      "high": [
+        {
+          "category": "technical_failures",
+          "type": "Health Check/Probe Failure",
+          "service": "pbx-web",
+          "count": 1,
+          "severity": "high",
+          "description": "Probable health check failure preventing pod readiness",
+          "date": "2026-07-28T17:05:51Z",
+          "resolution": "Automatic rollback to previous ReplicaSet",
+          "root_cause": "Likely readiness/liveness probe failure or startup crash",
+          "evidence": "Deployment failed on 2026-07-28T17:05:51Z with high severity. Probable health check failure preventing pod readiness"
+        }
+      ],
+      "medium": [
+        {
+          "category": "configuration_issues",
+          "type": "Configuration Drift/Same-Day Rollback",
+          "service": "pbx-web",
+          "count": 1,
+          "severity": "medium",
+          "description": "Same-day rollback to previous version",
+          "date": "2026-07-13T18:07:55Z",
+          "resolution": "Manual rollback to 1.0.8",
+          "root_cause": "Configuration or functional issue requiring rollback",
+          "evidence": "Same-day rollback on 2026-07-13T18:07:55Z within 10 minutes, indicating medium severity configuration issue."
+        }
+      ],
+      "low": [
+        {
+          "category": "operational_patterns",
+          "type": "Rapid Deployment Churn",
+          "service": "whisper-stt",
+          "count": 3,
+          "severity": "low",
+          "description": "3 deployments in 17 minutes suggests iterative improvements",
+          "date": "2026-07-08T03:09-03:26Z",
+          "versions": [
+            "1.8.2",
+            "1.8.4",
+            "1.8.6"
+          ],
+          "root_cause": "Rapid iterative fixes, configuration tuning, or image build corrections",
+          "evidence": "3 deployments in 17 minutes (1.8.2 \u2192 1.8.4 \u2192 1.8.6) suggesting iterative fixes or configuration tuning."
+        }
+      ],
+      "info": [
+        {
+          "category": "deployment_velocity",
+          "type": "Steady rhythm deployments",
+          "service": "pbx-web",
+          "severity": "info",
+          "description": "Consistent every ~3 days deployment cadence",
+          "count": 1,
+          "evidence": "Consistent every ~3 days deployment cadence"
+        }
+      ],
+      "positive": [
+        {
+          "category": "reliability",
+          "type": "Zero deployment failures",
+          "service": "whisper-stt",
+          "severity": "positive",
+          "description": "100% deployment success rate in analysis period",
+          "count": 1,
+          "evidence": "100% deployment success rate in analysis period"
+        }
+      ]
+    }
+  }
+}
