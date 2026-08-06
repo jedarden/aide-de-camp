@@ -26,21 +26,43 @@ Verify it took:
 .venv/bin/pytest --collect-only -q   # should collect ~60+ tests
 ```
 
-### Start / restart
+### One-time systemd setup
 
 ```bash
 # From /home/coding/aide-de-camp/
-nohup .venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000 > /tmp/adc.log 2>&1 &
+mkdir -p ~/.config/systemd/user
+ln -sT $(pwd)/deploy/aide-de-camp.service ~/.config/systemd/user/aide-de-camp.service
+systemctl --user daemon-reload
+systemctl --user enable aide-de-camp  # auto-start on login
+```
 
-# Restart (kill then start)
-kill -2 $(ps aux | grep "uvicorn src.main" | grep -v grep | awk '{print $2}') 2>/dev/null; true
-nohup .venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000 > /tmp/adc.log 2>&1 &
+The symlink ensures changes to the repo copy are reflected after `daemon-reload`.
+
+### Start / restart / stop
+
+```bash
+# Start the service
+systemctl --user start aide-de-camp
+
+# Restart (graceful shutdown via SIGINT, then start)
+systemctl --user restart aide-de-camp
+
+# Stop (graceful shutdown via SIGINT)
+systemctl --user stop aide-de-camp
+
+# Check status
+systemctl --user status aide-de-camp
+
+# View logs (live)
+journalctl --user -u aide-de-camp -f
 
 # Health check (expect HTTP 200 + {"status":"ok","service":"adc-voice"})
 curl -s http://localhost:8000/health
 ```
 
-Logs go to `/tmp/adc.log`. Root logging is configured in `src/main.py` — all `src.*` module loggers are visible at INFO level.
+Logs are written to `/tmp/adc.log` (StandardOutput/StandardError) and systemd journal (accessible via `journalctl`). Root logging in `src/main.py` is visible at INFO level in both.
+
+**Crash recovery:** The unit uses `Restart=on-failure` with 5-second backoff. If the process exits uncleanly (uncaught exception, OOM, etc.), systemd automatically restarts it.
 
 ## Versioning
 
