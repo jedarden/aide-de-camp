@@ -25,42 +25,43 @@ This schema defines the structure for `pod-logs-index.jsonl`, which documents al
 
 #### detected_patterns
 
-Each pattern category contains counts and metadata:
+Pattern detection results extracted directly from analysis files. Each pattern contains raw detection data:
 
 ```json
 {
   "startup": {
     "count": 0,
-    "has_evidence": false,
-    "first_occurrence": null,
-    "last_occurrence": null
+    "timestamps": [],
+    "samples": []
   },
   "oom_kill": {
     "count": 0,
-    "has_evidence": false,
-    "first_occurrence": null,
-    "last_occurrence": null
+    "timestamps": [],
+    "samples": []
   },
   "error": {
     "count": 0,
-    "has_evidence": false,
-    "first_occurrence": null,
-    "last_occurrence": null
+    "timestamps": [],
+    "samples": []
   },
   "performance": {
     "count": 0,
-    "has_evidence": false,
-    "first_occurrence": null,
-    "last_occurrence": null
+    "timestamps": [],
+    "samples": []
   }
 }
 ```
 
 **Pattern Fields:**
 - `count`: integer - Number of occurrences detected
-- `has_evidence`: boolean - Whether any evidence was found
-- `first_occurrence`: string (ISO 8601) or null - First detected occurrence timestamp
-- `last_occurrence`: string (ISO 8601) or null - Last detected occurrence timestamp
+- `timestamps`: array of strings - Timestamp strings for each detected occurrence (format varies)
+- `samples`: array of strings - Sample log lines showing the pattern in context
+
+**Pattern Types:**
+- `startup`: Application startup and initialization events
+- `oom_kill`: Out of memory kill events
+- `error`: Error messages and exceptions
+- `performance`: Performance-related events (slow queries, timeouts, etc.)
 
 #### key_timestamps
 
@@ -93,10 +94,10 @@ Important temporal boundaries for the log:
   "analysis_file_path": "research/pbx-web-30days/pod-logs/pbx-web-5ff68464d-mkn8n-2026-08-06-analysis.json",
   "log_size_bytes": 4200000,
   "detected_patterns": {
-    "startup": {"count": 3, "has_evidence": true, "first_occurrence": "2026-07-28T17:26:15Z", "last_occurrence": "2026-07-28T17:26:20Z"},
-    "oom_kill": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null},
-    "error": {"count": 12, "has_evidence": true, "first_occurrence": "2026-07-29T02:15:33Z", "last_occurrence": "2026-08-05T18:42:10Z"},
-    "performance": {"count": 5, "has_evidence": true, "first_occurrence": "2026-07-30T10:20:45Z", "last_occurrence": "2026-08-04T14:30:22Z"}
+    "startup": {"count": 3, "timestamps": ["2026-07-28T17:26:15Z", "2026-07-28T17:26:18Z", "2026-07-28T17:26:20Z"], "samples": ["Starting server...", "Listening on port 8000"]},
+    "oom_kill": {"count": 0, "timestamps": [], "samples": []},
+    "error": {"count": 12, "timestamps": ["2026-07-29T02:15:33Z", "2026-07-30T10:20:45Z"], "samples": ["Error: Connection refused", "ERROR: Failed query"]},
+    "performance": {"count": 5, "timestamps": ["2026-07-30T10:20:45Z"], "samples": ["Slow query: 5.2s", "Request timeout"]}
   },
   "key_timestamps": {
     "first_log_entry": "2026-07-28T17:26:15Z",
@@ -119,10 +120,10 @@ Important temporal boundaries for the log:
   "analysis_file_path": null,
   "log_size_bytes": 1024,
   "detected_patterns": {
-    "startup": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null},
-    "oom_kill": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null},
-    "error": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null},
-    "performance": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null}
+    "startup": {"count": 0, "timestamps": [], "samples": []},
+    "oom_kill": {"count": 0, "timestamps": [], "samples": []},
+    "error": {"count": 0, "timestamps": [], "samples": []},
+    "performance": {"count": 0, "timestamps": [], "samples": []}
   },
   "key_timestamps": {
     "first_log_entry": null,
@@ -145,10 +146,10 @@ Important temporal boundaries for the log:
   "analysis_file_path": "research/pbx-web-30days/pod-logs/pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06-analysis.json",
   "log_size_bytes": 0,
   "detected_patterns": {
-    "startup": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null},
-    "oom_kill": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null},
-    "error": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null},
-    "performance": {"count": 0, "has_evidence": false, "first_occurrence": null, "last_occurrence": null}
+    "startup": {"count": 0, "timestamps": [], "samples": []},
+    "oom_kill": {"count": 0, "timestamps": [], "samples": []},
+    "error": {"count": 0, "timestamps": [], "samples": []},
+    "performance": {"count": 0, "timestamps": [], "samples": []}
   },
   "key_timestamps": {
     "first_log_entry": null,

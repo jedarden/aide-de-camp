@@ -210,19 +210,21 @@ class DeterministicRouter:
         utterance_lower = utterance.lower()
 
         # Check each project's aliases
-        for entry in registry._entries.values():
+        projects = registry.get("projects", {})
+        for slug, entry in projects.items():
             if not entry:
                 continue
 
             # Try direct slug match
-            if entry.slug and entry.slug.lower() in utterance_lower:
-                return entry.slug
+            if slug and slug.lower() in utterance_lower:
+                return slug
 
             # Try alias match
-            if entry.aliases:
-                for alias in entry.aliases:
+            aliases = entry.get("aliases", [])
+            if aliases:
+                for alias in aliases:
                     if alias and alias.lower() in utterance_lower:
-                        return entry.slug
+                        return slug
 
         return None
 
