@@ -1,0 +1,2 @@
+LAST SEEN   TYPE     REASON         OBJECT                MESSAGE
+49m         Normal   nodeAssigned   service/whisper-stt   announcing from node "k3s-server-a" with protocol "layer2"
