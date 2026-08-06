@@ -1,0 +1,14 @@
+{
+  "query_date": "2026-08-06",
+  "query_window": "last_30_days",
+  "date_range_start": "2026-07-07",
+  "date_range_end": "2026-08-06",
+  "workflow_template": "pbx-web-build",
+  "namespace": "argo-workflows",
+  "cluster": "iad-ci",
+  "results": {
+    "total_count": 0,
+    "items": [],
+    "note": "No pbx-web-build workflows found in the last 30 days. The oldest workflow visible in argo-workflows namespace is from 2026-07-27, suggesting workflows may be cleaned up after ~10 days, or pbx-web-build has not been executed recently."
+  }
+}
