@@ -1,52 +1,95 @@
 {
-  "generated_at": "2026-08-06T12:28:31.005842",
-  "period_days": 30,
-  "services": {
-    "pbx-web": {
-      "service": "pbx-web",
-      "period_days": 30,
-      "total_deployments": 5,
-      "successful_deployments": 5,
-      "failed_deployments": 0,
+  "generated_at": "2026-08-06T19:50:00Z",
+  "aggregation_period": "30 days (2026-07-07 to 2026-08-06)",
+  "description": "Aggregated deployment metrics for analysis - intermediate file",
+  "services": [
+    {
+      "service_name": "pbx-web",
       "success_rate": 100.0,
       "failure_rate": 0.0,
-      "deployment_frequency_per_day": 0.3571,
-      "mean_time_between_deployments_hours": 89.74,
-      "deployment_names": [
-        "pbx-rebuild-relay",
-        "lab-rebuild-relay",
-        "pbx-web"
-      ],
-      "first_deployment": "2026-07-13T18:07:55Z",
-      "last_deployment": "2026-07-28T17:05:51Z"
-    },
-    "whisper-stt": {
-      "service": "whisper-stt",
-      "period_days": 30,
-      "total_deployments": 4,
-      "successful_deployments": 4,
-      "failed_deployments": 0,
-      "success_rate": 100.0,
-      "failure_rate": 0.0,
-      "deployment_frequency_per_day": 1.0,
-      "mean_time_between_deployments_hours": 36.58,
-      "deployment_names": [
-        "whisper-stt"
-      ],
-      "first_deployment": "2026-07-08T03:09:35Z",
-      "last_deployment": "2026-07-12T16:53:42Z"
-    }
-  },
-  "summary": {
-    "pbx-web": {
-      "success_rate": 100.0,
       "deploy_count": 5,
-      "deploy_frequency": 0.3571
+      "success_count": 5,
+      "failure_count": 0,
+      "deploy_frequency": 0.1667,
+      "mean_time_between_deployment_hours": 89.74,
+      "deployment_span_days": 16,
+      "unique_deployment_dates": [
+        "2026-07-13",
+        "2026-07-15",
+        "2026-07-27",
+        "2026-07-28"
+      ],
+      "last_deployment": "2026-07-28T17:05:51Z",
+      "days_since_last_deployment": 9,
+      "deployment_strategy": "RollingUpdate",
+      "uptime_percentage": 100.0,
+      "zero_downtime_deployment": true,
+      "total_incidents": 0,
+      "pod_health": {
+        "total_pods": 3,
+        "running_pods": 3,
+        "total_restarts": 0,
+        "crashloops": 0,
+        "oomkills": 0
+      }
     },
-    "whisper-stt": {
+    {
+      "service_name": "whisper-stt",
       "success_rate": 100.0,
+      "failure_rate": 0.0,
       "deploy_count": 4,
-      "deploy_frequency": 1.0
+      "success_count": 4,
+      "failure_count": 0,
+      "deploy_frequency": 0.1333,
+      "mean_time_between_deployment_hours": 36.58,
+      "deployment_span_days": 5,
+      "unique_deployment_dates": [
+        "2026-07-08",
+        "2026-07-12"
+      ],
+      "last_deployment": "2026-07-12T16:53:42Z",
+      "days_since_last_deployment": 25,
+      "deployment_strategy": "Recreate",
+      "uptime_percentage": 100.0,
+      "zero_downtime_deployment": true,
+      "total_incidents": 0,
+      "pod_health": {
+        "total_pods": 2,
+        "running_pods": 2,
+        "total_restarts": 0,
+        "crashloops": 0,
+        "oomkills": 0
+      },
+      "deployment_pattern": "burst",
+      "burst_description": "3 deployments within 17 minutes on 2026-07-08"
     }
-  }
+  ],
+  "summary_metrics": {
+    "total_services_analyzed": 2,
+    "overall_success_rate": 100.0,
+    "overall_failure_rate": 0.0,
+    "total_deployments": 9,
+    "total_successes": 9,
+    "total_failures": 0,
+    "combined_deploy_frequency_per_day": 0.15,
+    "services_with_100_percent_success": 2,
+    "services_with_zero_downtime": 2,
+    "services_with_zero_incidents": 2
+  },
+  "comparative_analysis": {
+    "deployment_frequency_winner": "pbx-web",
+    "deployment_frequency_reasoning": "pbx-web has 5 deployments over 16 days vs whisper-stt's 4 deployments over 5 days (burst pattern)",
+    "consistency_winner": "pbx-web",
+    "consistency_reasoning": "pbx-web shows steady deployment cadence while whisper-stt shows burst pattern followed by extended idle period",
+    "recency_winner": "pbx-web",
+    "recency_reasoning": "pbx-web last deployed 9 days ago vs whisper-stt's 25 days ago"
+  },
+  "data_sources": [
+    "deployment-frequency-metrics.json",
+    "pbx-web-metrics.json",
+    "whisper-stt-metrics.json",
+    "deployment-metrics-comparison.json"
+  ],
+  "schema_version": "1.0",
+  "computation_timestamp": "2026-08-06T19:50:00Z"
 }
