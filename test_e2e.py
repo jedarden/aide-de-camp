@@ -163,10 +163,10 @@ async def test_e2e_text_path():
                 print(f"❌ FAIL: No intent row found for utterance_id={utterance_id[:8] if utterance_id else 'unknown'}...")
                 success = False
 
-            # Check results table
+            # Check results table (use intent_id not utterance_id, created_at not created)
             cursor = await db.execute(
-                "SELECT id, summary, data FROM results WHERE utterance_id = ? ORDER BY created DESC LIMIT 1",
-                (utterance_id,) if utterance_id else (None,)
+                "SELECT id, summary, data FROM results WHERE intent_id = ? ORDER BY created_at DESC LIMIT 1",
+                (intent_id,) if intent_row else (None,)
             )
             result_row = await cursor.fetchone()
 

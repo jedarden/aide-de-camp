@@ -879,7 +879,7 @@ Deliverable: the core query loop working end-to-end.
 
 **Status: PARTIAL** ⚠️ — session store, topics, and bead watcher are verified-in-tests; the Telegram fallback deliverable is non-functional in every deployment to date (stub methods returning `False`, unreachable hardcoded bridge URL, architectural mismatch — see ADR-1, observed live 2026-07-20). Re-opened pending ADR-1 implementation.
 
-*Verification evidence:* see `docs/notes/core-verification-evidence.md` — session store, SSE, surface registration (test harness, not live; date unrecorded — re-verify). Those tests passed while the Telegram stubs shipped — this is exactly why the two-tier vocabulary above exists.
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` — smoke test runs (Run 1-20, 2026-06-10 to 2026-06-11) verify session store, SSE, surface registration (test harness only). Those tests passed while the Telegram stubs shipped — this is exactly why the two-tier vocabulary above exists.
 
 Results persist; the canvas has memory.
 
@@ -896,7 +896,7 @@ Deliverable: sessions that survive browser refresh (verified-in-tests); Telegram
 
 **Status: COMPLETE (verified-in-tests)** — not yet verified-live
 
-*Verification evidence:* see `docs/notes/core-verification-evidence.md` — component library, hot-reload manager (test harness, not live; date unrecorded — re-verify)
+*Verification evidence:* see `docs/notes/core-verification-evidence.md` — smoke test runs (Run 1-20, 2026-06-10 to 2026-06-11) verify component library and hot-reload manager initialization (test harness only).
 
 The interface can be improved by talking into it.
 
