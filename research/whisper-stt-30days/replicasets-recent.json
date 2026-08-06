@@ -1,0 +1,52 @@
+{
+  "name": "whisper-stt-5dbff75cbd",
+  "createdAt": "2026-07-08T03:09:35Z",
+  "replicas": 0,
+  "annotations": {
+    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+    "deployment.kubernetes.io/desired-replicas": "1",
+    "deployment.kubernetes.io/max-replicas": "1",
+    "deployment.kubernetes.io/revision": "29",
+    "reloader.stakater.com/auto": "true"
+  },
+  "image": "ronaldraygun/whisper-stt:1.8.2"
+}
+{
+  "name": "whisper-stt-5b8558f478",
+  "createdAt": "2026-07-08T03:16:13Z",
+  "replicas": 0,
+  "annotations": {
+    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+    "deployment.kubernetes.io/desired-replicas": "1",
+    "deployment.kubernetes.io/max-replicas": "1",
+    "deployment.kubernetes.io/revision": "30",
+    "reloader.stakater.com/auto": "true"
+  },
+  "image": "ronaldraygun/whisper-stt:1.8.4"
+}
+{
+  "name": "whisper-stt-6c497489fb",
+  "createdAt": "2026-07-08T03:26:44Z",
+  "replicas": 0,
+  "annotations": {
+    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+    "deployment.kubernetes.io/desired-replicas": "1",
+    "deployment.kubernetes.io/max-replicas": "1",
+    "deployment.kubernetes.io/revision": "31",
+    "reloader.stakater.com/auto": "true"
+  },
+  "image": "ronaldraygun/whisper-stt:1.8.6"
+}
+{
+  "name": "whisper-stt-847fd8d7b9",
+  "createdAt": "2026-07-12T16:53:42Z",
+  "replicas": 1,
+  "annotations": {
+    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+    "deployment.kubernetes.io/desired-replicas": "1",
+    "deployment.kubernetes.io/max-replicas": "1",
+    "deployment.kubernetes.io/revision": "32",
+    "reloader.stakater.com/auto": "true"
+  },
+  "image": "ronaldraygun/whisper-stt:1.8.6"
+}
