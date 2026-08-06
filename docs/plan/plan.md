@@ -512,6 +512,40 @@ feedback_signals (
   processed_at INTEGER
 )
 
+-- Pending bead approvals: beads awaiting user approval before creation
+-- Stores approval card data for action/self_modification/monitoring_config beads
+-- that passed validation but require explicit user approval.
+pending_bead_approvals (
+  id                TEXT PRIMARY KEY,  -- UUID for this approval request
+  intent_id         TEXT NOT NULL,  -- Reference to the intent that created this request
+  session_id        TEXT NOT NULL,  -- Session for this approval
+  bead_body         TEXT NOT NULL,  -- The bead body awaiting approval
+  bead_type         TEXT NOT NULL,  -- Bead type (action, self_modification, monitoring_config)
+  validation_result TEXT NOT NULL,  -- JSON: ValidationResult with approval details
+  utterance         TEXT NOT NULL,  -- Original user utterance
+  project_slug      TEXT,  -- Optional project slug
+  topic_id          TEXT,  -- Optional topic ID
+  created_at        INTEGER NOT NULL,  -- When the approval was requested
+  expires_at        INTEGER NOT NULL,  -- When this approval request expires
+  status            TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+  FOREIGN KEY (intent_id) REFERENCES intents(id) ON DELETE CASCADE,
+  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+)
+
+-- Card cache: pre-rendered HTML for result components (session store)
+-- Stores server-side rendered HTML for result/component/layout combinations.
+-- Primary key (result_id, component_id, layout_bucket) allows multiple cached
+-- variations per result. The component library DB also has a card_cache table
+-- with identical schema — both stores support the component selection hot path.
+card_cache (
+  result_id      TEXT NOT NULL,
+  component_id   TEXT NOT NULL,
+  layout_bucket  TEXT NOT NULL,
+  rendered_html  TEXT NOT NULL,
+  created_at     INTEGER NOT NULL,
+  PRIMARY KEY (result_id, component_id, layout_bucket)
+)
+
 -- Additional memberships for compound topics only: intents.topic_id is the
 -- primary topic (always set, authoritative); this table never replaces it,
 -- it only holds the extra topics a compound intent also belongs to.
