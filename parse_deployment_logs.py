@@ -31,7 +31,7 @@ def parse_pbx_web_deployments(file_path: str) -> List[Dict[str, str]]:
 
     for event in events:
         deployment_time = event.get('timestamp')
-        if deployment_time:
+        if deployment_time and validate_timestamp(deployment_time):
             deployments.append({
                 'service_name': 'pbx-web',
                 'deployment_time': deployment_time
@@ -58,7 +58,7 @@ def parse_whisper_stt_deployments(file_path: str) -> List[Dict[str, str]]:
 
     for rs in replicasets:
         created_time = rs.get('created')
-        if created_time:
+        if created_time and validate_timestamp(created_time):
             deployments.append({
                 'service_name': 'whisper-stt',
                 'deployment_time': created_time
@@ -104,7 +104,20 @@ def load_deployment_logs(
 
     Returns:
         Validated pandas DataFrame with columns: service_name, deployment_time
+
+    Raises:
+        FileNotFoundError: If deployment data files are not found
+        ValueError: If deployment data is invalid or cannot be parsed
     """
+    # Check if files exist
+    pbx_path = Path(pbx_web_file)
+    whisper_path = Path(whisper_stt_file)
+
+    if not pbx_path.exists():
+        raise FileNotFoundError(f"PBX web deployment data file not found: {pbx_web_file}")
+    if not whisper_path.exists():
+        raise FileNotFoundError(f"Whisper STT deployment data file not found: {whisper_stt_file}")
+
     # Parse deployments from both services
     pbx_deployments = parse_pbx_web_deployments(pbx_web_file)
     whisper_deployments = parse_whisper_stt_deployments(whisper_stt_file)
@@ -112,8 +125,23 @@ def load_deployment_logs(
     # Combine all deployments
     all_deployments = pbx_deployments + whisper_deployments
 
+    if not all_deployments:
+        raise ValueError("No valid deployment events found in either service file")
+
     # Create DataFrame
     df = pd.DataFrame(all_deployments)
+
+    # Convert deployment_time to datetime, coercing errors to NaT
+    df['deployment_time'] = pd.to_datetime(df['deployment_time'], errors='coerce')
+
+    # Remove rows with invalid timestamps (NaT)
+    invalid_count = df['deployment_time'].isna().sum()
+    if invalid_count > 0:
+        print(f"Warning: Filtering out {invalid_count} rows with invalid timestamps")
+        df = df.dropna(subset=['deployment_time'])
+
+    # Sort by deployment time
+    df = df.sort_values('deployment_time').reset_index(drop=True)
 
     return df
 
@@ -164,50 +192,57 @@ def main():
     print("Loading and Parsing Deployment Logs")
     print("=" * 60)
 
-    # Load deployment logs
-    print("\n1. Loading deployment data from JSON files...")
-    df = load_deployment_logs()
+    try:
+        # Load deployment logs
+        print("\n1. Loading deployment data from JSON files...")
+        df = load_deployment_logs()
 
-    print(f"   ✓ Loaded {len(df)} deployment events")
+        print(f"   ✓ Loaded {len(df)} deployment events")
 
-    # Parse deployment times to datetime
-    print("\n2. Converting deployment timestamps to datetime...")
-    df['deployment_time'] = pd.to_datetime(df['deployment_time'], errors='coerce')
+        # Show date range
+        print(f"\n2. Date range analysis:")
+        print(f"   First deployment: {df['deployment_time'].min()}")
+        print(f"   Last deployment: {df['deployment_time'].max()}")
 
-    # Sort by deployment time
-    df = df.sort_values('deployment_time')
+        # Data quality checks
+        print("\n3. Performing data quality validation...")
+        is_valid, message = validate_deployment_data(df)
 
-    print(f"   ✓ Converted {len(df)} timestamps")
-    print(f"   Date range: {df['deployment_time'].min()} to {df['deployment_time'].max()}")
+        if is_valid:
+            print(f"   ✓ {message}")
+        else:
+            print(f"   ✗ Validation failed: {message}")
+            return df
 
-    # Data quality checks
-    print("\n3. Performing data quality validation...")
-    is_valid, message = validate_deployment_data(df)
+        # Show deployments by service
+        print("\n4. Deployment summary by service:")
+        service_counts = df['service_name'].value_counts()
+        for service, count in service_counts.items():
+            print(f"   {service}: {count} deployments")
 
-    if is_valid:
-        print(f"   ✓ {message}")
-    else:
-        print(f"   ✗ Validation failed: {message}")
-        return
+        # Show sample data
+        print("\n5. Sample deployment data (first 5 rows):")
+        print(df.head().to_string(index=False))
 
-    # Show deployments by service
-    print("\n4. Deployment summary by service:")
-    service_counts = df['service_name'].value_counts()
-    for service, count in service_counts.items():
-        print(f"   {service}: {count} deployments")
+        print("\n6. DataFrame schema:")
+        print(df.dtypes.to_string())
 
-    # Show sample data
-    print("\n5. Sample deployment data (first 5 rows):")
-    print(df.head().to_string(index=False))
+        print("\n" + "=" * 60)
+        print("✓ Deployment log parsing complete")
+        print("=" * 60)
 
-    print("\n6. DataFrame schema:")
-    print(df.dtypes.to_string())
+        return df
 
-    print("\n" + "=" * 60)
-    print("✓ Deployment log parsing complete")
-    print("=" * 60)
-
-    return df
+    except FileNotFoundError as e:
+        print(f"\n✗ Error: {e}")
+        print("Please ensure deployment data files exist at the specified paths.")
+        return None
+    except ValueError as e:
+        print(f"\n✗ Error: {e}")
+        return None
+    except Exception as e:
+        print(f"\n✗ Unexpected error: {e}")
+        return None
 
 
 if __name__ == "__main__":
