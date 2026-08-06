@@ -27,7 +27,7 @@ class TestMemoryStoreLoad:
         session_id = "test-session-123"
 
         # Create a pre-existing memory file with facts
-        memory_dir = tmp_path / "memory"
+        memory_dir = tmp_path
         memory_dir.mkdir(parents=True, exist_ok=True)
 
         import hashlib
