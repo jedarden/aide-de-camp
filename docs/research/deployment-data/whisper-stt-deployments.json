@@ -1,0 +1,16 @@
+{
+  "query_metadata": {
+    "query_date": "2026-08-06",
+    "cluster": "iad-ci",
+    "workflow_template": "whisper-stt-build",
+    "target_period_start": "2026-07-07",
+    "target_period_end": "2026-08-06",
+    "days_queried": 30
+  },
+  "findings": {
+    "total_workflow_instances": 0,
+    "oldest_workflow_age_days": null,
+    "note": "No whisper-stt-build workflow instances found. Workflow retention policy appears to be ~9 days."
+  },
+  "deployments": []
+}
