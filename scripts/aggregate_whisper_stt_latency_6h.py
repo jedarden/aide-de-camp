@@ -55,6 +55,13 @@ class WhisperSTTLatencyAggregator:
             start_date: ISO format start timestamp
             end_date: ISO format end timestamp
             step_hours: Time step in hours (default: 1, optimal from analysis)
+
+        Step Size Rationale:
+            The 1-hour step size was chosen based on analysis in calculate_optimal_step_size.py.
+            See docs/notes/whisper-stt-time-step-rationale.md for detailed explanation:
+            - Formula: (30 days × 24 hours) / step_hours = total_buckets
+            - 1-hour steps = 720 buckets, ~480 events/bucket
+            - Balances high granularity with good manageability (<1000 buckets)
         """
         self.start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
         self.end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
