@@ -2607,6 +2607,54 @@ async def api_v1_telegram_bridge_status():
         )
 
 
+@app.post("/api/v1/telegram/reset_failure_count")
+async def api_v1_reset_telegram_failure_count():
+    """Reset the Telegram bridge failure counter.
+
+    This endpoint can be used for manual recovery or after a threshold
+    is reached. The reachability state and last failure timestamp are
+    preserved - only the consecutive failure counter is reset.
+    """
+    try:
+        telegram_fallback = get_telegram_fallback()
+        telegram_fallback.reset_failure_count()
+        logger.info("Telegram bridge failure count reset via API endpoint")
+        return {
+            "status": "success",
+            "message": "Failure count reset successfully",
+            "failure_summary": telegram_fallback.get_status().get("bridge_failure_summary")
+        }
+    except Exception as e:
+        logger.error(f"Error resetting Telegram failure count: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to reset failure count: {str(e)}"}
+        )
+
+
+@app.post("/api/v1/telegram/log_state")
+async def api_v1_log_telegram_state():
+    """Log the current Telegram bridge state for monitoring.
+
+    This endpoint triggers logging of the current bridge state at INFO level,
+    useful for periodic monitoring or on-demand debugging.
+    """
+    try:
+        telegram_fallback = get_telegram_fallback()
+        telegram_fallback.log_bridge_state()
+        return {
+            "status": "success",
+            "message": "Bridge state logged successfully",
+            "failure_summary": telegram_fallback.get_status().get("bridge_failure_summary")
+        }
+    except Exception as e:
+        logger.error(f"Error logging Telegram state: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to log state: {str(e)}"}
+        )
+
+
 # =============================================================================
 # STT Fallback endpoints
 # =============================================================================
