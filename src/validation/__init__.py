@@ -26,6 +26,12 @@ from src.validation.runner import validate_deployment_file
 
 from src.validation.integration import validate_all
 
+from src.validation.comparison import (
+    FieldDiff,
+    ComparisonResult,
+    ComparisonReport,
+)
+
 __all__ = [
     "validate_deployment_data",
     "validate_deployment_data_simple",
@@ -40,4 +46,7 @@ __all__ = [
     "validate_json_file_completeness",
     "validate_deployment_file",
     "validate_all",
+    "FieldDiff",
+    "ComparisonResult",
+    "ComparisonReport",
 ]
