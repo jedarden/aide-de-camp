@@ -254,47 +254,142 @@ class TestDispatchRequestModel:
 
     def test_utterance_must_be_non_empty(self):
         """Test that utterance validator rejects empty strings."""
-        from src.main import DispatchRequest
+        from src.api.models import DispatchRequest
 
         with pytest.raises(ValidationError) as exc_info:
-            DispatchRequest(utterance="")
+            DispatchRequest(utterance="", session_id="test-session", surface_id="test-surface")
 
         errors = exc_info.value.errors()
         assert any("utterance" in str(err.get("loc", "")) for err in errors)
+        # Verify the specific error message from the validator
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("utterance must be a non-empty string" in msg for msg in error_messages), \
+            f"Expected validator error message not found. Got: {error_messages}"
 
     def test_utterance_must_be_string(self):
         """Test that utterance must be a string."""
-        from src.main import DispatchRequest
+        from src.api.models import DispatchRequest
 
         with pytest.raises(ValidationError) as exc_info:
-            DispatchRequest(utterance=123)
+            DispatchRequest(utterance=123, session_id="test-session", surface_id="test-surface")
 
         errors = exc_info.value.errors()
         assert any("utterance" in str(err.get("loc", "")) for err in errors)
+        # Verify the specific error message from the validator
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("utterance must be a string" in msg for msg in error_messages), \
+            f"Expected validator error message not found. Got: {error_messages}"
 
-    def test_optional_fields_accept_none(self):
-        """Test that optional fields accept None."""
-        from src.main import DispatchRequest
-
-        # Should not raise
-        request = DispatchRequest(utterance="test")
-        assert request.session_id is None
-        assert request.surface_id is None
-        assert request.utterance_id is None
-
-    def test_optional_fields_reject_empty_strings(self):
-        """Test that optional fields reject empty strings."""
-        from src.main import DispatchRequest
+    def test_session_id_must_be_non_empty(self):
+        """Test that session_id validator rejects empty strings."""
+        from src.api.models import DispatchRequest
 
         with pytest.raises(ValidationError) as exc_info:
-            DispatchRequest(utterance="test", session_id="")
+            DispatchRequest(utterance="test", session_id="", surface_id="test-surface")
 
         errors = exc_info.value.errors()
         assert any("session_id" in str(err.get("loc", "")) for err in errors)
+        # Verify the specific error message from the validator
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("session_id must be a non-empty string" in msg for msg in error_messages), \
+            f"Expected validator error message not found. Got: {error_messages}"
+
+    def test_session_id_must_be_string(self):
+        """Test that session_id must be a string."""
+        from src.api.models import DispatchRequest
+
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(utterance="test", session_id=123, surface_id="test-surface")
+
+        errors = exc_info.value.errors()
+        assert any("session_id" in str(err.get("loc", "")) for err in errors)
+        # Verify the specific error message from the validator
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("session_id must be a string" in msg for msg in error_messages), \
+            f"Expected validator error message not found. Got: {error_messages}"
+
+    def test_surface_id_must_be_non_empty(self):
+        """Test that surface_id validator rejects empty strings."""
+        from src.api.models import DispatchRequest
+
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(utterance="test", session_id="test-session", surface_id="")
+
+        errors = exc_info.value.errors()
+        assert any("surface_id" in str(err.get("loc", "")) for err in errors)
+        # Verify the specific error message from the validator
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("surface_id must be a non-empty string" in msg for msg in error_messages), \
+            f"Expected validator error message not found. Got: {error_messages}"
+
+    def test_surface_id_must_be_string(self):
+        """Test that surface_id must be a string."""
+        from src.api.models import DispatchRequest
+
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(utterance="test", session_id="test-session", surface_id=123)
+
+        errors = exc_info.value.errors()
+        assert any("surface_id" in str(err.get("loc", "")) for err in errors)
+        # Verify the specific error message from the validator
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("surface_id must be a string" in msg for msg in error_messages), \
+            f"Expected validator error message not found. Got: {error_messages}"
+
+    def test_utterance_id_must_be_non_empty_if_provided(self):
+        """Test that utterance_id validator rejects empty strings if provided."""
+        from src.api.models import DispatchRequest
+
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(
+                utterance="test",
+                session_id="test-session",
+                surface_id="test-surface",
+                utterance_id=""
+            )
+
+        errors = exc_info.value.errors()
+        assert any("utterance_id" in str(err.get("loc", "")) for err in errors)
+        # Verify the specific error message from the validator
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("utterance_id must be a non-empty string if provided" in msg for msg in error_messages), \
+            f"Expected validator error message not found. Got: {error_messages}"
+
+    def test_utterance_id_must_be_string_if_provided(self):
+        """Test that utterance_id must be a string if provided."""
+        from src.api.models import DispatchRequest
+
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(
+                utterance="test",
+                session_id="test-session",
+                surface_id="test-surface",
+                utterance_id=123
+            )
+
+        errors = exc_info.value.errors()
+        assert any("utterance_id" in str(err.get("loc", "")) for err in errors)
+        # Verify the specific error message from the validator
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("utterance_id must be a string" in msg for msg in error_messages), \
+            f"Expected validator error message not found. Got: {error_messages}"
+
+    def test_optional_fields_accept_none(self):
+        """Test that optional fields accept None."""
+        from src.api.models import DispatchRequest
+
+        # Note: DispatchRequest requires session_id and surface_id, they are not optional
+        # This test verifies that utterance_id is truly optional
+        request = DispatchRequest(
+            utterance="test",
+            session_id="session-123",
+            surface_id="surface-456"
+        )
+        assert request.utterance_id is None
 
     def test_valid_request_constructs(self):
         """Test that valid request constructs successfully."""
-        from src.main import DispatchRequest
+        from src.api.models import DispatchRequest
 
         # Should not raise
         request = DispatchRequest(
@@ -308,3 +403,58 @@ class TestDispatchRequestModel:
         assert request.session_id == "session-123"
         assert request.surface_id == "surface-456"
         assert request.utterance_id == "utterance-789"
+
+    def test_whitespace_only_fields_rejected(self):
+        """Test that whitespace-only strings are rejected by validators."""
+        from src.api.models import DispatchRequest
+
+        # Test utterance with only whitespace
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(
+                utterance="   ",
+                session_id="test-session",
+                surface_id="test-surface"
+            )
+        errors = exc_info.value.errors()
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("utterance must be a non-empty string" in msg for msg in error_messages), \
+            f"Expected utterance validator error for whitespace-only input. Got: {error_messages}"
+
+        # Test session_id with only whitespace
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(
+                utterance="test",
+                session_id="  \t  ",
+                surface_id="test-surface"
+            )
+        errors = exc_info.value.errors()
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("session_id must be a non-empty string" in msg for msg in error_messages), \
+            f"Expected session_id validator error for whitespace-only input. Got: {error_messages}"
+
+        # Test surface_id with only whitespace
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(
+                utterance="test",
+                session_id="test-session",
+                surface_id="   "
+            )
+        errors = exc_info.value.errors()
+        error_messages = [err.get("msg", "") for err in errors]
+        assert any("surface_id must be a non-empty string" in msg for msg in error_messages), \
+            f"Expected surface_id validator error for whitespace-only input. Got: {error_messages}"
+
+    def test_validator_strips_whitespace(self):
+        """Test that validators strip leading/trailing whitespace."""
+        from src.api.models import DispatchRequest
+
+        request = DispatchRequest(
+            utterance="  test utterance  ",
+            session_id="  session-123  ",
+            surface_id="  surface-456  "
+        )
+
+        # Validators should strip whitespace
+        assert request.utterance == "test utterance"
+        assert request.session_id == "session-123"
+        assert request.surface_id == "surface-456"

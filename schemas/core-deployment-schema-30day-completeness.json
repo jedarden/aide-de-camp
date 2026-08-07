@@ -273,6 +273,9 @@
     "completeness": {
       "type": "object",
       "description": "30-day completeness validation metrics. This section is required for 30-day completeness validation and must pass all checks for the data to be considered complete.",
+      "errorMessage": {
+        "type": "Completeness validation section is required but missing. Add a 'completeness' object with period_coverage_days, data_coverage_percent, gaps_detected, and meets_completeness_threshold fields."
+      },
       "required": [
         "period_coverage_days",
         "data_coverage_percent",
@@ -288,21 +291,37 @@
           "type": "integer",
           "minimum": 30,
           "description": "Number of days covered by the deployment data. Must be at least 30 for completeness validation.",
+          "errorMessage": {
+            "minimum": "Period coverage is {actual} days but must be at least 30 days for completeness validation. Extend the analysis period from '{data_period_start}' to '{data_period_end}' to ensure at least 30 days of coverage.",
+            "type": "Period coverage days must be an integer value representing the total days covered by deployment data."
+          },
           "examples": [30, 31, 35]
         },
         "data_coverage_percent": {
           "type": "string",
           "pattern": "^(100|[1-9]?[0-9])%$",
           "description": "Percentage of the 30-day period with deployment data coverage. For completeness validation, this should be 100% or meet the minimum threshold (default 95%).",
+          "errorMessage": {
+            "pattern": "Data coverage percentage must be in format 'XX%' (e.g., '95%', '100%'). Current value: '{actual}'. Expected format: '100%', '95%', '87%', etc.",
+            "type": "Data coverage percent must be a string value like '95%' or '100%'."
+          },
           "examples": ["100%", "95%", "87%"]
         },
         "gaps_detected": {
           "type": "boolean",
-          "description": "Whether data gaps were detected in the 30-day period. For completeness validation, this should be false."
+          "description": "Whether data gaps were detected in the 30-day period. For completeness validation, this should be false.",
+          "errorMessage": {
+            "type": "Gaps detected must be a boolean value (true/false). Current: '{actual}'.",
+            "custom": "Data gaps detected in deployment coverage. Check gap_details array for specific missing periods. Critical gaps (>7 days) indicate incomplete deployment history."
+          }
         },
         "gap_details": {
           "type": "array",
           "description": "List of gaps detected in the deployment data. For completeness validation, this array should be empty or only contain gaps <3 days. Each gap includes start, end, duration, severity, and affected data types.",
+          "errorMessage": {
+            "type": "Gap details must be an array of gap objects, even if empty.",
+            "custom": "Data gaps detected in coverage period. Review each gap entry for duration (gap_duration_days), severity (critical: >7 days, warning: 3-7 days, info: <3 days), and missing data types. Critical gaps prevent completeness validation."
+          },
           "items": {
             "type": "object",
             "required": ["gap_start_days_ago", "gap_end_days_ago", "gap_duration_days"],
@@ -310,22 +329,38 @@
               "gap_start_days_ago": {
                 "type": "integer",
                 "minimum": 0,
-                "description": "Days ago when the gap started (relative to data_period_end)"
+                "description": "Days ago when the gap started (relative to data_period_end)",
+                "errorMessage": {
+                  "minimum": "Gap start days ago cannot be negative. Current: '{actual}'. Expected: 0 or more days ago.",
+                  "type": "Gap start days ago must be an integer relative to the analysis period end."
+                }
               },
               "gap_end_days_ago": {
                 "type": "integer",
                 "minimum": 0,
-                "description": "Days ago when the gap ended (relative to data_period_end)"
+                "description": "Days ago when the gap ended (relative to data_period_end)",
+                "errorMessage": {
+                  "minimum": "Gap end days ago cannot be negative. Current: '{actual}'. Expected: 0 or more days ago.",
+                  "type": "Gap end days ago must be an integer relative to the analysis period end."
+                }
               },
               "gap_duration_days": {
                 "type": "integer",
                 "minimum": 1,
-                "description": "Duration of the gap in days"
+                "description": "Duration of the gap in days",
+                "errorMessage": {
+                  "minimum": "Gap duration must be at least 1 day. Current: '{actual}'. Gaps of 0 days should not be recorded.",
+                  "type": "Gap duration must be an integer representing days in the gap."
+                }
               },
               "severity": {
                 "type": "string",
                 "enum": ["critical", "warning", "info"],
-                "description": "Gap severity level based on duration. Critical: >7 days, Warning: 3-7 days, Info: <3 days"
+                "description": "Gap severity level based on duration. Critical: >7 days, Warning: 3-7 days, Info: <3 days",
+                "errorMessage": {
+                  "enum": "Severity must be one of: 'critical' (>7 days), 'warning' (3-7 days), or 'info' (<3 days). Current: '{actual}'.",
+                  "type": "Severity must be a string value."
+                }
               },
               "missing_data_types": {
                 "type": "array",
@@ -340,13 +375,21 @@
         },
         "meets_completeness_threshold": {
           "type": "boolean",
-          "description": "Whether the deployment data meets the minimum completeness threshold (default: 95% coverage for 30-day period). For completeness validation, this should be true."
+          "description": "Whether the deployment data meets the minimum completeness threshold (default: 95% coverage for 30-day period). For completeness validation, this should be true.",
+          "errorMessage": {
+            "type": "Completeness threshold must be a boolean value (true/false). Current: '{actual}'.",
+            "custom": "Completeness threshold not met. Coverage: {data_coverage_percent} (required: {completeness_threshold_percent}). Action: Extend data collection period, fill missing deployment data, or adjust threshold if appropriate."
+          }
         },
         "completeness_threshold_percent": {
           "type": "string",
           "pattern": "^(100|[1-9]?[0-9])%$",
           "default": "95%",
           "description": "Minimum completeness threshold required for 30-day validation. Default is 95%, but can be set to 100% for strict validation.",
+          "errorMessage": {
+            "pattern": "Completeness threshold must be in format 'XX%' (e.g., '95%', '100%'). Current: '{actual}'. Expected format: percentage string with % symbol.",
+            "type": "Completeness threshold must be a string percentage value."
+          },
           "examples": ["95%", "100%"]
         },
         "minimum_deployment_days": {
@@ -354,16 +397,28 @@
           "minimum": 0,
           "default": 1,
           "description": "Minimum number of deployment days required in the 30-day period. Default is 1, but can be increased for stricter validation.",
+          "errorMessage": {
+            "minimum": "Minimum deployment days cannot be negative. Current: '{actual}'. Expected: 0 or more days.",
+            "type": "Minimum deployment days must be an integer value."
+          },
           "examples": [1, 5, 10]
         },
         "actual_deployment_days": {
           "type": "integer",
           "minimum": 0,
-          "description": "Actual number of distinct days with deployments in the 30-day period"
+          "description": "Actual number of distinct days with deployments in the 30-day period",
+          "errorMessage": {
+            "minimum": "Actual deployment days cannot be negative. Current: '{actual}'. Expected: 0 or more days with deployment activity.",
+            "type": "Actual deployment days must be an integer count of days with deployments."
+          }
         },
         "deployment_days_threshold_met": {
           "type": "boolean",
-          "description": "Whether the minimum deployment days threshold is met. For completeness validation, this should be true."
+          "description": "Whether the minimum deployment days threshold is met. For completeness validation, this should be true.",
+          "errorMessage": {
+            "type": "Deployment days threshold must be a boolean value (true/false). Current: '{actual}'.",
+            "custom": "Deployment days threshold not met. Actual: {actual_deployment_days} days (required: {minimum_deployment_days} days). Action: Verify deployment activity in the analysis period or adjust minimum_deployment_days threshold if appropriate."
+          }
         }
       }
     },

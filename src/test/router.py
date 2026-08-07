@@ -106,6 +106,18 @@ class TestClassificationResponse(BaseModel):
     message: str
 
 
+class IntentClassifyRequest(BaseModel):
+    """Request model for intent classification endpoint."""
+    utterance: str = Field(..., description="The utterance text to classify")
+
+
+class IntentClassifyResponse(BaseModel):
+    """Response model for intent classification endpoint."""
+    utterance: str
+    classifications: list[dict]
+    message: str
+
+
 @router.post("/test/classify")
 async def test_classify_intent(request: TestClassificationRequest) -> TestClassificationResponse:
     """
@@ -174,6 +186,85 @@ async def test_classify_intent(request: TestClassificationRequest) -> TestClassi
 
     except Exception as e:
         logger.error(f"[TEST] Classification error: {e}", exc_info=True)
+        raise
+
+
+@router.post("/test/intent-classify")
+async def test_intent_classify(request: IntentClassifyRequest) -> IntentClassifyResponse:
+    """
+    Test intent classification endpoint without audio processing.
+
+    Mounted at ``POST /api/v1/test/intent-classify``. This endpoint accepts
+    test utterances directly into the intent classification pipeline without
+    requiring audio processing or microphone dependencies. Returns classification
+    results in the same format as /dispatch would produce.
+
+    Request body:
+    ```
+    {
+        "utterance": "test utterance here"
+    }
+    ```
+
+    Returns:
+    ```
+    {
+        "utterance": "...",
+        "classifications": [
+            {
+                "intent_type": "status|action|brainstorm|lookup|reminder|self-modification|monitoring-config|task-profile|clarification",
+                "project_slug": "project-id or null",
+                "confidence": 0.0-1.0,
+                "utterance_fragment": "the specific fragment this intent covers",
+                "reasoning": "brief explanation of classification",
+                "urgency": "critical|high|normal|low",
+                "lookup_kind": "logs|config|docs or null"
+            }
+        ],
+        "message": "Classified into N intent(s)"
+    }
+    ```
+
+    Error responses:
+        422: Validation error (missing or invalid utterance field)
+        500: Classification processing error
+    """
+    from ..intent.router import get_router
+
+    logger.info(f"[TEST] Classifying intent: {request.utterance[:100]}...")
+
+    try:
+        # Get router and classify
+        router = get_router()
+        classifications, _ = await router.classify_utterance(
+            utterance=request.utterance,
+            session_id="test-session",  # Default session for classification
+        )
+
+        # Convert classifications to dict format (same as /dispatch would produce)
+        classification_dicts = []
+        for classification in classifications:
+            classification_dict = {
+                "intent_type": classification.intent_type.value,
+                "project_slug": classification.project_slug,
+                "confidence": classification.confidence,
+                "utterance_fragment": classification.utterance_fragment,
+                "reasoning": classification.reasoning,
+                "urgency": classification.urgency,
+            }
+            # Add lookup_kind only if present (optional field for lookup intents)
+            if classification.lookup_kind is not None:
+                classification_dict["lookup_kind"] = classification.lookup_kind
+            classification_dicts.append(classification_dict)
+
+        return IntentClassifyResponse(
+            utterance=request.utterance,
+            classifications=classification_dicts,
+            message=f"Classified into {len(classifications)} intent(s)",
+        )
+
+    except Exception as e:
+        logger.error(f"[TEST] Intent classification error: {e}", exc_info=True)
         raise
 
 

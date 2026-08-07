@@ -273,21 +273,44 @@ class TopicRegistry:
 
     Helps resolve vague references like "the pipeline" by maintaining
     a mapping of aliases and references.
+
+    ASYNCIO LOCKING: Instance-level lock protects _aliases dict from
+    concurrent modifications during alias registration.
     """
 
     def __init__(self):
         self._aliases: dict[str, str] = {}
+        self._lock = asyncio.Lock()  # Instance-level lock for alias modifications
 
-    def register_alias(self, alias: str, topic_label: str) -> None:
-        """Register an alias for a topic."""
-        self._aliases[alias.lower()] = topic_label
+    async def register_alias(self, alias: str, topic_label: str) -> None:
+        """
+        Register an alias for a topic (protected write).
 
-    def resolve_alias(self, alias: str) -> str | None:
-        """Resolve an alias to a topic label."""
-        return self._aliases.get(alias.lower())
+        ASYNCIO LOCKING: Uses instance-level lock to ensure safe concurrent access.
+        Multiple concurrent registrations will be serialized.
+        """
+        logger.debug(f"Acquiring TopicRegistry lock for alias registration: {alias}")
+        async with self._lock:
+            logger.debug(f"TopicRegistry lock acquired for alias: {alias}")
+            self._aliases[alias.lower()] = topic_label
+            logger.debug(f"TopicRegistry alias registered: {alias} -> {topic_label}")
 
-    def add_common_aliases(self) -> None:
-        """Add common aliases for well-known topics."""
+    async def resolve_alias(self, alias: str) -> str | None:
+        """
+        Resolve an alias to a topic label (protected read).
+
+        ASYNCIO LOCKING: Uses instance-level lock to ensure safe concurrent access.
+        Reads are protected to prevent seeing partially updated state.
+        """
+        logger.debug(f"Acquiring TopicRegistry lock for alias resolution: {alias}")
+        async with self._lock:
+            logger.debug(f"TopicRegistry lock acquired for resolution: {alias}")
+            result = self._aliases.get(alias.lower())
+            logger.debug(f"TopicRegistry alias resolved: {alias} -> {result}")
+            return result
+
+    async def add_common_aliases(self) -> None:
+        """Add common aliases for well-known topics (protected batch write)."""
         common_aliases = {
             "pipeline": "options-pipeline",
             "the pipeline": "options-pipeline",
@@ -296,18 +319,37 @@ class TopicRegistry:
             "mcp": "ibkr-mcp",
             "ibkr": "ibkr-mcp",
         }
-        for alias, label in common_aliases.items():
-            self.register_alias(alias, label)
+        logger.debug("Acquiring TopicRegistry lock for batch common alias registration")
+        async with self._lock:
+            logger.debug("TopicRegistry lock acquired for common aliases")
+            for alias, label in common_aliases.items():
+                self._aliases[alias.lower()] = label
+            logger.debug("TopicRegistry common aliases registered")
 
 
 # Global topic registry
 _topic_registry: TopicRegistry | None = None
+_topic_registry_lock = asyncio.Lock()
 
 
-def get_topic_registry() -> TopicRegistry:
-    """Get or create the global topic registry."""
+async def get_topic_registry() -> TopicRegistry:
+    """
+    Get or create the global topic registry (protected read-modify-write).
+
+    ASYNCIO LOCKING: Uses module-level lock to ensure safe concurrent access.
+    Multiple concurrent calls will be serialized - only one initialization.
+    """
     global _topic_registry
-    if _topic_registry is None:
-        _topic_registry = TopicRegistry()
-        _topic_registry.add_common_aliases()
-    return _topic_registry
+
+    logger.debug("Acquiring global topic registry lock")
+    async with _topic_registry_lock:
+        logger.debug("Global topic registry lock acquired")
+        # Double-check pattern
+        if _topic_registry is None:
+            logger.debug("Initializing global topic registry")
+            _topic_registry = TopicRegistry()
+            await _topic_registry.add_common_aliases()
+            logger.debug("Global topic registry initialized with common aliases")
+        else:
+            logger.debug("Global topic registry already initialized")
+        return _topic_registry

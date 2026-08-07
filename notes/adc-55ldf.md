@@ -23,7 +23,10 @@ Filtered workflows (last 30 days): 0
 Workflows removed (older than 30 days): 0
 ```
 
-**Note:** No pbx-web-build workflows currently exist in the cluster (as expected - the template exists but hasn't been run).
+**Note:** No pbx-web-build workflows currently exist in the cluster. Verified 2026-08-06 that:
+- Template exists (created 2026-05-27, 72 days ago)
+- No workflow instances found
+- Query is functioning correctly - empty results reflect actual cluster state
 
 ## Verification Testing
 

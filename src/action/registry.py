@@ -149,12 +149,15 @@ def _validate_workflow_definition(
     return errors
 
 
-def get_workflow_definition(
+async def get_workflow_definition(
     project_slug: str,
     workflow_name: str,
 ) -> dict[str, Any]:
     """
     Get workflow definition from project registry.
+
+    ASYNCIO LOCKING: Protected by async lock in get_registry() to ensure safe
+    concurrent access to registry cache.
 
     Args:
         project_slug: Project slug to lookup
@@ -167,7 +170,7 @@ def get_workflow_definition(
         WorkflowValidationError: If workflow definition is invalid
         ValueError: If project or workflow not found
     """
-    registry = get_registry()
+    registry = await get_registry()
 
     # Get project entry
     projects = registry.get("projects", {})
@@ -194,9 +197,12 @@ def get_workflow_definition(
     return workflow_config
 
 
-def list_workflows(project_slug: str) -> dict[str, dict[str, Any]]:
+async def list_workflows(project_slug: str) -> dict[str, dict[str, Any]]:
     """
     List all workflows for a project.
+
+    ASYNCIO LOCKING: Protected by async lock in get_registry() to ensure safe
+    concurrent access to registry cache.
 
     Args:
         project_slug: Project slug to lookup
@@ -207,7 +213,7 @@ def list_workflows(project_slug: str) -> dict[str, dict[str, Any]]:
     Raises:
         ValueError: If project not found
     """
-    registry = get_registry()
+    registry = await get_registry()
 
     projects = registry.get("projects", {})
     project_cfg = projects.get(project_slug)
@@ -218,9 +224,12 @@ def list_workflows(project_slug: str) -> dict[str, dict[str, Any]]:
     return project_cfg.get("workflows", {})
 
 
-def validate_all_workflows() -> list[dict[str, Any]]:
+async def validate_all_workflows() -> list[dict[str, Any]]:
     """
     Validate all workflow definitions across all projects.
+
+    ASYNCIO LOCKING: Protected by async lock in get_registry() to ensure safe
+    concurrent access to registry cache.
 
     Returns:
         List of validation error dictionaries. Each dict has:
@@ -230,7 +239,7 @@ def validate_all_workflows() -> list[dict[str, Any]]:
 
     Returns empty list if all workflows are valid.
     """
-    registry = get_registry()
+    registry = await get_registry()
     all_errors = []
 
     projects = registry.get("projects", {})
@@ -255,24 +264,30 @@ def validate_all_workflows() -> list[dict[str, Any]]:
     return all_errors
 
 
-def reload_registry() -> None:
+async def reload_registry() -> None:
     """
     Force reload the project registry cache.
+
+    ASYNCIO LOCKING: Protected by async lock in get_registry() to ensure safe
+    concurrent access to registry cache.
 
     This bypasses the TTL cache and forces a fresh read from disk.
     Useful after registry.yaml has been updated.
     """
-    get_registry(force=True)
+    await get_registry(force=True)
     logger.info("Registry cache reloaded")
 
 
 # Alias functions for compatibility with acceptance criteria naming
-def load_workflow_definition(
+async def load_workflow_definition(
     project_slug: str,
     workflow_name: str,
 ) -> dict[str, Any]:
     """
     Alias for get_workflow_definition().
+
+    ASYNCIO LOCKING: Protected by async lock in get_workflow_definition() to ensure
+    safe concurrent access to registry cache.
 
     Args:
         project_slug: Project slug to lookup
@@ -285,12 +300,15 @@ def load_workflow_definition(
         WorkflowValidationError: If workflow definition is invalid
         ValueError: If project or workflow not found
     """
-    return get_workflow_definition(project_slug, workflow_name)
+    return await get_workflow_definition(project_slug, workflow_name)
 
 
-def list_available_workflows(project_slug: str) -> dict[str, dict[str, Any]]:
+async def list_available_workflows(project_slug: str) -> dict[str, dict[str, Any]]:
     """
     Alias for list_workflows().
+
+    ASYNCIO LOCKING: Protected by async lock in list_workflows() to ensure safe
+    concurrent access to registry cache.
 
     Args:
         project_slug: Project slug to lookup
@@ -301,4 +319,4 @@ def list_available_workflows(project_slug: str) -> dict[str, dict[str, Any]]:
     Raises:
         ValueError: If project not found
     """
-    return list_workflows(project_slug)
+    return await list_workflows(project_slug)

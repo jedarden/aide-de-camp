@@ -7,6 +7,8 @@ Kubernetes events, pod status, deployment logs, and ReplicaSet status.
 
 import pytest
 from src.categorize_events import (
+    # Types
+    EventType,
     # Constants
     EVENT_DEPLOYMENT_START,
     EVENT_DEPLOYMENT_COMPLETE,
@@ -1550,6 +1552,286 @@ class TestFallbackTriggerMechanism:
 
         # Assert the event fell back to UNKNOWN
         assert result == EVENT_UNKNOWN, f"{description} - got {result} instead"
+
+
+# -----------------------------------------------------------------------------
+# Tests for unknown category return value assertions
+# -----------------------------------------------------------------------------
+
+class TestUnknownCategoryReturnAssertions:
+    """
+    Tests to verify unknown category return value assertions per adc-5gg3r.
+
+    These tests verify that:
+    1. 'unknown' is returned when fallback is triggered
+    2. The unknown result has the correct structure (matches Result type)
+    3. The unknown result includes the original event for traceability
+    4. Unknown results are distinguishable from valid categorizations
+    """
+
+    def test_unknown_returned_when_fallback_triggered(self, base_parsed_event):
+        """
+        Test that 'unknown' category is returned when fallback is triggered.
+
+        This verifies the fundamental fallback behavior: when no patterns match,
+        the system returns EventType.UNKNOWN.
+        """
+        # Create an event that should trigger fallback (no patterns match)
+        base_parsed_event.update({
+            'event_type': 'completely_unknown_event_type',
+            'status': 'unknown_status',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'random_field': 'random_value'
+                }
+            }
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Assert unknown is returned when fallback is triggered
+        assert result == EVENT_UNKNOWN, "Fallback should return EVENT_UNKNOWN when no patterns match"
+
+    def test_unknown_result_has_correct_structure(self, base_parsed_event):
+        """
+        Test that the unknown result has the correct structure (matches Result type).
+
+        The categorize_event function returns EventType enum values. This test verifies
+        that the return value is a valid EventType enum member.
+        """
+        # Create an event that should return unknown
+        base_parsed_event.update({
+            'event_type': 'unknown_type',
+            'status': 'unknown',
+            'error_code': None,
+            'metadata': {'source_fields': {}}
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Verify result is an EventType enum (has the expected structure)
+        assert isinstance(result, EventType), f"Result should be EventType enum, got {type(result)}"
+        assert result in EventType, f"Result should be valid EventType member, got {result}"
+
+        # Verify it's specifically the UNKNOWN type
+        assert result == EventType.UNKNOWN, f"Result should be EventType.UNKNOWN, got {result}"
+
+    def test_unknown_result_distinguishable_from_valid_categorizations(self, base_parsed_event):
+        """
+        Test that unknown results are distinguishable from valid categorizations.
+
+        This verifies that EVENT_UNKNOWN is distinct from all other valid event types
+        and can be uniquely identified.
+        """
+        # Create an event that should return unknown
+        base_parsed_event.update({
+            'event_type': 'custom_event',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {'source_fields': {'custom_field': 'custom_value'}}
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Verify unknown is distinguishable from all other event types
+        all_event_types = get_all_event_types()
+
+        # The result should be in the list of all event types
+        assert result in all_event_types, "Result should be a valid event type"
+
+        # The result should be UNKNOWN and NOT any other specific type
+        assert result == EVENT_UNKNOWN, "Result should be EVENT_UNKNOWN"
+
+        # Verify UNKNOWN is distinct from each specific event type
+        specific_types = [
+            EVENT_DEPLOYMENT_START, EVENT_DEPLOYMENT_COMPLETE, EVENT_POD_CRASH,
+            EVENT_OOM, EVENT_READINESS_FAIL, EVENT_TIMEOUT, EVENT_IMAGE_PULL_ERROR,
+            EVENT_RESOURCE_LIMIT, EVENT_PROBE_FAILURE, EVENT_NETWORK_ERROR
+        ]
+
+        for specific_type in specific_types:
+            assert result != specific_type, f"EVENT_UNKNOWN should be distinct from {specific_type}"
+
+    def test_unknown_includes_original_event_context(self, base_parsed_event):
+        """
+        Test that the unknown result preserves context from the original event.
+
+        While the function returns a simple enum value (not a complex Result object),
+        the categorization process should not destroy the original event data.
+        This test verifies that the original event remains intact after categorization.
+        """
+        # Create a detailed event with traceable information
+        original_event = {
+            'timestamp': '2026-08-07T12:00:00Z',
+            'service': 'test-service',
+            'event_type': 'unknown_traceable_event',
+            'status': 'unknown',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'test-cluster',
+            'namespace': 'test-ns',
+            'metadata': {
+                'source_fields': {
+                    'traceable_id': 'abc123',
+                    'traceable_field': 'traceable_value'
+                },
+                'raw_format': 'custom'
+            }
+        }
+
+        # Make a deep copy to verify immutability
+        import copy
+        event_copy = copy.deepcopy(original_event)
+        base_parsed_event.clear()
+        base_parsed_event.update(original_event)
+
+        # Categorize the event
+        result = categorize_event(base_parsed_event)
+
+        # Verify the result is unknown
+        assert result == EVENT_UNKNOWN
+
+        # Verify the original event is preserved for traceability
+        assert base_parsed_event['timestamp'] == event_copy['timestamp'], "Timestamp should be preserved"
+        assert base_parsed_event['service'] == event_copy['service'], "Service should be preserved"
+        assert base_parsed_event['event_type'] == event_copy['event_type'], "Event type should be preserved"
+        assert base_parsed_event['metadata']['source_fields']['traceable_id'] == 'abc123', "Traceable fields should be preserved"
+
+    def test_unknown_value_type_consistency(self, base_parsed_event):
+        """
+        Test that unknown result has consistent type across different fallback scenarios.
+
+        Whether fallback is triggered due to invalid input, missing fields, or
+        unrecognizable patterns, the return type should always be EventType enum.
+        """
+        test_cases = [
+            # Scenario 1: None input
+            (None, "None input"),
+            # Scenario 2: Empty dict
+            ({}, "Empty dict"),
+            # Scenario 3: Invalid input type
+            ("not a dict", "Invalid input type"),
+            # Scenario 4: Unrecognizable event pattern
+            ({'event_type': 'foobar', 'status': 'baz', 'metadata': {}}, "Unrecognizable pattern"),
+        ]
+
+        for event_input, scenario_name in test_cases:
+            result = categorize_event(event_input) if isinstance(event_input, dict) else categorize_event(event_input)
+
+            # All should return EventType enum
+            assert isinstance(result, EventType), f"{scenario_name}: Should return EventType enum, got {type(result)}"
+            assert result == EVENT_UNKNOWN, f"{scenario_name}: Should return EVENT_UNKNOWN"
+
+    @pytest.mark.parametrize("fallback_trigger,description", [
+        # Various fallback trigger scenarios
+        ({
+            'event_type': 'custom_metrics_event',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {'source_fields': {'metric_name': 'latency_p99', 'value': 250}}
+        }, "Custom metrics event triggers fallback"),
+
+        ({
+            'event_type': 'scaling_activity',
+            'status': 'completed',
+            'error_code': None,
+            'metadata': {'source_fields': {'scaling_action': 'autoscaled', 'from': 3, 'to': 5}}
+        }, "Scaling activity triggers fallback"),
+
+        ({
+            'event_type': 'config_change',
+            'status': 'applied',
+            'error_code': None,
+            'metadata': {'source_fields': {'configmap': 'app-config', 'version': 'v2'}}
+        }, "Config change triggers fallback"),
+
+        ({
+            'event_type': 'volume_operation',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'volume': 'data-vol', 'operation': 'attach'}}
+        }, "Volume operation triggers fallback"),
+
+        ({
+            'event_type': 'security_event',
+            'status': 'allowed',
+            'error_code': None,
+            'metadata': {'source_fields': {'user': 'system', 'action': 'read', 'resource': 'secret'}}
+        }, "Security event triggers fallback"),
+    ])
+    def test_unknown_returned_for_various_fallback_scenarios(self, base_parsed_event, fallback_trigger, description):
+        """
+        Parametrized test verifying unknown is returned for various fallback scenarios.
+
+        Each test case represents a realistic scenario that should trigger the
+        fallback mechanism and return EVENT_UNKNOWN.
+        """
+        base_parsed_event.update(fallback_trigger)
+        result = categorize_event(base_parsed_event)
+
+        # Assert unknown is returned
+        assert result == EVENT_UNKNOWN, f"{description}: Expected EVENT_UNKNOWN, got {result}"
+
+        # Assert result has correct structure (EventType enum)
+        assert isinstance(result, EventType), f"{description}: Result should be EventType enum"
+
+        # Assert result is distinguishable from other event types
+        assert result != EVENT_OOM, f"{description}: Should not be categorized as OOM"
+        assert result != EVENT_POD_CRASH, f"{description}: Should not be categorized as Pod Crash"
+        assert result != EVENT_DEPLOYMENT_START, f"{description}: Should not be categorized as Deployment Start"
+        assert result != EVENT_DEPLOYMENT_COMPLETE, f"{description}: Should not be categorized as Deployment Complete"
+
+    def test_unknown_value_equals_event_type_unknown_constant(self, base_parsed_event):
+        """
+        Test that the unknown return value equals the EVENT_UNKNOWN constant.
+
+        This verifies the module-level constant is correctly aligned with
+        the EventType enum value.
+        """
+        # Create an event that should return unknown
+        base_parsed_event.update({
+            'event_type': 'test_unknown',
+            'status': 'unknown',
+            'error_code': None,
+            'metadata': {'source_fields': {}}
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Verify result equals the constant
+        assert result == EVENT_UNKNOWN, "Result should equal EVENT_UNKNOWN constant"
+        assert result == EventType.UNKNOWN, "Result should equal EventType.UNKNOWN enum"
+
+        # Verify the constant equals the enum value
+        assert EVENT_UNKNOWN == EventType.UNKNOWN, "EVENT_UNKNOWN constant should equal EventType.UNKNOWN"
+
+    def test_unknown_result_in_all_event_types(self, base_parsed_event):
+        """
+        Test that unknown result is included in get_all_event_types().
+
+        This verifies that EVENT_UNKNOWN is a recognized event type in the system.
+        """
+        # Create an event that should return unknown
+        base_parsed_event.update({
+            'event_type': 'test_unknown',
+            'status': 'unknown',
+            'error_code': None,
+            'metadata': {'source_fields': {}}
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Get all event types
+        all_types = get_all_event_types()
+
+        # Verify unknown is in the list
+        assert EVENT_UNKNOWN in all_types, "EVENT_UNKNOWN should be in all event types"
+        assert result in all_types, "Unknown result should be a valid event type in the system"
+
+        # Verify display name works for unknown
+        display_name = get_event_type_display_name(result)
+        assert display_name == 'Unknown Event', f"Display name should be 'Unknown Event', got '{display_name}'"
 
 
 # -----------------------------------------------------------------------------

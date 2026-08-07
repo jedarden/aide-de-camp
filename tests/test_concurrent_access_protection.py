@@ -113,14 +113,20 @@ async def test_concurrent_registry_access():
                 # Force some cache rebuilds
                 force = (i % 5 == 0)  # Every 5th access forces rebuild
 
-                registry = get_registry(force=force)
+                # Run the async function in an event loop
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    registry = loop.run_until_complete(get_registry(force=force))
 
-                # Verify we got a valid registry
-                assert isinstance(registry, dict), "Registry should be a dict"
-                assert 'projects' in registry, "Registry should have projects"
+                    # Verify we got a valid registry
+                    assert isinstance(registry, dict), "Registry should be a dict"
+                    assert 'projects' in registry, "Registry should have projects"
 
-                # Small delay to increase concurrency
-                time.sleep(0.001)
+                    # Small delay to increase concurrency
+                    time.sleep(0.001)
+                finally:
+                    loop.close()
 
             stats.record_access(True)
             return True
@@ -189,21 +195,26 @@ async def test_race_condition_read_write():
     def race_reader():
         """Read registry rapidly to trigger race conditions."""
         try:
-            for i in range(num_iterations):
-                # Mix of forced and cached reads
-                force = (i % 7 == 0)  # Varying force pattern
-                registry = get_registry(force=force)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                for i in range(num_iterations):
+                    # Mix of forced and cached reads
+                    force = (i % 7 == 0)  # Varying force pattern
+                    registry = loop.run_until_complete(get_registry(force=force))
 
-                # Verify registry structure
-                assert isinstance(registry, dict)
-                assert 'projects' in registry
-                assert 'clusters' in registry
+                    # Verify registry structure
+                    assert isinstance(registry, dict)
+                    assert 'projects' in registry
+                    assert 'clusters' in registry
 
-                # Small delay to reduce CPU load
-                time.sleep(0.001)
+                    # Small delay to reduce CPU load
+                    time.sleep(0.001)
 
-            stats.record_access(True)
-            return True
+                stats.record_access(True)
+                return True
+            finally:
+                loop.close()
 
         except Exception as e:
             stats.record_access(False, e)

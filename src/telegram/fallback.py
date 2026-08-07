@@ -159,6 +159,8 @@ class TelegramFallback:
                     # Update reachability state - reset state tracker if was unreachable
                     if not self._state_tracker.is_reachable:
                         self._state_tracker.mark_as_reachable()
+                        # Reset the fallback's internal failure count when recovering from unreachable state
+                        self._failure_count = 0
                     self._set_reachable(True)  # Update reachability state
                     return True
                 else:
@@ -264,7 +266,10 @@ class TelegramFallback:
                 )
                 is_available = response.status_code == 200
                 if is_available:
-                    self._state_tracker.mark_as_reachable()
+                    # Reset state tracker and failure count when transitioning from unreachable to reachable
+                    if not self._state_tracker.is_reachable:
+                        self._state_tracker.mark_as_reachable()
+                        self._failure_count = 0
                 else:
                     self._state_tracker.mark_as_unreachable(datetime.now())
                 self._set_reachable(is_available)

@@ -419,6 +419,12 @@ TEST_UTTERANCES = [
         description="Lookup request for logs",
     ),
     TestUtterance(
+        name="weather_query",
+        utterance="what is the weather",
+        expected_intent_type="weather",
+        description="Weather query for current conditions",
+    ),
+    TestUtterance(
         name="brainstorm",
         utterance="let's brainstorm ways to optimize the pipeline performance",
         expected_intent_type="brainstorm",

@@ -342,6 +342,9 @@ class EventType:
     # Approval events (Generated-Bead Safety)
     APPROVAL_REQUIRED = "approval_required"
     APPROVAL_GRANTED = "approval_granted"
+
+    # Confirmation prompt events
+    CONFIRMATION_RESPONDED = "confirmation_responded"
     APPROVAL_DENIED = "approval_denied"
 
     # Degraded-state error events (see docs/plan/plan.md: Degraded-State UX)
