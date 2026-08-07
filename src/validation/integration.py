@@ -111,24 +111,23 @@ def validate_all(
     errors = []
 
     # Step 1: JSON well-formedness validation
+    # Early termination on JSON parse failure (cannot check further without valid JSON)
     is_valid_json, error_json = validate_json_wellformedness(data)
     if not is_valid_json:
         errors.append(f"JSON validation: {error_json}")
+        return (False, errors)
 
     # Step 2: Required fields validation
-    # Run regardless of JSON validation result to collect all errors
     is_valid_fields, error_fields = validate_required_fields(data)
     if not is_valid_fields:
         errors.append(f"Required fields validation: {error_fields}")
 
     # Step 3: Data types validation
-    # Run regardless of previous validation results to collect all errors
     is_valid_types, error_types = validate_data_types(data, schema)
     if not is_valid_types:
         errors.append(f"Data types validation: {error_types}")
 
     # Step 4: Completeness validation
-    # Run regardless of previous validation results to collect all errors
     # Extract deployment events for completeness check
     deployment_events = data.get("deployment_events_last_30_days", [])
 
