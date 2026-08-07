@@ -35,23 +35,8 @@ from src.instrument.timings import (
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """Isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "test.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 @pytest.fixture
-def mock_clock() -> MagicMock:
-    """Mock monotonic clock that returns deterministic timestamps."""
-    clock = MagicMock()
-    # Simulate 0, 0.5, 1.0, 1.5... seconds per call
-    clock.side_effect = [i * 0.5 for i in range(100)]
-    return clock
-
 
 # --- Schema verification tests ----------------------------------------------
 
@@ -60,11 +45,11 @@ class TestDispatchTimingsSchema:
     """Verify dispatch_timings table has the correct schema and columns."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_timings_table_has_correct_columns(self, store: SessionStore):
+    async def test_dispatch_timings_table_has_correct_columns(self, test_db_store):
         """dispatch_timings table exists with all expected columns."""
         import aiosqlite
 
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             # Get table schema
             cursor = await db.execute(
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name='dispatch_timings'"
@@ -93,11 +78,11 @@ class TestDispatchTimingsSchema:
                 assert col in schema, f"Column {col} not found in dispatch_timings schema"
 
     @pytest.mark.asyncio
-    async def test_dispatch_timings_primary_key_is_intent_id(self, store: SessionStore):
+    async def test_dispatch_timings_primary_key_is_intent_id(self, test_db_store):
         """intent_id is the PRIMARY KEY of dispatch_timings."""
         import aiosqlite
 
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             cursor = await db.execute(
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name='dispatch_timings'"
             )
@@ -112,11 +97,11 @@ class TestDispatchTimingsSchema:
                 "intent_id should be the PRIMARY KEY column"
 
     @pytest.mark.asyncio
-    async def test_dispatch_timings_created_at_is_not_null(self, store: SessionStore):
+    async def test_dispatch_timings_created_at_is_not_null(self, test_db_store):
         """created_at column has NOT NULL constraint."""
         import aiosqlite
 
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             cursor = await db.execute(
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name='dispatch_timings'"
             )
@@ -137,18 +122,18 @@ class TestRecordDispatchTimings:
     """Test record_dispatch_timings() upsert behavior."""
 
     @pytest.mark.asyncio
-    async def test_record_dispatch_timings_creates_row_on_first_call(self, store: SessionStore):
+    async def test_record_dispatch_timings_creates_row_on_first_call(self, test_db_store):
         """First record_dispatch_timings() call creates a new row."""
         intent_id = "test-intent-1"
         now = int(datetime.now(timezone.utc).timestamp())
 
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             router_ms=100,
             fetch_total_ms=500,
         )
 
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings is not None, "Row should have been created"
         assert timings["intent_id"] == intent_id
         assert timings["router_ms"] == 100
@@ -156,24 +141,24 @@ class TestRecordDispatchTimings:
         assert timings["created_at"] is not None
 
     @pytest.mark.asyncio
-    async def test_record_dispatch_timings_upserts_by_intent_id(self, store: SessionStore):
+    async def test_record_dispatch_timings_upserts_by_intent_id(self, test_db_store):
         """record_dispatch_timings() upserts using intent_id as PRIMARY KEY."""
         intent_id = "test-intest-upsert"
 
         # First write
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             router_ms=150,
         )
 
         # Second write with different columns
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             fetch_total_ms=750,
             synthesize_total_ms=300,
         )
 
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings is not None
         assert timings["intent_id"] == intent_id
         assert timings["router_ms"] == 150, "First write should be preserved"
@@ -182,7 +167,7 @@ class TestRecordDispatchTimings:
 
         # Should still be only one row
         import aiosqlite
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             cursor = await db.execute(
                 "SELECT COUNT(*) FROM dispatch_timings WHERE intent_id = ?",
                 (intent_id,)
@@ -191,7 +176,7 @@ class TestRecordDispatchTimings:
             assert count == 1, "Should only have one row per intent_id"
 
     @pytest.mark.asyncio
-    async def test_partial_upsert_does_not_clobber_existing_values(self, store: SessionStore):
+    async def test_partial_upsert_does_not_clobber_existing_values(self, test_db_store):
         """
         Second record_dispatch_timings(sse_emit_ms=...) call does NOT null router_ms set earlier.
         This is the critical test proving partial upsert works correctly.
@@ -199,74 +184,74 @@ class TestRecordDispatchTimings:
         intent_id = "test-partial-upsert"
 
         # First write: set router_ms
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             router_ms=123,
         )
 
         # Verify first write
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings is not None
         assert timings["router_ms"] == 123
         assert timings["sse_emit_ms"] is None, "sse_emit_ms should be NULL initially"
 
         # Second write: only set sse_emit_ms (partial write)
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             sse_emit_ms=456,
         )
 
         # Verify both values are present (second write did NOT null router_ms)
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings is not None
         assert timings["router_ms"] == 123, "router_ms should still be 123 after partial upsert"
         assert timings["sse_emit_ms"] == 456, "sse_emit_ms should be set to 456"
 
     @pytest.mark.asyncio
-    async def test_record_dispatch_timings_skips_none_values(self, store: SessionStore):
+    async def test_record_dispatch_timings_skips_none_values(self, test_db_store):
         """record_dispatch_timings() skips None values (does not write NULL)."""
         intent_id = "test-none-skipping"
 
         # Write with some None values
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             router_ms=100,
             fetch_total_ms=None,  # Should be skipped
             synthesize_total_ms=200,
         )
 
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings is not None
         assert timings["router_ms"] == 100
         assert timings["fetch_total_ms"] is None, "fetch_total_ms=None should have been skipped"
         assert timings["synthesize_total_ms"] == 200
 
     @pytest.mark.asyncio
-    async def test_record_dispatch_timings_rejects_unknown_columns(self, store: SessionStore):
+    async def test_record_dispatch_timings_rejects_unknown_columns(self, test_db_store):
         """record_dispatch_timings() ignores columns not in DISPATCH_TIMING_COLUMNS."""
         intent_id = "test-unknown-cols"
 
         # This should not raise, but unknown columns should be ignored
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             router_ms=100,
             unknown_column=999,  # Should be ignored
         )
 
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings is not None
         assert timings["router_ms"] == 100
         # unknown_column is not in the schema, so we just verify it didn't break anything
 
     @pytest.mark.asyncio
-    async def test_record_dispatch_timings_sets_created_at_once_on_insert(self, store: SessionStore):
+    async def test_record_dispatch_timings_sets_created_at_once_on_insert(self, test_db_store):
         """created_at is set once on first INSERT OR IGNORE and never overwritten."""
         intent_id = "test-created-at-once"
 
         # First write - sets created_at
-        await store.record_dispatch_timings(intent_id, router_ms=100)
+        await test_db_store.record_dispatch_timings(intent_id, router_ms=100)
 
-        first_timings = await store.get_dispatch_timings(intent_id)
+        first_timings = await test_db_store.get_dispatch_timings(intent_id)
         assert first_timings is not None
         first_created_at = first_timings["created_at"]
 
@@ -275,9 +260,9 @@ class TestRecordDispatchTimings:
         await asyncio.sleep(0.01)
 
         # Second write - should NOT change created_at
-        await store.record_dispatch_timings(intent_id, fetch_total_ms=500)
+        await test_db_store.record_dispatch_timings(intent_id, fetch_total_ms=500)
 
-        second_timings = await store.get_dispatch_timings(intent_id)
+        second_timings = await test_db_store.get_dispatch_timings(intent_id)
         assert second_timings is not None
         assert second_timings["created_at"] == first_created_at, \
             "created_at should not change on upsert"
@@ -290,23 +275,23 @@ class TestGetDispatchTimings:
     """Test get_dispatch_timings() retrieval behavior."""
 
     @pytest.mark.asyncio
-    async def test_get_dispatch_timings_returns_none_for_nonexistent_intent(self, store: SessionStore):
+    async def test_get_dispatch_timings_returns_none_for_nonexistent_intent(self, test_db_store):
         """get_dispatch_timings() returns None when intent_id doesn't exist."""
-        timings = await store.get_dispatch_timings("nonexistent-intent")
+        timings = await test_db_store.get_dispatch_timings("nonexistent-intent")
         assert timings is None
 
     @pytest.mark.asyncio
-    async def test_get_dispatch_timings_returns_all_columns(self, store: SessionStore):
+    async def test_get_dispatch_timings_returns_all_columns(self, test_db_store):
         """get_dispatch_timings() returns all columns including NULL ones."""
         intent_id = "test-all-columns"
 
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             router_ms=100,
             fetch_total_ms=500,
         )
 
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings is not None
 
         # Verify all timing columns are present in the result
@@ -314,13 +299,13 @@ class TestGetDispatchTimings:
             assert col in timings, f"Column {col} missing from result"
 
     @pytest.mark.asyncio
-    async def test_get_dispatch_timings_returns_correct_intent_id(self, store: SessionStore):
+    async def test_get_dispatch_timings_returns_correct_intent_id(self, test_db_store):
         """get_dispatch_timings() returns the correct intent_id."""
         intent_id = "test-correct-id"
 
-        await store.record_dispatch_timings(intent_id, router_ms=100)
+        await test_db_store.record_dispatch_timings(intent_id, router_ms=100)
 
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings is not None
         assert timings["intent_id"] == intent_id
 
@@ -332,20 +317,20 @@ class TestGetLatencyPercentiles:
     """Test get_latency_percentiles() aggregation and nearest-rank calculation."""
 
     @pytest.mark.asyncio
-    async def test_get_latency_percentiles_returns_empty_dict_when_no_data(self, store: SessionStore):
+    async def test_get_latency_percentiles_returns_empty_dict_when_no_data(self, test_db_store):
         """get_latency_percentiles() returns empty dict when no timing data exists."""
-        percentiles_result = await store.get_latency_percentiles()
+        percentiles_result = await test_db_store.get_latency_percentiles()
         assert percentiles_result == {}
 
     @pytest.mark.asyncio
-    async def test_get_latency_percentiles_returns_p50_p95_per_stage(self, store: SessionStore):
+    async def test_get_latency_percentiles_returns_p50_p95_per_stage(self, test_db_store):
         """get_latency_percentiles() returns p50 and p95 for each stage with data."""
         # Create multiple dispatch timings with router_ms values
         for i, ms in enumerate([100, 150, 200, 250, 300]):
             intent_id = f"test-percentiles-{i}"
-            await store.record_dispatch_timings(intent_id, router_ms=ms)
+            await test_db_store.record_dispatch_timings(intent_id, router_ms=ms)
 
-        percentiles_result = await store.get_latency_percentiles()
+        percentiles_result = await test_db_store.get_latency_percentiles()
 
         assert "router_ms" in percentiles_result
         assert "p50" in percentiles_result["router_ms"]
@@ -354,7 +339,7 @@ class TestGetLatencyPercentiles:
         assert percentiles_result["router_ms"]["count"] == 5
 
     @pytest.mark.asyncio
-    async def test_get_latency_percentiles_p50_nearest_rank_verification(self, store: SessionStore):
+    async def test_get_latency_percentiles_p50_nearest_rank_verification(self, test_db_store):
         """
         Verify p50 calculation against hand-computed nearest-rank fixture.
         For [100, 150, 200, 250, 300]:
@@ -366,15 +351,15 @@ class TestGetLatencyPercentiles:
         values = [100, 150, 200, 250, 300]
         for i, ms in enumerate(values):
             intent_id = f"test-p50-{i}"
-            await store.record_dispatch_timings(intent_id, router_ms=ms)
+            await test_db_store.record_dispatch_timings(intent_id, router_ms=ms)
 
-        percentiles_result = await store.get_latency_percentiles()
+        percentiles_result = await test_db_store.get_latency_percentiles()
 
         # Hand-computed p50 = 200
         assert percentiles_result["router_ms"]["p50"] == 200
 
     @pytest.mark.asyncio
-    async def test_get_latency_percentiles_p95_nearest_rank_verification(self, store: SessionStore):
+    async def test_get_latency_percentiles_p95_nearest_rank_verification(self, test_db_store):
         """
         Verify p95 calculation against hand-computed nearest-rank fixture.
         For [100, 150, 200, 250, 300]:
@@ -386,15 +371,15 @@ class TestGetLatencyPercentiles:
         values = [100, 150, 200, 250, 300]
         for i, ms in enumerate(values):
             intent_id = f"test-p95-{i}"
-            await store.record_dispatch_timings(intent_id, router_ms=ms)
+            await test_db_store.record_dispatch_timings(intent_id, router_ms=ms)
 
-        percentiles_result = await store.get_latency_percentiles()
+        percentiles_result = await test_db_store.get_latency_percentiles()
 
         # Hand-computed p95 = 300
         assert percentiles_result["router_ms"]["p95"] == 300
 
     @pytest.mark.asyncio
-    async def test_get_latency_percentiles_with_larger_dataset(self, store: SessionStore):
+    async def test_get_latency_percentiles_with_larger_dataset(self, test_db_store):
         """
         Verify p50/p95 against a larger dataset.
         For [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]:
@@ -408,15 +393,15 @@ class TestGetLatencyPercentiles:
         values = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
         for i, ms in enumerate(values):
             intent_id = f"test-large-{i}"
-            await store.record_dispatch_timings(intent_id, router_ms=ms)
+            await test_db_store.record_dispatch_timings(intent_id, router_ms=ms)
 
-        percentiles_result = await store.get_latency_percentiles()
+        percentiles_result = await test_db_store.get_latency_percentiles()
 
         assert percentiles_result["router_ms"]["p50"] == 50, "p50 should be 50"
         assert percentiles_result["router_ms"]["p95"] == 100, "p95 should be 100"
 
     @pytest.mark.asyncio
-    async def test_get_latency_percentiles_skips_null_values(self, store: SessionStore):
+    async def test_get_latency_percentiles_skips_null_values(self, test_db_store):
         """get_latency_percentiles() skips NULL values for a stage."""
         intent_ids = []
 
@@ -425,19 +410,19 @@ class TestGetLatencyPercentiles:
             intent_id = f"test-null-skip-{i}"
             intent_ids.append(intent_id)
             if ms is not None:
-                await store.record_dispatch_timings(intent_id, router_ms=ms)
+                await test_db_store.record_dispatch_timings(intent_id, router_ms=ms)
             else:
                 # Create row without router_ms
-                await store.record_dispatch_timings(intent_id, fetch_total_ms=500)
+                await test_db_store.record_dispatch_timings(intent_id, fetch_total_ms=500)
 
-        percentiles_result = await store.get_latency_percentiles()
+        percentiles_result = await test_db_store.get_latency_percentiles()
 
         # Should only count non-NULL values
         assert "router_ms" in percentiles_result
         assert percentiles_result["router_ms"]["count"] == 3
 
     @pytest.mark.asyncio
-    async def test_get_latency_percentiles_with_since_window_filtering(self, store: SessionStore):
+    async def test_get_latency_percentiles_with_since_window_filtering(self, test_db_store):
         """since parameter filters to recent dispatches only."""
         import time
 
@@ -445,11 +430,11 @@ class TestGetLatencyPercentiles:
 
         # Create old timing (1 hour ago)
         old_intent_id = "test-old-timing"
-        await store.record_dispatch_timings(old_intent_id, router_ms=1000)
+        await test_db_store.record_dispatch_timings(old_intent_id, router_ms=1000)
 
         # Manually set created_at to 1 hour ago
         import aiosqlite
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             one_hour_ago = now - 3600
             await db.execute(
                 "UPDATE dispatch_timings SET created_at = ? WHERE intent_id = ?",
@@ -459,35 +444,35 @@ class TestGetLatencyPercentiles:
 
         # Create recent timing (now)
         recent_intent_id = "test-recent-timing"
-        await store.record_dispatch_timings(recent_intent_id, router_ms=100)
+        await test_db_store.record_dispatch_timings(recent_intent_id, router_ms=100)
 
         # Without since filter, should get both
-        all_percentiles = await store.get_latency_percentiles()
+        all_percentiles = await test_db_store.get_latency_percentiles()
         assert all_percentiles["router_ms"]["count"] == 2
         # p50 of [100, 1000]: ceil(0.50 * 2) - 1 = 0, sorted[0] = 100
         assert all_percentiles["router_ms"]["p50"] == 100
 
         # With since filter (5 minutes ago), should only get recent
         five_minutes_ago = now - 300
-        recent_percentiles = await store.get_latency_percentiles(since=five_minutes_ago)
+        recent_percentiles = await test_db_store.get_latency_percentiles(since=five_minutes_ago)
         assert recent_percentiles["router_ms"]["count"] == 1
         assert recent_percentiles["router_ms"]["p50"] == 100
         assert recent_percentiles["router_ms"]["p95"] == 100
 
     @pytest.mark.asyncio
-    async def test_get_latency_percentiles_returns_multiple_stages(self, store: SessionStore):
+    async def test_get_latency_percentiles_returns_multiple_stages(self, test_db_store):
         """get_latency_percentiles() returns percentiles for all stages with data."""
         # Create timings with multiple stages
         for i in range(3):
             intent_id = f"test-multi-stage-{i}"
-            await store.record_dispatch_timings(
+            await test_db_store.record_dispatch_timings(
                 intent_id,
                 router_ms=100 + i * 50,
                 fetch_total_ms=200 + i * 100,
                 synthesize_total_ms=300 + i * 150,
             )
 
-        percentiles_result = await store.get_latency_percentiles()
+        percentiles_result = await test_db_store.get_latency_percentiles()
 
         assert "router_ms" in percentiles_result
         assert "fetch_total_ms" in percentiles_result

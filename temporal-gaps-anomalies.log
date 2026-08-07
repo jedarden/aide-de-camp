@@ -1,0 +1,134 @@
+Temporal Gap Analysis Anomalies Log
+Generated: 2026-08-07T04:18:54.762140
+Analysis Type: Coverage and temporal gap detection across pbx-web and whisper-stt datasets
+
+=============================================================================
+CRITICAL ANOMALIES DETECTED
+=============================================================================
+
+1. **pbx-web Dataset: Extremely Sparse Deployment Events**
+   - Severity: CRITICAL
+   - Issue: Only 5 deployment events captured over 15-day period
+   - Expected: Continuous deployment monitoring data
+   - Impact: Cannot perform meaningful latency analysis
+   - Details: 
+     * First event: 2026-07-13T18:07:55+00:00
+     * Last event: 2026-07-28T17:26:12+00:00
+     * Coverage: 26.7% (4 days with data out of 15)
+     * Average: 1.25 events per day
+
+2. **pbx-web: CRITICAL 11-Day Temporal Gap**
+   - Severity: CRITICAL
+   - Gap Period: 2026-07-16 to 2026-07-27 (11 days)
+   - Missing data: Complete deployment monitoring blackout
+   - Impact: No visibility into service health during this period
+
+3. **whisper-stt Dataset: Sparse Deployment Events**
+   - Severity: HIGH
+   - Issue: Only 5 deployment events captured over 28-day period
+   - Expected: Continuous deployment monitoring data
+   - Details:
+     * First event: 2026-06-14T04:11:57+00:00
+     * Last event: 2026-07-12T16:53:42+00:00
+     * Coverage: 10.3% (3 days with data out of 29)
+     * Average: 1.67 events per day
+
+4. **whisper-stt: CRITICAL 23-Day Temporal Gap in Deployment Events**
+   - Severity: CRITICAL
+   - Gap Period: 2026-06-15 to 2026-07-08 (23 days)
+   - Missing data: Nearly complete deployment monitoring blackout
+   - Impact: No visibility into deployment activity for 3+ weeks
+
+5. **whisper-stt Latency Data: CRITICAL 456-Hour Gap**
+   - Severity: CRITICAL
+   - Gap Period: 2026-07-17T19:00:00-04:00 to 2026-08-05T19:00:00-04:00
+   - Duration: 456 hours (19 days)
+   - Impact: No latency measurements during extended period
+   - Data quality: DEGRADED (31.3% hourly coverage)
+
+=============================================================================
+DATA QUALITY ISSUES
+=============================================================================
+
+1. **pbx-web JSONL Files: Parse Failures**
+   - File: ./logs/pbx-web-30day.jsonl (16 lines - no valid timestamps)
+   - File: ./logs/pbx-web-parsed.jsonl (1,438 lines - no valid timestamps)
+   - File: ./logs/pbx-web-victorialogs-raw.jsonl (10,000 lines - no valid timestamps)
+   - Issue: Files exist but timestamp parsing failed
+   - Impact: 11,454 potential records unavailable for analysis
+
+2. **File Size Anomalies**
+   - pbx-web CSV: 0.001 MB (suspiciously small for 30-day data)
+   - whisper-stt CSV: 0.001 MB (suspiciously small for 30-day data)
+   - Expected: Significantly larger files for continuous monitoring
+
+=============================================================================
+TEMPORAL COVERAGE SUMMARY
+=============================================================================
+
+pbx-web Dataset:
+- Time span: 15 days (2026-07-13 to 2026-07-28)
+- Expected days: 15
+- Days with data: 4
+- Coverage: 26.7%
+- Gap days: 12
+- Data quality: DEGRADED
+
+whisper-stt Dataset (CSV):
+- Time span: 28.5 days (2026-06-14 to 2026-07-12)
+- Expected days: 29
+- Days with data: 3
+- Coverage: 10.3%
+- Gap days: 26
+- Data quality: DEGRADED
+
+whisper-stt Dataset (JSONL Latency Data):
+- Time span: 27.6 days (2026-07-10 to 2026-08-07)
+- Expected hours: 662
+- Hours with data: 207
+- Coverage: 31.3%
+- Gap hours: 456
+- Total records: 98,252
+- Data quality: DEGRADED
+
+=============================================================================
+SEVERITY ASSESSMENT
+=============================================================================
+
+Total Gaps Detected: 4
+- Critical gaps (≥24hrs): 2
+- Major gaps (≥6hrs): 1
+- Minor gaps (<6hrs): 1
+
+Overall Assessment: CRITICAL
+- Multiple critical gaps exceed 1 week
+- Extremely sparse deployment event data
+- Significant data quality issues
+- Unable to perform reliable temporal analysis
+
+=============================================================================
+RECOMMENDATIONS
+=============================================================================
+
+IMMEDIATE ACTIONS REQUIRED:
+1. **URGENT:** Investigate pbx-web deployment event collection pipeline
+2. **URGENT:** Fix timestamp parsing issues for JSONL files
+3. **HIGH:** Review whisper-stt deployment event monitoring
+4. **HIGH:** Investigate root cause of extended temporal gaps
+
+SYSTEMIC IMPROVEMENTS:
+1. Implement continuous monitoring with gap detection alerts
+2. Add redundant data collection to prevent single-point failures
+3. Standardize timestamp formats across all data sources
+4. Implement data quality validation in collection pipeline
+5. Add automated alerting for coverage drop below 80%
+
+MONITORING GAPS:
+- Log collection failures during extended periods
+- Deployment monitoring pipeline interruptions
+- Timestamp format inconsistencies
+- Possible storage/retention issues
+
+=============================================================================
+END OF ANOMALIES LOG
+=============================================================================

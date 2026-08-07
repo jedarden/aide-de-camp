@@ -44,73 +44,12 @@ from src.fetch.commands import (
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """Isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "test.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 @pytest.fixture
-def degraded_handler():
-    """Fresh DegradedStateHandler for each test."""
-    return DegradedStateHandler()
-
 
 @pytest.fixture
-def sample_fetch_result():
-    """Sample fetch result with mixed success/failure."""
-    return FetchResult(
-        intent_id="intent-1",
-        intent_type=FetchIntentType.STATUS,
-        sources={
-            FetchSource.KUBECTL_PODS: SourceResult(
-                source=FetchSource.KUBECTL_PODS,
-                status="success",
-                data={"pods": [{"name": "pod-1", "phase": "Running"}]},
-                duration_ms=100,
-            ),
-            FetchSource.ARGOCD_APP: SourceResult(
-                source=FetchSource.ARGOCD_APP,
-                status="timeout",
-                data={},
-                error="Timed out after 5s",
-                duration_ms=5000,
-            ),
-            FetchSource.GIT_LOG: SourceResult(
-                source=FetchSource.GIT_LOG,
-                status="success",
-                data={"commits": [{"hash": "abc123", "message": "Test commit"}]},
-                duration_ms=150,
-            ),
-        },
-        coverage=FetchCoverage(
-            total_sources=3,
-            succeeded=[FetchSource.KUBECTL_PODS, FetchSource.GIT_LOG],
-            timed_out=[FetchSource.ARGOCD_APP],
-            failed=[],
-            skipped=[],
-        ),
-        total_duration_ms=5250,
-        caveats=["Optional source argocd_app timed out"],
-    )
-
 
 @pytest.fixture
-def all_failed_fetch_result():
-    """Fetch result where ALL sources failed (terminal failure condition)."""
-    sources = {}
-    for source in [FetchSource.KUBECTL_PODS, FetchSource.ARGOCD_APP, FetchSource.GIT_LOG]:
-        sources[source] = SourceResult(
-            source=source,
-            status="error",
-            data={},
-            error=f"{source.value} failed",
-            duration_ms=1000,
-        )
-
     return FetchResult(
         intent_id="intent-1",
         intent_type=FetchIntentType.STATUS,

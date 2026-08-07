@@ -1,0 +1,228 @@
+{
+  "discovery_timestamp": "2026-08-07T05:26:00Z",
+  "cluster": "ardenone-cluster",
+  "namespace": "whisper-stt",
+  "summary": {
+    "total_pods": 2,
+    "total_containers": 2,
+    "deployments": 2,
+    "log_sources": ["kubectl_logs"]
+  },
+  "pods": [
+    {
+      "name": "whisper-openai-68966786fb-jsb5d",
+      "namespace": "whisper-stt",
+      "status": "Running",
+      "restarts": 0,
+      "age": "54d",
+      "node": "k3s-lenovo-tiny",
+      "ip": "10.42.2.128",
+      "containers": [
+        {
+          "name": "whisper-openai",
+          "image": "localhost:7439/fedirz/faster-whisper-server:latest-cpu",
+          "ports": [
+            {
+              "containerPort": 8000,
+              "protocol": "TCP"
+            }
+          ],
+          "resources": {
+            "requests": {
+              "cpu": "1",
+              "memory": "4Gi"
+            },
+            "limits": {
+              "cpu": "8",
+              "memory": "8Gi"
+            }
+          },
+          "log_source": "stdout/stderr",
+          "log_access_method": "kubectl logs",
+          "health_checks": {
+            "liveness": {
+              "path": "/health",
+              "port": 8000,
+              "period_seconds": 30
+            },
+            "readiness": {
+              "path": "/health",
+              "port": 8000,
+              "period_seconds": 10
+            }
+          }
+        }
+      ],
+      "deployment": "whisper-openai",
+      "replica_set": "whisper-openai-68966786fb",
+      "volumes": {
+        "model-cache": {
+          "claim": "whisper-openai-model-cache",
+          "mount_path": "/root/.cache/huggingface"
+        }
+      }
+    },
+    {
+      "name": "whisper-stt-847fd8d7b9-v2rs5",
+      "namespace": "whisper-stt",
+      "status": "Running",
+      "restarts": 0,
+      "age": "25d",
+      "node": "k3s-agent-minisforum",
+      "ip": "10.42.6.3",
+      "containers": [
+        {
+          "name": "whisper-stt",
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "ports": [
+            {
+              "containerPort": 8080,
+              "protocol": "TCP"
+            }
+          ],
+          "resources": {
+            "requests": {
+              "cpu": "1",
+              "memory": "4Gi"
+            },
+            "limits": {
+              "cpu": "8",
+              "memory": "8Gi"
+            }
+          },
+          "log_source": "stdout/stderr",
+          "log_access_method": "kubectl logs",
+          "health_checks": {
+            "liveness": {
+              "path": "/health",
+              "port": 8080,
+              "initial_delay_seconds": 120,
+              "period_seconds": 30
+            },
+            "readiness": {
+              "path": "/health",
+              "port": 8080,
+              "initial_delay_seconds": 60,
+              "period_seconds": 10
+            }
+          },
+          "environment_variables": {
+            "WHISPER_MODEL": "distil-large-v3"
+          }
+        }
+      ],
+      "deployment": "whisper-stt",
+      "replica_set": "whisper-stt-847fd8d7b9",
+      "volumes": {
+        "model-cache": {
+          "claim": "whisper-model-cache",
+          "mount_path": "/root/.cache/huggingface"
+        },
+        "jobs-data": {
+          "claim": "whisper-stt-jobs",
+          "mount_path": "/data"
+        }
+      }
+    }
+  ],
+  "deployments": [
+    {
+      "name": "whisper-openai",
+      "namespace": "whisper-stt",
+      "replicas": 1,
+      "revision": 24,
+      "strategy": "RollingUpdate",
+      "image": "fedirz/faster-whisper-server:latest-cpu",
+      "age": "54d"
+    },
+    {
+      "name": "whisper-stt",
+      "namespace": "whisper-stt",
+      "replicas": 1,
+      "revision": 32,
+      "strategy": "Recreate",
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "age": "97d"
+    }
+  ],
+  "pod_naming_patterns": {
+    "whisper-openai": "whisper-openai-<replicaset-hash>-<pod-suffix>",
+    "whisper-stt": "whisper-stt-<replicaset-hash>-<pod-suffix>"
+  },
+  "log_sources": {
+    "primary": {
+      "type": "kubectl_logs",
+      "description": "Container stdout/stderr accessed via kubectl logs",
+      "access_method": "kubectl --server=http://traefik-ardenone-cluster:8001 logs -n whisper-stt <pod-name>",
+      "retention": "Container runtime managed (estimated 7-14 days default)",
+      "log_format": "Mixed (uvicorn INFO logs + application logs)",
+      "examples": {
+        "whisper_openai": "INFO:     10.42.2.1:49014 - \"GET /health HTTP/1.1\" 200 OK",
+        "whisper_stt": "Application-specific logs from ronaldraygun/whisper-stt:1.8.6"
+      }
+    },
+    "secondary": [],
+    "aggregation": {
+      "enabled": false,
+      "systems": [],
+      "note": "No centralized log aggregation detected (no fluentd, Victoria Logs, or similar)"
+    }
+  },
+  "persistent_volumes": [
+    {
+      "name": "whisper-model-cache",
+      "capacity": "10Gi",
+      "access_mode": "RWO",
+      "storage_class": "longhorn",
+      "age": "85d"
+    },
+    {
+      "name": "whisper-openai-model-cache",
+      "capacity": "10Gi",
+      "access_mode": "RWO",
+      "storage_class": "longhorn",
+      "age": "54d"
+    },
+    {
+      "name": "whisper-stt-jobs",
+      "capacity": "1Gi",
+      "access_mode": "RWO",
+      "storage_class": "longhorn",
+      "age": "42d"
+    }
+  ],
+  "services": [
+    {
+      "name": "whisper-openai",
+      "type": "ClusterIP",
+      "cluster_ip": "10.43.173.92",
+      "port": 8000,
+      "age": "54d"
+    },
+    {
+      "name": "whisper-stt",
+      "type": "LoadBalancer",
+      "cluster_ip": "10.43.78.243",
+      "external_ip": "10.20.23.123",
+      "port": 8080,
+      "age": "97d"
+    }
+  ],
+  "log_retention_analysis": {
+    "kubernetes_default": "Container runtime managed (typically 7-14 days)",
+    "centralized_logging": "Not detected/enabled",
+    "persistent_log_storage": "None (PVCs used for model cache and job data, not logs)",
+    "recommended_action": "Implement centralized log aggregation (Victoria Logs/ELK) for long-term retention and analysis"
+  },
+  "discovery_methodology": {
+    "kubectl_queries": [
+      "get pods -n whisper-stt",
+      "get deployments -n whisper-stt -o json",
+      "get pods -n whisper-stt -o json",
+      "get services -n whisper-stt",
+      "get pvc -n whisper-stt"
+    ],
+    "cluster_access": "Read-only proxy via traefik-ardenone-cluster:8001",
+    "timestamp": "2026-08-07T05:26:00Z"
+  }
+}

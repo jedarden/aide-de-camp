@@ -12,6 +12,7 @@ import json
 import os
 import random
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -185,12 +186,38 @@ class MemoryStore:
 
     @retry_with_backoff(max_retries=3, initial_delay=0.1, backoff_factor=2.0, exceptions=(OSError,))
     def save(self) -> None:
-        """Persist memory to disk."""
+        """
+        Persist memory to disk using atomic file operations.
+
+        Uses temp file + atomic rename pattern to prevent partial state issues.
+        If the process crashes during write, either the old file remains intact
+        or the new file is completely written - never a partial/corrupted state.
+        """
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         self._data["facts"] = [f.to_dict() for f in self._facts]
         self._data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        with open(self.file_path, "w") as f:
-            json.dump(self._data, f, indent=2)
+
+        # Atomic write: temp file + rename pattern with unique naming (UUID4)
+        temp_path = self.file_path.parent / f".{self.file_path.name}.{uuid.uuid4()}.tmp"
+
+        try:
+            # Write to temp file first
+            with open(temp_path, "w") as f:
+                json.dump(self._data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())  # Ensure data is written to disk
+
+            # Atomic rename to target path
+            temp_path.replace(self.file_path)
+
+        except Exception as e:
+            # Clean up temp file if it exists
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
+            raise  # Re-raise to trigger retry logic
 
     def _normalize_text(self, text: str) -> str:
         """Normalize text for comparison."""

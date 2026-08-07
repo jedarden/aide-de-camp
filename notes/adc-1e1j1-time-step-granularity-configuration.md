@@ -6,14 +6,19 @@
 
 ## Executive Summary
 
-**Recommended Configuration:** `step="6h"` (6-hour granularity)
+**Recommended Configuration:** `step="1h"` (1-hour granularity)
 
-For 30-day whisper-stt latency aggregation, the optimal time step granularity is **6 hours**. This configuration provides:
+For 30-day whisper-stt latency aggregation, the optimal time step granularity is **1 hour** (default configuration). This provides the highest granularity while meeting all performance targets:
 
-- **Performance:** ~120 data points for fast query execution
-- **Statistical Significance:** ~876 entries per bucket for robust statistics  
+- **Performance:** ~720 data points (within 1000-bucket performance target)
+- **Statistical Significance:** ~148 entries per bucket for robust statistics
+- **Temporal Resolution:** 24 data points per day for detailed hourly patterns
+- **Visualization:** Excellent density for charts and trend analysis
+
+**Performance-Focused Alternative:** `step="6h"` (6-hour granularity) - Use for faster queries when hourly detail is not critical:
+- **Performance:** ~120 data points for very fast query execution
+- **Statistical Significance:** ~885 entries per bucket for robust statistics
 - **Temporal Resolution:** 4 data points per day to capture daily patterns
-- **Visualization:** Ideal for charts and trend analysis
 
 ## Acceptance Criteria ✅
 
@@ -40,16 +45,26 @@ For 30-day whisper-stt latency aggregation, the optimal time step granularity is
 step="<value><unit>"
 ```
 - Units: `s` (seconds), `m` (minutes), `h` (hours), `d` (days)
-- Example: `step="6h"` for 6-hour granularity
+- Example: `step="1h"` for 1-hour granularity (default)
+
+**Default Configuration:**
+```yaml
+default:
+  step: "1h"  # Optimal balance of granularity and performance
+```
 
 ### ✅ 3. Estimate result count to ensure manageability
 
 **30-Day Window Estimates:**
 
-- **6-hour granularity:** 120 data points (30 days × 24 hours ÷ 6 hours)
-- **Query time:** <1 second for typical VictoriaLogs queries
-- **Memory usage:** Minimal (<1MB result set)
-- **Visualization:** Excellent for charts and graphs
+- **1-hour granularity (default):** 720 data points (30 days × 24 hours)
+  - Query time: <2 seconds for typical VictoriaLogs queries
+  - Memory usage: Minimal (<2MB result set)
+  - Visualization: Excellent density for charts
+- **6-hour granularity (performance-focused):** 120 data points
+  - Query time: <1 second for typical VictoriaLogs queries
+  - Memory usage: Minimal (<1MB result set)
+  - Visualization: Good for trend analysis
 
 ### ✅ 4. Document step size rationale
 

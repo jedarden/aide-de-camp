@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from registry import get_registry, REGISTRY_PATH, CACHE_TTL, get_project
 
 
-def test_registry_alias_hot_reload():
+async def test_registry_alias_hot_reload():
     """
     Test that modifying a registry alias in config/registry.yaml
     is picked up by get_registry(force=True).
@@ -37,7 +37,7 @@ def test_registry_alias_hot_reload():
     print("\n=== Testing Registry Alias Hot-Reload ===\n")
 
     # Force reload to start fresh
-    original_registry = get_registry(force=True)
+    original_registry = await get_registry(force=True)
 
     # Use pbx-web project as our test subject (it has multiple aliases)
     test_project = "pbx-web"
@@ -67,7 +67,7 @@ def test_registry_alias_hot_reload():
         print(f"Added test alias '{test_alias}' to {test_project}")
 
         # Force reload to pick up the change
-        reloaded_registry = get_registry(force=True)
+        reloaded_registry = await get_registry(force=True)
         reloaded_entry = reloaded_registry["projects"].get(test_project)
         reloaded_aliases = list(reloaded_entry.get("aliases", []))
 
@@ -106,7 +106,7 @@ def test_registry_alias_hot_reload():
     print("\n✓ Registry alias hot-reload test: PASSED")
 
 
-def test_registry_cache_invalidation():
+async def test_registry_cache_invalidation():
     """
     Test that the registry cache respects CACHE_TTL and can be invalidated.
 
@@ -215,7 +215,7 @@ def test_registry_alias_dispatch_integration():
     print("\n✓ Registry alias dispatch integration test: PASSED")
 
 
-def test_registry_hot_reload_no_restart():
+async def test_registry_hot_reload_no_restart():
     """
     Test that modifying a registry alias and dispatching an utterance
     picks up the change without requiring server restart.
@@ -280,7 +280,7 @@ def test_registry_hot_reload_no_restart():
         print(f"✓ Simulating utterance: '{test_utterance}'")
 
         # Verify routing would find the project via the new alias
-        project = get_project(test_project)
+        project = await get_project(test_project)
         assert project is not None, f"Project '{test_project}' not found"
         assert test_alias in project["aliases"], f"Alias '{test_alias}' not in project aliases"
         print(f"✓ Routing would resolve '{test_alias}' → '{test_project}'")
@@ -344,7 +344,7 @@ def main():
 
     # Test 1: Basic alias hot-reload
     try:
-        test_registry_alias_hot_reload()
+        asyncio.run(test_registry_alias_hot_reload())
         passed += 1
     except Exception as e:
         print(f"\n✗ Test 1 failed with exception: {e}")
@@ -354,7 +354,7 @@ def main():
 
     # Test 2: Cache invalidation
     try:
-        test_registry_cache_invalidation()
+        asyncio.run(test_registry_cache_invalidation())
         passed += 1
     except Exception as e:
         print(f"\n✗ Test 2 failed with exception: {e}")
@@ -364,7 +364,7 @@ def main():
 
     # Test 3: Dispatch integration
     try:
-        test_registry_alias_dispatch_integration()
+        asyncio.run(test_registry_alias_dispatch_integration())
         passed += 1
     except Exception as e:
         print(f"\n✗ Test 3 failed with exception: {e}")
@@ -374,7 +374,7 @@ def main():
 
     # Test 4: Hot-reload without restart
     try:
-        test_registry_hot_reload_no_restart()
+        asyncio.run(test_registry_hot_reload_no_restart())
         passed += 1
     except Exception as e:
         print(f"\n✗ Test 4 failed with exception: {e}")

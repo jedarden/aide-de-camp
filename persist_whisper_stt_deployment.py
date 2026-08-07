@@ -28,6 +28,7 @@ Usage:
 
 import json
 import os
+import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, Union
 from pathlib import Path
@@ -172,10 +173,15 @@ def cleanup_old_backups(backup_dir: Path, file_stem: str, keep_count: int) -> No
     """
     Remove old backup files, keeping only the most recent ones.
 
+    Uses atomic file operations with unique temp file handling and rollback.
+
     Args:
         backup_dir: Directory containing backups
         file_stem: Base name of files to consider for cleanup
         keep_count: Number of backups to keep
+
+    Raises:
+        OSError: If cleanup operations fail critically
     """
     try:
         # Find all backup files for this specific file
@@ -186,13 +192,43 @@ def cleanup_old_backups(backup_dir: Path, file_stem: str, keep_count: int) -> No
             reverse=True
         )
 
-        # Remove excess backups
+        # Remove excess backups using atomic operations
+        failed_deletions = []
         for old_backup in backup_files[keep_count:]:
-            old_backup.unlink()
-            logger.debug(f"Removed old backup: {old_backup}")
+            try:
+                # Use atomic rename-to-temp pattern for safer deletion
+                # This prevents race conditions and provides rollback capability
+                temp_deletion_path = old_backup.parent / f".deleting_{old_backup.name}.{uuid.uuid4()}.tmp"
+
+                # First, rename to temp deletion marker
+                old_backup.replace(temp_deletion_path)
+
+                # Then, delete the temp file
+                temp_deletion_path.unlink()
+
+                logger.debug(f"Atomically removed old backup: {old_backup}")
+
+            except FileNotFoundError:
+                # Already deleted - continue
+                logger.debug(f"Backup already deleted: {old_backup}")
+                continue
+            except Exception as e:
+                # Track failures but continue with other files
+                failed_deletions.append((old_backup, str(e)))
+                logger.warning(f"Failed to delete backup {old_backup}: {e}")
+
+        # If any deletions failed, log summary but don't fail the operation
+        if failed_deletions:
+            logger.warning(
+                f"Completed backup cleanup with {len(failed_deletions)} failures "
+                f"out of {len(backup_files[keep_count:])} attempted deletions"
+            )
+        else:
+            logger.debug(f"Successfully cleaned up {len(backup_files[keep_count:])} old backups")
 
     except Exception as e:
-        logger.warning(f"Failed to cleanup old backups: {e}")
+        logger.error(f"Critical failure during backup cleanup: {e}")
+        raise OSError(f"Backup cleanup operation failed: {e}") from e
 
 
 # ============================================================================

@@ -22,20 +22,12 @@ from pathlib import Path
 
 
 @pytest.fixture
-async def test_store(tmp_path: Path) -> SessionStore:
-    """An isolated SessionStore on a temp DB for testing."""
-    db_path = tmp_path / "test_session.db"
-    store = SessionStore(db_path)
-    await store.initialize()
-    yield store
-    await store.close()
-
 
 class TestSSEBroadcastFromTestEndpoint:
     """Verify SSE broadcast from /test endpoint."""
 
     @pytest.mark.asyncio
-    async def test_test_endpoint_broadcasts_sse_event(self, test_store: SessionStore) -> None:
+    async def test_test_endpoint_broadcasts_sse_event(self, test_test_db_store) -> None:
         """Verify that /test endpoint broadcasts result_created SSE event when surface_id is provided."""
         # Get broadcaster
         broadcaster = get_broadcaster()
@@ -95,7 +87,7 @@ class TestSSEBroadcastFromTestEndpoint:
             await broadcaster.stop()
 
     @pytest.mark.asyncio
-    async def test_test_endpoint_without_surface_id_no_broadcast(self, test_store: SessionStore) -> None:
+    async def test_test_endpoint_without_surface_id_no_broadcast(self, test_test_db_store) -> None:
         """Verify that /test endpoint without surface_id does not broadcast to specific surface."""
         # Get broadcaster
         broadcaster = get_broadcaster()
@@ -151,7 +143,7 @@ class TestSSEBroadcastFromTestEndpoint:
             await broadcaster.stop()
 
     @pytest.mark.asyncio
-    async def test_test_endpoint_sse_matches_dispatch_pattern(self, test_store: SessionStore) -> None:
+    async def test_test_endpoint_sse_matches_dispatch_pattern(self, test_test_db_store) -> None:
         """Verify that /test endpoint SSE pattern matches /dispatch endpoint pattern."""
         # Get broadcaster
         broadcaster = get_broadcaster()
@@ -215,7 +207,7 @@ class TestSSEBroadcastFromTestEndpoint:
             await broadcaster.stop()
 
     @pytest.mark.asyncio
-    async def test_test_endpoint_uses_get_broadcaster(self, test_store: SessionStore) -> None:
+    async def test_test_endpoint_uses_get_broadcaster(self, test_test_db_store) -> None:
         """Verify that /test endpoint uses get_broadcaster() singleton."""
         # Mock the store
         with patch('src.main.get_store', return_value=test_store):

@@ -1,0 +1,316 @@
+{
+  "generated_at": "2026-08-07T03:52:58.899979+00:00",
+  "analysis_summary": {
+    "total_records_processed": 108721,
+    "categorized_failures": 1442,
+    "uncategorized_failures": 107279,
+    "unique_pattern_categories": 5
+  },
+  "categories": {
+    "NetworkIssue": {
+      "description": "Network allocation or connectivity problems",
+      "severity": "low",
+      "occurrence_count": 8,
+      "percentage_of_categorized": 0.55,
+      "service_distribution": {
+        "pbx-web": 8
+      },
+      "image_distribution": {
+        "container_logs": 6,
+        "unknown": 2
+      },
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "dates_with_occurrences": [],
+        "occurrences_by_date": {},
+        "consecutive_days": 0,
+        "span_days": 0,
+        "average_occurrences_per_day": 0.0
+      },
+      "error_type_distribution": {
+        "broken_pipe": 6,
+        "recording_fetch_errors": 2
+      },
+      "sample_failures": [
+        {
+          "error_type": "recording_fetch_errors",
+          "error_pattern": "[Errno 104] Connection reset by peer",
+          "severity": "intermittent",
+          "context": "Recording fetch failures from storage backend",
+          "_source_file": "logs/pbx-web-30day.jsonl",
+          "pattern_category": "NetworkIssue"
+        },
+        {
+          "error_type": "recording_fetch_errors",
+          "error_pattern": "BrokenPipeError: [Errno 32] Broken pipe",
+          "severity": "intermittent",
+          "context": "Recording fetch failures from storage backend",
+          "_source_file": "logs/pbx-web-30day.jsonl",
+          "pattern_category": "NetworkIssue"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "broken_pipe",
+          "severity": "errno 32",
+          "message": "2026-07-28T20:23:24.872959658-04:00 BrokenPipeError: [Errno 32] Broken pipe",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "NetworkIssue"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "broken_pipe",
+          "severity": "errno 32",
+          "message": "2026-07-28T22:58:58.428619967-04:00 BrokenPipeError: [Errno 32] Broken pipe",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "NetworkIssue"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "broken_pipe",
+          "severity": "errno 32",
+          "message": "2026-08-04T14:35:02.257225307-04:00 BrokenPipeError: [Errno 32] Broken pipe",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "NetworkIssue"
+        }
+      ]
+    },
+    "RecordingFetchError": {
+      "description": "Failed to fetch recordings from storage backend",
+      "severity": "medium",
+      "occurrence_count": 1,
+      "percentage_of_categorized": 0.07,
+      "service_distribution": {
+        "pbx-web": 1
+      },
+      "image_distribution": {
+        "unknown": 1
+      },
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "dates_with_occurrences": [],
+        "occurrences_by_date": {},
+        "consecutive_days": 0,
+        "span_days": 0,
+        "average_occurrences_per_day": 0.0
+      },
+      "error_type_distribution": {
+        "http_server_errors": 1
+      },
+      "sample_failures": [
+        {
+          "error_type": "http_server_errors",
+          "status_code": 500,
+          "severity": "intermittent",
+          "context": "Generated during recording fetch failures",
+          "frequency": "intermittent pattern in recent logs",
+          "_source_file": "logs/pbx-web-30day.jsonl",
+          "pattern_category": "RecordingFetchError"
+        }
+      ]
+    },
+    "HTTPError": {
+      "description": "HTTP error responses (4xx, 5xx)",
+      "severity": "medium",
+      "occurrence_count": 1420,
+      "percentage_of_categorized": 98.47,
+      "service_distribution": {
+        "pbx-web": 1420
+      },
+      "image_distribution": {
+        "container_logs": 1420
+      },
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "dates_with_occurrences": [],
+        "occurrences_by_date": {},
+        "consecutive_days": 0,
+        "span_days": 0,
+        "average_occurrences_per_day": 0.0
+      },
+      "error_type_distribution": {
+        "http_500": 371,
+        "http_504": 353,
+        "http_503": 349,
+        "http_502": 347
+      },
+      "sample_failures": [
+        {
+          "source": "container_logs",
+          "error_type": "http_500",
+          "severity": "status 500",
+          "message": "2026-07-28T13:36:40.095001455-04:00 Output:       \"/var/www/calls/pagefind\"",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "http_500",
+          "severity": "status 500",
+          "message": "2026-07-28T13:36:40.095003346-04:00",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "http_500",
+          "severity": "status 500",
+          "message": "2026-07-28T13:36:40.095005482-04:00 [Walking source directory]",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "http_502",
+          "severity": "status 502",
+          "message": "2026-07-28T13:37:29.514105025-04:00 [Building search indexes]",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "http_502",
+          "severity": "status 502",
+          "message": "2026-07-28T13:38:48.475450285-04:00   Indexed 6967 words",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        }
+      ]
+    },
+    "DependencyTimeout": {
+      "description": "Timeout connecting to dependent services",
+      "severity": "medium",
+      "occurrence_count": 12,
+      "percentage_of_categorized": 0.83,
+      "service_distribution": {
+        "pbx-web": 12
+      },
+      "image_distribution": {
+        "container_logs": 12
+      },
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "dates_with_occurrences": [],
+        "occurrences_by_date": {},
+        "consecutive_days": 0,
+        "span_days": 0,
+        "average_occurrences_per_day": 0.0
+      },
+      "error_type_distribution": {
+        "connection_reset": 12
+      },
+      "sample_failures": [
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-07-28T20:23:24.870819612-04:00 [pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-07-28T20:23:24.872445550-04:00 ConnectionResetError: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-07-28T22:58:58.425954166-04:00 [pbx-web] recording fetch error for 1785285870.480/20260729-004430_19148734884_1785285870.480.wav: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-07-28T22:58:58.427820643-04:00 ConnectionResetError: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-08-04T14:35:02.254776922-04:00 [pbx-web] recording fetch error for 1785864705.535/20260804-173145_19142698463_1785864705.535.wav: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        }
+      ]
+    },
+    "DeploymentRollback": {
+      "description": "Deployment was rolled back to previous version",
+      "severity": "high",
+      "occurrence_count": 1,
+      "percentage_of_categorized": 0.07,
+      "service_distribution": {
+        "pbx_web": 1
+      },
+      "image_distribution": {
+        "ronaldraygun/pbx-web:1.0.8": 1
+      },
+      "time_distribution": {
+        "first_occurrence": "2026-07-13T18:07:55+00:00",
+        "last_occurrence": "2026-07-13T18:07:55+00:00",
+        "dates_with_occurrences": [
+          "2026-07-13"
+        ],
+        "occurrences_by_date": {
+          "2026-07-13": 1
+        },
+        "consecutive_days": 1,
+        "span_days": 0,
+        "average_occurrences_per_day": 1.0
+      },
+      "error_type_distribution": {
+        "unknown": 1
+      },
+      "sample_failures": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "event_type": "deployment_rollback",
+          "category": "rollback",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "notes": "Rolled back to 1.0.8 on same day",
+          "service": "pbx_web",
+          "_source": "deployment_analysis",
+          "pattern_category": "DeploymentRollback"
+        }
+      ]
+    }
+  },
+  "cross_category_analysis": {
+    "services_with_multiple_categories": {
+      "pbx-web": {
+        "NetworkIssue": 8,
+        "RecordingFetchError": 1,
+        "HTTPError": 1420,
+        "DependencyTimeout": 12
+      }
+    },
+    "most_affected_services_overall": {
+      "pbx-web": 1441,
+      "pbx_web": 1
+    }
+  },
+  "temporal_analysis": {
+    "daily_breakdown": {
+      "2026-07-13": {
+        "DeploymentRollback": 1
+      }
+    },
+    "peak_failure_days": [
+      {
+        "date": "2026-07-13",
+        "total_count": 1
+      }
+    ]
+  }
+}

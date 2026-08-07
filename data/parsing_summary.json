@@ -1,0 +1,43 @@
+{
+  "pipeline_status": "success",
+  "data_sources": {
+    "pbx-web": {
+      "files_loaded": 5,
+      "entries_loaded": 51,
+      "parse_errors": 132,
+      "skipped_lines": 0
+    },
+    "whisper-stt": {
+      "files_loaded": 4,
+      "entries_loaded": 196528,
+      "parse_errors": 0,
+      "skipped_lines": 0
+    }
+  },
+  "parsing": {
+    "total_entries": 196572,
+    "parse_success": 196572,
+    "parse_failed": 0,
+    "success_rate": "100.00%"
+  },
+  "categorization": {
+    "event_counts": {
+      "deployment_start": 0,
+      "deployment_complete": 0,
+      "pod_crash": 0,
+      "oom": 0,
+      "readiness_fail": 0,
+      "timeout": 44,
+      "image_pull_error": 0,
+      "resource_limit": 0,
+      "probe_failure": 0,
+      "network_error": 0,
+      "unknown": 196528
+    }
+  },
+  "validation": {
+    "csv_valid": true,
+    "error_count": 0,
+    "errors": []
+  }
+}

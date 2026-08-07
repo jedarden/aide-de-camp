@@ -500,6 +500,38 @@ class TestIntentClassification:
                 # Special characters might cause issues - acceptable behavior
                 assert True, f"Special character handling for '{utterance}': {e}"
 
+    @pytest.mark.asyncio
+    async def test_weather_utterance_classification(self, router):
+        """Test that 'what is the weather' utterance returns lookup classification.
+
+        Validates the specific test case: 'what is the weather' → lookup intent
+        This ensures weather-related queries are properly classified as lookup intents.
+        """
+        utterance = "what is the weather"
+        classifications, timing = await router.classify_utterance(utterance, "test-session")
+
+        assert len(classifications) > 0, f"No classifications for: {utterance}"
+        assert classifications[0].intent_type == IntentType.LOOKUP, \
+            f"Expected LOOKUP intent for weather query, got {classifications[0].intent_type} for: {utterance}"
+        assert classifications[0].confidence > 0.5, \
+            f"Low confidence ({classifications[0].confidence}) for weather query: {utterance}"
+
+    @pytest.mark.asyncio
+    async def test_research_utterance_classification(self, router):
+        """Test that 'tell me about X' utterance returns lookup classification.
+
+        Validates the specific test case: 'tell me about X' → lookup intent
+        This ensures research/informational queries are properly classified as lookup intents.
+        """
+        utterance = "tell me about Kubernetes"
+        classifications, timing = await router.classify_utterance(utterance, "test-session")
+
+        assert len(classifications) > 0, f"No classifications for: {utterance}"
+        assert classifications[0].intent_type == IntentType.LOOKUP, \
+            f"Expected LOOKUP intent for research query, got {classifications[0].intent_type} for: {utterance}"
+        assert classifications[0].confidence > 0.5, \
+            f"Low confidence ({classifications[0].confidence}) for research query: {utterance}"
+
 
 # Run tests if executed directly
 if __name__ == "__main__":

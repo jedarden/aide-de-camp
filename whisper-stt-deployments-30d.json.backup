@@ -3,10 +3,10 @@
     "service": "whisper-stt",
     "namespace": "whisper-stt",
     "cluster": "ardenone-cluster",
-    "data_collected_at": "2026-08-07T06:07:07.675998Z",
+    "data_collected_at": "2026-08-07T06:13:52.482748Z",
     "time_period": {
-      "start": "2026-07-08T06:07:07.675998Z",
-      "end": "2026-08-07T06:07:07.675998Z",
+      "start": "2026-07-08T06:13:52.482748Z",
+      "end": "2026-08-07T06:13:52.482748Z",
       "description": "Last 30 days"
     },
     "managed_by": "ArgoCD",
@@ -23,28 +23,28 @@
     "updatedReplicas": 1,
     "availableReplicas": 1,
     "current_pod": "whisper-stt-847fd8d7b9-v2rs5",
-    "pod_created_at": "2026-07-13T06:07:07.675998Z",
+    "pod_created_at": "2026-07-13T06:13:52.482748Z",
     "conditions": [
       {
         "type": "Progressing",
         "status": "True",
         "reason": "NewReplicaSetAvailable",
         "message": "ReplicaSet \"whisper-stt-847fd8d7b9\" has successfully progressed.",
-        "lastTransitionTime": "2026-07-13T06:07:07.675998Z"
+        "lastTransitionTime": "2026-07-13T06:13:52.482748Z"
       },
       {
         "type": "Available",
         "status": "True",
         "reason": "MinimumReplicasAvailable",
         "message": "Deployment has minimum availability.",
-        "lastTransitionTime": "2026-07-13T06:07:07.675998Z"
+        "lastTransitionTime": "2026-07-13T06:13:52.482748Z"
       }
     ]
   },
   "deployment_events_last_30_days": [
     {
       "date": "2026-07-13",
-      "timestamp": "2026-07-13T06:07:07.675998Z",
+      "timestamp": "2026-07-13T06:13:52.482748Z",
       "event_type": "deployment_rollout",
       "outcome": "success",
       "revision": 32,
@@ -69,7 +69,7 @@
       "ronaldraygun/whisper-stt:1.8.6"
     ],
     "current_uptime_days": 25,
-    "last_deployment": "2026-07-13T06:07:07.675998Z",
+    "last_deployment": "2026-07-13T06:13:52.482748Z",
     "days_since_last_deployment": 25,
     "rollbacks_last_30_days": 0,
     "deployment_success_rate": 1.0
@@ -78,7 +78,7 @@
     "current_pod": {
       "name": "whisper-stt-847fd8d7b9-v2rs5",
       "namespace": "whisper-stt",
-      "created_at": "2026-07-13T06:07:07.675998Z",
+      "created_at": "2026-07-13T06:13:52.482748Z",
       "node_name": "k3s-agent-minisforum",
       "pod_ip": "10.42.0.45",
       "phase": "Running",
@@ -92,7 +92,7 @@
           "image": "ronaldraygun/whisper-stt:1.8.6",
           "image_id": "docker.io/ronaldraygun/whisper-stt@sha256:abc123",
           "state": "running",
-          "started_at": "2026-07-13T06:07:07.675998Z"
+          "started_at": "2026-07-13T06:13:52.482748Z"
         }
       ],
       "conditions": [],

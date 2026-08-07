@@ -223,19 +223,24 @@ async def test_race_condition_read_write():
     def race_writer():
         """Force cache rebuilds rapidly."""
         try:
-            for i in range(num_iterations):
-                # Force cache rebuild
-                registry = get_registry(force=True)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                for i in range(num_iterations):
+                    # Force cache rebuild
+                    registry = loop.run_until_complete(get_registry(force=True))
 
-                # Verify rebuild worked
-                assert isinstance(registry, dict)
-                assert 'projects' in registry
+                    # Verify rebuild worked
+                    assert isinstance(registry, dict)
+                    assert 'projects' in registry
 
-                # Small delay to reduce CPU load
-                time.sleep(0.001)
+                    # Small delay to reduce CPU load
+                    time.sleep(0.001)
 
-            stats.record_access(True)
-            return True
+                stats.record_access(True)
+                return True
+            finally:
+                loop.close()
 
         except Exception as e:
             stats.record_access(False, e)
@@ -437,33 +442,38 @@ async def test_high_concurrency_stress():
     def stress_worker(thread_id: int):
         """Execute a mix of operations under stress."""
         try:
-            for i in range(operations_per_thread):
-                # Mix of registry and hot-reload operations
-                operation_type = i % 4
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                for i in range(operations_per_thread):
+                    # Mix of registry and hot-reload operations
+                    operation_type = i % 4
 
-                if operation_type == 0:
-                    # Registry read
-                    get_registry()
+                    if operation_type == 0:
+                        # Registry read
+                        loop.run_until_complete(get_registry())
 
-                elif operation_type == 1:
-                    # Forced registry rebuild
-                    get_registry(force=True)
+                    elif operation_type == 1:
+                        # Forced registry rebuild
+                        loop.run_until_complete(get_registry(force=True))
 
-                elif operation_type == 2:
-                    # Hot-reload prompt access
-                    mgr = get_reload_manager()
-                    mgr.get_prompt('router')
+                    elif operation_type == 2:
+                        # Hot-reload prompt access
+                        mgr = get_reload_manager()
+                        mgr.get_prompt('router')
 
-                else:
-                    # Hot-reload config access
-                    mgr = get_reload_manager()
-                    mgr.get_config('registry')
+                    else:
+                        # Hot-reload config access
+                        mgr = get_reload_manager()
+                        mgr.get_config('registry')
 
-                # Very small delay
-                time.sleep(0.0001)
+                    # Very small delay
+                    time.sleep(0.0001)
 
-            stats.record_access(True)
-            return True
+                stats.record_access(True)
+                return True
+            finally:
+                loop.close()
 
         except Exception as e:
             stats.record_access(False, e)
@@ -526,10 +536,9 @@ async def test_cache_consistency():
 
     try:
         # Clear cache to start fresh
-        from registry import _cache, _cache_at
-        global _cache, _cache_at
-        _cache = None
-        _cache_at = 0
+        import registry
+        registry._cache = None
+        registry._cache_at = 0
 
         # Collect cache states from multiple threads
         cache_states = []
@@ -538,21 +547,26 @@ async def test_cache_consistency():
         def cache_observer(thread_id: int):
             """Observe cache state during concurrent access."""
             try:
-                for i in range(20):
-                    registry = get_registry(force=(i % 3 == 0))
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    for i in range(20):
+                        registry = loop.run_until_complete(get_registry(force=(i % 3 == 0)))
 
-                    with cache_lock:
-                        cache_states.append({
-                            'thread': thread_id,
-                            'iteration': i,
-                            'projects_count': len(registry.get('projects', {})),
-                            'has_clusters': 'clusters' in registry,
-                            'has_argocd': 'argocd' in registry
-                        })
+                        with cache_lock:
+                            cache_states.append({
+                                'thread': thread_id,
+                                'iteration': i,
+                                'projects_count': len(registry.get('projects', {})),
+                                'has_clusters': 'clusters' in registry,
+                                'has_argocd': 'argocd' in registry
+                            })
 
-                    time.sleep(0.001)
+                        time.sleep(0.001)
 
-                return True
+                    return True
+                finally:
+                    loop.close()
             except Exception as e:
                 print(f"Cache observer error: {e}")
                 return False

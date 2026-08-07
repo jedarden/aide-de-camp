@@ -1,0 +1,64 @@
+{
+  "collection_timestamp": "2026-08-07T01:50:00.000000",
+  "cluster": "ardenone-cluster", 
+  "namespace": "whisper-stt",
+  "task_completion": "COMPLETE",
+  "stats": {
+    "total_pods_discovered": 2,
+    "pods_with_logs": 1,
+    "pods_without_logs": 1,
+    "total_records": 97399,
+    "file_size_mb": 22.1,
+    "retention_period_days": 27.5
+  },
+  "pods_included": [
+    {
+      "name": "whisper-openai-68966786fb-jsb5d",
+      "status": "SUCCESS",
+      "record_count": 97399,
+      "age": "54d",
+      "image": "fedirz/faster-whisper-server:latest-cpu",
+      "log_type": "uvicorn HTTP access logs",
+      "time_range": {
+        "earliest": "2026-07-10T13:39:33.767796087-04:00",
+        "latest": "2026-08-07T01:46:14.146291384-04:00"
+      }
+    }
+  ],
+  "pods_excluded": [
+    {
+      "name": "whisper-stt-847fd8d7b9-v2rs5", 
+      "status": "NO_LOGS",
+      "reason": "Application produces no stdout/stderr output",
+      "age": "25d",
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "note": "Pod is running and healthy (0 restarts) but configured to log internally or not at all"
+    }
+  ],
+  "time_coverage": {
+    "earliest_timestamp": "2026-07-10T13:39:33.767796087-04:00",
+    "latest_timestamp": "2026-08-07T01:46:14.146291384-04:00", 
+    "span_days": 27.5,
+    "missing_periods": [],
+    "completeness": "100% of available logs"
+  },
+  "log_format": {
+    "format": "JSONL",
+    "fields": ["timestamp", "pod_name", "namespace", "log_message", "source"],
+    "sample_entry": {
+      "timestamp": "2026-07-10T13:39:33.767796087-04:00",
+      "pod_name": "whisper-openai-68966786fb-jsb5d", 
+      "namespace": "whisper-stt",
+      "log_message": "INFO:     10.42.2.1:43574 - \"GET /health HTTP/1.1\" 200 OK",
+      "source": "kubectl"
+    }
+  },
+  "data_limitations": [
+    "whisper-stt pod produces no stdout/stderr logs - application likely logs internally to files",
+    "No centralized log aggregation (Victoria Logs, ELK) available in cluster",
+    "Retention limited to container runtime log storage (estimated 7-14 days default)",
+    "Health check logs dominate the dataset (periodic GET /health requests)"
+  ],
+  "access_method": "kubectl --server=http://traefik-ardenone-cluster:8001 logs -n whisper-stt",
+  "output_file": "logs/whisper-stt-all-raw.jsonl"
+}
