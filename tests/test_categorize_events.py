@@ -234,6 +234,85 @@ class TestDeploymentLifecycle:
         result = categorize_event(base_parsed_event)
         assert result != EVENT_DEPLOYMENT_COMPLETE
 
+    def test_deployment_creation_event(self, base_parsed_event):
+        """Deployment creation with status='created' is deployment_start."""
+        base_parsed_event.update({
+            'event_type': 'deployment_created',
+            'status': 'created'
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_deployment_create_in_event_type(self, base_parsed_event):
+        """Event type containing 'deployment' and 'create' is deployment_start."""
+        base_parsed_event.update({
+            'event_type': 'deployment_create_new',
+            'status': 'success'
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_replicaset_creation_initial(self, base_parsed_event):
+        """ReplicaSet creation with 'initial' in event_type is deployment_start."""
+        base_parsed_event.update({
+            'event_type': 'replicaset_initial',
+            'status': 'success'
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_replicaset_creation_with_created_status(self, base_parsed_event):
+        """ReplicaSet with status='created' is deployment_start."""
+        base_parsed_event.update({
+            'event_type': 'replicaset_created',
+            'status': 'created'
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_deployment_starting_event(self, base_parsed_event):
+        """Deployment with 'starting' in event_type is deployment_start."""
+        base_parsed_event.update({
+            'event_type': 'deployment_starting',
+            'status': 'success'
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_replicaset_new_generation(self, base_parsed_event):
+        """ReplicaSet with 'generation' in event_type is deployment_start."""
+        base_parsed_event.update({
+            'event_type': 'replicaset_generation_new',
+            'status': 'success'
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_event_created_kubernetes(self, base_parsed_event):
+        """Kubernetes event_created is deployment_start."""
+        base_parsed_event.update({
+            'event_type': 'event_created',
+            'status': 'success',
+            'metadata': {
+                'source_fields': {
+                    'type': 'Normal',
+                    'reason': 'Created',
+                    'message': 'Created new deployment'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_event_creating_kubernetes(self, base_parsed_event):
+        """Kubernetes event_creating is deployment_start."""
+        base_parsed_event.update({
+            'event_type': 'event_creating',
+            'status': 'success'
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+
 
 # -----------------------------------------------------------------------------
 # Tests for pod crash detection

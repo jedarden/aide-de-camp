@@ -437,3 +437,81 @@ async def api_v1_test_sse_broadcast(request: TestSSEBroadcastRequest) -> dict:
         "surface_id": request.surface_id,
         "event_type": request.event_type,
     }
+
+
+class DispatchRequest(BaseModel):
+    """Request model for dispatch endpoint."""
+    utterance: str = Field(..., description="The utterance text to dispatch")
+    session_id: str = Field(..., description="Session ID for the dispatch")
+    surface_id: str = Field(..., description="Surface ID for SSE targeting")
+
+    @field_validator('utterance')
+    @classmethod
+    def utterance_must_be_non_empty(cls, v: str) -> str:
+        """Validate that utterance is a non-empty string."""
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError('utterance must be a non-empty string')
+        return stripped
+
+
+class DispatchResponse(BaseModel):
+    """Response model for dispatch endpoint."""
+    status: str
+    message: str
+    utterance: str
+    session_id: str
+    surface_id: str
+    timestamp: int
+
+
+@router.post("/dispatch")
+async def dispatch(request: DispatchRequest) -> DispatchResponse:
+    """
+    Test dispatch endpoint for simple utterance processing.
+
+    Mounted at ``POST /api/v1/dispatch``. This endpoint accepts test
+    dispatch requests with utterance, session_id, and surface_id, validates
+    the input, and returns a structured response.
+
+    Request body:
+    ```
+    {
+        "utterance": "test utterance here",
+        "session_id": "test-session-id",
+        "surface_id": "test-surface-id"
+    }
+    ```
+
+    Returns:
+    ```
+    {
+        "status": "received",
+        "message": "Dispatch request received successfully",
+        "utterance": "test utterance here",
+        "session_id": "test-session-id",
+        "surface_id": "test-surface-id",
+        "timestamp": 1722638400
+    }
+    ```
+
+    Error responses:
+        422: Validation error (missing or invalid fields)
+    """
+    import time
+
+    logger.info(
+        f"[TEST] Dispatch request received - "
+        f"utterance: {request.utterance[:50]}..., "
+        f"session_id: {request.session_id}, "
+        f"surface_id: {request.surface_id}"
+    )
+
+    return DispatchResponse(
+        status="received",
+        message="Dispatch request received successfully",
+        utterance=request.utterance,
+        session_id=request.session_id,
+        surface_id=request.surface_id,
+        timestamp=int(time.time()),
+    )
