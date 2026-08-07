@@ -57,6 +57,111 @@ This document provides comprehensive execution flow diagrams and detailed status
 └───────────────────────────┘ └───────────────────┘ └───────────────────┘
 ```
 
+### Detailed Execution Phase Breakdown
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    DETAILED STEP EXECUTION PHASES                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    ┌──────────────────┐
+                    │   1. ENQUEUE     │
+                    │                  │
+                    │ • Step created   │
+                    │ • Added to queue │
+                    │ • Status: PENDING│
+                    │ • Priority set   │
+                    │ • Dependencies   │
+                    │   checked        │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │   2. DEQUEUE      │
+                    │                  │
+                    │ • Popped from    │
+                    │   queue          │
+                    │ • Executor       │
+                    │   assigned       │
+                    │ • Resources     │
+                    │   allocated      │
+                    │ • Started_at set │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │   3. VALIDATE     │
+                    │                  │
+                    │ • Pre-conditions │
+                    │   checked        │
+                    │ • Guard          │
+                    │   conditions     │
+                    │   evaluated      │
+                    │ • Input params   │
+                    │   validated      │
+                    │ • Permissions    │
+                    │   verified       │
+                    └────────┬─────────┘
+                             │
+                ┌────────────┴────────────┐
+                │                         │
+         Validation PASSED         Validation FAILED
+         or SKIPPABLE              or CRITICAL ERROR
+                │                         │
+                ▼                         ▼
+    ┌──────────────────┐      ┌──────────────────┐
+    │   4. EXECUTE      │      │   TERMINATE       │
+    │                  │      │                   │
+    │ • Main logic     │      │ • Status: SKIPPED │
+    │   runs          │      │   or FAILED       │
+    │ • Async ops      │      │ • Error set       │
+    │   in flight      │      │ • Cleanup run     │
+    │ • Progress       │      └────────┬─────────┘
+    │   tracked        │               │
+    │ • Logs emitted   │               │
+    └────────┬─────────┘               │
+             │                         │
+             ▼                         ▼
+    ┌──────────────────┐      ┌──────────────────┐
+    │   5. PERSIST      │      │   6. COMPLETE    │
+    │                  │      │   (Terminal)      │
+    │ • Results        │      │                   │
+    │   stored         │      │ • Final status    │
+    │ • Output         │      │   set            │
+    │   finalized      │      │ • Timestamps      │
+    │ • Error state    │      │   completed      │
+    │   set if needed  │      │ • SSE event       │
+    │ • Duration       │      │   broadcast      │
+    │   calculated     │      │ • Resources      │
+    └────────┬─────────┘      │   released        │
+             │                └──────────────────┘
+             ▼
+    ┌──────────────────┐
+    │   6. COMPLETE    │
+    │   (Terminal)     │
+    │                  │
+    │ • Status:        │
+    │   COMPLETED      │
+    │ • Timestamps     │
+    │   finalized     │
+    │ • SSE event      │
+    │   broadcast     │
+    │ • Next steps     │
+    │   triggered      │
+    └──────────────────┘
+```
+
+### Phase Transition Details
+
+| Phase | Input State | Output State | Key Operations | Failure Modes |
+|-------|------------|--------------|----------------|---------------|
+| **ENQUEUE** | — | `PENDING` | Create step, set priority, check dependencies | Invalid configuration, missing dependencies |
+| **DEQUEUE** | `PENDING` | `PENDING` | Pop from queue, allocate resources, set `started_at` | Resource exhaustion, queue deadlock |
+| **VALIDATE** | `PENDING` | `IN_PROGRESS` or `SKIPPED` | Check preconditions, guards, permissions | Validation failure → `SKIPPED` or `FAILED` |
+| **EXECUTE** | `IN_PROGRESS` | `COMPLETED` or `FAILED` | Run main logic, async operations | Exceptions, timeouts → `FAILED` |
+| **PERSIST** | Intermediate | Terminal state | Store results, calculate duration, set error state | Storage failure, serialization errors |
+| **COMPLETE** | Any terminal | Final terminal | Broadcast SSE, release resources, trigger next steps | Notification failures (non-critical) |
+
 ### Step Lifecycle Detailed Timeline
 
 ```
@@ -95,6 +200,382 @@ FAILED PATH:
 | `COMPLETED` | *(none)* | Terminal state - no transitions | All fields finalized |
 | `FAILED` | *(none)* | Terminal state - no transitions | All fields finalized |
 | `SKIPPED` | *(none)* | Terminal state - no transitions | All fields finalized |
+
+---
+
+## Error Handling Patterns and Common Scenarios
+
+### Phase-Specific Error Handling
+
+#### ENQUEUE Phase Errors
+
+```python
+# Error: Invalid step configuration
+try:
+    step = Step(
+        step_type="ci_status",
+        description="Check CI workflow status",
+        parameters={"project_slug": None}  # Invalid!
+    )
+except ValidationError as e:
+    # Handle at workflow definition level
+    logger.error(f"Step configuration invalid: {e}")
+    # Return error before execution starts
+```
+
+**Common Scenarios:**
+- Missing required parameters
+- Invalid step type
+- Circular dependencies
+- Resource quota exceeded
+
+#### DEQUEUE Phase Errors
+
+```python
+# Error: Resource exhaustion
+async def dequeue_step(queue: StepQueue) -> Step:
+    try:
+        step = await queue.pop()
+        # Allocate resources (memory, CPU, connections)
+        await allocate_resources(step)
+        step.started_at = time.time()
+        return step
+    except ResourceExhaustedError as e:
+        # Step stays in queue, will be retried
+        logger.warning(f"Resource exhaustion, step requeued: {e}")
+        await queue.requeue(step, delay=5.0)
+        raise
+```
+
+**Common Scenarios:**
+- Too many concurrent steps
+- Memory limits exceeded
+- Connection pool exhaustion
+- Thread/process limits
+
+#### VALIDATE Phase Errors
+
+```python
+# Error: Validation failure vs. skip condition
+async def validate_step(ctx: ExecutionContext, step: Step) -> StepResult:
+    started_at = time.time()
+    
+    # Critical validation → FAILED
+    if not ctx.project_slug:
+        return StepResult(
+            step_name=step.step_type,
+            status=StepStatus.FAILED,
+            error="Missing required project_slug",
+            started_at=started_at,
+            completed_at=time.time(),
+            duration_ms=10.0,
+        )
+    
+    # Skip condition → SKIPPED
+    if ctx.dry_run and step.is_mutating:
+        return StepResult(
+            step_name=step.step_type,
+            status=StepStatus.SKIPPED,
+            output={"reason": "dry_run enabled"},
+            started_at=started_at,
+            completed_at=time.time(),
+            duration_ms=5.0,
+        )
+    
+    # Proceed to execution
+    return None  # Signal to continue
+```
+
+**Common Scenarios:**
+- Missing permissions → `FAILED`
+- dry_run mode → `SKIPPED`  
+- Guard conditions false → `SKIPPED`
+- Invalid input parameters → `FAILED`
+
+#### EXECUTE Phase Errors
+
+```python
+# Error: Transient vs. permanent errors
+async def execute_step(ctx: ExecutionContext) -> StepResult:
+    started_at = time.time()
+    
+    try:
+        result = await perform_operation(ctx)
+        return StepResult(
+            step_name="operation",
+            status=StepStatus.COMPLETED,
+            output=result,
+            started_at=started_at,
+            completed_at=time.time(),
+            duration_ms=(time.time() - started_at) * 1000,
+        )
+    except TimeoutError as e:
+        # Transient error → retry with backoff
+        if should_retry(e):
+            raise RetryableError(e)  # Caller handles retry
+        # Permanent failure
+        return StepResult(
+            step_name="operation",
+            status=StepStatus.FAILED,
+            error=f"Operation timeout: {e}",
+            started_at=started_at,
+            completed_at=time.time(),
+            duration_ms=(time.time() - started_at) * 1000,
+        )
+    except PermissionError as e:
+        # Permanent error → no retry
+        return StepResult(
+            step_name="operation",
+            status=StepStatus.FAILED,
+            error=f"Permission denied: {e}",
+            started_at=started_at,
+            completed_at=time.time(),
+            duration_ms=(time.time() - started_at) * 1000,
+        )
+```
+
+**Common Scenarios:**
+- Network timeout → Transient, retry
+- Permission denied → Permanent, fail
+- Resource not found → Permanent, fail
+- Rate limiting → Transient, retry with backoff
+- Invalid response → Permanent, fail
+
+#### PERSIST Phase Errors
+
+```python
+# Error: Storage failures
+async def persist_result(result: StepResult, storage: Storage) -> None:
+    try:
+        await storage.save_step_result(result)
+    except StorageError as e:
+        # Log but don't fail the step - result is already computed
+        logger.error(f"Failed to persist step result: {e}")
+        # Optionally retry or cache locally
+        await cache_locally(result)
+```
+
+**Common Scenarios:**
+- Database connection failure
+- Disk space exhausted
+- Serialization failure
+- Network partition
+
+#### COMPLETE Phase Errors
+
+```python
+# Error: Notification failures (non-critical)
+async def complete_step(result: StepResult, broadcaster: SSEBroadcaster) -> None:
+    # Step result is already final, notifications are best-effort
+    try:
+        await broadcaster.broadcast(SSEEvent(
+            event_type="step_completed",
+            data=result.model_dump(),
+        ))
+    except BroadcastError as e:
+        logger.warning(f"Failed to broadcast completion: {e}")
+        # Don't fail the step - result is already stored
+```
+
+**Common Scenarios:**
+- SSE connection failure
+- WebSocket disconnected
+- Notification service unavailable
+- Event queue full
+
+### Common Execution Scenarios
+
+#### Scenario 1: Successful Execution Flow
+
+```
+ENQUEUE → DEQUEUE → VALIDATE (passed) → EXECUTE (success) → PERSIST → COMPLETE
+Status:  PENDING   PENDING   IN_PROGRESS        COMPLETED    COMPLETED   COMPLETED
+```
+
+**Timeline:**
+- t0: Step created and queued
+- t1: Step dequeued, resources allocated
+- t2: Validation passed, execution starts
+- t3: Execution completed successfully
+- t4: Results persisted to database
+- t5: SSE broadcast, workflow continues
+
+#### Scenario 2: Validation Skip
+
+```
+ENQUEUE → DEQUEUE → VALIDATE (dry_run) → COMPLETE
+Status:  PENDING   PENDING   SKIPPED           SKIPPED
+```
+
+**Timeline:**
+- t0: Step created and queued
+- t1: Step dequeued, dry_run detected
+- t2: Validation returns SKIPPED
+- t3: Fast completion with skip reason
+
+#### Scenario 3: Execution Failure with Retry
+
+```
+ENQUEUE → DEQUEUE → VALIDATE (passed) → EXECUTE (timeout) → RETRY → EXECUTE (success) → PERSIST → COMPLETE
+Status:  PENDING   PENDING   IN_PROGRESS        FAILED         PENDING  IN_PROGRESS      COMPLETED   COMPLETED
+```
+
+**Timeline:**
+- t0: Step created and queued
+- t1: Step dequeued, validation passed
+- t2: Execution attempt 1 times out
+- t3: Step marked FAILED, retry scheduled
+- t4: Wait period (exponential backoff)
+- t5: Retry attempt succeeds
+- t6: Results persisted
+- t7: Completion broadcast
+
+#### Scenario 4: Permanent Failure
+
+```
+ENQUEUE → DEQUEUE → VALIDATE (failed) → COMPLETE
+Status:  PENDING   PENDING   FAILED          FAILED
+```
+
+**Timeline:**
+- t0: Step created and queued
+- t1: Step dequeued
+- t2: Validation fails critically (e.g., missing permissions)
+- t3: Immediate failure, no execution attempted
+- t4: Error broadcast, workflow halts
+
+#### Scenario 5: Resource Exhaustion
+
+```
+ENQUEUE → DEQUEUE (resource exhaustion) → REQUEUE → DEQUEUE → VALIDATE → EXECUTE → ...
+Status:  PENDING   PENDING (stays in queue)    PENDING   PENDING   IN_PROGRESS  ...
+```
+
+**Timeline:**
+- t0: Step created and queued
+- t1: Dequeue attempted, resources exhausted
+- t2: Step requeued with delay
+- t3: Wait period
+- t4: Dequeue succeeds
+- t5: Normal execution proceeds
+
+### Error Recovery Matrix
+
+| Error Type | Phase | Retry? | Backoff? | Final Status | Recovery Action |
+|------------|-------|--------|----------|--------------|-----------------|
+| Invalid config | ENQUEUE | No | No | FAILED | Fix workflow definition |
+| Resource exhausted | DEQUEUE | Yes | Yes | PENDING | Wait for resources |
+| Validation critical | VALIDATE | No | No | FAILED | Fix input/permissions |
+| Guard condition | VALIDATE | No | No | SKIPPED | Continue workflow |
+| Network timeout | EXECUTE | Yes | Yes | COMPLETED | Retry operation |
+| Permission denied | EXECUTE | No | No | FAILED | Fix permissions |
+| Rate limiting | EXECUTE | Yes | Yes | COMPLETED | Retry with backoff |
+| Storage failure | PERSIST | Yes | Yes | COMPLETED | Retry/cache locally |
+| SSE broadcast | COMPLETE | No | No | COMPLETED | Log warning only |
+
+### Timeout Handling Patterns
+
+```python
+# Step-level timeout with graceful degradation
+async def execute_with_timeout(step: Step, timeout_ms: int) -> StepResult:
+    started_at = time.time()
+    
+    try:
+        # Use asyncio.wait_for for timeout enforcement
+        result = await asyncio.wait_for(
+            perform_step_operation(step),
+            timeout=timeout_ms / 1000.0
+        )
+        return StepResult(
+            step_name=step.step_type,
+            status=StepStatus.COMPLETED,
+            output=result,
+            started_at=started_at,
+            completed_at=time.time(),
+            duration_ms=(time.time() - started_at) * 1000,
+        )
+    except asyncio.TimeoutError:
+        # Include partial results if available
+        partial = await capture_partial_results(step)
+        return StepResult(
+            step_name=step.step_type,
+            status=StepStatus.FAILED,
+            error=f"Step timeout after {timeout_ms}ms",
+            output={"partial_results": partial},
+            started_at=started_at,
+            completed_at=time.time(),
+            duration_ms=(time.time() - started_at) * 1000,
+        )
+```
+
+### Deadlock Detection and Recovery
+
+```python
+# Detect and prevent circular dependencies
+def detect_circular_dependencies(steps: list[Step]) -> list[Step]:
+    """Check for circular dependencies in workflow steps."""
+    visited = set()
+    recursion_stack = set()
+    
+    def has_cycle(step: Step) -> bool:
+        visited.add(step.step_id)
+        recursion_stack.add(step.step_id)
+        
+        for dep in step.depends_on:
+            if dep not in visited:
+                if has_cycle(dep):
+                    return True
+            elif dep in recursion_stack:
+                return True  # Cycle detected
+        
+        recursion_stack.remove(step.step_id)
+        return False
+    
+    cyclic_steps = [s for s in steps if has_cycle(s)]
+    
+    if cyclic_steps:
+        logger.error(f"Circular dependencies detected: {[s.step_id for s in cyclic_steps]}")
+        raise WorkflowValidationError("Circular dependencies in workflow definition")
+    
+    return steps
+```
+
+### Circuit Breaker Pattern for External Services
+
+```python
+class CircuitBreaker:
+    """Prevent cascading failures by tripping on repeated errors."""
+    
+    def __init__(self, failure_threshold: int = 5, timeout_ms: int = 30000):
+        self.failure_count = 0
+        self.failure_threshold = failure_threshold
+        self.timeout_ms = timeout_ms
+        self.last_failure_time = None
+        self.state = "closed"  # closed, open, half-open
+    
+    async def call(self, operation: callable) -> Any:
+        if self.state == "open":
+            if time.time() * 1000 - self.last_failure_time > self.timeout_ms:
+                self.state = "half-open"
+            else:
+                raise CircuitBreakerOpenError("Circuit breaker is OPEN")
+        
+        try:
+            result = await operation()
+            if self.state == "half-open":
+                self.state = "closed"
+                self.failure_count = 0
+            return result
+        except Exception as e:
+            self.failure_count += 1
+            self.last_failure_time = time.time() * 1000
+            
+            if self.failure_count >= self.failure_threshold:
+                self.state = "open"
+                logger.error(f"Circuit breaker tripped after {self.failure_count} failures")
+            
+            raise
+```
 
 ---
 
