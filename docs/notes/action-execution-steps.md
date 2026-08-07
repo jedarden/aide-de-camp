@@ -12,6 +12,241 @@ The Action Execution Model implements a step-based workflow system where:
 - **Progress streaming**: Each step outcome streams to canvas via SSE
 - **Failure handling**: Failed steps halt the workflow
 
+## Foundation: Core Type System
+
+The Action Execution Model is built on four core data types that define the execution context, results, and status reporting. These types are the foundation for all step implementations.
+
+### ExecutionContext
+
+The `ExecutionContext` contains project configuration and runtime context needed for step execution.
+
+#### Purpose
+
+The `ExecutionContext` is passed to all step executors and provides:
+- **Tracking identifiers**: `intent_id` and `session_id` for SSE targeting and logging
+- **Project context**: `project_slug` and `project_cfg` for registry lookups and configuration
+- **Execution control**: `dry_run` flag to skip mutating operations
+- **Convenience accessors**: Properties for commonly used configuration values
+
+#### Lifecycle
+
+1. **Creation**: Created by `ActionExecutor` when starting a workflow
+2. **Population**: Fields populated from intent classification and project registry
+3. **Usage**: Passed to each step executor during workflow execution
+4. **Scope**: Exists only for the duration of a single workflow execution
+
+#### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `intent_id` | `str` | Intent ID for tracking and SSE targeting |
+| `session_id` | `str` | Session ID for SSE targeting |
+
+#### Optional Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `project_slug` | `Optional[str]` | `None` | Project slug for registry lookup |
+| `project_cfg` | `dict[str, Any]` | `{}` | Project configuration from registry |
+| `dry_run` | `bool` | `False` | If True, skip mutating operations |
+
+#### Convenience Properties
+
+| Property | Type | Source | Description |
+|----------|------|--------|-------------|
+| `cluster` | `str \| None` | `project_cfg["cluster"]` | Cluster name |
+| `namespace` | `str \| None` | `project_cfg["namespace"]` | Kubernetes namespace |
+| `repo_path` | `str \| None` | `project_cfg["repo_path"]` | Repository filesystem path |
+| `argocd_app` | `str \| None` | `project_cfg["argocd_app"]` | ArgoCD application name |
+
+#### Type Definition
+
+```python
+from src.action.models import ExecutionContext
+
+ctx = ExecutionContext(
+    intent_id="int-12345",
+    session_id="sess-67890",
+    project_slug="mta-my-way",
+    project_cfg={
+        "cluster": "rs-manager",
+        "namespace": "argocd",
+        "repo_path": "ardent/declarative-config",
+        "argocd_app": "mta-my-way-deploy"
+    },
+    dry_run=False
+)
+
+# Access convenience properties
+cluster = ctx.cluster  # "rs-manager"
+namespace = ctx.namespace  # "argocd"
+```
+
+---
+
+### StepResult
+
+The `StepResult` contains the outcome of a single workflow step execution.
+
+#### Purpose
+
+The `StepResult` captures:
+- **Step identification**: Which step was executed
+- **Execution status**: Success, failure, or in-progress state
+- **Output data**: Structured data returned by the step
+- **Error information**: Error messages if execution failed
+- **Timing metrics**: Duration and completion timestamps
+
+#### Status Handling
+
+The `status` field follows the `StepStatus` enum progression:
+- **IN_PROGRESS**: Set when step starts execution
+- **COMPLETED**: Set on successful execution
+- **FAILED**: Set on execution error (includes `error` field)
+- **SKIPPED**: Set when step is bypassed (e.g., dry_run mode)
+
+#### Data Structure
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `step_name` | `str` | Yes | Name of the step that was executed |
+| `status` | `StepStatus` | Yes | Execution status |
+| `output` | `dict[str, Any]` | No | Step output data (default: {}) |
+| `error` | `str \| None` | No | Error message if step failed |
+| `started_at` | `float` | Yes | Unix timestamp when step started |
+| `completed_at` | `float \| None` | No | Unix timestamp when step completed |
+| `duration_ms` | `float` | No | Step execution duration in milliseconds (default: 0.0) |
+
+#### Methods
+
+**`to_dict()`**: Converts result to dictionary for SSE broadcasting.
+
+#### Type Definition
+
+```python
+from src.action.models import StepResult, StepStatus
+
+result = StepResult(
+    step_name="pod_status",
+    status=StepStatus.COMPLETED,
+    output={
+        "total_pods": 3,
+        "running": 3,
+        "phase_counts": {"Running": 3}
+    },
+    started_at=1699200000.0,
+    completed_at=1699200005.5,
+    duration_ms=5500.0
+)
+
+# Broadcast to canvas
+sse_data = result.to_dict()
+```
+
+---
+
+### StepStatus Enumeration (StatusCode)
+
+The `StepStatus` enum defines the valid states for step execution.
+
+#### Purpose
+
+The `StepStatus` enum provides:
+- **Type safety**: Ensures only valid status values are used
+- **State tracking**: Defines the execution lifecycle of steps
+- **Workflow control**: Determines if workflow should continue or halt
+
+#### Status Codes and Semantics
+
+| Status | String Value | Description | Workflow Impact |
+|--------|-------------|-------------|-----------------|
+| `StepStatus.PENDING` | `"pending"` | Step has not started yet | No impact (initial state) |
+| `StepStatus.IN_PROGRESS` | `"in_progress"` | Step is currently executing | No impact (intermediate state) |
+| `StepStatus.COMPLETED` | `"completed"` | Step completed successfully | Proceeds to next step |
+| `StepStatus.FAILED` | `"failed"` | Step failed with error | **Halts workflow immediately** |
+| `StepStatus.SKIPPED` | `"skipped"` | Step was skipped (e.g., dry_run) | Proceeds to next step (no-op) |
+
+#### State Progression
+
+```
+PENDING → IN_PROGRESS → COMPLETED
+                     → FAILED
+                     → SKIPPED
+```
+
+**Common transition patterns:**
+1. **Success:** `PENDING` → `IN_PROGRESS` → `COMPLETED`
+2. **Error:** `PENDING` → `IN_PROGRESS` → `FAILED`
+3. **Dry run:** `PENDING` → `SKIPPED`
+4. **Conditional skip:** `PENDING` → `SKIPPED` (e.g., gate not met)
+
+#### Type Definition
+
+```python
+from src.action.models import StepStatus
+
+# All valid status values
+StepStatus.PENDING      # "pending"
+StepStatus.IN_PROGRESS # "in_progress"
+StepStatus.COMPLETED   # "completed"
+StepStatus.FAILED      # "failed"
+StepStatus.SKIPPED     # "skipped"
+
+# Usage in StepResult
+result = StepResult(
+    step_name="ci_status",
+    status=StepStatus.COMPLETED,
+    # ... other fields
+)
+```
+
+---
+
+### ActionResult
+
+The `ActionResult` contains the complete execution result for a workflow.
+
+#### Purpose
+
+The `ActionResult` aggregates:
+- **Workflow identification**: Which workflow was executed
+- **Overall status**: Final workflow state (running, completed, failed, cancelled)
+- **Step results**: Collection of all individual step results
+- **Timing information**: Workflow-level duration metrics
+- **Error context**: Error message if workflow failed
+
+#### Data Structure
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `intent_id` | `str` | Yes | Intent ID for tracking |
+| `session_id` | `str` | Yes | Session ID for SSE targeting |
+| `project_slug` | `str \| None` | No | Project slug that was executed |
+| `workflow_name` | `str` | Yes | Name of the workflow that was executed |
+| `status` | `str` | Yes | Final workflow status |
+| `steps` | `list[StepResult]` | No | All step results in execution order (default: []) |
+| `started_at` | `float` | Yes | Unix timestamp when workflow started |
+| `completed_at` | `float \| None` | No | Unix timestamp when workflow completed |
+| `duration_ms` | `float` | No | Workflow execution duration in milliseconds (default: 0.0) |
+| `error` | `str \| None` | No | Error message if workflow failed |
+
+#### Methods
+
+**`add_step(step: StepResult)`**: Appends a step result to the steps list.
+
+**`to_dict()`**: Converts result to dictionary for SSE broadcasting.
+
+#### Workflow Status Values
+
+| Status | Description |
+|--------|-------------|
+| `"running"` | Workflow is currently executing |
+| `"completed"` | All steps completed successfully |
+| `"failed"` | One or more steps failed, workflow halted |
+| `"cancelled"` | Workflow was cancelled before completion |
+
+---
+
 ## Execution Flow
 
 ```
