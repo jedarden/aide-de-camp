@@ -1,0 +1,46 @@
+{
+  "query_metadata": {
+    "timestamp": "2026-08-06T22:29:14.681825",
+    "time_period_days": 30,
+    "start_date": "2026-07-07T00:00:00Z",
+    "end_date": "2026-08-06T23:59:59Z",
+    "service": "pbx-web",
+    "metrics_queried": [
+      "p50",
+      "p95",
+      "p99",
+      "mean",
+      "median",
+      "min",
+      "max"
+    ]
+  },
+  "latency_metrics": {
+    "count": 0,
+    "p50_seconds": 0,
+    "p95_seconds": 0,
+    "p99_seconds": 0,
+    "mean_seconds": 0,
+    "median_seconds": 0,
+    "min_seconds": 0,
+    "max_seconds": 0
+  },
+  "raw_data": [],
+  "query_log": [
+    {
+      "timestamp": "2026-08-06T22:29:14.856453",
+      "query": "PROCESS_FILE: /home/coding/aide-de-camp/logs/pbx-web-victorialogs-raw.jsonl",
+      "result_count": 0,
+      "execution_time_ms": 174.57,
+      "status": "success"
+    }
+  ],
+  "processing_stats": {
+    "total_entries_processed": 10000,
+    "entries_with_latency": 0,
+    "entries_without_latency": 10000,
+    "parse_errors": 0,
+    "temporal_coverage_days": 0,
+    "execution_time_ms": 174.57
+  }
+}

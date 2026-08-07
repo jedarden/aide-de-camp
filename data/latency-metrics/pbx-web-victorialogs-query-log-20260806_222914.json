@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-08-06T22:29:14.856769",
+  "query_log": [
+    {
+      "timestamp": "2026-08-06T22:29:14.856453",
+      "query": "PROCESS_FILE: /home/coding/aide-de-camp/logs/pbx-web-victorialogs-raw.jsonl",
+      "result_count": 0,
+      "execution_time_ms": 174.57,
+      "status": "success"
+    }
+  ]
+}
