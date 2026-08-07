@@ -22,6 +22,7 @@ from typing import Any, Callable
 from functools import wraps
 
 import yaml
+from .utils.atomic_write import atomic_write
 
 logger = logging.getLogger(__name__)
 
