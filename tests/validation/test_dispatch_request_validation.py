@@ -521,7 +521,10 @@ class TestEdgeCases:
             surface_id="surface-456"
         )
 
-        assert request.utterance == long_utterance
+        # Validator strips trailing spaces, so expect stripped version
+        expected = long_utterance.rstrip()
+        assert request.utterance == expected
+        assert len(request.utterance) > 10000  # Very long utterance preserved
 
     def test_unicode_in_utterance(self):
         """Test that Unicode characters in utterance are handled correctly."""
@@ -555,3 +558,156 @@ class TestEdgeCases:
         )
 
         assert "\t" in request.utterance
+
+
+class TestDispatchEndpointValidation:
+    """Integration tests for /dispatch endpoint request validation."""
+
+    def test_missing_utterance_field_returns_400(self, test_client):
+        """Test that missing utterance field returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_missing_utterance_error_structure(self, test_client):
+        """Test that missing utterance error includes proper field validation structure."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "detail" in error_data
+        assert "error" in error_data
+        assert "errors" in error_data
+
+        # Verify error detail contains field validation information
+        assert error_data["error"] == "Validation failed"
+        errors = error_data["errors"]
+        assert isinstance(errors, list)
+
+        # Find utterance-related error
+        utterance_errors = [e for e in errors if "utterance" in e.get("field", "")]
+        assert len(utterance_errors) > 0
+
+        # Verify error structure
+        utterance_error = utterance_errors[0]
+        assert "field" in utterance_error
+        assert "message" in utterance_error
+        assert "type" in utterance_error
+        assert "utterance" in utterance_error["field"]
+        assert utterance_error["type"] == "missing"
+
+    def test_missing_session_id_field_returns_400(self, test_client):
+        """Test that missing session_id field returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_missing_surface_id_field_returns_400(self, test_client):
+        """Test that missing surface_id field returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-123"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_empty_utterance_string_returns_400(self, test_client):
+        """Test that empty utterance string returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "",
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_empty_utterance_error_message(self, test_client):
+        """Test that empty utterance returns clear error message."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "",
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "errors" in error_data
+
+        # Find utterance error
+        errors = error_data["errors"]
+        utterance_errors = [e for e in errors if "utterance" in e.get("field", "")]
+        assert len(utterance_errors) > 0
+
+        # Verify error message is clear
+        utterance_error = utterance_errors[0]
+        error_msg = utterance_error.get("message", "")
+        assert len(error_msg) > 0
+        assert "utterance" in error_msg.lower()
+        assert "empty" in error_msg.lower()
+
+    def test_whitespace_only_utterance_returns_400(self, test_client):
+        """Test that whitespace-only utterance returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "   ",
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_multiple_missing_fields_returns_400(self, test_client):
+        """Test that multiple missing fields are reported together."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status"
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "errors" in error_data
+
+        errors = error_data["errors"]
+        missing_errors = [e for e in errors if e.get("type") == "missing"]
+
+        # Should report both session_id and surface_id as missing
+        assert len(missing_errors) >= 2
+
+        # Verify the missing fields are session_id and surface_id
+        missing_fields = [e.get("field", "") for e in missing_errors]
+        assert any("session_id" in field for field in missing_fields)
+        assert any("surface_id" in field for field in missing_fields)
