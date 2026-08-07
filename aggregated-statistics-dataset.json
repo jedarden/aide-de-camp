@@ -1,0 +1,501 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-07T07:30:19.729326Z",
+    "generation_source": "adc-46mz4 - statistics aggregation",
+    "source_files": {
+      "frequency_statistics": "/home/coding/aide-de-camp/pattern-category-frequency-stats.json",
+      "time_distribution": "/home/coding/aide-de-camp/comprehensive-time-distribution-statistics.json"
+    },
+    "frequency_analysis_timestamp": "2026-08-07T03:52:58.899979+00:00",
+    "time_analysis_timestamp": "2026-08-07T06:55:19Z"
+  },
+  "summary": {
+    "total_categories": 6,
+    "total_failures": 2862,
+    "categorized_failures": 2862,
+    "uncategorized_failures": 0,
+    "unique_services": 2
+  },
+  "categories": {
+    "RecordingFetchError": {
+      "description": "Failed to fetch recordings from storage backend",
+      "severity": "medium",
+      "total_failures": 1,
+      "percentage_of_categorized": 0.07,
+      "service_distribution": {
+        "pbx-web": 1
+      },
+      "image_version_distribution": {
+        "unknown": 1
+      },
+      "error_type_distribution": {
+        "http_server_errors": 1
+      },
+      "time_distribution": {
+        "first_occurrence": "2026-07-28T20:23:24Z",
+        "last_occurrence": "2026-08-05T16:14:35Z",
+        "span_days": 7,
+        "timestamps_analyzed": 6,
+        "gap_statistics": {
+          "average_gap_seconds": 135254.133216,
+          "median_gap_seconds": 20683.492023,
+          "min_gap_seconds": 1040.590032,
+          "max_gap_seconds": 574563.828822,
+          "stddev_gap_seconds": 247064.01246545685
+        },
+        "daily_weekly_counts": {
+          "daily_counts": {
+            "2026-07-28": 2,
+            "2026-08-04": 2,
+            "2026-08-05": 2
+          },
+          "weekly_counts": {
+            "2026-W31": 2,
+            "2026-W32": 4
+          }
+        },
+        "time_clusters": {
+          "clusters_found": 0,
+          "clusters": []
+        }
+      },
+      "sample_failures": [
+        {
+          "error_type": "http_server_errors",
+          "status_code": 500,
+          "severity": "intermittent",
+          "context": "Generated during recording fetch failures",
+          "frequency": "intermittent pattern in recent logs",
+          "_source_file": "logs/pbx-web-30day.jsonl",
+          "pattern_category": "RecordingFetchError"
+        }
+      ]
+    },
+    "DeploymentRollback": {
+      "description": "Deployment was rolled back to previous version",
+      "severity": "high",
+      "total_failures": 1,
+      "percentage_of_categorized": 0.07,
+      "service_distribution": {
+        "pbx_web": 1
+      },
+      "image_version_distribution": {
+        "ronaldraygun/pbx-web:1.0.8": 1
+      },
+      "error_type_distribution": {
+        "unknown": 1
+      },
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "span_days": 0,
+        "timestamps_analyzed": 0,
+        "gap_statistics": null,
+        "daily_weekly_counts": null,
+        "time_clusters": null
+      },
+      "sample_failures": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "event_type": "deployment_rollback",
+          "category": "rollback",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "notes": "Rolled back to 1.0.8 on same day",
+          "service": "pbx_web",
+          "_source": "deployment_analysis",
+          "pattern_category": "DeploymentRollback"
+        }
+      ]
+    },
+    "DependencyTimeout": {
+      "description": "Timeout connecting to dependent services",
+      "severity": "medium",
+      "total_failures": 12,
+      "percentage_of_categorized": 0.83,
+      "service_distribution": {
+        "pbx-web": 12
+      },
+      "image_version_distribution": {
+        "container_logs": 12
+      },
+      "error_type_distribution": {
+        "connection_reset": 12
+      },
+      "time_distribution": {
+        "first_occurrence": "2026-07-28T20:23:24Z",
+        "last_occurrence": "2026-08-05T16:14:35Z",
+        "span_days": 7,
+        "timestamps_analyzed": 12,
+        "gap_statistics": {
+          "average_gap_seconds": 61479.15154918181,
+          "median_gap_seconds": 0.001866,
+          "min_gap_seconds": 0.00066,
+          "max_gap_seconds": 574563.826956,
+          "stddev_gap_seconds": 171480.13254606925
+        },
+        "daily_weekly_counts": {
+          "daily_counts": {
+            "2026-07-28": 4,
+            "2026-08-04": 4,
+            "2026-08-05": 4
+          },
+          "weekly_counts": {
+            "2026-W31": 4,
+            "2026-W32": 8
+          }
+        },
+        "time_clusters": {
+          "clusters_found": 0,
+          "clusters": []
+        }
+      },
+      "sample_failures": [
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-07-28T20:23:24.870819612-04:00 [pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-07-28T20:23:24.872445550-04:00 ConnectionResetError: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-07-28T22:58:58.425954166-04:00 [pbx-web] recording fetch error for 1785285870.480/20260729-004430_19148734884_1785285870.480.wav: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-07-28T22:58:58.427820643-04:00 ConnectionResetError: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "connection_reset",
+          "severity": "errno 104",
+          "message": "2026-08-04T14:35:02.254776922-04:00 [pbx-web] recording fetch error for 1785864705.535/20260804-173145_19142698463_1785864705.535.wav: [Errno 104] Connection reset by peer",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "DependencyTimeout"
+        }
+      ]
+    },
+    "HTTPError": {
+      "description": "HTTP error responses (4xx, 5xx)",
+      "severity": "medium",
+      "total_failures": 1420,
+      "percentage_of_categorized": 98.47,
+      "service_distribution": {
+        "pbx-web": 1420
+      },
+      "image_version_distribution": {
+        "container_logs": 1420
+      },
+      "error_type_distribution": {
+        "http_500": 371,
+        "http_504": 353,
+        "http_503": 349,
+        "http_502": 347
+      },
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "span_days": 0,
+        "timestamps_analyzed": 0,
+        "gap_statistics": null,
+        "daily_weekly_counts": null,
+        "time_clusters": null
+      },
+      "sample_failures": [
+        {
+          "source": "container_logs",
+          "error_type": "http_500",
+          "severity": "status 500",
+          "message": "2026-07-28T13:36:40.095001455-04:00 Output:       \"/var/www/calls/pagefind\"",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "http_500",
+          "severity": "status 500",
+          "message": "2026-07-28T13:36:40.095003346-04:00",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "http_500",
+          "severity": "status 500",
+          "message": "2026-07-28T13:36:40.095005482-04:00 [Walking source directory]",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "http_502",
+          "severity": "status 502",
+          "message": "2026-07-28T13:37:29.514105025-04:00 [Building search indexes]",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "http_502",
+          "severity": "status 502",
+          "message": "2026-07-28T13:38:48.475450285-04:00   Indexed 6967 words",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "HTTPError"
+        }
+      ]
+    },
+    "NetworkIssue": {
+      "description": "Network allocation or connectivity problems",
+      "severity": "low",
+      "total_failures": 8,
+      "percentage_of_categorized": 0.55,
+      "service_distribution": {
+        "pbx-web": 8
+      },
+      "image_version_distribution": {
+        "container_logs": 6,
+        "unknown": 2
+      },
+      "error_type_distribution": {
+        "broken_pipe": 6,
+        "recording_fetch_errors": 2
+      },
+      "time_distribution": {
+        "first_occurrence": "2026-07-28T20:23:24Z",
+        "last_occurrence": "2026-08-05T16:14:35Z",
+        "span_days": 7,
+        "timestamps_analyzed": 18,
+        "gap_statistics": {
+          "average_gap_seconds": 39780.62749735294,
+          "median_gap_seconds": 0.001197,
+          "min_gap_seconds": 0.000371,
+          "max_gap_seconds": 574563.826157,
+          "stddev_gap_seconds": 138908.34047411146
+        },
+        "daily_weekly_counts": {
+          "daily_counts": {
+            "2026-07-28": 6,
+            "2026-08-04": 6,
+            "2026-08-05": 6
+          },
+          "weekly_counts": {
+            "2026-W31": 6,
+            "2026-W32": 12
+          }
+        },
+        "time_clusters": {
+          "clusters_found": 0,
+          "clusters": []
+        }
+      },
+      "sample_failures": [
+        {
+          "error_type": "recording_fetch_errors",
+          "error_pattern": "[Errno 104] Connection reset by peer",
+          "severity": "intermittent",
+          "context": "Recording fetch failures from storage backend",
+          "_source_file": "logs/pbx-web-30day.jsonl",
+          "pattern_category": "NetworkIssue"
+        },
+        {
+          "error_type": "recording_fetch_errors",
+          "error_pattern": "BrokenPipeError: [Errno 32] Broken pipe",
+          "severity": "intermittent",
+          "context": "Recording fetch failures from storage backend",
+          "_source_file": "logs/pbx-web-30day.jsonl",
+          "pattern_category": "NetworkIssue"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "broken_pipe",
+          "severity": "errno 32",
+          "message": "2026-07-28T20:23:24.872959658-04:00 BrokenPipeError: [Errno 32] Broken pipe",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "NetworkIssue"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "broken_pipe",
+          "severity": "errno 32",
+          "message": "2026-07-28T22:58:58.428619967-04:00 BrokenPipeError: [Errno 32] Broken pipe",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "NetworkIssue"
+        },
+        {
+          "source": "container_logs",
+          "error_type": "broken_pipe",
+          "severity": "errno 32",
+          "message": "2026-08-04T14:35:02.257225307-04:00 BrokenPipeError: [Errno 32] Broken pipe",
+          "_source_file": "logs/pbx-web-parsed.jsonl",
+          "pattern_category": "NetworkIssue"
+        }
+      ]
+    },
+    "Uncategorized": {
+      "description": "Uncategorized failures",
+      "severity": "unknown",
+      "total_failures": 1420,
+      "percentage_of_categorized": 0.0,
+      "service_distribution": {},
+      "image_version_distribution": {},
+      "error_type_distribution": {},
+      "time_distribution": {
+        "first_occurrence": "2026-07-28T13:36:40Z",
+        "last_occurrence": "2026-08-06T13:35:34Z",
+        "span_days": 8,
+        "timestamps_analyzed": 1420,
+        "gap_statistics": {
+          "average_gap_seconds": 547.945412202255,
+          "median_gap_seconds": 120.000004,
+          "min_gap_seconds": 2e-06,
+          "max_gap_seconds": 275344.971791,
+          "stddev_gap_seconds": 7894.581006813092
+        },
+        "daily_weekly_counts": {
+          "daily_counts": {
+            "2026-07-28": 26,
+            "2026-07-29": 10,
+            "2026-07-30": 5,
+            "2026-07-31": 7,
+            "2026-08-03": 147,
+            "2026-08-04": 463,
+            "2026-08-05": 514,
+            "2026-08-06": 248
+          },
+          "weekly_counts": {
+            "2026-W31": 48,
+            "2026-W32": 1372
+          }
+        },
+        "time_clusters": {
+          "clusters_found": 13,
+          "clusters": [
+            {
+              "start": "2026-07-28T18:38:51Z",
+              "end": "2026-07-28T23:29:28Z",
+              "duration_hours": 4.843686450833333,
+              "failure_count": 19,
+              "density_per_hour": 3.1666666666666665
+            },
+            {
+              "start": "2026-08-03T17:05:54Z",
+              "end": "2026-08-03T23:05:34Z",
+              "duration_hours": 5.994444446388888,
+              "failure_count": 126,
+              "density_per_hour": 21.0
+            },
+            {
+              "start": "2026-08-03T23:05:34Z",
+              "end": "2026-08-04T05:05:34Z",
+              "duration_hours": 5.999999998888889,
+              "failure_count": 103,
+              "density_per_hour": 17.166666666666668
+            },
+            {
+              "start": "2026-08-04T05:05:34Z",
+              "end": "2026-08-04T11:02:42Z",
+              "duration_hours": 5.952294439444445,
+              "failure_count": 124,
+              "density_per_hour": 20.666666666666668
+            },
+            {
+              "start": "2026-08-04T11:02:42Z",
+              "end": "2026-08-04T17:02:24Z",
+              "duration_hours": 5.994927910555555,
+              "failure_count": 135,
+              "density_per_hour": 22.5
+            },
+            {
+              "start": "2026-08-04T17:02:24Z",
+              "end": "2026-08-04T22:59:54Z",
+              "duration_hours": 5.958333333333333,
+              "failure_count": 114,
+              "density_per_hour": 19.0
+            },
+            {
+              "start": "2026-08-04T22:59:54Z",
+              "end": "2026-08-05T04:57:44Z",
+              "duration_hours": 5.963888751388889,
+              "failure_count": 110,
+              "density_per_hour": 18.333333333333332
+            },
+            {
+              "start": "2026-08-05T04:57:44Z",
+              "end": "2026-08-05T10:57:24Z",
+              "duration_hours": 5.994444303611111,
+              "failure_count": 135,
+              "density_per_hour": 22.5
+            },
+            {
+              "start": "2026-08-05T10:57:24Z",
+              "end": "2026-08-05T16:56:54Z",
+              "duration_hours": 5.991666754444445,
+              "failure_count": 124,
+              "density_per_hour": 20.666666666666668
+            },
+            {
+              "start": "2026-08-05T16:56:54Z",
+              "end": "2026-08-05T22:55:04Z",
+              "duration_hours": 5.96944462,
+              "failure_count": 137,
+              "density_per_hour": 22.833333333333332
+            },
+            {
+              "start": "2026-08-05T22:55:04Z",
+              "end": "2026-08-06T04:52:24Z",
+              "duration_hours": 5.955555441944444,
+              "failure_count": 118,
+              "density_per_hour": 19.666666666666668
+            },
+            {
+              "start": "2026-08-06T04:52:24Z",
+              "end": "2026-08-06T10:46:54Z",
+              "duration_hours": 5.908333424444444,
+              "failure_count": 110,
+              "density_per_hour": 18.333333333333332
+            },
+            {
+              "start": "2026-08-06T10:46:54Z",
+              "end": "2026-08-06T13:35:34Z",
+              "duration_hours": 2.811110985277778,
+              "failure_count": 47,
+              "density_per_hour": 7.833333333333333
+            }
+          ]
+        }
+      },
+      "sample_failures": []
+    }
+  },
+  "cross_category_analysis": {
+    "services_with_multiple_categories": {
+      "pbx-web": {
+        "NetworkIssue": 8,
+        "RecordingFetchError": 1,
+        "HTTPError": 1420,
+        "DependencyTimeout": 12
+      }
+    },
+    "most_affected_services": {
+      "pbx-web": 1441,
+      "pbx_web": 1
+    }
+  }
+}
