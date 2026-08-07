@@ -192,24 +192,17 @@ def validate_30_day_completeness(data: Dict[str, Any]) -> Tuple[bool, List[str]]
     errors = []
     warnings = []
 
-    # Check time_period exists
-    if "metadata" not in data or "time_period" not in data["metadata"]:
-        errors.append("metadata.time_period is required for 30-day completeness validation")
+    # Check time period fields exist
+    if "metadata" not in data or "data_period_start" not in data["metadata"] or "data_period_end" not in data["metadata"]:
+        errors.append("metadata.data_period_start and metadata.data_period_end are required for 30-day completeness validation")
         return False, errors
 
-    time_period = data["metadata"]["time_period"]
-    if not isinstance(time_period, dict):
-        errors.append("metadata.time_period must be an object")
-        return False, errors
+    metadata = data["metadata"]
 
     # Check start and end timestamps
-    if "start" not in time_period or "end" not in time_period:
-        errors.append("metadata.time_period must include 'start' and 'end' timestamps")
-        return False, errors
-
     try:
-        start_str = time_period["start"]
-        end_str = time_period["end"]
+        start_str = metadata["data_period_start"]
+        end_str = metadata["data_period_end"]
 
         start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
         end = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
@@ -228,14 +221,35 @@ def validate_30_day_completeness(data: Dict[str, Any]) -> Tuple[bool, List[str]]
         errors.append(f"Invalid timestamp format in time_period: {e}")
         return False, errors
 
-    # Check deployment_events_last_30_days exists and has events
-    if "deployment_events_last_30_days" not in data:
-        errors.append("deployment_events_last_30_days is required for 30-day completeness")
+    # Check cluster_deployments exists and has deployment metrics
+    if "cluster_deployments" not in data:
+        errors.append("cluster_deployments is required for 30-day completeness")
         return False, errors
 
-    events = data["deployment_events_last_30_days"]
+    cluster_deployments = data["cluster_deployments"]
+    if not isinstance(cluster_deployments, dict):
+        errors.append("cluster_deployments must be an object")
+        return False, errors
+
+    if "whisper-stt" not in cluster_deployments:
+        errors.append("cluster_deployments.whisper-stt is required for 30-day completeness")
+        return False, errors
+
+    whisper_stt = cluster_deployments["whisper-stt"]
+    if not isinstance(whisper_stt, dict):
+        errors.append("cluster_deployments.whisper-stt must be an object")
+        return False, errors
+
+    if "deployments_last_30_days" not in whisper_stt:
+        errors.append("cluster_deployments.whisper-stt.deployments_last_30_days is required")
+        return False, errors
+
+    deployments_last_30_days = whisper_stt["deployments_last_30_days"]
+
+    # Check replica_history for deployment events
+    events = whisper_stt.get("replica_history", [])
     if not isinstance(events, list):
-        errors.append("deployment_events_last_30_days must be an array")
+        errors.append("cluster_deployments.whisper-stt.replica_history must be an array")
         return False, errors
 
     if len(events) == 0:
@@ -268,36 +282,36 @@ def validate_30_day_completeness(data: Dict[str, Any]) -> Tuple[bool, List[str]]
                 f"specified time period. Check timestamp alignment."
             )
 
-    # Check deployment_metrics exists and has 30-day fields
-    if "deployment_metrics" not in data:
-        errors.append("deployment_metrics is required for 30-day completeness")
+    # Check summary exists and has 30-day fields
+    if "summary" not in data:
+        errors.append("summary is required for 30-day completeness")
         return False, errors
 
-    metrics = data["deployment_metrics"]
-    if not isinstance(metrics, dict):
-        errors.append("deployment_metrics must be an object")
+    summary = data["summary"]
+    if not isinstance(summary, dict):
+        errors.append("summary must be an object")
         return False, errors
 
-    if "total_deployments_last_30_days" not in metrics:
-        errors.append("deployment_metrics.total_deployments_last_30_days is required")
+    if "total_deployments_last_30_days" not in summary:
+        errors.append("summary.total_deployments_last_30_days is required")
     else:
-        total_deployments = metrics["total_deployments_last_30_days"]
+        total_deployments = summary["total_deployments_last_30_days"]
 
         if not isinstance(total_deployments, int):
-            errors.append("deployment_metrics.total_deployments_last_30_days must be an integer")
+            errors.append("summary.total_deployments_last_30_days must be an integer")
         elif total_deployments < 0:
-            errors.append("deployment_metrics.total_deployments_last_30_days cannot be negative")
+            errors.append("summary.total_deployments_last_30_days cannot be negative")
         elif total_deployments == 0 and len(events) > 0:
             warnings.append(
-                "deployment_metrics.total_deployments_last_30_days is 0, "
-                "but deployment_events_last_30_days contains events. "
+                "summary.total_deployments_last_30_days is 0, "
+                "but replica_history contains events. "
                 "Verify metrics calculation."
             )
-        elif total_deployments != len(events):
+        elif total_deployments != deployments_last_30_days:
             warnings.append(
-                f"deployment_metrics.total_deployments_last_30_days ({total_deployments}) "
-                f"does not match number of events in deployment_events_last_30_days ({len(events)}). "
-                "Verify event counting."
+                f"summary.total_deployments_last_30_days ({total_deployments}) "
+                f"does not match cluster_deployments.whisper-stt.deployments_last_30_days ({deployments_last_30_days}). "
+                "Verify deployment counting."
             )
 
     is_complete = len(errors) == 0
