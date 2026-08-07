@@ -135,22 +135,77 @@ class KubernetesCommandExecutor:
         namespace: str,
         cluster_proxy: Optional[str] = None,
         project_slug: Optional[str] = None,
+        skip_warning: bool = False,
     ) -> dict:
         """
-        Execute kubectl delete pod command.
+        Execute kubectl delete pod command with Deployment/ReplicaSet recreation warning.
 
         Args:
             pod_name: Name of the pod to delete
             namespace: Kubernetes namespace
             cluster_proxy: Optional proxy URL (auto-resolved if not provided)
             project_slug: Project context for proxy resolution
+            skip_warning: If True, proceed with deletion even if pod is managed
 
         Returns:
-            Execution result dict with status, message, and data
+            Execution result dict with status, message, and data.
+            Returns confirmation_required status if pod is managed by Deployment/ReplicaSet.
         """
         # Resolve proxy if not provided
         if not cluster_proxy:
             cluster_proxy = self._resolve_cluster_proxy(project_slug)
+
+        # Check pod ownership before deletion
+        ownership_info = await self.check_pod_ownership(
+            pod_name=pod_name,
+            namespace=namespace,
+            cluster_proxy=cluster_proxy,
+            project_slug=project_slug,
+        )
+
+        # If pod is managed and warning not skipped, return confirmation request
+        if not skip_warning and ownership_info.get("is_managed"):
+            owner_kind = ownership_info.get("owner_kind")
+            owner_name = ownership_info.get("owner_name")
+
+            logger.info(
+                f"Pod {pod_name} is managed by {owner_kind} {owner_name} - "
+                f"returning confirmation request with recreation warning"
+            )
+
+            return {
+                "status": "confirmation_required",
+                "summary": f"Pod '{pod_name}' is managed by a {owner_kind} and will be automatically recreated",
+                "data": {
+                    "action": "kubectl_delete_pod",
+                    "pod_name": pod_name,
+                    "namespace": namespace,
+                    "cluster_proxy": cluster_proxy,
+                    "ownership_info": ownership_info,
+                    "owner_kind": owner_kind,
+                    "owner_name": owner_name,
+                },
+                "warning": ownership_info.get("warning_message"),
+                "urgency": "normal",
+                "confirmation_details": {
+                    "title": f"Pod is managed by {owner_kind}",
+                    "message": (
+                        f"Pod '{pod_name}' is managed by {owner_kind} '{owner_name}'. "
+                        f"This pod will be automatically recreated after deletion. "
+                        f"This is normal Kubernetes behavior - the {owner_kind} will "
+                        f"maintain the desired number of pod replicas."
+                    ),
+                    "owner_kind": owner_kind,
+                    "owner_name": owner_name,
+                    "behavior": "automatic_recreation",
+                    "explanation": (
+                        f"Deployments and ReplicaSets are Kubernetes controllers that ensure "
+                        f"a specified number of pod replicas are running at all times. When you "
+                        f"delete a pod managed by these controllers, they automatically create a "
+                        f"replacement pod to maintain the desired state."
+                    ),
+                },
+            }
 
         logger.info(
             f"Deleting pod: {pod_name} in namespace: {namespace} "
@@ -179,7 +234,8 @@ class KubernetesCommandExecutor:
                 output = stdout.decode().strip()
                 logger.info(f"Pod deleted successfully: {output}")
 
-                return {
+                # Build response with ownership information
+                response = {
                     "status": "completed",
                     "summary": f"Deleted pod '{pod_name}' from namespace '{namespace}'",
                     "data": {
@@ -188,9 +244,17 @@ class KubernetesCommandExecutor:
                         "namespace": namespace,
                         "cluster_proxy": cluster_proxy,
                         "output": output,
+                        "ownership_info": ownership_info,
                     },
                     "urgency": "low",
                 }
+
+                # Add warning message if pod is managed
+                if ownership_info.get("is_managed") and ownership_info.get("warning_message"):
+                    response["warning"] = ownership_info["warning_message"]
+                    response["summary"] += f" - {ownership_info['warning_message']}"
+
+                return response
             else:
                 error_msg = stderr.decode().strip()
                 logger.error(f"Failed to delete pod: {error_msg}")
@@ -203,6 +267,7 @@ class KubernetesCommandExecutor:
                         "pod_name": pod_name,
                         "namespace": namespace,
                         "error": error_msg,
+                        "ownership_info": ownership_info,
                     },
                     "urgency": "normal",
                 }
