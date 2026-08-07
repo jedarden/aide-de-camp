@@ -154,3 +154,219 @@ class TestCompareStructuredFields:
         # All fields should be marked as mismatch
         assert len(result) == 4  # All 4 fields from both dicts
         assert all(value is False for value in result.values())
+
+    def test_two_level_nested_dict_match(self):
+        """Test nested dict comparison at 2 levels of depth."""
+        dispatch = {
+            "metadata": {
+                "project": "adc",
+                "version": "1.0.0"
+            }
+        }
+        test = {
+            "metadata": {
+                "project": "adc",
+                "version": "1.0.0"
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Should return match results for nested fields using dot notation
+        assert "metadata.project" in result
+        assert "metadata.version" in result
+        assert result["metadata.project"] is True
+        assert result["metadata.version"] is True
+
+    def test_two_level_nested_dict_mismatch(self):
+        """Test nested dict comparison with mismatch at 2 levels."""
+        dispatch = {
+            "metadata": {
+                "project": "adc",
+                "version": "1.0.0"
+            }
+        }
+        test = {
+            "metadata": {
+                "project": "different-project",
+                "version": "1.0.0"
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Should detect mismatch in nested field
+        assert "metadata.project" in result
+        assert "metadata.version" in result
+        assert result["metadata.project"] is False
+        assert result["metadata.version"] is True
+
+    def test_three_level_nested_dict_match(self):
+        """Test nested dict comparison at 3 levels of depth."""
+        dispatch = {
+            "metadata": {
+                "config": {
+                    "project": "adc",
+                    "threshold": 0.9
+                }
+            }
+        }
+        test = {
+            "metadata": {
+                "config": {
+                    "project": "adc",
+                    "threshold": 0.9
+                }
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Should traverse 3 levels with dot notation
+        assert "metadata.config.project" in result
+        assert "metadata.config.threshold" in result
+        assert result["metadata.config.project"] is True
+        assert result["metadata.config.threshold"] is True
+
+    def test_three_level_nested_dict_mismatch(self):
+        """Test nested dict comparison with mismatch at 3 levels."""
+        dispatch = {
+            "metadata": {
+                "config": {
+                    "project": "adc",
+                    "threshold": 0.9
+                }
+            }
+        }
+        test = {
+            "metadata": {
+                "config": {
+                    "project": "adc",
+                    "threshold": 0.5  # Different value
+                }
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Should detect mismatch at deepest level
+        assert "metadata.config.project" in result
+        assert "metadata.config.threshold" in result
+        assert result["metadata.config.project"] is True
+        assert result["metadata.config.threshold"] is False
+
+    def test_mixed_flat_and_nested_dict(self):
+        """Test comparison with mixed flat and nested fields."""
+        dispatch = {
+            "project_slug": "adc",  # Flat field
+            "confidence": 0.9,     # Flat field
+            "metadata": {          # Nested field
+                "version": "1.0.0",
+                "env": "production"
+            }
+        }
+        test = {
+            "project_slug": "adc",
+            "confidence": 0.9,
+            "metadata": {
+                "version": "1.0.0",
+                "env": "production"
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Should have both flat and nested field results
+        assert "project_slug" in result
+        assert "confidence" in result
+        assert "metadata.version" in result
+        assert "metadata.env" in result
+        assert result["project_slug"] is True
+        assert result["confidence"] is True
+        assert result["metadata.version"] is True
+        assert result["metadata.env"] is True
+
+    def test_mixed_flat_and_nested_with_partial_mismatch(self):
+        """Test comparison with mixed flat/nested and some mismatches."""
+        dispatch = {
+            "project_slug": "adc",
+            "confidence": 0.9,
+            "metadata": {
+                "version": "1.0.0",
+                "env": "production"
+            }
+        }
+        test = {
+            "project_slug": "different-project",  # Mismatch
+            "confidence": 0.9,
+            "metadata": {
+                "version": "2.0.0",  # Mismatch
+                "env": "production"
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Should detect mismatches at both flat and nested levels
+        assert "project_slug" in result
+        assert "confidence" in result
+        assert "metadata.version" in result
+        assert "metadata.env" in result
+        assert result["project_slug"] is False
+        assert result["confidence"] is True
+        assert result["metadata.version"] is False
+        assert result["metadata.env"] is True
+
+    def test_nested_dict_with_missing_child_field(self):
+        """Test nested dict comparison when child field is missing in one dict."""
+        dispatch = {
+            "metadata": {
+                "project": "adc",
+                "version": "1.0.0"
+            }
+        }
+        test = {
+            "metadata": {
+                "project": "adc"
+                # version is missing
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Should detect missing nested field
+        assert "metadata.project" in result
+        assert "metadata.version" in result
+        assert result["metadata.project"] is True
+        assert result["metadata.version"] is False
+
+    def test_deeply_nested_four_levels(self):
+        """Test nested dict comparison at 4 levels to verify recursion depth."""
+        dispatch = {
+            "level1": {
+                "level2": {
+                    "level3": {
+                        "level4": "deep_value",
+                        "sibling": "other_value"
+                    }
+                }
+            }
+        }
+        test = {
+            "level1": {
+                "level2": {
+                    "level3": {
+                        "level4": "deep_value",
+                        "sibling": "other_value"
+                    }
+                }
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Should traverse all 4 levels
+        assert "level1.level2.level3.level4" in result
+        assert "level1.level2.level3.sibling" in result
+        assert result["level1.level2.level3.level4"] is True
+        assert result["level1.level2.level3.sibling"] is True
