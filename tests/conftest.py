@@ -3,6 +3,7 @@ Pytest fixtures for unit testing FastAPI endpoints.
 """
 
 import asyncio
+from pathlib import Path
 from typing import AsyncGenerator
 from uuid import uuid4
 
@@ -14,6 +15,60 @@ from src.sse.broadcaster import (
     SSEBroadcaster,
     SSEConnection,
 )
+
+# Import registry test helpers
+from tests.helpers.registry_test_helpers import (
+    backup_registry,
+    cleanup_backup,
+    restore_registry,
+    RegistryModificationContext,
+)
+
+
+# -----------------------------------------------------------------------------
+# Registry hot-reload fixtures
+# -----------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function")
+def registry_backup_path() -> Path:
+    """
+    Create a backup of config/registry.yaml before a test.
+
+    This fixture automatically backs up the registry before each test
+    and restores it after the test completes, even if the test fails.
+
+    Usage in tests:
+        def test_something(registry_backup_path):
+            # Modify registry.yaml
+            # Registry is automatically restored after test
+            pass
+    """
+    backup_path = backup_registry()
+    yield backup_path
+    # Teardown: restore and cleanup
+    try:
+        restore_registry(backup_path)
+    finally:
+        cleanup_backup(backup_path)
+
+
+@pytest.fixture(scope="function")
+def registry_context():
+    """
+    Provide a RegistryModificationContext for safe registry modification.
+
+    This fixture gives tests a context manager for safe registry modifications
+    with automatic restoration.
+
+    Usage in tests:
+        def test_something(registry_context):
+            with registry_context as ctx:
+                ctx.add_alias("pbx-web", "test-alias")
+                # Registry is automatically restored on exit
+    """
+    with RegistryModificationContext(auto_cleanup=False) as ctx:
+        yield ctx
 
 
 @pytest.fixture(scope="function")
