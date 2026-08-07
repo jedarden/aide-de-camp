@@ -1,99 +1,183 @@
 {
-  "generated_at": "2026-08-06T19:06:41.095495",
-  "analysis_period": {
-    "start": "2026-07-08T03:09:35+00:00",
-    "end": "2026-07-28T17:26:12+00:00",
-    "days": 20
+  "metadata": {
+    "analysis_date": "2026-08-07T00:39:57.331429Z",
+    "data_window_days": 31,
+    "total_failures_analyzed": 1,
+    "total_deployments_analyzed": 9,
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "analysis_period": {
+      "start_date": "2026-07-07",
+      "end_date": "2026-08-06"
+    }
   },
-  "patterns": {
+  "summary": {
+    "total_patterns_identified": 6,
+    "patterns_with_occurrences": 1,
+    "total_failures": 1,
+    "services_with_failures": 1,
+    "pattern_rankings": [
+      [
+        "Other",
+        1
+      ],
+      [
+        "ImagePullBackOff",
+        0
+      ],
+      [
+        "CrashLoopBackOff",
+        0
+      ],
+      [
+        "OOMKilled",
+        0
+      ],
+      [
+        "Probe_failure",
+        0
+      ],
+      [
+        "Dependency_timeout",
+        0
+      ]
+    ],
+    "high_severity_patterns": [],
+    "critical_severity_patterns": [],
+    "peak_failure_day": "2026-07-13",
+    "total_days_with_failures": 1,
+    "total_correlations": 1
+  },
+  "pattern_statistics": {
     "ImagePullBackOff": {
+      "pattern_type": "ImagePullBackOff",
       "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
       "severity": "high",
       "occurrence_count": 0,
-      "frequency_per_day": 0,
-      "services_affected": [],
-      "images_affected": [],
+      "frequency_per_day": 0.0,
+      "affected_services": {},
+      "image_versions": {},
       "time_distribution": {
         "first_occurrence": null,
         "last_occurrence": null,
         "dates_with_occurrences": [],
-        "consecutive_days": 0
+        "peak_failure_day": null,
+        "total_days_with_failures": 0
       },
-      "temporal_clusters": []
+      "deployment_correlations": []
     },
     "CrashLoopBackOff": {
+      "pattern_type": "CrashLoopBackOff",
       "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
       "severity": "critical",
       "occurrence_count": 0,
-      "frequency_per_day": 0,
-      "services_affected": [],
-      "images_affected": [],
+      "frequency_per_day": 0.0,
+      "affected_services": {},
+      "image_versions": {},
       "time_distribution": {
         "first_occurrence": null,
         "last_occurrence": null,
         "dates_with_occurrences": [],
-        "consecutive_days": 0
+        "peak_failure_day": null,
+        "total_days_with_failures": 0
       },
-      "temporal_clusters": []
+      "deployment_correlations": []
     },
     "OOMKilled": {
+      "pattern_type": "OOMKilled",
       "description": "Container killed due to memory exhaustion (resource limits exceeded)",
       "severity": "high",
       "occurrence_count": 0,
-      "frequency_per_day": 0,
-      "services_affected": [],
-      "images_affected": [],
+      "frequency_per_day": 0.0,
+      "affected_services": {},
+      "image_versions": {},
       "time_distribution": {
         "first_occurrence": null,
         "last_occurrence": null,
         "dates_with_occurrences": [],
-        "consecutive_days": 0
+        "peak_failure_day": null,
+        "total_days_with_failures": 0
       },
-      "temporal_clusters": []
+      "deployment_correlations": []
     },
     "Probe_failure": {
+      "pattern_type": "Probe_failure",
       "description": "Readiness or liveness probe failures (health check issues)",
       "severity": "medium",
       "occurrence_count": 0,
-      "frequency_per_day": 0,
-      "services_affected": [],
-      "images_affected": [],
+      "frequency_per_day": 0.0,
+      "affected_services": {},
+      "image_versions": {},
       "time_distribution": {
         "first_occurrence": null,
         "last_occurrence": null,
         "dates_with_occurrences": [],
-        "consecutive_days": 0
+        "peak_failure_day": null,
+        "total_days_with_failures": 0
       },
-      "temporal_clusters": []
+      "deployment_correlations": []
     },
     "Dependency_timeout": {
+      "pattern_type": "Dependency_timeout",
       "description": "Deployment timeout due to dependency unavailability",
       "severity": "medium",
       "occurrence_count": 0,
-      "frequency_per_day": 0,
-      "services_affected": [],
-      "images_affected": [],
+      "frequency_per_day": 0.0,
+      "affected_services": {},
+      "image_versions": {},
       "time_distribution": {
         "first_occurrence": null,
         "last_occurrence": null,
         "dates_with_occurrences": [],
-        "consecutive_days": 0
+        "peak_failure_day": null,
+        "total_days_with_failures": 0
       },
-      "temporal_clusters": []
+      "deployment_correlations": []
     },
     "Other": {
+      "pattern_type": "Other",
       "description": "Other failure patterns not matching standard categories",
       "severity": "unknown",
       "occurrence_count": 1,
-      "frequency_per_day": 0.05,
-      "services_affected": {
+      "frequency_per_day": 0.0323,
+      "affected_services": {
         "pbx-web": 1
       },
-      "images_affected": {
+      "image_versions": {
         "ronaldraygun/pbx-web:1.0.8": 1
       },
       "time_distribution": {
-        "first_occurrence": "2026-07-13T18:07:55+00:00",
-        "last_occurrence": "2026-07-13T18:07:55+00:00",
+        "first_occurrence": "2026-07-13",
+        "last_occurrence": "2026-07-13",
         "dates_with_occurrences": [
-          
+          {
+            "date": "2026-07-13",
+            "count": 1,
+            "rate_percentage": 100.0
+          }
+        ],
+        "peak_failure_day": "2026-07-13",
+        "total_days_with_failures": 1
+      },
+      "deployment_correlations": [
+        {
+          "failure_date": "2026-07-13",
+          "failure_timestamp": "2026-07-13T18:07:55Z",
+          "related_deployments": [
+            {
+              "deployment_id": "pbx-web-revision-11-rollback",
+              "timestamp": "2026-07-13T18:07:55Z",
+              "event_type": "deployment_rollback",
+              "image": "ronaldraygun/pbx-web:1.0.8",
+              "service": "pbx-web",
+              "hours_before_failure": 0.0
+            }
+          ],
+          "deployment_count": 1
+        }
+      ]
+    }
+  }
+}
