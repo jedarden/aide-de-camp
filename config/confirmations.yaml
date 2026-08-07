@@ -1,0 +1,20 @@
+# Confirmation dialog templates for aide-de-camp
+# These templates are used for user confirmation before executing destructive actions
+
+pod_deletion:
+  template: "Do you want to proceed with deleting pod {pod_name}? (yes/no)"
+  warning: "This will permanently delete the pod. The pod will be terminated and cannot be recovered unless recreated by its controller."
+  required_response: "yes|no"
+
+  # Context variables that will be interpolated
+  context_vars:
+    - pod_name
+    - namespace
+    - cluster
+
+  # Consequences to mention in the confirmation
+  consequences:
+    - "Pod will be terminated immediately"
+    - "Running processes will be stopped"
+    - "Pod logs will be deleted (unless archived)"
+    - "Pod will be recreated if managed by a Deployment/ReplicaSet/DaemonSet"
