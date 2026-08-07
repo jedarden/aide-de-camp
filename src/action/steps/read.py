@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -228,8 +229,8 @@ class ImageTagStep:
             # This is simplified; real implementation would parse workflow YAML
             tag = workflow_name.split("-")[-1] if workflow_name else "unknown"
 
-        # Validate we don't return :latest
-        if tag == ":latest" or tag == "latest":
+        # Validate we don't return :latest or latest
+        if tag in (":latest", "latest", "build-latest"):
             return StepResult(
                 success=False,
                 data={"tag": tag},

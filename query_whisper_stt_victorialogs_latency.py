@@ -20,21 +20,81 @@ from typing import Dict, Any, List, Tuple
 from collections import defaultdict
 import subprocess
 import urllib.parse
+import re
+import yaml
 
 
 class WhisperSTTVictoriaLogsQuery:
     """Query and analyze whisper-stt latency metrics from VictoriaLogs."""
 
-    def __init__(self, start_date: str, end_date: str):
+    def __init__(self, start_date: str, end_date: str, step: str = "6h"):
+        """
+        Initialize the query engine with time step granularity.
+
+        Args:
+            start_date: ISO format start timestamp (e.g., "2026-07-07T00:00:00Z")
+            end_date: ISO format end timestamp (e.g., "2026-08-06T23:59:59Z")
+            step: Time step size in VictoriaLogs format (e.g., "6h", "1h", "1d")
+                  Format: <number><unit> where unit is s, m, h, or d
+                  Default: "6h" (optimal for 30-day aggregation from config)
+
+        The step size determines the granularity of time-bucketed aggregation.
+        Recommended: "6h" for balanced performance and detail in 30-day windows.
+        """
         self.start_date = start_date
         self.end_date = end_date
+        self.step = step  # VictoriaLogs step format (e.g., "6h", "1h", "1d")
+        self.step_hours = self._parse_step_to_hours(step)  # Convert to hours for internal calculations
         self.latency_data = []
         self.query_log = []
         self.error_count = 0
+        self.time_buckets = []  # For time-bucketed aggregation
 
         # VictoriaLogs configuration
         self.vlogs_url = "http://victorialogs.ardenone-manager:24169"
         self.query_endpoint = f"{self.vlogs_url}/select/logsql/query"
+
+    def _parse_step_to_hours(self, step: str) -> int:
+        """
+        Parse VictoriaLogs step format to hours.
+
+        Args:
+            step: Step string in format "<number><unit>" (e.g., "6h", "30m", "1d")
+
+        Returns:
+            Equivalent number of hours (rounded down for partial hours)
+
+        Examples:
+            "6h" -> 6
+            "1h" -> 1
+            "30m" -> 0 (rounded down)
+            "1d" -> 24
+            "15s" -> 0 (rounded down)
+        """
+        if not step:
+            return 1  # Default fallback
+
+        # Parse the step format: number followed by unit
+        match = re.match(r'^(\d+)([smhd])$', step.lower())
+        if not match:
+            print(f"Warning: Invalid step format '{step}', defaulting to 1 hour")
+            return 1
+
+        value = int(match.group(1))
+        unit = match.group(2)
+
+        # Convert to hours
+        conversion_factors = {
+            's': 1 / 3600,  # seconds to hours
+            'm': 1 / 60,    # minutes to hours
+            'h': 1,         # hours to hours
+            'd': 24         # days to hours
+        }
+
+        hours = value * conversion_factors.get(unit, 1)
+
+        # Return as integer (round down for partial hours)
+        return int(hours)
 
     def log_query(self, query: str, timestamp: str, result_count: int,
                   execution_time_ms: float, status: str = "success"):
@@ -86,6 +146,110 @@ class WhisperSTTVictoriaLogsQuery:
         """
 
         return query.strip()
+
+    def _initialize_time_buckets(self) -> List[Dict[str, Any]]:
+        """
+        Initialize time buckets for step-based aggregation.
+
+        Creates buckets covering the full date range with configured step size.
+        Each bucket represents a time window for calculating percentiles.
+
+        Returns:
+            List of time bucket dictionaries with metadata
+        """
+        from datetime import datetime, timedelta
+
+        start_dt = datetime.fromisoformat(self.start_date.replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(self.end_date.replace('Z', '+00:00'))
+
+        buckets = []
+        current = start_dt
+        bucket_index = 0
+
+        while current <= end_dt:
+            bucket_end = current + timedelta(hours=self.step_hours)
+
+            buckets.append({
+                "bucket_index": bucket_index,
+                "window_start": current.isoformat(),
+                "window_end": min(bucket_end, end_dt).isoformat(),
+                "latencies": [],
+                "record_count": 0
+            })
+
+            current = bucket_end
+            bucket_index += 1
+
+        return buckets
+
+    def _add_to_time_bucket(self, timestamp: datetime, latency: float) -> bool:
+        """
+        Add latency value to appropriate time bucket.
+
+        Args:
+            timestamp: Datetime timestamp of the log entry
+            latency: Latency value in seconds
+
+        Returns:
+            True if added to a bucket, False otherwise
+        """
+        if not self.time_buckets:
+            return False
+
+        for bucket in self.time_buckets:
+            bucket_start = datetime.fromisoformat(bucket["window_start"])
+            bucket_end = datetime.fromisoformat(bucket["window_end"])
+
+            if bucket_start <= timestamp < bucket_end:
+                bucket["latencies"].append(latency)
+                bucket["record_count"] += 1
+                return True
+
+        return False
+
+    def _calculate_bucket_percentiles(self, bucket: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate percentile metrics for a single time bucket.
+
+        Args:
+            bucket: Bucket dictionary with latencies list
+
+        Returns:
+            Dictionary with p50, p95, p99, mean, min, max metrics
+        """
+        latencies = bucket["latencies"]
+
+        if not latencies:
+            return {
+                "record_count": 0,
+                "p50_seconds": None,
+                "p95_seconds": None,
+                "p99_seconds": None,
+                "mean_seconds": None,
+                "median_seconds": None,
+                "min_seconds": None,
+                "max_seconds": None
+            }
+
+        sorted_latencies = sorted(latencies)
+
+        try:
+            quantiles = statistics.quantiles(sorted_latencies, n=100, method='inclusive')
+            return {
+                "record_count": len(latencies),
+                "p50_seconds": round(quantiles[49], 3),
+                "p95_seconds": round(quantiles[94], 3),
+                "p99_seconds": round(quantiles[98], 3),
+                "mean_seconds": round(statistics.mean(sorted_latencies), 3),
+                "median_seconds": round(statistics.median(sorted_latencies), 3),
+                "min_seconds": round(min(sorted_latencies), 3),
+                "max_seconds": round(max(sorted_latencies), 3)
+            }
+        except Exception as e:
+            return {
+                "error": str(e),
+                "record_count": len(latencies)
+            }
 
     def execute_query_via_curl(self, query: str) -> Tuple[List[Dict], float]:
         """
@@ -227,8 +391,10 @@ class WhisperSTTVictoriaLogsQuery:
         Process local VictoriaLogs JSON file and extract latency metrics.
 
         This is used when direct query to VictoriaLogs is not available.
+        Uses time-bucketed aggregation with configured step size (optimal: 1-hour).
         """
         print(f"\nProcessing local VictoriaLogs file: {file_path}")
+        print(f"Using time-bucketed aggregation with step size: {self.step_hours}h")
 
         if not file_path.exists():
             return {
@@ -238,6 +404,11 @@ class WhisperSTTVictoriaLogsQuery:
                 "raw_data": [],
                 "query_log": []
             }
+
+        # Initialize time buckets with configured step size
+        self.time_buckets = self._initialize_time_buckets()
+        total_buckets = len(self.time_buckets)
+        print(f"  Initialized {total_buckets} time buckets for step-based aggregation")
 
         total_entries = 0
         entries_with_latency = 0
@@ -273,8 +444,12 @@ class WhisperSTTVictoriaLogsQuery:
                         # Try to parse latency
                         latency = self.parse_whisper_stt_latency(log_entry)
                         if latency is not None and latency > 0:
+                            # Add to appropriate time bucket instead of flat list
+                            if self._add_to_time_bucket(timestamp, latency):
+                                entries_with_latency += 1
+
+                            # Also add to flat list for backward compatibility
                             self.latency_data.append(latency)
-                            entries_with_latency += 1
 
                             # Track temporal coverage
                             date_key = timestamp.date().isoformat()
@@ -346,6 +521,27 @@ class WhisperSTTVictoriaLogsQuery:
         }
 
 
+def load_step_config() -> str:
+    """
+    Load step configuration from config file.
+
+    Returns the configured step size (e.g., "6h") or defaults to "6h".
+    """
+    config_path = Path("/home/coding/aide-de-camp/config/time_step_granularity.yaml")
+
+    if config_path.exists():
+        try:
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+                step = config.get('default', {}).get('step', '6h')
+                print(f"✓ Loaded step configuration from {config_path}: {step}")
+                return step
+        except Exception as e:
+            print(f"Warning: Could not load config file {config_path}: {e}")
+
+    return "6h"  # Default optimal value
+
+
 def main():
     """Query whisper-stt latency metrics from VictoriaLogs for 30-day window."""
     print("=" * 70)
@@ -359,8 +555,12 @@ def main():
     print(f"\nTime Range: {start_date} to {end_date} (30 days)")
     print(f"Service: whisper-stt")
 
-    # Initialize query engine
-    query_engine = WhisperSTTVictoriaLogsQuery(start_date, end_date)
+    # Load step configuration
+    step = load_step_config()
+
+    # Initialize query engine with configured step
+    query_engine = WhisperSTTVictoriaLogsQuery(start_date, end_date, step=step)
+    print(f"Time step granularity: {step} ({query_engine.step_hours} hours per bucket)")
 
     # Check for local VictoriaLogs files
     possible_files = [

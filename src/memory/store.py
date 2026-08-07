@@ -3,23 +3,87 @@ Memory store for ADC - simplified user memory extraction and persistence.
 
 Extracts salient facts from conversation turns and persists them to disk.
 Based on DUCK-E's memory module but simplified for ADC's context.
+
+Enhanced with retry logic for transient failures in file operations.
 """
 import hashlib
 import httpx
 import json
 import os
+import random
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from functools import wraps
 from logging import Logger
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional, Tuple
 
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL", "https://openai-proxy.ardenone.com:8444")
 
 
 DEFAULT_MEMORY_DIR = "/home/coding/aide-de-camp/data/memory"
 MAX_FACTS = 100
+
+
+def retry_with_backoff(
+    max_retries: int = 3,
+    initial_delay: float = 0.1,
+    backoff_factor: float = 2.0,
+    exceptions: Tuple = (OSError, json.JSONDecodeError),
+) -> Callable:
+    """
+    Retry decorator with exponential backoff for transient failures.
+
+    Handles transient failures from concurrent file access, temporary
+    filesystem issues, or resource contention with exponential backoff.
+
+    Args:
+        max_retries: Maximum number of retry attempts (default: 3)
+        initial_delay: Initial delay in seconds (default: 0.1 = 100ms)
+        backoff_factor: Multiplier for delay after each retry (default: 2.0)
+        exceptions: Tuple of exceptions to catch and retry
+
+    Returns:
+        Decorated function that retries on failure with exponential backoff
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            delay = initial_delay
+            last_exception = None
+
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    last_exception = e
+                    if attempt < max_retries:
+                        # Log retry attempt with attempt number and error type
+                        print(
+                            f"INFO: Retry attempt {attempt + 1}/{max_retries} for {func.__name__}: "
+                            f"{type(e).__name__}: {e}"
+                        )
+                        # Add jitter to prevent thundering herd problem
+                        jittered_delay = delay * (0.5 + random.random() * 0.5)
+                        time.sleep(jittered_delay)
+                        delay *= backoff_factor
+                    else:
+                        # All retries exhausted - log final failure
+                        print(
+                            f"ERROR: All {max_retries} retry attempts exhausted for {func.__name__}: "
+                            f"{type(e).__name__}: {e}"
+                        )
+                        raise
+
+            # Should never reach here, but just in case
+            if last_exception:
+                raise last_exception
+            raise RuntimeError("Retry logic exhausted without exception")
+
+        return wrapper
+    return decorator
 
 
 class FactCategory(str, Enum):
@@ -82,16 +146,21 @@ class MemoryStore:
         self._data: dict = {}
         self._facts: list[Fact] = []
 
+    @retry_with_backoff(max_retries=3, initial_delay=0.1, backoff_factor=2.0, exceptions=(OSError, json.JSONDecodeError))
+    def _load_with_retry(self) -> None:
+        """Internal method to load memory from disk with retry logic."""
+        if self.file_path.exists():
+            with open(self.file_path, "r") as f:
+                self._data = json.load(f)
+        else:
+            self._data = {"facts": [], "session_id": self.session_id}
+
     def load(self) -> None:
         """Load memory from disk. No-op if file doesn't exist."""
         try:
-            if self.file_path.exists():
-                with open(self.file_path, "r") as f:
-                    self._data = json.load(f)
-            else:
-                self._data = {"facts": [], "session_id": self.session_id}
+            self._load_with_retry()
         except (json.JSONDecodeError, OSError) as e:
-            self.logger.debug(f"Failed to load memory: {e}")
+            self.logger.debug(f"Failed to load memory after retries: {e}")
             self._data = {"facts": [], "session_id": self.session_id}
 
         # Ensure session_id is present (handle missing/null/empty cases)
@@ -114,16 +183,14 @@ class MemoryStore:
 
         self.logger.debug(f"Loaded {len(self._facts)} facts from memory")
 
+    @retry_with_backoff(max_retries=3, initial_delay=0.1, backoff_factor=2.0, exceptions=(OSError,))
     def save(self) -> None:
         """Persist memory to disk."""
-        try:
-            self.memory_dir.mkdir(parents=True, exist_ok=True)
-            self._data["facts"] = [f.to_dict() for f in self._facts]
-            self._data["updated_at"] = datetime.now(timezone.utc).isoformat()
-            with open(self.file_path, "w") as f:
-                json.dump(self._data, f, indent=2)
-        except OSError as e:
-            self.logger.warning(f"Failed to save memory: {e}")
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        self._data["facts"] = [f.to_dict() for f in self._facts]
+        self._data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        with open(self.file_path, "w") as f:
+            json.dump(self._data, f, indent=2)
 
     def _normalize_text(self, text: str) -> str:
         """Normalize text for comparison."""
@@ -176,7 +243,13 @@ class MemoryStore:
             last_referenced=now,
         )
         self._facts.append(fact)
-        self.save()
+
+        # Save with error handling to maintain fire-and-forget behavior
+        try:
+            self.save()
+        except (OSError, json.JSONDecodeError) as e:
+            self.logger.warning(f"Failed to save memory after retries: {e}")
+
         self.logger.info(f"Added fact: [{category.value}] {text[:50]}...")
         return True
 
@@ -261,8 +334,22 @@ class MemoryStore:
                 data = resp.json()
 
                 content = data["choices"][0]["message"]["content"].strip()
-                facts = json.loads(content)
-                if isinstance(facts, list):
+
+                # Parse JSON with retry logic for transient decode errors
+                facts = None
+                for attempt in range(3):
+                    try:
+                        facts = json.loads(content)
+                        break
+                    except json.JSONDecodeError as e:
+                        if attempt < 2:
+                            self.logger.debug(f"JSON decode attempt {attempt + 1} failed: {e}")
+                            time.sleep(0.1 * (2 ** attempt))  # 100ms, 200ms, 400ms
+                        else:
+                            self.logger.debug(f"JSON decode failed after 3 attempts: {e}")
+                            return  # Exit gracefully on persistent decode errors
+
+                if facts and isinstance(facts, list):
                     for fact in facts:
                         if isinstance(fact, dict) and "text" in fact:
                             text = fact["text"].strip()

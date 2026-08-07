@@ -32,6 +32,7 @@ from .realtime.dispatch import dispatch_intent, result_listener
 from .realtime.continuity import handle_surface_switch
 from ._version import read_version
 from .session.store import get_store as session_store_get_store
+from .api.models import DispatchRequest
 from .memory.extraction import create_memory_handler
 from .sse.broadcaster import SSEBroadcaster, get_broadcaster, EventType, SSEEvent
 from .topic.model import TopicManager
@@ -1016,8 +1017,8 @@ async def dispatch_intent(request: DispatchRequest):
 
     Request validation:
     - utterance: required, non-empty string (after stripping whitespace)
-    - session_id: optional string, non-empty if provided
-    - surface_id: optional string, non-empty if provided
+    - session_id: required, non-empty string
+    - surface_id: required, non-empty string
     - utterance_id: optional string, auto-generated if not provided
 
     Returns 400 for validation errors with detailed error messages.
@@ -1479,36 +1480,6 @@ class SurfaceRegisterRequest(BaseModel):
 class HeartbeatRequest(BaseModel):
     session_id: str
     surface_id: str
-
-
-class DispatchRequest(BaseModel):
-    """Request model for POST /dispatch endpoint."""
-    utterance: str = Field(..., description="The utterance text to dispatch")
-    session_id: Optional[str] = Field(None, description="Session ID for the dispatch")
-    surface_id: Optional[str] = Field(None, description="Surface ID for SSE targeting")
-    utterance_id: Optional[str] = Field(None, description="Optional utterance ID (generated if not provided)")
-
-    @field_validator('utterance')
-    @classmethod
-    def utterance_must_be_non_empty(cls, v: str) -> str:
-        """Validate that utterance is a non-empty string."""
-        if not isinstance(v, str):
-            raise ValueError('utterance must be a string')
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError('utterance must be a non-empty string')
-        return stripped
-
-    @field_validator('session_id', 'surface_id', 'utterance_id')
-    @classmethod
-    def validate_optional_strings(cls, v: Optional[str]) -> Optional[str]:
-        """Validate optional string fields."""
-        if v is not None:
-            if not isinstance(v, str):
-                raise ValueError('must be a string')
-            if v.strip() == "":
-                raise ValueError('must be a non-empty string if provided')
-        return v
 
 
 class FeedbackRequestModel(BaseModel):
@@ -2829,6 +2800,229 @@ async def api_v1_stt_status():
 
     stt = get_stt_fallback()
     return stt.get_status()
+
+
+# =============================================================================
+# Confirmation prompt endpoints
+# =============================================================================
+
+class CreateConfirmationRequest(BaseModel):
+    """Request to create a confirmation prompt."""
+    intent_id: str
+    session_id: str
+    pod_name: str
+    namespace: Optional[str] = None
+    cluster: Optional[str] = None
+
+
+class ConfirmationResponseRequest(BaseModel):
+    """Request to submit a confirmation response."""
+    response: str
+
+
+@app.post("/api/v1/confirmations")
+async def api_v1_create_confirmation(request: CreateConfirmationRequest):
+    """
+    Create a confirmation prompt for pod deletion.
+
+    Creates a new confirmation prompt using the templates from adc-46ksu.
+    Returns the confirmation_id and formatted question for display.
+
+    Returns:
+        {
+            "confirmation_id": "...",
+            "question": "...",
+            "message": "...",
+            "context": {...},
+            "status": "pending"
+        }
+    """
+    from .confirmations.prompts import get_confirmation_manager
+
+    manager = get_confirmation_manager()
+
+    try:
+        confirmation = await manager.create_pod_deletion_confirmation(
+            intent_id=request.intent_id,
+            session_id=request.session_id,
+            pod_name=request.pod_name,
+            namespace=request.namespace,
+            cluster=request.cluster,
+        )
+
+        logger.info(f"Created confirmation {confirmation['confirmation_id']} for intent {request.intent_id}")
+
+        return confirmation
+
+    except Exception as e:
+        logger.error(f"Failed to create confirmation: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to create confirmation: {str(e)}"}
+        )
+
+
+@app.get("/api/v1/confirmations/{confirmation_id}")
+async def api_v1_get_confirmation(confirmation_id: str):
+    """
+    Get a confirmation prompt by ID.
+
+    Returns the confirmation prompt details including the formatted question
+    and current status. Use this to display the prompt to the user.
+
+    Returns:
+        {
+            "confirmation_id": "...",
+            "question": "...",
+            "message": "...",
+            "context": {...},
+            "status": "pending|responded|expired",
+            "response": null or "...",
+            "responded_at": null or "..."
+        }
+    """
+    from .confirmations.prompts import get_confirmation_manager
+
+    manager = get_confirmation_manager()
+
+    try:
+        confirmation = await manager.get_confirmation_for_validation(confirmation_id)
+
+        # Get the formatted message for display
+        message = await manager.display_confirmation_prompt(confirmation_id)
+
+        return {
+            "confirmation_id": confirmation["confirmation_id"],
+            "question": confirmation["question"],
+            "message": message,
+            "context": confirmation["context"],
+            "status": confirmation["status"],
+            "response": confirmation.get("response"),
+            "responded_at": confirmation.get("responded_at"),
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get confirmation {confirmation_id}: {e}")
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"Confirmation not found: {str(e)}"}
+        )
+
+
+@app.post("/api/v1/confirmations/{confirmation_id}/respond")
+async def api_v1_submit_confirmation_response(
+    confirmation_id: str,
+    request: ConfirmationResponseRequest
+):
+    """
+    Submit a user response to a confirmation prompt.
+
+    This endpoint captures the raw user response without validation.
+    Validation is performed in the next step.
+
+    Body: {"response": "yes"} or {"response": "no"} or {"response": "pod-name"}
+
+    Returns:
+        {
+            "success": true,
+            "confirmation_id": "...",
+            "response": "...",
+            "responded_at": "..."
+        }
+    """
+    from .confirmations.prompts import get_confirmation_manager
+
+    manager = get_confirmation_manager()
+
+    try:
+        result = await manager.capture_confirmation_response(
+            confirmation_id=confirmation_id,
+            response=request.response,
+        )
+
+        logger.info(f"Captured response '{request.response}' for confirmation {confirmation_id}")
+
+        # Broadcast response event via SSE so connected canvases update
+        if _broadcaster:
+            # Get session_id from the confirmation
+            confirmation_data = await manager.get_confirmation_for_validation(confirmation_id)
+            session_id = confirmation_data.get("session_id")
+
+            await _broadcaster.broadcast(
+                SSEEvent(
+                    event_type=EventType.CONFIRMATION_RESPONDED,
+                    data={
+                        "confirmation_id": confirmation_id,
+                        "response": request.response,
+                        "responded_at": result["responded_at"],
+                    },
+                    target_session_id=session_id,
+                )
+            )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to capture response for confirmation {confirmation_id}: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Failed to capture response: {str(e)}"}
+        )
+
+
+@app.get("/api/v1/confirmations/{confirmation_id}/wait")
+async def api_v1_wait_for_confirmation_response(confirmation_id: str):
+    """
+    Wait for a user to respond to a confirmation prompt.
+
+    This endpoint blocks until a response is received or a timeout occurs.
+    Use this for synchronous workflows that need to wait for user input.
+
+    Query params:
+        timeout: Maximum time to wait in seconds (default: 300)
+
+    Returns:
+        {
+            "confirmation_id": "...",
+            "response": "...",
+            "responded_at": "...",
+            "status": "responded"
+        }
+    """
+    import asyncio
+    from .confirmations.prompts import get_confirmation_manager
+
+    timeout = int(Query(..., default=300))
+
+    manager = get_confirmation_manager()
+
+    async def wait_for_response():
+        """Poll until response is received."""
+        while True:
+            confirmation = await manager.get_confirmation_for_validation(confirmation_id)
+            if confirmation["status"] == "responded":
+                return {
+                    "confirmation_id": confirmation_id,
+                    "response": confirmation.get("response"),
+                    "responded_at": confirmation.get("responded_at"),
+                    "status": "responded",
+                }
+            await asyncio.sleep(1)  # Poll every second
+
+    try:
+        result = await asyncio.wait_for(wait_for_response(), timeout=timeout)
+        return result
+    except asyncio.TimeoutError:
+        return JSONResponse(
+            status_code=408,
+            content={"error": "Timeout waiting for confirmation response"}
+        )
+    except Exception as e:
+        logger.error(f"Error waiting for confirmation {confirmation_id}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Error waiting for response: {str(e)}"}
+        )
 
 
 @app.on_event("startup")

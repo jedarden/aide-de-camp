@@ -5,6 +5,7 @@ Stores sessions, surfaces, utterances, intents, results, topics, and intent_topi
 Provides concurrent read access with serialized writes via WAL mode.
 """
 
+import asyncio
 import logging
 import os
 
@@ -248,6 +249,28 @@ CREATE INDEX IF NOT EXISTS idx_pending_approvals_intent ON pending_bead_approval
 CREATE INDEX IF NOT EXISTS idx_pending_approvals_status ON pending_bead_approvals(status);
 CREATE INDEX IF NOT EXISTS idx_pending_approvals_expires ON pending_bead_approvals(expires_at);
 
+-- Confirmation prompts: quick user confirmations for actions
+-- Stores confirmation dialog requests (e.g., pod deletion confirmation)
+-- with user responses and simple validation status.
+CREATE TABLE IF NOT EXISTS confirmation_prompts (
+    id              TEXT PRIMARY KEY,  -- UUID for this confirmation request
+    intent_id       TEXT NOT NULL,  -- Reference to the intent that created this confirmation
+    session_id      TEXT NOT NULL,  -- Session for this confirmation
+    prompt_type     TEXT NOT NULL,  -- Type of confirmation (e.g., 'pod_deletion')
+    question        TEXT NOT NULL,  -- The confirmation question displayed to user
+    context         TEXT,  -- JSON: Additional context (pod_name, namespace, etc.)
+    response        TEXT,  -- User's raw response (yes/no/pod name)
+    created_at      INTEGER NOT NULL,  -- When the confirmation was requested
+    responded_at    INTEGER,  -- When the user responded
+    status          TEXT NOT NULL CHECK(status IN ('pending', 'responded', 'expired')) DEFAULT 'pending',
+    FOREIGN KEY (intent_id) REFERENCES intents(id) ON DELETE CASCADE,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_confirmation_prompts_session ON confirmation_prompts(session_id);
+CREATE INDEX IF NOT EXISTS idx_confirmation_prompts_intent ON confirmation_prompts(intent_id);
+CREATE INDEX IF NOT EXISTS idx_confirmation_prompts_status ON confirmation_prompts(status);
+
 -- Card cache: pre-rendered HTML for result components
 -- Stores server-side rendered HTML for result/component/layout combinations.
 -- Primary key (result_id, component_id, layout_bucket) allows multiple cached
@@ -300,10 +323,13 @@ CIRCUIT_BREAKER_AGE_THRESHOLD_HOURS = 24.0  # Fence after N hours without progre
 
 
 class SessionStore:
-    """Session store with WAL mode for concurrent access."""
+    """Session store with WAL mode for concurrent access and asyncio.Lock for critical sections."""
 
     def __init__(self, db_path: Path):
         self.db_path = db_path
+        # ASYNCIO LOCKING PROTECTION: Protect critical sections from concurrent access
+        self._lock = asyncio.Lock()
+        logger.debug("SessionStore lock initialized")
 
     async def initialize(self) -> None:
         """Initialize database with schema and WAL mode."""
@@ -2377,6 +2403,147 @@ class SessionStore:
                 """DELETE FROM pending_bead_approvals
                    WHERE expires_at <= ?""",
                 (int(datetime.now().timestamp()),),
+            )
+            await db.commit()
+            return cursor.rowcount
+
+    # Confirmation prompt methods
+
+    async def create_confirmation_prompt(
+        self,
+        intent_id: str,
+        session_id: str,
+        prompt_type: str,
+        question: str,
+        context: dict | None = None,
+        expires_seconds: int = 300,  # 5 minutes default
+    ) -> str:
+        """Create a confirmation prompt request.
+
+        Args:
+            intent_id: The intent that triggered this confirmation
+            session_id: The session for this confirmation
+            prompt_type: Type of confirmation (e.g., 'pod_deletion')
+            question: The confirmation question to display
+            context: Additional context (pod_name, namespace, etc.)
+            expires_seconds: Seconds until confirmation expires (default 5 minutes)
+
+        Returns:
+            The confirmation prompt ID
+        """
+        import json
+        confirmation_id = str(uuid4())
+        now = int(datetime.now().timestamp())
+
+        context_json = json.dumps(context) if context else None
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                """INSERT INTO confirmation_prompts
+                   (id, intent_id, session_id, prompt_type, question, context, created_at, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (confirmation_id, intent_id, session_id, prompt_type, question, context_json, now, "pending"),
+            )
+            await db.commit()
+
+        return confirmation_id
+
+    async def get_confirmation_prompt(self, confirmation_id: str) -> Optional[dict]:
+        """Get a confirmation prompt by ID.
+
+        Args:
+            confirmation_id: The confirmation ID
+
+        Returns:
+            The confirmation prompt data or None if not found
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM confirmation_prompts WHERE id = ?""",
+                (confirmation_id,),
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return dict(row)
+                return None
+
+    async def get_pending_confirmation_for_intent(self, intent_id: str) -> Optional[dict]:
+        """Get the pending confirmation for a specific intent.
+
+        Args:
+            intent_id: The intent ID
+
+        Returns:
+            The pending confirmation data or None if not found
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM confirmation_prompts
+                   WHERE intent_id = ? AND status = 'pending'
+                   ORDER BY created_at DESC LIMIT 1""",
+                (intent_id,),
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return dict(row)
+                return None
+
+    async def submit_confirmation_response(
+        self,
+        confirmation_id: str,
+        response: str,
+    ) -> bool:
+        """Submit a user response to a confirmation prompt.
+
+        Args:
+            confirmation_id: The confirmation ID
+            response: User's response (yes/no/pod name)
+
+        Returns:
+            True if the response was recorded, False if confirmation not found or already responded
+        """
+        now = int(datetime.now().timestamp())
+
+        async with aiosqlite.connect(self.db_path) as db:
+            # Check if confirmation exists and is pending
+            cursor = await db.execute(
+                "SELECT status FROM confirmation_prompts WHERE id = ?",
+                (confirmation_id,),
+            )
+            row = await cursor.fetchone()
+
+            if not row or row[0] != "pending":
+                return False
+
+            # Update with response
+            await db.execute(
+                """UPDATE confirmation_prompts
+                   SET response = ?, responded_at = ?, status = 'responded'
+                   WHERE id = ?""",
+                (response, now, confirmation_id),
+            )
+            await db.commit()
+            return True
+
+    async def expire_old_confirmation_prompts(self, max_age_seconds: int = 300) -> int:
+        """Mark old pending confirmation prompts as expired.
+
+        Args:
+            max_age_seconds: Maximum age in seconds (default 5 minutes)
+
+        Returns:
+            Number of prompts marked as expired
+        """
+        cutoff = int(datetime.now().timestamp()) - max_age_seconds
+
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                """UPDATE confirmation_prompts
+                   SET status = 'expired'
+                   WHERE status = 'pending' AND created_at <= ?""",
+                (cutoff,),
             )
             await db.commit()
             return cursor.rowcount
