@@ -65,8 +65,8 @@ def retry_with_backoff(
                 except exceptions as e:
                     last_exception = e
                     if attempt < max_retries:
-                        # Log retry attempt with attempt number and error type at WARNING level
-                        logger.warning(
+                        # Log retry attempt with attempt number and error type at INFO level
+                        logger.info(
                             f"Retry attempt {attempt + 1}/{max_retries} for {func.__name__}: "
                             f"{type(e).__name__}: {e}"
                         )
