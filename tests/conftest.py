@@ -359,3 +359,255 @@ def empty_file_scenario():
                 pass
     """
     return EdgeCaseScenario.empty_file()
+
+
+# -----------------------------------------------------------------------------
+# Test database isolation fixtures
+# -----------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function")
+async def test_db_path(tmp_path):
+    """
+    Provide a fresh temporary database file path for testing.
+
+    This fixture creates a unique temporary database file for each test,
+    ensuring complete isolation from production data and between tests.
+
+    Usage in tests:
+        async def test_something(test_db_path):
+            store = SessionStore(test_db_path)
+            await store.initialize()
+            # Test with isolated database
+    """
+    import tempfile
+    import os
+
+    # Create a unique temporary database file for this test
+    db_path = tmp_path / f"test_db_{os.urandom(8).hex()}.db"
+    yield db_path
+
+    # Cleanup: delete the temporary database file
+    try:
+        if db_path.exists():
+            os.unlink(db_path)
+        # Also clean up WAL files if they exist
+        wal_path = str(db_path) + "-wal"
+        shm_path = str(db_path) + "-shm"
+        if os.path.exists(wal_path):
+            os.unlink(wal_path)
+        if os.path.exists(shm_path):
+            os.unlink(shm_path)
+    except Exception:
+        pass  # Ignore cleanup errors
+
+
+@pytest.fixture(scope="function")
+async def test_db_store(test_db_path):
+    """
+    Provide a fresh SessionStore with an isolated database.
+
+    This fixture creates a completely isolated test database using a temporary
+    file, ensuring that each test gets a fresh database instance that is
+    completely isolated from the production session.db.
+
+    The database is automatically initialized with the full schema including
+    all migrations, and is automatically cleaned up after the test completes.
+
+    Usage in tests:
+        async def test_something(test_db_store):
+            session_id = await test_db_store.create_session()
+            # Test with isolated database
+            # Database is automatically cleaned up after test
+
+    Benefits:
+        - Complete isolation from production data
+        - Each test gets a fresh database (no state leakage between tests)
+        - Full schema: includes all tables and migrations like production
+        - WAL mode enabled for concurrent access like production
+        - Automatic cleanup: database file is deleted after test
+    """
+    from src.session.store import SessionStore
+
+    store = SessionStore(test_db_path)
+    await store.initialize()
+
+    yield store
+
+    # Cleanup: close the store and let the test_db_path fixture handle file deletion
+    await store.close()
+
+
+@pytest.fixture(scope="function")
+async def test_session_id(test_db_store):
+    """
+    Create a test session and return its ID.
+
+    This fixture provides a convenient way to get a fresh session ID for testing
+    without manually calling create_session().
+
+    Usage in tests:
+        async def test_something(test_db_store, test_session_id):
+            # test_session_id is a fresh session ID ready to use
+            pass
+    """
+    return await test_db_store.create_session()
+
+
+@pytest.fixture(scope="function")
+async def test_db_connection(test_db_path):
+    """
+    Provide a direct aiosqlite connection to an isolated database.
+
+    This fixture gives tests direct database access for low-level testing
+    without going through the SessionStore API. The database is initialized
+    with the full schema.
+
+    Usage in tests:
+        async def test_raw_sql(test_db_connection):
+            async with test_db_connection.execute("SELECT * FROM sessions") as cur:
+                rows = await cur.fetchall()
+                # Test with direct SQL access
+    """
+    import aiosqlite
+    from src.session.store import SCHEMA_SQL
+
+    # Create database connection
+    db = await aiosqlite.connect(test_db_path)
+
+    # Enable WAL mode for consistency with production
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA synchronous=NORMAL")
+
+    # Initialize schema
+    await db.executescript(SCHEMA_SQL)
+    await db.commit()
+
+    yield db
+
+    # Cleanup: close the connection
+    await db.close()
+
+
+@pytest.fixture(scope="function")
+async def in_memory_db_store():
+    """
+    Provide a fresh SessionStore with a completely isolated in-memory database.
+
+    This fixture creates a completely isolated test database using SQLite's
+    shared cache in-memory mode, ensuring that each test gets a fresh database
+    instance that is completely isolated from the production session.db and
+    from other tests.
+
+    The database is automatically initialized with the full schema including
+    all migrations, and is automatically destroyed after the test completes.
+
+    Usage in tests:
+        async def test_something(in_memory_db_store):
+            session_id = await in_memory_db_store.create_session()
+            # Test with isolated database
+            # Database is automatically destroyed after test
+
+    Benefits:
+        - Complete isolation from production data
+        - Each test gets a fresh database (no state leakage between tests)
+        - Full schema: includes all tables and migrations like production
+        - Automatic cleanup: database is destroyed when connection closes
+        - Faster I/O: in-memory database has no disk access overhead
+        - Guaranteed isolation: in-memory databases cannot accidentally interfere
+
+    Technical Note:
+        Uses SQLite's shared cache mode (file:in_memory_db?mode=memory&cache=shared)
+        instead of :memory: to ensure all connections within the process access
+        the same in-memory database. Each test gets a unique cache name to ensure
+        complete isolation between tests.
+    """
+    import aiosqlite
+    import uuid
+    from src.session.store import SessionStore, SCHEMA_SQL
+
+    # Use shared cache mode with unique cache name per test for isolation
+    # This ensures all connections within this test share the same database
+    cache_name = f"in_memory_db_{uuid.uuid4().hex}"
+    db_path = f"file:{cache_name}?mode=memory&cache=shared"
+
+    # Initialize in-memory database with full schema
+    async with aiosqlite.connect(db_path) as db:
+        # Enable WAL mode for concurrent access
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA synchronous=NORMAL")
+
+        # Create schema with all migrations
+        await db.executescript(SCHEMA_SQL)
+        await db.commit()
+
+        # Run all migrations to ensure full schema compatibility
+        await SessionStore._migrate_additive_columns(db)
+
+    # Create SessionStore with in-memory database
+    store = SessionStore(db_path)
+
+    yield store
+
+    # Cleanup: close the store (in-memory database is automatically destroyed)
+    await store.close()
+
+
+@pytest.fixture(scope="function")
+async def in_memory_db_session_id(in_memory_db_store):
+    """
+    Create a test session in the in-memory database and return its ID.
+
+    This fixture provides a convenient way to get a fresh session ID for testing
+    with the in-memory database without manually calling create_session().
+
+    Usage in tests:
+        async def test_something(in_memory_db_store, in_memory_db_session_id):
+            # in_memory_db_session_id is a fresh session ID ready to use
+            pass
+    """
+    return await in_memory_db_store.create_session()
+
+
+@pytest.fixture(scope="function")
+async def in_memory_db_connection():
+    """
+    Provide a direct aiosqlite connection to an isolated in-memory database.
+
+    This fixture gives tests direct database access for low-level testing
+    without going through the SessionStore API. The database is initialized
+    with the full schema including all migrations.
+
+    The in-memory database is completely isolated and automatically destroyed
+    when the test completes.
+
+    Usage in tests:
+        async def test_raw_sql(in_memory_db_connection):
+            async with in_memory_db_connection.execute("SELECT * FROM sessions") as cur:
+                rows = await cur.fetchall()
+                # Test with direct SQL access to in-memory database
+    """
+    import aiosqlite
+    import uuid
+    from src.session.store import SessionStore, SCHEMA_SQL
+
+    # Use shared cache mode with unique cache name per test for isolation
+    cache_name = f"in_memory_conn_{uuid.uuid4().hex}"
+    db_path = f"file:{cache_name}?mode=memory&cache=shared"
+
+    # Create in-memory database connection
+    db = await aiosqlite.connect(db_path)
+
+    # Enable WAL mode for consistency with production
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA synchronous=NORMAL")
+
+    # Initialize schema with all migrations
+    await db.executescript(SCHEMA_SQL)
+    await SessionStore._migrate_additive_columns(db)
+    await db.commit()
+
+    yield db
+
+    # Cleanup: close the connection (in-memory database is automatically destroyed)
+    await db.close()

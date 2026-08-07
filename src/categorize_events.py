@@ -133,12 +133,18 @@ def categorize_event(log_data: Dict[str, Any]) -> EventType:
     if not log_data or not isinstance(log_data, dict):
         return EventType.UNKNOWN
 
-    # Get key fields
-    event_type = log_data.get('event_type', '')
-    status = log_data.get('status', '')
+    # Get key fields with proper None handling
+    event_type = log_data.get('event_type') or ''
+    status = log_data.get('status') or ''
     error_code = log_data.get('error_code')
-    metadata = log_data.get('metadata', {})
-    source_fields = metadata.get('source_fields', {})
+    metadata = log_data.get('metadata') or {}
+    source_fields = metadata.get('source_fields') or {}
+
+    # Ensure event_type and status are strings for helper functions
+    if not isinstance(event_type, str):
+        event_type = ''
+    if not isinstance(status, str):
+        status = ''
 
     # Check specific error types FIRST (in order of specificity)
 

@@ -75,6 +75,23 @@ def extract_service_from_failure(failure: Dict[str, Any]) -> str:
     return 'unknown'
 
 
+def extract_image_from_failure(failure: Dict[str, Any]) -> str:
+    """Extract image tag from failure record."""
+    # Direct image field
+    if 'image' in failure and failure['image']:
+        return failure['image']
+
+    # From pod_name patterns
+    if 'pod_name' in failure:
+        pod_name = failure['pod_name']
+        if 'pbx-web' in pod_name:
+            return 'ronaldraygun/pbx-web:version-unknown'
+        elif 'whisper-stt' in pod_name:
+            return 'ronaldraygun/whisper-stt:version-unknown'
+
+    return 'unknown'
+
+
 def extract_namespace_from_failure(failure: Dict[str, Any]) -> str:
     """Extract namespace from failure record."""
     if 'namespace' in failure:
@@ -117,6 +134,7 @@ def calculate_category_statistics(failures: List[Dict[str, Any]]) -> Dict[str, D
             'service_distribution': Counter(),
             'namespace_distribution': Counter(),
             'source_distribution': Counter(),
+            'image_distribution': Counter(),  # New: image/version context
             'temporal_distribution': defaultdict(int),  # by day
             'timestamps': [],
             'sample_failures': [],
@@ -143,6 +161,10 @@ def calculate_category_statistics(failures: List[Dict[str, Any]]) -> Dict[str, D
             # Source distribution
             source = failure.get('source', 'unknown')
             stats['source_distribution'][source] += 1
+
+            # Image/version distribution
+            image = extract_image_from_failure(failure)
+            stats['image_distribution'][image] += 1
 
             # Temporal distribution
             timestamp = None
@@ -191,6 +213,12 @@ def calculate_category_statistics(failures: List[Dict[str, Any]]) -> Dict[str, D
             reverse=True
         ))
 
+        stats['image_distribution'] = dict(sorted(
+            stats['image_distribution'].items(),
+            key=lambda x: x[1],
+            reverse=True
+        ))
+
         stats['temporal_distribution'] = dict(sorted(
             stats['temporal_distribution'].items()
         ))
@@ -201,6 +229,56 @@ def calculate_category_statistics(failures: List[Dict[str, Any]]) -> Dict[str, D
         category_stats[category] = stats
 
     return category_stats
+
+
+def add_percentages_to_distribution(distribution: Dict[str, int], total: int) -> Dict[str, Dict[str, Any]]:
+    """Add percentages to a distribution dict."""
+    result = {}
+    for key, count in distribution.items():
+        percentage = (count / total * 100) if total > 0 else 0
+        result[key] = {
+            'count': count,
+            'percentage': round(percentage, 2)
+        }
+    return result
+
+
+def enhance_statistics_with_percentages(category_stats: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Add percentage calculations to all category statistics."""
+    enhanced_stats = {}
+
+    for category, stats in category_stats.items():
+        total_count = stats['total_count']
+
+        enhanced = {
+            'category': stats['category'],
+            'total_count': total_count,
+            'error_type_distribution': add_percentages_to_distribution(
+                stats['error_type_distribution'], total_count
+            ),
+            'severity_distribution': add_percentages_to_distribution(
+                stats['severity_distribution'], total_count
+            ),
+            'service_distribution': add_percentages_to_distribution(
+                stats['service_distribution'], total_count
+            ),
+            'namespace_distribution': add_percentages_to_distribution(
+                stats['namespace_distribution'], total_count
+            ),
+            'source_distribution': add_percentages_to_distribution(
+                stats['source_distribution'], total_count
+            ),
+            'image_distribution': add_percentages_to_distribution(
+                stats['image_distribution'], total_count
+            ),
+            'temporal_distribution': stats['temporal_distribution'],
+            'timestamps': stats['timestamps'],
+            'sample_failures': stats['sample_failures'],
+        }
+
+        enhanced_stats[category] = enhanced
+
+    return enhanced_stats
 
 
 def generate_summary_statistics(category_stats: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
@@ -217,13 +295,15 @@ def generate_summary_statistics(category_stats: Dict[str, Dict[str, Any]]) -> Di
         ),
         'all_services': set(),
         'all_namespaces': set(),
+        'all_images': set(),  # New: track all unique images
         'date_range': {'earliest': None, 'latest': None},
     }
 
-    # Collect all services and namespaces
+    # Collect all services, namespaces, and images
     for stats in category_stats.values():
         summary['all_services'].update(stats['service_distribution'].keys())
         summary['all_namespaces'].update(stats['namespace_distribution'].keys())
+        summary['all_images'].update(stats['image_distribution'].keys())
 
         # Track date range
         if stats['timestamps']:
@@ -286,6 +366,10 @@ def main():
     print("\nCalculating category statistics...")
     category_stats = calculate_category_statistics(failures)
 
+    # Enhance with percentages and image context
+    print("Adding percentages and image context...")
+    enhanced_stats = enhance_statistics_with_percentages(category_stats)
+
     # Generate summary statistics
     print("Generating summary statistics...")
     summary = generate_summary_statistics(category_stats)
@@ -295,7 +379,7 @@ def main():
         'generated_at': datetime.now().isoformat(),
         'source_report': str(report_path),
         'summary': summary,
-        'category_statistics': category_stats,
+        'category_statistics': enhanced_stats,
     }
 
     # Write output

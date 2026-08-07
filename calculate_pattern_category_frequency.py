@@ -62,6 +62,14 @@ def extract_service_name(failure: Dict) -> str:
         value = failure.get(field)
         if value and isinstance(value, str) and value not in ['N/A', '', 'unknown']:
             return value
+
+    # Try to infer from source file
+    source_file = failure.get('_source_file', '')
+    if 'pbx-web' in source_file:
+        return 'pbx-web'
+    elif 'whisper-stt' in source_file:
+        return 'whisper-stt'
+
     return 'unknown'
 
 
@@ -82,6 +90,12 @@ def extract_image_name(failure: Dict) -> str:
                     digest = parts[1].split('@')[0][:12]  # First 12 chars of digest
                     return f"{parts[0]}:{digest}"
             return value
+
+    # For log entries, we can note they're from logs (no specific image)
+    source_file = failure.get('_source_file', '')
+    if source_file and 'parsed' in source_file:
+        return 'container_logs'
+
     return 'unknown'
 
 
@@ -94,6 +108,20 @@ def extract_timestamp(failure: Dict) -> Optional[datetime]:
             parsed = parse_timestamp(str(value))
             if parsed:
                 return parsed
+
+    # Try to extract timestamp from message field (common pattern: 2026-07-28T13:36:40...)
+    message = failure.get('message', '')
+    if message and isinstance(message, str):
+        # Look for ISO timestamp pattern at start of message
+        import re
+        # Match ISO 8601 timestamp (with or without microseconds, with or without timezone)
+        ts_pattern = r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?)'
+        match = re.search(ts_pattern, message)
+        if match:
+            parsed = parse_timestamp(match.group(1))
+            if parsed:
+                return parsed
+
     return None
 
 

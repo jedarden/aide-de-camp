@@ -138,10 +138,15 @@ class DeterministicRouter:
         self._total_calls = 0
         self._fast_path_hits = 0
 
-    def _get_registry(self):
-        """Get or load the project registry."""
+    async def _get_registry(self):
+        """
+        Get or load the project registry.
+
+        ASYNCIO LOCKING: Protected by async lock in get_registry() to ensure safe
+        concurrent access to registry cache.
+        """
         if self.registry is None:
-            self.registry = get_registry()
+            self.registry = await get_registry()
         return self.registry
 
     def _detect_intent_type(self, utterance: str, lookup_kind: str | None = None) -> FetchIntentType:

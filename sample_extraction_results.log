@@ -1,20 +1,20 @@
 === Sample File Extraction Results ===
-Started at: Fri Aug  7 01:53:43 AM EDT 2026
+Started at: Fri Aug  7 02:13:51 AM EDT 2026
 
 Processing file 1/10: logs/whisper-stt-raw.jsonl
 
 === File 1: logs/whisper-stt-raw.jsonl ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .037358655s
+Execution time: .051833721s
 Output:
 {
   "file_path": "logs/whisper-stt-raw.jsonl",
   "file_exists": true,
-  "size_bytes": 2856767,
-  "creation_timestamp": "2026-08-06T23:57:28.757170",
-  "modification_timestamp": "2026-08-06T23:57:28.757170",
-  "line_count": 83671,
+  "size_bytes": 22109573,
+  "creation_timestamp": "2026-08-07T01:54:53.426638",
+  "modification_timestamp": "2026-08-07T01:54:53.426638",
+  "line_count": 97399,
   "first_timestamp": null,
   "last_timestamp": null,
   "error": null
@@ -25,7 +25,7 @@ Processing file 2/10: logs/pbx-web-victorialogs-raw.jsonl
 === File 2: logs/pbx-web-victorialogs-raw.jsonl ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .068997933s
+Execution time: .063636454s
 Output:
 {
   "file_path": "logs/pbx-web-victorialogs-raw.jsonl",
@@ -44,7 +44,7 @@ Processing file 3/10: logs/whisper-stt-30day.jsonl
 === File 3: logs/whisper-stt-30day.jsonl ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .019380159s
+Execution time: .024507740s
 Output:
 {
   "file_path": "logs/whisper-stt-30day.jsonl",
@@ -63,7 +63,7 @@ Processing file 4/10: logs/pbx-web-parsed.jsonl
 === File 4: logs/pbx-web-parsed.jsonl ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .025562632s
+Execution time: .030841914s
 Output:
 {
   "file_path": "logs/pbx-web-parsed.jsonl",
@@ -82,7 +82,7 @@ Processing file 5/10: logs/pbx-web-nginx.log
 === File 5: logs/pbx-web-nginx.log ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .020806654s
+Execution time: .027237397s
 Output:
 {
   "file_path": "logs/pbx-web-nginx.log",
@@ -101,7 +101,7 @@ Processing file 6/10: logs/whisper-openai-raw.log
 === File 6: logs/whisper-openai-raw.log ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .031575710s
+Execution time: .025650964s
 Output:
 {
   "file_path": "logs/whisper-openai-raw.log",
@@ -120,7 +120,7 @@ Processing file 7/10: logs/pbx-web-site-generator.log
 === File 7: logs/pbx-web-site-generator.log ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .021185137s
+Execution time: .019274411s
 Output:
 {
   "file_path": "logs/pbx-web-site-generator.log",
@@ -139,7 +139,7 @@ Processing file 8/10: logs/whisper-stt-deployment-describe.txt
 === File 8: logs/whisper-stt-deployment-describe.txt ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .027207612s
+Execution time: .023165041s
 Output:
 {
   "file_path": "logs/whisper-stt-deployment-describe.txt",
@@ -158,7 +158,7 @@ Processing file 9/10: logs/pbx-web-pods-describe.txt
 === File 9: logs/pbx-web-pods-describe.txt ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .025926476s
+Execution time: .026237399s
 Output:
 {
   "file_path": "logs/pbx-web-pods-describe.txt",
@@ -177,7 +177,7 @@ Processing file 10/10: logs/whisper-stt-pod-raw.log
 === File 10: logs/whisper-stt-pod-raw.log ===
 Status: SUCCESS
 Exit code: 0
-Execution time: .020353846s
+Execution time: .025068182s
 Output:
 {
   "file_path": "logs/whisper-stt-pod-raw.log",
@@ -193,21 +193,21 @@ Output:
 
 
 === EXTRACTION SUMMARY ===
-Completed at: Fri Aug  7 01:53:44 AM EDT 2026
+Completed at: Fri Aug  7 02:13:52 AM EDT 2026
 
 Total files processed: 10
 Successful extractions: 10
 Failed extractions: 0
 
 === Successful Files ===
-  ✓ logs/whisper-stt-raw.jsonl (.037358655s)
-  ✓ logs/pbx-web-victorialogs-raw.jsonl (.068997933s)
-  ✓ logs/whisper-stt-30day.jsonl (.019380159s)
-  ✓ logs/pbx-web-parsed.jsonl (.025562632s)
-  ✓ logs/pbx-web-nginx.log (.020806654s)
-  ✓ logs/whisper-openai-raw.log (.031575710s)
-  ✓ logs/pbx-web-site-generator.log (.021185137s)
-  ✓ logs/whisper-stt-deployment-describe.txt (.027207612s)
-  ✓ logs/pbx-web-pods-describe.txt (.025926476s)
-  ✓ logs/whisper-stt-pod-raw.log (.020353846s)
+  ✓ logs/whisper-stt-raw.jsonl (.051833721s)
+  ✓ logs/pbx-web-victorialogs-raw.jsonl (.063636454s)
+  ✓ logs/whisper-stt-30day.jsonl (.024507740s)
+  ✓ logs/pbx-web-parsed.jsonl (.030841914s)
+  ✓ logs/pbx-web-nginx.log (.027237397s)
+  ✓ logs/whisper-openai-raw.log (.025650964s)
+  ✓ logs/pbx-web-site-generator.log (.019274411s)
+  ✓ logs/whisper-stt-deployment-describe.txt (.023165041s)
+  ✓ logs/pbx-web-pods-describe.txt (.026237399s)
+  ✓ logs/whisper-stt-pod-raw.log (.025068182s)
 

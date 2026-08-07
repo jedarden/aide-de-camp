@@ -27,6 +27,7 @@ projects:
     - adc
     - aide-de-camp
     - this interface
+    - test-hot-reload-alias
     cluster: null
     description: aide-de-camp itself (this interface)
     intent_support:
@@ -46,7 +47,7 @@ projects:
     - gitops
     - k8s config
     cluster: null
-    description: Kubernetes declarative configuration (GitOps)
+    description: Test description
     intent_support:
     - status
     - action
