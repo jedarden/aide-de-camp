@@ -919,3 +919,208 @@ async def test_session_table_state_reset(test_db_store):
 
     # Test passes when run once - the session table state is verified to be clean
     # The test_db_store fixture will perform additional cleanup after this test completes
+
+
+# =============================================================================
+# Test: Topic table specific state verification (bead adc-523dqb)
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_topic_table_state_reset(test_db_store):
+    """Verify topic table state reset and no orphaned records after test execution.
+
+    This test specifically verifies the topics table (per bead adc-523dqb scope):
+    1. Topics can be created and exist in the database
+    2. Topic records can be queried and counted
+    3. After cleanup (via fixture or manual), no orphaned topic records remain
+    4. Test passes when run once (idempotent)
+
+    Scope: ONLY for topic table verification. Utterance table is covered by separate tests.
+    """
+    # Step 1: Create a session and topic records, then verify they exist
+    session_id = await test_db_store.create_session()
+
+    topic_id_1 = await test_db_store.create_topic(
+        label="Test Topic 1",
+        topic_type="project",
+        project_slugs=["test-project-1"],
+        scope="session",
+        session_id=session_id
+    )
+
+    topic_id_2 = await test_db_store.create_topic(
+        label="Test Topic 2",
+        topic_type="research",
+        project_slugs=["test-project-2"],
+        scope="session",
+        session_id=session_id
+    )
+
+    topic_id_3 = await test_db_store.create_topic(
+        label="Test Topic 3",
+        topic_type="personal",
+        project_slugs=["test-project-3"],
+        scope="session",
+        session_id=session_id
+    )
+
+    # Verify topics were created by querying the topics table directly
+    async with aiosqlite.connect(test_db_store.db_path) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Count total topics
+        async with db.execute("SELECT COUNT(*) FROM topics") as cur:
+            topic_count = (await cur.fetchone())[0]
+
+        assert topic_count == 3, (
+            f"Expected exactly 3 topics after creating 3, but found {topic_count}. "
+            f"This verifies that topic records are properly persisted to the topics table."
+        )
+
+        # Verify the specific topic IDs exist
+        async with db.execute(
+            "SELECT id FROM topics WHERE id IN (?, ?, ?)",
+            (topic_id_1, topic_id_2, topic_id_3)
+        ) as cur:
+            found_topics = await cur.fetchall()
+
+        assert len(found_topics) == 3, (
+            f"Expected to find all 3 created topic IDs, but found {len(found_topics)}. "
+            f"This verifies that the topic records are queryable by their IDs."
+        )
+
+    # Step 2: Manually delete topics to simulate fixture cleanup behavior
+    # This tests the deletion mechanism directly (idempotent - can run multiple times)
+    # Note: There's no delete_topic method in SessionStore, so we delete via raw SQL
+    async with aiosqlite.connect(test_db_store.db_path) as db:
+        # Delete the topics we created
+        await db.execute(
+            "DELETE FROM topics WHERE id IN (?, ?, ?)",
+            (topic_id_1, topic_id_2, topic_id_3)
+        )
+        await db.commit()
+
+    # Step 3: Verify no orphaned topic records remain after deletion
+    async with aiosqlite.connect(test_db_store.db_path) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Query topics table to verify row count is 0
+        async with db.execute("SELECT COUNT(*) FROM topics") as cur:
+            final_topic_count = (await cur.fetchone())[0]
+
+        assert final_topic_count == 0, (
+            f"Expected 0 topics after cleanup, but found {final_topic_count}. "
+            f"This verifies that topic records are properly deleted and "
+            f"leaves no orphaned topic records in the database."
+        )
+
+        # Additional verification: query for any topic records (should be empty)
+        async with db.execute("SELECT id FROM topics") as cur:
+            any_topics = await cur.fetchall()
+
+        assert len(any_topics) == 0, (
+            f"Expected no topic records after cleanup, but found {len(any_topics)} records. "
+            f"This verifies that the topics table is completely empty with no orphaned data."
+        )
+
+    # Test passes when run once - the topic table state is verified to be clean
+    # The test_db_store fixture will perform additional cleanup after this test completes
+
+
+# =============================================================================
+# Test: Utterance table specific state verification (bead adc-4z7pk7)
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_utterance_table_state_reset(test_db_store):
+    """Verify utterance table state reset and no orphaned records after test execution.
+
+    This test specifically verifies the utterances table (per bead adc-4z7pk7 scope):
+    1. Utterances can be created and exist in the database
+    2. Utterance records can be queried and counted
+    3. After cleanup (via fixture or manual), no orphaned utterance records remain
+    4. Test passes when run once (idempotent)
+
+    Scope: ONLY for utterance table verification. Integration with repeat runner comes in final child.
+    """
+    # Step 1: Create a session and utterance records, then verify they exist
+    session_id = await test_db_store.create_session()
+
+    utterance_id_1 = await test_db_store.create_utterance(
+        session_id=session_id,
+        raw_text="Test utterance 1"
+    )
+
+    utterance_id_2 = await test_db_store.create_utterance(
+        session_id=session_id,
+        raw_text="Test utterance 2"
+    )
+
+    utterance_id_3 = await test_db_store.create_utterance(
+        session_id=session_id,
+        raw_text="Test utterance 3"
+    )
+
+    # Verify utterances were created by querying the utterances table directly
+    async with aiosqlite.connect(test_db_store.db_path) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Count total utterances
+        async with db.execute("SELECT COUNT(*) FROM utterances") as cur:
+            utterance_count = (await cur.fetchone())[0]
+
+        assert utterance_count == 3, (
+            f"Expected exactly 3 utterances after creating 3, but found {utterance_count}. "
+            f"This verifies that utterance records are properly persisted to the utterances table."
+        )
+
+        # Verify the specific utterance IDs exist
+        async with db.execute(
+            "SELECT id FROM utterances WHERE id IN (?, ?, ?)",
+            (utterance_id_1, utterance_id_2, utterance_id_3)
+        ) as cur:
+            found_utterances = await cur.fetchall()
+
+        assert len(found_utterances) == 3, (
+            f"Expected to find all 3 created utterance IDs, but found {len(found_utterances)}. "
+            f"This verifies that the utterance records are queryable by their IDs."
+        )
+
+    # Step 2: Manually delete utterances to simulate fixture cleanup behavior
+    # This tests the deletion mechanism directly (idempotent - can run multiple times)
+    # Note: There's no delete_utterance method in SessionStore, so we delete via raw SQL
+    async with aiosqlite.connect(test_db_store.db_path) as db:
+        # Delete the utterances we created
+        await db.execute(
+            "DELETE FROM utterances WHERE id IN (?, ?, ?)",
+            (utterance_id_1, utterance_id_2, utterance_id_3)
+        )
+        await db.commit()
+
+    # Step 3: Verify no orphaned utterance records remain after deletion
+    async with aiosqlite.connect(test_db_store.db_path) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Query utterances table to verify row count is 0
+        async with db.execute("SELECT COUNT(*) FROM utterances") as cur:
+            final_utterance_count = (await cur.fetchone())[0]
+
+        assert final_utterance_count == 0, (
+            f"Expected 0 utterances after cleanup, but found {final_utterance_count}. "
+            f"This verifies that utterance records are properly deleted and "
+            f"leaves no orphaned utterance records in the database."
+        )
+
+        # Additional verification: query for any utterance records (should be empty)
+        async with db.execute("SELECT id FROM utterances") as cur:
+            any_utterances = await cur.fetchall()
+
+        assert len(any_utterances) == 0, (
+            f"Expected no utterance records after cleanup, but found {len(any_utterances)} records. "
+            f"This verifies that the utterances table is completely empty with no orphaned data."
+        )
+
+    # Test passes when run once - the utterance table state is verified to be clean
+    # The test_db_store fixture will perform additional cleanup after this test completes
