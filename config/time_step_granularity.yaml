@@ -4,25 +4,26 @@
 
 # Recommended configuration for 30-day latency aggregation
 default:
-  step: "6h"  # 6-hour granularity for balanced performance and detail
+  step: "1h"  # 1-hour granularity for optimal balance of detail and performance
   window_days: 30  # Standard analysis window
 
-  # Result estimates
-  estimated_data_points: 120  # 30 days × 24 hours ÷ 6 hours
-  estimated_entries_per_bucket: 876  # 6h × 146 avg entries/hour
-  query_performance: "good"  # Fast query execution
-  statistical_significance: "high"  # Robust statistics with ~876 samples
+  # Result estimates (based on actual data analysis: 97,398 events over 660 hours = 147.55 events/hour)
+  estimated_data_points: 720  # 30 days × 24 hours ÷ 1 hour
+  estimated_entries_per_bucket: 148  # ~147.55 events/hour (actual measured rate)
+  query_performance: "good"  # Fast query execution with <1000 data points
+  statistical_significance: "high"  # Robust statistics with ~148 samples per bucket
+  granularity: "high"  # Finest granularity that meets manageability targets
 
 # Alternative granularities for specific use cases
 alternatives:
-  detailed_analysis:
-    step: "1h"
-    use_case: "Detailed hourly trend analysis"
-    estimated_data_points: 720
-    estimated_entries_per_bucket: 146
-    performance: "moderate"
-    significance: "high"
-    recommendation: "Use for detailed diagnostics of specific time periods"
+  balanced_performance:
+    step: "6h"
+    use_case: "Balanced performance with reduced data points"
+    estimated_data_points: 120  # 30 days × 24 hours ÷ 6 hours
+    estimated_entries_per_bucket: 885  # 6h × ~147.55 events/hour
+    performance: "excellent"  # Faster queries with fewer buckets
+    significance: "high"  # Very robust statistics with ~885 samples
+    recommendation: "Use for faster queries when hourly detail is not critical"
 
   high_level_trends:
     step: "1d"
@@ -57,13 +58,16 @@ step_format:
     - "6h - 6 hours"
     - "1d - 1 day"
 
-# Data volume metrics (from actual whisper-stt logs)
+# Data volume metrics (from actual whisper-stt logs analyzed 2026-08-07)
 data_metrics:
-  total_entries_analyzed: 96239
-  time_span_days: 27.4
-  average_entries_per_hour: 146
-  average_entries_per_minute: 2.44
-  data_collection_period: "2026-07-10 to 2026-08-06"
+  total_entries_analyzed: 97398  # Total valid timestamps extracted
+  time_span_hours: 660.11  # Actual data span in hours
+  time_span_days: 27.5  # ~27.5 days of actual data
+  average_entries_per_hour: 147.55  # Actual measured event rate
+  average_entries_per_minute: 2.46  # For fine-grained analysis
+  actual_hours_with_data: 205  # Hours containing at least one event
+  data_collection_period: "2026-07-10T17:39:33Z to 2026-08-07T05:46:12Z"
+  analysis_date: "2026-08-07"
 
 # Query templates with step configuration
 query_templates:
@@ -87,20 +91,28 @@ query_templates:
 
 # Performance guidelines
 performance_guidelines:
-  max_data_points: 1000  # Maximum recommended for visualization
-  optimal_range: [50, 500]  # Optimal range for most use cases
+  max_data_points: 1000  # Maximum recommended for visualization and query performance
+  optimal_range: [100, 1000]  # Optimal range for 30-day aggregation
   min_samples_per_bucket: 30  # Minimum for statistical significance
+  target_buckets_30day: 720  # Target for 1-hour granularity (30 days × 24 hours)
+  max_acceptable_buckets: 1000  # Upper limit for manageability
 
-# Decision matrix
+# Decision matrix (based on actual data analysis)
 decision_matrix:
+  optimal_balance:
+    recommended_step: "1h"
+    reasoning: "Highest granularity that meets all targets (<1000 buckets, >30 samples/bucket, good performance)"
+
   performance_priority:
     recommended_step: "6h"
-    reasoning: "Balances fast queries with sufficient detail"
-
-  detail_priority:
-    recommended_step: "1h"
-    reasoning: "Maximum detail while maintaining good performance"
+    reasoning: "Faster queries with fewer buckets (120) when hourly detail is not required"
 
   statistical_robustness:
     recommended_step: "1d"
-    reasoning: "Maximum samples per bucket for robust statistics"
+    reasoning: "Maximum samples per bucket (~3,541) for robust statistics, minimal buckets (30)"
+
+  analysis_basis:
+    data_points_analyzed: 97398
+    event_rate_measured: "147.55 events/hour"
+    analysis_method: "Actual timestamp extraction from whisper-stt-raw.jsonl"
+    recommendation_algorithm: "Highest granularity meeting <1000 buckets target"
