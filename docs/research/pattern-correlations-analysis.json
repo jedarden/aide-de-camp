@@ -1,0 +1,216 @@
+{
+  "analysis_metadata": {
+    "generated_at": "2026-08-07T06:30:00Z",
+    "data_source": "pattern_aggregations.json",
+    "analysis_period": "2026-05-02 to 2026-07-28",
+    "total_patterns_analyzed": 181,
+    "analysis_type": "pattern_correlations_and_insights"
+  },
+  "top_pattern_types": {
+    "description": "All detected patterns categorized by type with percentages",
+    "total_patterns": 181,
+    "pattern_rankings": [
+      {
+        "rank": 1,
+        "pattern_type": "Other",
+        "frequency": 181,
+        "percentage": 100.0,
+        "description": "Uncategorized patterns not matching standard failure types (ImagePullBackOff, CrashLoopBackOff, OOMKilled, Probe_failure, Dependency_timeout)"
+      }
+    ],
+    "standard_patterns": {
+      "ImagePullBackOff": {"frequency": 0, "percentage": 0.0},
+      "CrashLoopBackOff": {"frequency": 0, "percentage": 0.0},
+      "OOMKilled": {"frequency": 0, "percentage": 0.0},
+      "Probe_failure": {"frequency": 0, "percentage": 0.0},
+      "Dependency_timeout": {"frequency": 0, "percentage": 0.0}
+    },
+    "key_insight": "100% of patterns fall into 'Other' category, indicating either unique failure modes not captured by standard taxonomy or limitations in pattern detection logic."
+  },
+  "service_failure_analysis": {
+    "description": "Services ranked by failure pattern frequency",
+    "total_services_affected": 5,
+    "service_rankings": [
+      {
+        "rank": 1,
+        "service": "whisper-stt",
+        "pattern_count": 15,
+        "percentage": 8.3,
+        "failure_rate": "highest",
+        "note": "Speech-to-text service with most detected patterns"
+      },
+      {
+        "rank": 2,
+        "service": "whisper-openai",
+        "pattern_count": 6,
+        "percentage": 3.3,
+        "failure_rate": "moderate"
+      },
+      {
+        "rank": 3,
+        "service": "lab-rebuild-relay",
+        "pattern_count": 3,
+        "percentage": 1.7,
+        "failure_rate": "lower"
+      },
+      {
+        "rank": 4,
+        "service": "pbx-rebuild-relay",
+        "pattern_count": 3,
+        "percentage": 1.7,
+        "failure_rate": "lower"
+      },
+      {
+        "rank": 5,
+        "service": "pbx-web",
+        "pattern_count": 1,
+        "percentage": 0.6,
+        "failure_rate": "lowest"
+      }
+    ],
+    "key_insights": [
+      "whisper-stt service accounts for 8.3% of all patterns despite being one of 5 services",
+      "Whisper services (stt + openai) together account for 11.6% of patterns",
+      "Build relay services (lab + pbx) show similar pattern counts at 3 each"
+    ]
+  },
+  "temporal_correlations": {
+    "description": "Time-based patterns and correlations in failure occurrences",
+    "overall_time_span": {
+      "start": "2026-05-02T11:29:50+00:00",
+      "end": "2026-07-28T17:26:12+00:00",
+      "duration_hours": 2093.94,
+      "duration_days": 87.2,
+      "average_timestamp": "2026-06-15T02:28:01+00:00"
+    },
+    "temporal_insights": [
+      {
+        "pattern": "Extended observation period",
+        "description": "Patterns span ~87 days, suggesting long-term data collection rather than acute failure period",
+        "significance": "high"
+      },
+      {
+        "pattern": "Mid-period concentration",
+        "description": "Average timestamp falls mid-June, suggesting potential clustering around that time",
+        "significance": "moderate"
+      },
+      {
+        "pattern": "Recent activity",
+        "description": "Latest pattern late July 2026 indicates ongoing issues",
+        "significance": "moderate"
+      }
+    ],
+    "time_distribution_analysis": {
+      "pattern_density": "0.086 patterns per hour overall",
+      "observation": "Low pattern density suggests patterns represent special conditions rather than continuous failures"
+    }
+  },
+  "pattern_co_occurrence": {
+    "description": "Analysis of patterns that occur together or in sequence",
+    "limitations": "All patterns categorized as 'Other', limiting co-occurrence analysis",
+    "service_level_cooccurrence": [
+      {
+        "observation": "Whisper service cluster correlation",
+        "services": ["whisper-stt", "whisper-openai"],
+        "combined_pattern_count": 21,
+        "interpretation": "Speech-to-text processing services show correlated patterns, suggesting shared infrastructure or dependency issues"
+      },
+      {
+        "observation": "Build relay service correlation",
+        "services": ["lab-rebuild-relay", "pbx-rebuild-relay"],
+        "combined_pattern_count": 6,
+        "interpretation": "Build relay services show identical pattern counts, indicating coordinated build/deployment processes"
+      }
+    ]
+  },
+  "image_version_insights": {
+    "description": "Patterns correlated with specific image versions",
+    "top_images": [
+      {
+        "rank": 1,
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "pattern_count": 12,
+        "percentage": 6.6,
+        "note": "Most frequent image despite service having lowest overall pattern count"
+      },
+      {
+        "rank": 2,
+        "image": "python:3-slim",
+        "pattern_count": 12,
+        "percentage": 6.6,
+        "note": "Base image used across multiple services"
+      },
+      {
+        "rank": 3,
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "pattern_count": 12,
+        "percentage": 6.6,
+        "note": "Latest whisper-stt version in data set"
+      },
+      {
+        "rank": 4,
+        "image": "ronaldraygun/pbx-web:1.0.8",
+        "pattern_count": 7,
+        "percentage": 3.9,
+        "note": "Previous pbx-web version"
+      },
+      {
+        "rank": 5,
+        "image": "ronaldraygun/whisper-stt:1.8.4",
+        "pattern_count": 6,
+        "percentage": 3.3,
+        "note": "Older whisper-stt version"
+      }
+    ],
+    "version_insights": [
+      "pbx-web:1.0.9 shows highest pattern frequency despite pbx-web having lowest service-level count (1)",
+      "Multiple whisper-stt versions present (1.8.2, 1.8.4, 1.8.6) suggesting ongoing deployment activity",
+      "Base image python:3-slim appears frequently, indicating potential shared dependencies"
+    ]
+  },
+  "quantitative_summary": {
+    "total_patterns": 181,
+    "unique_pattern_types": 1,
+    "services_affected": 5,
+    "unique_images": 7,
+    "observation_period_days": 87.2,
+    "pattern_density_per_day": 2.08,
+    "most_problematic_service": "whisper-stt",
+    "most_problematic_image": "ronaldraygun/pbx-web:1.0.9",
+    "categorization_coverage": 0.0
+  },
+  "recommendations": [
+    {
+      "category": "Data Quality",
+      "issue": "100% of patterns categorized as 'Other'",
+      "recommendation": "Review pattern detection logic - current taxonomy may not capture actual failure modes in this environment",
+      "priority": "high"
+    },
+    {
+      "category": "Service Health",
+      "issue": "whisper-stt shows highest pattern frequency",
+      "recommendation": "Investigate whisper-stt service specifically - patterns may indicate resource constraints, dependency issues, or workload characteristics",
+      "priority": "high"
+    },
+    {
+      "category": "Deployment Patterns",
+      "issue": "Multiple versions of same services present",
+      "recommendation": "Analyze whether patterns correlate with deployment transitions or version rollbacks",
+      "priority": "medium"
+    },
+    {
+      "category": "Temporal Analysis",
+      "issue": "Extended time span with low pattern density",
+      "recommendation": "Consider whether patterns represent actual failures or are artifacts of monitoring/configuration events",
+      "priority": "medium"
+    }
+  ],
+  "methodology_notes": [
+    "Analysis based on aggregated pattern statistics from 28 processed files",
+    "71 total records extracted, 181 patterns detected",
+    "All patterns fell into 'Other' category - standard failure types (ImagePullBackOff, CrashLoopBackOff, etc.) had 0 frequency",
+    "Service and image context extracted from pattern metadata",
+    "Temporal analysis based on timestamp min/max/avg calculations",
+    "Co-occurrence analysis limited by 'Other' categorization - performed service-level correlation instead"
+  ]
+}
