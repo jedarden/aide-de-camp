@@ -16,9 +16,9 @@
     "application_errors": {
       "total_pods_analyzed": 8,
       "pods_with_errors": 1,
-      "total_error_count": 42,
-      "error_rate_per_pod": 5.25,
-      "error_rate_per_day": 1.4
+      "total_error_count": 5,
+      "error_rate_per_pod": 0.625,
+      "error_rate_per_day": 0.16666666666666666
     },
     "deployment_errors": {
       "total_deployments": 24,
@@ -61,5 +61,5 @@
       }
     }
   },
-  "query_timestamp": "2026-08-06T17:46:56.779402"
+  "query_timestamp": "2026-08-06T19:05:09.255063"
 }
