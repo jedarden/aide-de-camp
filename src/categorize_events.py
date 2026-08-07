@@ -284,7 +284,7 @@ def _is_deployment_start(event_type: str, status: str) -> bool:
     # Deployment creation events (deployment created, deployment updated starting rollout)
     event_type_lower = event_type.lower()
     if 'deployment' in event_type_lower:
-        if any(term in event_type_lower for term in ('create', 'created', 'initial', 'starting', 'started')):
+        if any(term in event_type_lower for term in ('create', 'created', 'initial', 'starting', 'started', 'rollback')):
             return True
 
     # ReplicaSet creation events (initial ReplicaSet created for deployment)

@@ -2215,6 +2215,244 @@ class TestRealLogSamples:
 
 
 # -----------------------------------------------------------------------------
+# Tests with actual deployment event data from 30-day history
+# -----------------------------------------------------------------------------
+
+class TestActualDeploymentEvents:
+    """
+    Tests using actual deployment events from the 30-day deployment history.
+
+    These events are extracted from real Kubernetes ReplicaSet and deployment
+    data collected between 2026-07-07 and 2026-08-06 for whisper-stt and pbx-web
+    services in the ardenone-cluster.
+    """
+
+    def test_actual_whisper_stt_deployment_rollout_v182(self):
+        """Actual whisper-stt deployment rollout - revision 29, image 1.8.2."""
+        event = {
+            'timestamp': '2026-07-08T03:09:35Z',
+            'service': 'whisper-stt',
+            'event_type': 'deployment_rollout',
+            'status': 'success',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'whisper-stt',
+            'metadata': {
+                'source_fields': {
+                    'replicaSet': 'whisper-stt-5dbff75cbd',
+                    'image': 'ronaldraygun/whisper-stt:1.8.2',
+                    'revision': 29,
+                    'outcome': 'success'
+                },
+                'raw_format': 'replicaset'
+            }
+        }
+        result = categorize_event(event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_actual_whisper_stt_deployment_rollout_v184(self):
+        """Actual whisper-stt deployment rollout - revision 30, image 1.8.4."""
+        event = {
+            'timestamp': '2026-07-08T03:16:13Z',
+            'service': 'whisper-stt',
+            'event_type': 'deployment_rollout',
+            'status': 'success',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'whisper-stt',
+            'metadata': {
+                'source_fields': {
+                    'replicaSet': 'whisper-stt-5b8558f478',
+                    'image': 'ronaldraygun/whisper-stt:1.8.4',
+                    'revision': 30,
+                    'outcome': 'success'
+                },
+                'raw_format': 'replicaset'
+            }
+        }
+        result = categorize_event(event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_actual_whisper_stt_deployment_rollout_v186(self):
+        """Actual whisper-stt deployment rollout - revision 31, image 1.8.6."""
+        event = {
+            'timestamp': '2026-07-08T03:26:44Z',
+            'service': 'whisper-stt',
+            'event_type': 'deployment_rollout',
+            'status': 'success',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'whisper-stt',
+            'metadata': {
+                'source_fields': {
+                    'replicaSet': 'whisper-stt-6c497489fb',
+                    'image': 'ronaldraygun/whisper-stt:1.8.6',
+                    'revision': 31,
+                    'outcome': 'success'
+                },
+                'raw_format': 'replicaset'
+            }
+        }
+        result = categorize_event(event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_actual_pbx_web_deployment_rollback(self):
+        """Actual pbx-web deployment rollback from 1.0.9 to 1.0.8."""
+        event = {
+            'timestamp': '2026-07-13T18:07:55Z',
+            'service': 'pbx-web',
+            'event_type': 'deployment_rollback',
+            'status': 'failure',
+            'error_code': 'rollback',
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'pbx-web',
+            'metadata': {
+                'source_fields': {
+                    'replicaSet': 'pbx-web-754f4cfdf7',
+                    'image': 'ronaldraygun/pbx-web:1.0.8',
+                    'revision': 11,
+                    'outcome': 'rolled_back'
+                },
+                'raw_format': 'replicaset'
+            }
+        }
+        result = categorize_event(event)
+        # Rollback is categorized as deployment_start (deployment lifecycle event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_actual_pbx_web_deployment_after_rollback(self):
+        """Actual pbx-web re-deployment of 1.0.9 after rollback."""
+        event = {
+            'timestamp': '2026-07-13T18:18:07Z',
+            'service': 'pbx-web',
+            'event_type': 'deployment_rollout',
+            'status': 'success',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'pbx-web',
+            'metadata': {
+                'source_fields': {
+                    'replicaSet': 'pbx-web-5ff68464d',
+                    'image': 'ronaldraygun/pbx-web:1.0.9',
+                    'revision': 14,
+                    'outcome': 'success'
+                },
+                'raw_format': 'replicaset'
+            }
+        }
+        result = categorize_event(event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_actual_pbx_rebuild_relay_deployment(self):
+        """Actual pbx-rebuild-relay deployment - infrastructure supporting service."""
+        event = {
+            'timestamp': '2026-07-15T03:24:40Z',
+            'service': 'pbx-rebuild-relay',
+            'event_type': 'deployment_rollout',
+            'status': 'success',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'pbx-web',
+            'metadata': {
+                'source_fields': {
+                    'replicaSet': 'pbx-rebuild-relay-588d79c5b9',
+                    'image': 'python:3-slim',
+                    'revision': 5,
+                    'outcome': 'success'
+                },
+                'raw_format': 'replicaset'
+            }
+        }
+        result = categorize_event(event)
+        assert result == EVENT_DEPLOYMENT_START
+
+    def test_actual_whisper_stt_current_deployment_complete(self):
+        """Actual whisper-stt current deployment with successful rollout completion."""
+        event = {
+            'timestamp': '2026-07-12T16:53:42Z',
+            'service': 'whisper-stt',
+            'event_type': 'replicaset_status',
+            'status': 'success',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'whisper-stt',
+            'metadata': {
+                'source_fields': {
+                    'replicaSet': 'whisper-stt-847fd8d7b9',
+                    'image': 'ronaldraygun/whisper-stt:1.8.6',
+                    'replicas': 1,
+                    'readyReplicas': 1,
+                    'availableReplicas': 1,
+                    'updatedReplicas': 1,
+                    'revision': 32,
+                    'outcome': 'success'
+                },
+                'raw_format': 'replicaset'
+            }
+        }
+        result = categorize_event(event)
+        assert result == EVENT_DEPLOYMENT_COMPLETE
+
+    def test_actual_pbx_web_current_deployment_complete(self):
+        """Actual pbx-web current deployment with all replicas ready."""
+        event = {
+            'timestamp': '2026-07-28T17:26:12Z',
+            'service': 'pbx-web',
+            'event_type': 'replicaset_status',
+            'status': 'success',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'pbx-web',
+            'metadata': {
+                'source_fields': {
+                    'replicaSet': 'pbx-web-5ff68464d',
+                    'image': 'ronaldraygun/pbx-web:1.0.9',
+                    'replicas': 3,
+                    'readyReplicas': 3,
+                    'availableReplicas': 3,
+                    'revision': 14,
+                    'outcome': 'success'
+                },
+                'raw_format': 'replicaset'
+            }
+        }
+        result = categorize_event(event)
+        assert result == EVENT_DEPLOYMENT_COMPLETE
+
+    def test_actual_lab_rebuild_relay_deployment(self):
+        """Actual lab-rebuild-relay deployment - supporting infrastructure."""
+        event = {
+            'timestamp': '2026-07-27T17:56:07Z',
+            'service': 'lab-rebuild-relay',
+            'event_type': 'deployment_rollout',
+            'status': 'success',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'pbx-web',
+            'metadata': {
+                'source_fields': {
+                    'replicaSet': 'lab-rebuild-relay-79957dbd4',
+                    'image': 'python:3-slim',
+                    'revision': 2,
+                    'outcome': 'success'
+                },
+                'raw_format': 'replicaset'
+            }
+        }
+        result = categorize_event(event)
+        assert result == EVENT_DEPLOYMENT_START
+
+
+# -----------------------------------------------------------------------------
 # Tests for unknown event fallback exclusivity
 # -----------------------------------------------------------------------------
 
