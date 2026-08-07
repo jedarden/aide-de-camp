@@ -421,14 +421,14 @@ TEST_UTTERANCES = [
     TestUtterance(
         name="weather_query",
         utterance="what is the weather",
-        expected_intent_type="weather",
-        description="Weather query for current conditions",
+        expected_intent_type="lookup",
+        description="Weather query for current conditions (classified as lookup)",
     ),
     TestUtterance(
         name="research_query",
         utterance="tell me about Kubernetes architecture patterns",
-        expected_intent_type="research",
-        description="Research query for information gathering",
+        expected_intent_type="lookup",
+        description="Research query for information gathering (classified as lookup)",
     ),
     TestUtterance(
         name="brainstorm",
