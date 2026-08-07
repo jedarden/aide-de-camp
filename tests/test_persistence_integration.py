@@ -27,25 +27,25 @@ from src.session.store import SessionStore
 # =============================================================================
 
 @pytest.mark.asyncio
-async def test_create_result_stores_all_fields(test_db_store, session_id: str) -> None:
+async def test_create_result_stores_all_fields(test_db_store, test_session_id: str) -> None:
     """Test result creation stores all synthesis output, fetch metadata, and timestamps."""
     # Create a topic for the result
     topic_id = await test_db_store.create_topic(
         label="Test Topic",
         topic_type="project",
         scope="session",
-        session_id=session_id
+        session_id=test_session_id
     )
 
     # Create an utterance and intent for the result
     utterance_id = await test_db_store.create_utterance(
-        session_id=session_id,
+        session_id=test_session_id,
         raw_text="test utterance for result"
     )
 
     intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
-        session_id=session_id,
+        session_id=test_session_id,
         project_slug="adc",
         intent_type="status",
         bead_ref="adc-test",
@@ -57,7 +57,7 @@ async def test_create_result_stores_all_fields(test_db_store, session_id: str) -
     result_id = await test_db_store.create_result(
         intent_id=intent_id,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Test result with all fields",
         data={
             "synthesis_output": "This is the synthesis output",
@@ -89,7 +89,7 @@ async def test_create_result_stores_all_fields(test_db_store, session_id: str) -
     assert result["id"] == result_id
     assert result["intent_id"] == intent_id
     assert result["topic_id"] == topic_id
-    assert result["session_id"] == session_id
+    assert result["session_id"] == test_session_id
     assert result["summary"] == "Test result with all fields"
     assert result["urgency"] == "high"
     assert result["result_type"] == "status:adc"
@@ -104,12 +104,11 @@ async def test_create_result_stores_all_fields(test_db_store, session_id: str) -
     assert result_data["structured_data"]["key"] == "value"
     assert result_data["structured_data"]["nested"]["field"] == "nested_value"
 
-    # Verify timestamps are set (created_at and surfaced_at should be recent)
+    # Verify timestamps are set (created_at is set on creation, surfaced_at is NULL until surfaced)
     assert result["created_at"] is not None
-    assert result["surfaced_at"] is not None
+    assert result["surfaced_at"] is None  # Not surfaced yet
     now = int(datetime.now().timestamp())
     assert abs(now - result["created_at"]) < 5  # Created within last 5 seconds
-    assert abs(now - result["surfaced_at"]) < 5  # Surfaced within last 5 seconds
 
     # Verify optional fields are correctly set to None
     assert result["acked_at"] is None
@@ -119,20 +118,20 @@ async def test_create_result_stores_all_fields(test_db_store, session_id: str) -
 
 
 @pytest.mark.asyncio
-async def test_create_result_with_diff_data(test_db_store, session_id: str) -> None:
+async def test_create_result_with_diff_data(test_db_store, test_session_id: str) -> None:
     """Test result creation with diff computation data."""
     topic_id = await test_db_store.create_topic(
         label="Diff Test Topic",
         topic_type="project",
         scope="session",
-        session_id=session_id
+        session_id=test_session_id
     )
 
     # Create first result
     first_result_id = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="First result",
         data={"status": "active", "count": 1},
         urgency="normal",
@@ -143,7 +142,7 @@ async def test_create_result_with_diff_data(test_db_store, session_id: str) -> N
     second_result_id = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Second result",
         data={"status": "pending", "count": 2},
         urgency="normal",
@@ -172,20 +171,20 @@ async def test_create_result_with_diff_data(test_db_store, session_id: str) -> N
 
 
 @pytest.mark.asyncio
-async def test_create_result_card_fallback_flag(test_db_store, session_id: str) -> None:
+async def test_create_result_card_fallback_flag(test_db_store, test_session_id: str) -> None:
     """Test result creation correctly stores card_fallback flag."""
     topic_id = await test_db_store.create_topic(
         label="Fallback Test Topic",
         topic_type="project",
         scope="session",
-        session_id=session_id
+        session_id=test_session_id
     )
 
     # Create result with card_fallback=True
     result_with_fallback = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Result with generic card fallback",
         data={"message": "No component matched"},
         urgency="normal",
@@ -197,7 +196,7 @@ async def test_create_result_card_fallback_flag(test_db_store, session_id: str) 
     result_without_fallback = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Result with specific component",
         data={"message": "Component rendered successfully"},
         urgency="normal",
@@ -220,12 +219,12 @@ async def test_create_result_card_fallback_flag(test_db_store, session_id: str) 
 # =============================================================================
 
 @pytest.mark.asyncio
-async def test_find_or_create_topic_returns_existing_on_duplicate(test_db_store, session_id: str) -> None:
+async def test_find_or_create_topic_returns_existing_on_duplicate(test_db_store, test_session_id: str) -> None:
     """Test find_or_create_topic returns existing topic on duplicate label."""
     # Create initial topic
     first_id, first_created = await test_db_store.find_or_create_topic(
         label="Duplicate Test Topic",
-        session_id=session_id,
+        session_id=test_session_id,
         topic_type="project",
         project_slugs=["test-project"]
     )
@@ -236,7 +235,7 @@ async def test_find_or_create_topic_returns_existing_on_duplicate(test_db_store,
     # Call again with same label and session
     second_id, second_created = await test_db_store.find_or_create_topic(
         label="Duplicate Test Topic",
-        session_id=session_id,
+        session_id=test_session_id,
         topic_type="project",
         project_slugs=["test-project"]
     )
@@ -245,12 +244,12 @@ async def test_find_or_create_topic_returns_existing_on_duplicate(test_db_store,
     assert second_id == first_id, "Should return same topic ID"
 
     # Verify only one topic exists in database
-    topics = await test_db_store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(test_session_id)
     assert len(topics) == 1, "Should have exactly one topic"
 
 
 @pytest.mark.asyncio
-async def test_topic_retrieval_with_all_fields(test_db_store, session_id: str) -> None:
+async def test_topic_retrieval_with_all_fields(test_db_store, test_session_id: str) -> None:
     """Test topic retrieval returns all fields correctly."""
     # Create topic with all parameters
     topic_id = await test_db_store.create_topic(
@@ -258,7 +257,7 @@ async def test_topic_retrieval_with_all_fields(test_db_store, session_id: str) -
         topic_type="research",
         project_slugs=["project-a", "project-b"],
         scope="session",
-        session_id=session_id
+        session_id=test_session_id
     )
 
     # Retrieve the topic
@@ -271,7 +270,7 @@ async def test_topic_retrieval_with_all_fields(test_db_store, session_id: str) -
     assert topic["type"] == "research"
     assert topic["project_slugs"] == ["project-a", "project-b"]
     assert topic["scope"] == "session"
-    assert topic["session_id"] == session_id
+    assert topic["session_id"] == test_session_id
     assert topic["archived_at"] is None
 
     # Verify timestamps
@@ -287,12 +286,12 @@ async def test_topic_retrieval_with_all_fields(test_db_store, session_id: str) -
 # =============================================================================
 
 @pytest.mark.asyncio
-async def test_create_utterance_links_to_results(test_db_store, session_id: str) -> None:
+async def test_create_utterance_links_to_results(test_db_store, test_session_id: str) -> None:
     """Test utterance → intent → result linkage chain."""
     # Create utterance
     utterance_text = "Show me the status of pbx-web"
     utterance_id = await test_db_store.create_utterance(
-        session_id=session_id,
+        session_id=test_session_id,
         raw_text=utterance_text
     )
 
@@ -300,7 +299,7 @@ async def test_create_utterance_links_to_results(test_db_store, session_id: str)
     utterance = await test_db_store.get_utterance(utterance_id)
     assert utterance is not None
     assert utterance["raw_text"] == utterance_text
-    assert utterance["session_id"] == session_id
+    assert utterance["session_id"] == test_session_id
 
     # Create topic
     topic_id = await test_db_store.create_topic(
@@ -308,13 +307,13 @@ async def test_create_utterance_links_to_results(test_db_store, session_id: str)
         topic_type="project",
         project_slugs=["pbx-web"],
         scope="session",
-        session_id=session_id
+        session_id=test_session_id
     )
 
     # Create intent linked to utterance
     intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
-        session_id=session_id,
+        session_id=test_session_id,
         project_slug="pbx-web",
         intent_type="status",
         bead_ref=None,
@@ -326,14 +325,14 @@ async def test_create_utterance_links_to_results(test_db_store, session_id: str)
     intent = await test_db_store.get_intent(intent_id)
     assert intent is not None
     assert intent["utterance_id"] == utterance_id
-    assert intent["session_id"] == session_id
+    assert intent["session_id"] == test_session_id
     assert intent["topic_id"] == topic_id
 
     # Create result linked to intent
     result_id = await test_db_store.create_result(
         intent_id=intent_id,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="pbx-web is running",
         data={
             "status": "running",
@@ -349,7 +348,7 @@ async def test_create_utterance_links_to_results(test_db_store, session_id: str)
     assert result is not None
     assert result["intent_id"] == intent_id
     assert result["topic_id"] == topic_id
-    assert result["session_id"] == session_id
+    assert result["session_id"] == test_session_id
 
     # Verify complete chain: utterance → intent → result
     # Retrieve results for the intent
@@ -364,10 +363,10 @@ async def test_create_utterance_links_to_results(test_db_store, session_id: str)
 
 
 @pytest.mark.asyncio
-async def test_utterance_router_timing_breakdown(test_db_store, session_id: str) -> None:
+async def test_utterance_router_timing_breakdown(test_db_store, test_session_id: str) -> None:
     """Test utterance stores router timing breakdown."""
     utterance_id = await test_db_store.create_utterance(
-        session_id=session_id,
+        session_id=test_session_id,
         raw_text="test utterance with timing"
     )
 
@@ -852,20 +851,20 @@ async def test_cross_session_vs_session_scoped_isolation(test_db_store) -> None:
 # =============================================================================
 
 @pytest.mark.asyncio
-async def test_result_type_for_component_selection(test_db_store, session_id: str) -> None:
+async def test_result_type_for_component_selection(test_db_store, test_session_id: str) -> None:
     """Test that result_type is stored correctly for component selection."""
     topic_id = await test_db_store.create_topic(
         label="Component Selection Test",
         topic_type="project",
         scope="session",
-        session_id=session_id
+        session_id=test_session_id
     )
 
     # Create results with different result_types
     status_result = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Status result",
         data={"status": "running"},
         urgency="normal",
@@ -875,7 +874,7 @@ async def test_result_type_for_component_selection(test_db_store, session_id: st
     lookup_result = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Lookup result",
         data={"logs": "output"},
         urgency="normal",
@@ -885,7 +884,7 @@ async def test_result_type_for_component_selection(test_db_store, session_id: st
     monitoring_result = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Monitoring result",
         data={"metrics": {"cpu": 50}},
         urgency="normal",
@@ -903,7 +902,7 @@ async def test_result_type_for_component_selection(test_db_store, session_id: st
     assert monitoring["result_type"] == "monitoring:pbx-web"
 
     # Verify get_latest_results_by_type returns one result per type
-    latest_results = await test_db_store.get_latest_results_by_type(session_id)
+    latest_results = await test_db_store.get_latest_results_by_type(test_session_id)
     assert len(latest_results) == 3, "Should have one result per result_type"
 
     result_types = {r["result_type"] for r in latest_results}
@@ -915,20 +914,20 @@ async def test_result_type_for_component_selection(test_db_store, session_id: st
 # =============================================================================
 
 @pytest.mark.asyncio
-async def test_result_urgency_levels(test_db_store, session_id: str) -> None:
+async def test_result_urgency_levels(test_db_store, test_session_id: str) -> None:
     """Test that all urgency levels are stored correctly."""
     topic_id = await test_db_store.create_topic(
         label="Urgency Test",
         topic_type="exception",
         scope="session",
-        session_id=session_id
+        session_id=test_session_id
     )
 
     # Create results with different urgency levels
     critical_result = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Critical issue",
         data={"issue": "system down"},
         urgency="critical"
@@ -937,7 +936,7 @@ async def test_result_urgency_levels(test_db_store, session_id: str) -> None:
     high_result = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="High priority issue",
         data={"issue": "degraded performance"},
         urgency="high"
@@ -946,7 +945,7 @@ async def test_result_urgency_levels(test_db_store, session_id: str) -> None:
     normal_result = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Normal update",
         data={"status": "running"},
         urgency="normal"
@@ -955,7 +954,7 @@ async def test_result_urgency_levels(test_db_store, session_id: str) -> None:
     low_result = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
-        session_id=session_id,
+        session_id=test_session_id,
         summary="Low priority info",
         data={"info": "minor event"},
         urgency="low"
