@@ -225,9 +225,12 @@ def _is_deployment_start(event_type: str, status: str) -> bool:
     Check if event represents a deployment starting.
 
     Deployment start detection rules:
-    - event_type starts with 'deployment_' and status is 'success'
-    - event_type is 'event_started' or 'event_pulled'
-    - Kubernetes event with reason 'Started' or 'Pulling'
+    - event_type starts with 'deployment_' and status is 'success', 'warning', or 'created'
+    - event_type contains 'deployment' and 'create' (deployment creation events)
+    - event_type is 'replicaset_status' or contains 'replicaset' with creation indicators
+    - event_type is 'event_started', 'event_pulling', 'event_pullings', or 'event_created'
+    - status is 'created' (indicating resource creation)
+    - Kubernetes event with reason 'Started', 'Pulling', or 'Created'
 
     Args:
         event_type: Event type from parsed event
@@ -236,12 +239,29 @@ def _is_deployment_start(event_type: str, status: str) -> bool:
     Returns:
         True if event indicates deployment start, False otherwise
     """
+    # Check for creation status (highest priority for deployment start)
+    if status == 'created':
+        # Deployment or ReplicaSet creation events
+        if 'deployment' in event_type.lower() or 'replicaset' in event_type.lower():
+            return True
+
     # Deployment events that indicate start
-    if event_type.startswith('deployment_') and status in ('success', 'warning'):
+    if event_type.startswith('deployment_') and status in ('success', 'warning', 'created'):
         return True
 
-    # Kubernetes events indicating start
-    if event_type in ('event_started', 'event_pulling', 'event_pullings'):
+    # Deployment creation events (deployment created, deployment updated starting rollout)
+    event_type_lower = event_type.lower()
+    if 'deployment' in event_type_lower:
+        if any(term in event_type_lower for term in ('create', 'created', 'initial', 'starting', 'started')):
+            return True
+
+    # ReplicaSet creation events (initial ReplicaSet created for deployment)
+    if 'replicaset' in event_type_lower:
+        if any(term in event_type_lower for term in ('create', 'created', 'initial', 'new', 'generation')):
+            return True
+
+    # Kubernetes events indicating start or creation
+    if event_type in ('event_started', 'event_pulling', 'event_pullings', 'event_created', 'event_creating'):
         return True
 
     return False
