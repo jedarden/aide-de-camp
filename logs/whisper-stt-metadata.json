@@ -1,0 +1,29 @@
+{
+  "total_record_count": 97399,
+  "time_range": {
+    "first_timestamp": "2026-07-10T13:39:33.767796087-04:00",
+    "last_timestamp": "2026-08-07T01:46:14.146291384-04:00"
+  },
+  "pods_included": [
+    "whisper-openai-68966786fb-jsb5d"
+  ],
+  "file_size_bytes": 22109573,
+  "collection_timestamp": "2026-08-07T05:55:22.563019Z",
+  "data_fields": [
+    "timestamp",
+    "pod_name",
+    "namespace",
+    "log_message",
+    "source"
+  ],
+  "collection_method": "kubectl logs via ardenone-cluster proxy",
+  "cluster": "ardenone-cluster",
+  "namespace": "whisper-stt",
+  "known_issues": [
+    "whisper-stt-847fd8d7b9-v2rs5 pod produces no stdout/stderr logs",
+    "Collection dominated by health check logs (GET /health requests)",
+    "No centralized log aggregation available in cluster",
+    "Container runtime retention limits historical coverage"
+  ],
+  "completeness": "100% of available stdout/stderr logs from whisper-openai pod"
+}
