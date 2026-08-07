@@ -24,8 +24,39 @@ class GitError(RuntimeError):
 
 
 class GitConflictError(GitError):
-    """Raised when git operations encounter merge conflicts or rejection."""
-    pass
+    """
+    Raised when git operations encounter merge conflicts or rejection.
+
+    Attributes:
+        message: Error message describing the conflict
+        conflict_files: List of files with conflicts (if detected)
+        conflict_type: Type of conflict (merge, push_rejection, etc.)
+        details: Additional context about the conflict
+    """
+    def __init__(
+        self,
+        message: str,
+        conflict_files: list[str] | None = None,
+        conflict_type: str = "merge",
+        details: dict | None = None,
+    ):
+        super().__init__(message)
+        self.conflict_files = conflict_files or []
+        self.conflict_type = conflict_type
+        self.details = details or {}
+
+    def __str__(self) -> str:
+        """Return formatted error message with conflict details."""
+        base_msg = super().__str__()
+        if self.conflict_files:
+            files_msg = f"\nConflicting files ({len(self.conflict_files)}): {', '.join(self.conflict_files[:5])}"
+            if len(self.conflict_files) > 5:
+                files_msg += f" ... and {len(self.conflict_files) - 5} more"
+            base_msg += files_msg
+        if self.details:
+            details_msg = "\nDetails: " + ", ".join(f"{k}={v}" for k, v in self.details.items())
+            base_msg += details_msg
+        return base_msg
 
 
 class GitNetworkError(GitError):
@@ -329,6 +360,110 @@ def check_file_permissions(
     except Exception as e:
         # Log but don't fail - permission checks can be flaky in some environments
         logger.debug(f"Could not verify file permissions: {e}")
+
+
+def detect_merge_conflicts(
+    repo_path: str | Path,
+    timeout: int = 10,
+) -> list[str]:
+    """
+    Detect files with merge conflict markers in the working directory.
+
+    This function actively scans the repository for conflict markers (<<<<<<<,
+    =======, >>>>>>>) in tracked files to identify which files have unresolved
+    merge conflicts.
+
+    Args:
+        repo_path: Path to the repository
+        timeout: Timeout in seconds for git commands
+
+    Returns:
+        List of file paths (relative to repo root) that contain conflict markers
+
+    Raises:
+        GitStateError: If repository check fails
+        GitNetworkError: If git command times out
+
+    Example:
+        >>> conflicts = detect_merge_conflicts("/path/to/repo")
+        >>> if conflicts:
+        ...     raise GitConflictError(
+        ...         "Merge conflicts detected",
+        ...         conflict_files=conflicts,
+        ...         conflict_type="merge"
+        ...     )
+    """
+    repo_path = Path(repo_path)
+
+    try:
+        # First check if we're in a merge/rebase/cherry-pick state
+        # This is faster than scanning all files
+        merge_head = repo_path / ".git" / "MERGE_HEAD"
+        rebase_merge = repo_path / ".git" / "rebase" / "merge"
+        cherry_pick_head = repo_path / ".git" / "CHERRY_PICK_HEAD"
+
+        in_merge_state = (
+            merge_head.exists() or
+            rebase_merge.exists() or
+            cherry_pick_head.exists()
+        )
+
+        if not in_merge_state:
+            # Not in any conflict state, return early
+            logger.debug(f"No merge conflict state detected in {repo_path}")
+            return []
+
+        # Search for files with conflict markers using git grep
+        # This is more efficient than scanning all files manually
+        result = subprocess.run(
+            ["git", "-C", str(repo_path), "grep", "--cached", "-l", "^<<<<<<< "],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+
+        # Also check working directory for unstaged conflicts
+        result_working = subprocess.run(
+            ["git", "-C", str(repo_path), "grep", "-l", "^<<<<<<< "],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+
+        conflict_files = []
+
+        # Parse cached (staged) conflicts
+        if result.stdout.strip():
+            files = result.stdout.strip().split("\n")
+            conflict_files.extend(files)
+
+        # Parse working directory conflicts
+        if result_working.stdout.strip():
+            files = result_working.stdout.strip().split("\n")
+            conflict_files.extend(files)
+
+        # Remove duplicates and sort
+        conflict_files = sorted(set(conflict_files))
+
+        if conflict_files:
+            logger.warning(
+                f"Detected {len(conflict_files)} file(s) with merge conflicts: "
+                f"{', '.join(conflict_files[:5])}"
+                + (f" ... and {len(conflict_files) - 5} more" if len(conflict_files) > 5 else "")
+            )
+
+        return conflict_files
+
+    except subprocess.TimeoutExpired:
+        raise GitNetworkError("Git conflict detection timed out")
+    except FileNotFoundError:
+        raise GitStateError("Git command not found - ensure git is installed")
+    except Exception as e:
+        logger.error(f"Failed to detect merge conflicts: {e}")
+        # Don't raise - conflict detection is best-effort
+        return []
 
 
 def check_and_clean_git_locks(

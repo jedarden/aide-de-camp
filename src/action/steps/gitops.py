@@ -34,6 +34,7 @@ from .git_validation import (
     GitAuthenticationError,
     GitStateError,
     PreflightGitValidation,
+    detect_merge_conflicts,
 )
 
 logger = logging.getLogger(__name__)
@@ -565,10 +566,33 @@ class GitOpsCommitStep:
                 # Check for authentication failures
                 if any(pattern in error_output for pattern in ["authentication", "permission denied", "credentials", "auth"]):
                     raise GitAuthenticationError(f"Git authentication failed during commit: {result.stderr.strip()}")
-                # Check for merge conflicts
-                if "merge conflict" in error_output:
-                    raise GitConflictError(f"Merge conflict detected during commit: {result.stderr.strip()}")
+
+                # Check for merge conflicts in error message
+                if "merge conflict" in error_output or "fix conflicts" in error_output:
+                    # Detect actual conflicting files
+                    conflict_files = detect_merge_conflicts(self.declarative_config_path, timeout=5)
+                    raise GitConflictError(
+                        f"Merge conflict detected during commit: {result.stderr.strip()}",
+                        conflict_files=conflict_files,
+                        conflict_type="merge",
+                        details={"operation": "commit"}
+                    )
                 raise GitError(f"git commit failed: {result.stderr.strip()}")
+
+            # After successful commit, still check for lingering conflict state
+            # This catches cases where commit succeeded but left conflicts behind
+            try:
+                conflict_files = detect_merge_conflicts(self.declarative_config_path, timeout=5)
+                if conflict_files:
+                    raise GitConflictError(
+                        "Merge conflicts detected after commit - repository is in conflicted state",
+                        conflict_files=conflict_files,
+                        conflict_type="merge",
+                        details={"operation": "post_commit_check"}
+                    )
+            except (GitStateError, GitNetworkError) as e:
+                # Don't fail commit for detection errors, just log
+                logger.warning(f"Could not check for conflicts after commit: {e}")
 
             # Extract commit SHA
             result = subprocess.run(
@@ -644,11 +668,28 @@ class GitOpsCommitStep:
             # Detect common push failures
             if "rejected" in error_msg or "rejected" in stdout_msg:
                 if "non-fast-forward" in error_msg or "non-fast-forward" in stdout_msg:
-                    raise GitConflictError(f"Non-fast-forward push: {result.stderr.strip()} - remote has new commits, pull required")
+                    raise GitConflictError(
+                        f"Non-fast-forward push: {result.stderr.strip()} - remote has new commits, pull required",
+                        conflict_files=[],
+                        conflict_type="push_rejection",
+                        details={"reason": "non_fast_forward", "hint": "pull remote changes first"}
+                    )
                 else:
-                    raise GitConflictError(f"Push rejected: {result.stderr.strip()} - may need to pull remote changes first")
+                    raise GitConflictError(
+                        f"Push rejected: {result.stderr.strip()} - may need to pull remote changes first",
+                        conflict_files=[],
+                        conflict_type="push_rejection",
+                        details={"reason": "unknown"}
+                    )
             elif "merge conflict" in error_msg or "merge conflict" in stdout_msg:
-                raise GitConflictError(f"Merge conflict detected: {result.stderr.strip()}")
+                # Detect actual conflicting files after push failure
+                conflict_files = detect_merge_conflicts(self.declarative_config_path, timeout=5)
+                raise GitConflictError(
+                    f"Merge conflict detected: {result.stderr.strip()}",
+                    conflict_files=conflict_files,
+                    conflict_type="merge",
+                    details={"operation": "push"}
+                )
             else:
                 raise GitError(f"git push failed: {result.stderr.strip()}")
 
