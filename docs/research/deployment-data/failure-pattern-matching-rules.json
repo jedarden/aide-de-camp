@@ -1,0 +1,888 @@
+{
+  "metadata": {
+    "title": "Deployment Failure Pattern Matching Rules",
+    "version": "1.0.0",
+    "created": "2026-08-06T21:41:03.820530",
+    "purpose": "Comprehensive pattern-matching rules for identifying deployment failure types",
+    "scope": "Kubernetes deployment failures, pod lifecycle issues, and dependency problems"
+  },
+  "pattern_hierarchy": {
+    "levels": [
+      {
+        "level": 1,
+        "name": "Critical Infrastructure",
+        "description": "Failures that prevent pod startup entirely",
+        "patterns": ["ImagePullBackOff", "VolumeMountFailure", "ConfigMapMissing", "SecretMissing"]
+      },
+      {
+        "level": 2,
+        "name": "Runtime Failures",
+        "description": "Failures during pod execution",
+        "patterns": ["CrashLoopBackOff", "OOMKilled", "RuntimeError", "UncaughtException"]
+      },
+      {
+        "level": 3,
+        "name": "Health Check Failures",
+        "description": "Failures detected by probes",
+        "patterns": ["ReadinessProbeFailure", "LivenessProbeFailure", "StartupProbeFailure"]
+      },
+      {
+        "level": 4,
+        "name": "Dependency Issues",
+        "description": "Failures related to external services",
+        "patterns": ["DependencyTimeout", "DatabaseConnectionFailure", "APIServiceUnavailable", "NetworkPolicyBlocked"]
+      },
+      {
+        "level": 5,
+        "name": "Deployment Process Issues",
+        "description": "Issues with deployment orchestration",
+        "patterns": ["DeploymentRollback", "ReplicaSetFailure", "ProgressDeadlineExceeded"]
+      }
+    ]
+  },
+  "pattern_matching_rules": [
+    {
+      "pattern_id": "ImagePullBackOff",
+      "category": "Critical Infrastructure",
+      "severity": "critical",
+      "description": "Container image cannot be pulled from registry",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "pod.phase",
+            "operator": "contains",
+            "value": "Failed"
+          },
+          {
+            "field": "pod.containerStatuses.state.waiting.reason",
+            "operator": "equals",
+            "value": "ImagePullBackOff"
+          },
+          {
+            "field": "pod.containerStatuses.state.waiting.reason",
+            "operator": "equals",
+            "value": "ErrImagePull"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "Failed to pull image"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "ImagePullBackOff"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "registry"
+          },
+          {
+            "field": "events.reason",
+            "operator": "equals",
+            "value": "Pulling"
+          }
+        ],
+        "log_patterns": [
+          ".*Failed to pull image.*",
+          ".*ErrImagePull.*",
+          ".*BackOff pulling image.*",
+          ".*registry.*timeout.*",
+          ".*manifest.*not found.*",
+          ".*unauthorized.*",
+          ".*authentication.*failed.*"
+        ]
+      },
+      "example_messages": [
+        "Failed to pull image \"ronaldraygun/service:latest\": rpc error: code = Unknown desc = Error response from daemon: pull access denied",
+        "Back-off pulling image \"example.com/image:tag\"",
+        "ErrImagePull: rpc error: code = NotFound desc = image repository not found",
+        "ImagePullBackOff: Cannot pull image: connection timeout"
+      ],
+      "common_causes": [
+        "Image does not exist in registry",
+        "Registry authentication failure",
+        "Network connectivity to registry",
+        "Image tag or name typo",
+        "Private registry access denied"
+      ],
+      "resolution_hints": [
+        "Verify image exists in registry",
+        "Check image pull secrets",
+        "Test network connectivity to registry",
+        "Validate image tag spelling"
+      ]
+    },
+    {
+      "pattern_id": "CrashLoopBackOff",
+      "category": "Runtime Failures",
+      "severity": "critical",
+      "description": "Pod repeatedly crashes and Kubernetes gives up restarting",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "pod.status.phase",
+            "operator": "equals",
+            "value": "Running"
+          },
+          {
+            "field": "pod.containerStatuses.state.waiting.reason",
+            "operator": "equals",
+            "value": "CrashLoopBackOff"
+          },
+          {
+            "field": "pod.containerStatuses.restartCount",
+            "operator": "greater_than",
+            "value": 4
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "pod.containerStatuses.lastState.terminated.reason",
+            "operator": "equals",
+            "value": "Error"
+          },
+          {
+            "field": "pod.containerStatuses.lastState.terminated.reason",
+            "operator": "equals",
+            "value": "ContainerCannotRun"
+          },
+          {
+            "field": "events.reason",
+            "operator": "equals",
+            "value": "BackOff"
+          }
+        ],
+        "log_patterns": [
+          ".*CrashLoopBackOff.*",
+          ".*back-off restarting.*",
+          ".*container.*was terminated.*",
+          ".*exit code.*[1-9].*",
+          ".*Error:.*",
+          ".*Exception:.*",
+          ".*panic:.*"
+        ]
+      },
+      "example_messages": [
+        "back-off restarting failed container",
+        "Container crashed with exit code 1",
+        "Pod was terminated due to excessive restarts",
+        "Application error: missing required configuration"
+      ],
+      "common_causes": [
+        "Application code errors",
+        "Missing environment variables",
+        "Incorrect command or arguments",
+        "Missing dependencies or libraries",
+        "Runtime exceptions not caught",
+        "Resource constraints causing crashes"
+      ],
+      "resolution_hints": [
+        "Check container logs for application errors",
+        "Verify environment variables are set",
+        "Validate command and arguments",
+        "Check for missing dependencies",
+        "Review application error handling"
+      ]
+    },
+    {
+      "pattern_id": "OOMKilled",
+      "category": "Runtime Failures",
+      "severity": "critical",
+      "description": "Container killed for exceeding memory limits",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "pod.containerStatuses.lastState.terminated.reason",
+            "operator": "equals",
+            "value": "OOMKilled"
+          },
+          {
+            "field": "events.reason",
+            "operator": "equals",
+            "value": "Killing"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "OOMKilled"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "exceeded memory limits"
+          },
+          {
+            "field": "pod.containerStatuses.state.terminated.reason",
+            "operator": "equals",
+            "value": "OOMKilled"
+          }
+        ],
+        "log_patterns": [
+          ".*OOMKilled.*",
+          ".*memory.*limit.*exceeded.*",
+          ".*out of memory.*",
+          ".*Memory cgroup.*",
+          ".*killed.*"
+        ]
+      },
+      "example_messages": [
+        "Container was killed (exit code 137) due to OOMKilled",
+        "Exceeded memory limits: current usage 512Mi, limit 256Mi",
+        "Process killed due to memory exhaustion"
+      ],
+      "common_causes": [
+        "Memory leaks in application",
+        "Memory limits set too low",
+        "Sudden increase in memory usage",
+        "Large file processing",
+        "Memory-intensive operations"
+      ],
+      "resolution_hints": [
+        "Increase memory limits in container spec",
+        "Investigate memory leaks in application",
+        "Add memory monitoring and profiling",
+        "Optimize memory usage"
+      ]
+    },
+    {
+      "pattern_id": "ReadinessProbeFailure",
+      "category": "Health Check Failures",
+      "severity": "medium",
+      "description": "Readiness probe repeatedly fails, preventing pod from receiving traffic",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "pod.status.conditions[?(@.type=='Ready')].status",
+            "operator": "equals",
+            "value": "False"
+          },
+          {
+            "field": "pod.containerStatuses.state.waiting.reason",
+            "operator": "equals",
+            "value": "RunError"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.reason",
+            "operator": "equals",
+            "value": "Unhealthy"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "readiness probe failed"
+          }
+        ],
+        "log_patterns": [
+          ".*readiness.*probe.*failed.*",
+          ".*Readiness.*failed.*",
+          ".*GET /health.*returned 400.*",
+          ".*Connection refused.*",
+          ".*timeout.*waiting for.*ready.*"
+        ]
+      },
+      "example_messages": [
+        "Readiness probe failed: GET http://localhost:8080/health returned 503",
+        "Readiness probe failed: connection refused",
+        "Container not ready after 30 seconds"
+      ],
+      "common_causes": [
+        "Application not fully started",
+        "Health endpoint returning wrong status",
+        "Dependencies not ready",
+        "Port not listening",
+        "Startup time exceeds probe timeout"
+      ],
+      "resolution_hints": [
+        "Increase initialDelaySeconds",
+        "Increase probe timeout",
+        "Check application startup time",
+        "Verify health endpoint logic"
+      ]
+    },
+    {
+      "pattern_id": "LivenessProbeFailure",
+      "category": "Health Check Failures",
+      "severity": "high",
+      "description": "Liveness probe fails, causing pod restart",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "pod.containerStatuses.lastState.terminated.reason",
+            "operator": "contains",
+            "value": "Error"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "liveness probe failed"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.reason",
+            "operator": "equals",
+            "value": "Unhealthy"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "killing container"
+          }
+        ],
+        "log_patterns": [
+          ".*liveness.*probe.*failed.*",
+          ".*Liveness.*failed.*",
+          ".*killing.*container.*unhealthy.*",
+          ".*deadlock.*detected.*",
+          ".*application.*hung.*"
+        ]
+      },
+      "example_messages": [
+        "Liveness probe failed: killing container",
+        "Container restarted due to failed liveness probe",
+        "Application hung, liveness probe timeout"
+      ],
+      "common_causes": [
+        "Application deadlock",
+        "Application hung state",
+        "Liveness endpoint too strict",
+        "Long-running operations blocking probe",
+        "Infinite loops or blocking calls"
+      ],
+      "resolution_hints": [
+        "Check for deadlocks in application",
+        "Increase liveness probe period",
+        "Review liveness endpoint logic",
+        "Add timeout to long operations"
+      ]
+    },
+    {
+      "pattern_id": "StartupProbeFailure",
+      "category": "Health Check Failures",
+      "severity": "high",
+      "description": "Startup probe fails during container initialization",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "pod.containerStatuses.lastState.terminated.reason",
+            "operator": "contains",
+            "value": "Error"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "startup probe failed"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.reason",
+            "operator": "equals",
+            "value": "Failed"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "failed startup probe"
+          }
+        ],
+        "log_patterns": [
+          ".*startup.*probe.*failed.*",
+          ".*Startup.*failed.*",
+          ".*container.*did not start.*",
+          ".*initialization.*timeout.*"
+        ]
+      },
+      "example_messages": [
+        "Startup probe failed: container did not start within timeout",
+        "Failed startup probe: application not responding",
+        "Container initialization exceeded deadline"
+      ],
+      "common_causes": [
+        "Application startup time too long",
+        "Missing dependencies blocking startup",
+        "Configuration errors preventing startup",
+        "Initialization failures"
+      ],
+      "resolution_hints": [
+        "Increase startup probe timeout and period",
+        "Check application startup logs",
+        "Verify startup dependencies",
+        "Review initialization code"
+      ]
+    },
+    {
+      "pattern_id": "DependencyTimeout",
+      "category": "Dependency Issues",
+      "severity": "high",
+      "description": "Application cannot connect to required external services",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "pod.containerStatuses.state.waiting.reason",
+            "operator": "contains",
+            "value": "RunError"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "timeout"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "connection refused"
+          }
+        ],
+        "log_patterns": [
+          ".*timeout.*connecting to.*",
+          ".*connection.*refused.*",
+          ".*service.*unavailable.*",
+          ".*database.*connection.*failed.*",
+          ".*upstream.*timeout.*",
+          ".*DNS.*lookup.*failed.*",
+          ".*network.*unreachable.*"
+        ]
+      },
+      "example_messages": [
+        "Timeout connecting to database: postgresql.default.svc.cluster.local:5432",
+        "Connection refused: API service not available",
+        "Service unavailable: dependency timeout after 30s",
+        "Failed to resolve DNS: api-service.example.com"
+      ],
+      "common_causes": [
+        "Dependency service not ready",
+        "Network policies blocking connections",
+        "DNS resolution failures",
+        "Service discovery issues",
+        "Network connectivity problems"
+      ],
+      "resolution_hints": [
+        "Check dependency service is running",
+        "Verify network policies allow traffic",
+        "Test DNS resolution",
+        "Check service endpoints",
+        "Review connection timeouts"
+      ]
+    },
+    {
+      "pattern_id": "DatabaseConnectionFailure",
+      "category": "Dependency Issues",
+      "severity": "high",
+      "description": "Cannot establish connection to database",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "database"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "connection"
+          }
+        ],
+        "log_patterns": [
+          ".*database.*connection.*failed.*",
+          ".*could not connect to.*database.*",
+          ".*SQL.*connection.*error.*",
+          ".*authentication.*failed.*database.*",
+          ".*database.*unreachable.*"
+        ]
+      },
+      "example_messages": [
+        "Failed to connect to database: connection refused",
+        "Database authentication failed: invalid credentials",
+        "SQL connection error: timeout",
+        "Cannot reach database server"
+      ],
+      "common_causes": [
+        "Database not available",
+        "Wrong connection string",
+        "Authentication failures",
+        "Network issues to database",
+        "Database overloaded"
+      ],
+      "resolution_hints": [
+        "Verify database is accessible",
+        "Check connection string",
+        "Validate database credentials",
+        "Test network connectivity to database"
+      ]
+    },
+    {
+      "pattern_id": "DeploymentRollback",
+      "category": "Deployment Process Issues",
+      "severity": "medium",
+      "description": "Deployment was rolled back to previous version",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "deployment.status",
+            "operator": "contains",
+            "value": "rolledback"
+          },
+          {
+            "field": "events.reason",
+            "operator": "equals",
+            "value": "Rollback"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "rolled back"
+          },
+          {
+            "field": "deployment.conditions",
+            "operator": "contains",
+            "value": "Progressing-False"
+          }
+        ],
+        "log_patterns": [
+          ".*rolled back to.*",
+          ".*deployment.*rollback.*",
+          ".*revert to.*version.*",
+          ".*previous.*version.*deployed.*",
+          ".*deployment.*failed.*rolling.*back.*"
+        ]
+      },
+      "example_messages": [
+        "Deployment rolled back to revision 11",
+        "Rolled back to previous version due to failed health checks",
+        "Deployment failure - reverted to stable version",
+        "Automatic rollback triggered by failed readiness probe"
+      ],
+      "common_causes": [
+        "Health check failures",
+        "Configuration errors",
+        "Performance degradation",
+        "Critical bugs detected",
+        "Manual rollback decision"
+      ],
+      "resolution_hints": [
+        "Review deployment logs for root cause",
+        "Fix issues in failed version",
+        "Test before redeploying",
+        "Consider gradual rollout strategies"
+      ]
+    },
+    {
+      "pattern_id": "VolumeMountFailure",
+      "category": "Critical Infrastructure",
+      "severity": "critical",
+      "description": "Cannot mount required volume",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "pod.containerStatuses.state.waiting.reason",
+            "operator": "contains",
+            "value": "ContainerCreating"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "volume"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.reason",
+            "operator": "equals",
+            "value": "Failed"
+          },
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "mount"
+          }
+        ],
+        "log_patterns": [
+          ".*volume.*mount.*failed.*",
+          ".*persistentvolume.*not found.*",
+          ".*persistentvolumeclaim.*not found.*",
+          ".*cannot.*mount.*volume.*",
+          ".*volume.*attachment.*failed.*"
+        ]
+      },
+      "example_messages": [
+        "Volume mount failed: persistentvolumeclaim 'data-pvc' not found",
+        "Cannot mount volume: PVC does not exist",
+        "Failed to attach volume: timeout",
+        "Volume 'config-volume' not found"
+      ],
+      "common_causes": [
+        "PVC not created",
+        "PV not available",
+        "Storage class issues",
+        "Volume attachment failures",
+        "Wrong volume name in spec"
+      ],
+      "resolution_hints": [
+        "Create missing PVC",
+        "Verify storage class exists",
+        "Check volume availability",
+        "Validate volume configuration"
+      ]
+    },
+    {
+      "pattern_id": "ConfigMapMissing",
+      "category": "Critical Infrastructure",
+      "severity": "high",
+      "description": "Required ConfigMap does not exist",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "configmap"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "not found"
+          }
+        ],
+        "log_patterns": [
+          ".*configmap.*not found.*",
+          ".*ConfigMap.*missing.*",
+          ".*reference.*configmap.*does not exist.*"
+        ]
+      },
+      "example_messages": [
+        "ConfigMap 'app-config' not found",
+        "Required ConfigMap missing: database-config",
+        "Cannot mount ConfigMap: resource not found"
+      ],
+      "common_causes": [
+        "ConfigMap not created",
+        "Wrong ConfigMap name",
+        "ConfigMap in different namespace",
+        "ConfigMap deleted"
+      ],
+      "resolution_hints": [
+        "Create required ConfigMap",
+        "Verify ConfigMap name in pod spec",
+        "Check ConfigMap namespace"
+      ]
+    },
+    {
+      "pattern_id": "SecretMissing",
+      "category": "Critical Infrastructure",
+      "severity": "high",
+      "description": "Required Secret does not exist",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "secret"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "not found"
+          }
+        ],
+        "log_patterns": [
+          ".*secret.*not found.*",
+          ".*Secret.*missing.*",
+          ".*reference.*secret.*does not exist.*"
+        ]
+      },
+      "example_messages": [
+        "Secret 'db-credentials' not found",
+        "Required Secret missing: api-token",
+        "Cannot mount Secret: resource not found"
+      ],
+      "common_causes": [
+        "Secret not created",
+        "Wrong Secret name",
+        "Secret in different namespace",
+        "Secret deleted"
+      ],
+      "resolution_hints": [
+        "Create required Secret",
+        "Verify Secret name in pod spec",
+        "Check Secret namespace"
+      ]
+    },
+    {
+      "pattern_id": "ProgressDeadlineExceeded",
+      "category": "Deployment Process Issues",
+      "severity": "high",
+      "description": "Deployment took longer than progress deadline",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "deployment.conditions",
+            "operator": "contains",
+            "value": "ProgressDeadlineExceeded"
+          },
+          {
+            "field": "deployment.status",
+            "operator": "contains",
+            "value": "progressDeadlineExceeded"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.reason",
+            "operator": "equals",
+            "value": "ProgressDeadlineExceeded"
+          }
+        ],
+        "log_patterns": [
+          ".*progress.*deadline.*exceeded.*",
+          ".*deployment.*timed out.*",
+          ".*ReplicaSet.*progress.*failed.*"
+        ]
+      },
+      "example_messages": [
+        "Deployment exceeded progress deadline",
+        "ReplicaSet progress timeout",
+        "Deployment did not complete within timeout period"
+      ],
+      "common_causes": [
+        "Readiness probes taking too long",
+        "Slow image pull",
+        "Resource constraints",
+        "Pod stuck in pending state"
+      ],
+      "resolution_hints": [
+        "Increase progressDeadlineSeconds",
+        "Check readiness probe timeouts",
+        "Verify resource availability",
+        "Review image pull speed"
+      ]
+    },
+    {
+      "pattern_id": "NetworkPolicyBlocked",
+      "category": "Dependency Issues",
+      "severity": "medium",
+      "description": "Network traffic blocked by network policy",
+      "matching_rules": {
+        "primary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "network policy"
+          }
+        ],
+        "secondary_indicators": [
+          {
+            "field": "events.message",
+            "operator": "contains",
+            "value": "denied"
+          }
+        ],
+        "log_patterns": [
+          ".*network.*policy.*denied.*",
+          ".*connection.*blocked.*",
+          ".*traffic.*not allowed.*",
+          ".*policy.*rules.*prevented.*"
+        ]
+      },
+      "example_messages": [
+        "Connection blocked by network policy",
+        "Traffic denied by NetworkPolicy",
+        "Network policy rules prevent connection"
+      ],
+      "common_causes": [
+        "NetworkPolicy too restrictive",
+        "Missing NetworkPolicy allow rules",
+        "Wrong namespace selectors",
+        "Missing pod labels for policy"
+      ],
+      "resolution_hints": [
+        "Review NetworkPolicy rules",
+        "Add allow rules for required traffic",
+        "Check pod labels match policy selectors",
+        "Verify namespace policies"
+      ]
+    }
+  ],
+  "pattern_matching_algorithm": {
+    "approach": "hierarchical_matching",
+    "steps": [
+      {
+        "step": 1,
+        "action": "Check for infrastructure failures (level 1)",
+        "priority": "highest",
+        "patterns": ["ImagePullBackOff", "VolumeMountFailure", "ConfigMapMissing", "SecretMissing"]
+      },
+      {
+        "step": 2,
+        "action": "Check for runtime failures (level 2)",
+        "priority": "high",
+        "patterns": ["CrashLoopBackOff", "OOMKilled"]
+      },
+      {
+        "step": 3,
+        "action": "Check for health check failures (level 3)",
+        "priority": "medium",
+        "patterns": ["StartupProbeFailure", "ReadinessProbeFailure", "LivenessProbeFailure"]
+      },
+      {
+        "step": 4,
+        "action": "Check for dependency issues (level 4)",
+        "priority": "medium",
+        "patterns": ["DependencyTimeout", "DatabaseConnectionFailure", "NetworkPolicyBlocked"]
+      },
+      {
+        "step": 5,
+        "action": "Check for deployment process issues (level 5)",
+        "priority": "low",
+        "patterns": ["DeploymentRollback", "ProgressDeadlineExceeded"]
+      }
+    ],
+    "scoring": {
+      "primary_match": 10,
+      "secondary_match": 5,
+      "log_match": 3,
+      "threshold": 8
+    },
+    "tie_breaking": "most_specific_match_wins"
+  },
+  "usage_instructions": {
+    "input_requirements": [
+      "Pod status including phase and conditions",
+      "Container statuses with state and reason",
+      "Kubernetes events from the pod",
+      "Container logs if available",
+      "Deployment status for deployment-level issues"
+    ],
+    "matching_process": [
+      "1. Extract relevant fields from input data",
+      "2. For each pattern, evaluate matching rules in order",
+      "3. Calculate pattern score based on matches",
+      "4. Return patterns scoring above threshold",
+      "5. Apply hierarchical tie-breaking"
+    ],
+    "output_format": {
+      "pattern_id": "string",
+      "confidence_score": "number",
+      "matched_indicators": "array",
+      "example_message": "string",
+      "suggested_investigation": "array"
+    }
+  }
+}

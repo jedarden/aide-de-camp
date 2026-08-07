@@ -1,88 +1,439 @@
 {
   "metadata": {
-    "generated_at": "2026-08-06T21:27:15.637599",
-    "data_directory": "/home/coding/aide-de-camp/docs/research/deployment-data",
-    "total_patterns_identified": 6,
-    "total_failures_analyzed": 0
+    "generated_at": "2026-08-06T21:41:03.820530",
+    "version": "2.0",
+    "pattern_categories": [
+      "ImagePullBackOff",
+      "CrashLoopBackOff",
+      "OOMKilled",
+      "Probe_failure",
+      "Dependency_timeout",
+      "Deployment_rollback",
+      "Infrastructure_failure",
+      "Other"
+    ],
+    "total_patterns_defined": 14,
+    "enhanced_from": "7 basic categories to 14 detailed patterns with hierarchical matching"
   },
-  "service_statistics": {
-    "pbx-web": {
-      "total_events": 5,
-      "failures": 0,
-      "successes": 4
+  "pattern_hierarchy": {
+    "level_1_critical_infrastructure": [
+      "ImagePullBackOff",
+      "VolumeMountFailure",
+      "ConfigMapMissing",
+      "SecretMissing"
+    ],
+    "level_2_runtime_failures": [
+      "CrashLoopBackOff",
+      "OOMKilled"
+    ],
+    "level_3_health_check_failures": [
+      "StartupProbeFailure",
+      "ReadinessProbeFailure",
+      "LivenessProbeFailure"
+    ],
+    "level_4_dependency_issues": [
+      "DependencyTimeout",
+      "DatabaseConnectionFailure",
+      "NetworkPolicyBlocked"
+    ],
+    "level_5_deployment_process": [
+      "DeploymentRollback",
+      "ProgressDeadlineExceeded"
+    ]
+  },
+  "pattern_definitions": [
+    {
+      "name": "ImagePullBackOff",
+      "level": 1,
+      "category": "Critical Infrastructure",
+      "description": "Container image cannot be pulled from registry",
+      "severity": "critical",
+      "indicators": [
+        "ImagePullBackOff",
+        "ErrImagePull",
+        "pull access denied",
+        "image not found",
+        "registry timeout",
+        "authentication failed"
+      ],
+      "common_causes": [
+        "registry unavailable",
+        "missing image",
+        "authentication failure",
+        "network issues",
+        "wrong image tag"
+      ],
+      "resolution_priority": "immediate",
+      "example_message": "Failed to pull image \"ronaldraygun/service:tag\": rpc error: code = NotFound"
     },
-    "whisper-stt": {
-      "total_events": 4,
-      "failures": 0,
-      "successes": 4
-    }
-  },
-  "pattern_taxonomy": {
-    "ImagePullBackOff": {
-      "description": "Container image cannot be pulled from registry (authentication issues, missing images, network problems)",
+    {
+      "name": "VolumeMountFailure",
+      "level": 1,
+      "category": "Critical Infrastructure",
+      "description": "Cannot mount required volume",
+      "severity": "critical",
+      "indicators": [
+        "volume mount failed",
+        "persistentvolumeclaim not found",
+        "persistentvolume not found",
+        "volume attachment failed",
+        "ContainerCreating"
+      ],
+      "common_causes": [
+        "PVC not created",
+        "PV not available",
+        "storage class issues",
+        "volume attachment failures"
+      ],
+      "resolution_priority": "immediate",
+      "example_message": "Volume mount failed: persistentvolumeclaim 'data-pvc' not found"
+    },
+    {
+      "name": "ConfigMapMissing",
+      "level": 1,
+      "category": "Critical Infrastructure",
+      "description": "Required ConfigMap does not exist",
       "severity": "high",
-      "statistics": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "services_affected": {},
-        "images_affected": {}
-      },
-      "sample_failures": []
+      "indicators": [
+        "configmap not found",
+        "ConfigMap missing",
+        "reference configmap does not exist"
+      ],
+      "common_causes": [
+        "ConfigMap not created",
+        "wrong ConfigMap name",
+        "ConfigMap in different namespace",
+        "ConfigMap deleted"
+      ],
+      "resolution_priority": "high",
+      "example_message": "ConfigMap 'app-config' not found"
     },
-    "CrashLoopBackOff": {
-      "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration, runtime exceptions)",
+    {
+      "name": "SecretMissing",
+      "level": 1,
+      "category": "Critical Infrastructure",
+      "description": "Required Secret does not exist",
+      "severity": "high",
+      "indicators": [
+        "secret not found",
+        "Secret missing",
+        "reference secret does not exist"
+      ],
+      "common_causes": [
+        "Secret not created",
+        "wrong Secret name",
+        "Secret in different namespace",
+        "Secret deleted"
+      ],
+      "resolution_priority": "high",
+      "example_message": "Secret 'db-credentials' not found"
+    },
+    {
+      "name": "CrashLoopBackOff",
+      "level": 2,
+      "category": "Runtime Failures",
+      "description": "Pod repeatedly crashes and Kubernetes gives up restarting",
       "severity": "critical",
-      "statistics": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "services_affected": {},
-        "images_affected": {}
-      },
-      "sample_failures": []
+      "indicators": [
+        "CrashLoopBackOff",
+        "back-off restarting",
+        "container was terminated",
+        "exit code [1-9]",
+        "restart count > 4"
+      ],
+      "common_causes": [
+        "application errors",
+        "misconfiguration",
+        "runtime exceptions",
+        "missing dependencies",
+        "resource constraints"
+      ],
+      "resolution_priority": "immediate",
+      "example_message": "back-off restarting failed container"
     },
-    "OOMKilled": {
-      "description": "Container killed due to exceeding memory limits (memory leaks, insufficient limits, high load)",
+    {
+      "name": "OOMKilled",
+      "level": 2,
+      "category": "Runtime Failures",
+      "description": "Container killed due to exceeding memory limits",
       "severity": "critical",
-      "statistics": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "services_affected": {},
-        "images_affected": {}
-      },
-      "sample_failures": []
+      "indicators": [
+        "OOMKilled",
+        "out of memory",
+        "memory limit exceeded",
+        "exit code 137",
+        "killed container"
+      ],
+      "common_causes": [
+        "memory leaks",
+        "insufficient limits",
+        "high load",
+        "memory-intensive operations"
+      ],
+      "resolution_priority": "immediate",
+      "example_message": "Container was killed (exit code 137) due to OOMKilled"
     },
-    "Probe_failure": {
-      "description": "Health check failures (readiness, liveness, or startup probes failing)",
+    {
+      "name": "StartupProbeFailure",
+      "level": 3,
+      "category": "Health Check Failures",
+      "description": "Startup probe fails during container initialization",
+      "severity": "high",
+      "indicators": [
+        "startup probe failed",
+        "container did not start",
+        "initialization timeout",
+        "failed startup probe"
+      ],
+      "common_causes": [
+        "application startup time too long",
+        "missing dependencies",
+        "configuration errors",
+        "initialization failures"
+      ],
+      "resolution_priority": "high",
+      "example_message": "Startup probe failed: container did not start within timeout"
+    },
+    {
+      "name": "ReadinessProbeFailure",
+      "level": 3,
+      "category": "Health Check Failures",
+      "description": "Readiness probe repeatedly fails, preventing pod from receiving traffic",
       "severity": "medium",
-      "statistics": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "services_affected": {},
-        "images_affected": {}
-      },
-      "sample_failures": []
+      "indicators": [
+        "readiness probe failed",
+        "Readiness failed",
+        "Ready status False",
+        "connection refused",
+        "timeout waiting for ready"
+      ],
+      "common_causes": [
+        "application not ready",
+        "health endpoint returning wrong status",
+        "dependencies not ready",
+        "port not listening",
+        "startup time exceeds probe timeout"
+      ],
+      "resolution_priority": "medium",
+      "example_message": "Readiness probe failed: GET http://localhost:8080/health returned 503"
     },
-    "Dependency_timeout": {
-      "description": "Timeouts connecting to external services (databases, APIs, network services)",
+    {
+      "name": "LivenessProbeFailure",
+      "level": 3,
+      "category": "Health Check Failures",
+      "description": "Liveness probe fails, causing pod restart",
       "severity": "high",
-      "statistics": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "services_affected": {},
-        "images_affected": {}
-      },
-      "sample_failures": []
+      "indicators": [
+        "liveness probe failed",
+        "Liveness failed",
+        "killing container unhealthy",
+        "deadlock detected",
+        "application hung"
+      ],
+      "common_causes": [
+        "application deadlock",
+        "application hung state",
+        "liveness endpoint too strict",
+        "long-running operations blocking probe"
+      ],
+      "resolution_priority": "high",
+      "example_message": "Liveness probe failed: killing container"
     },
-    "Other": {
-      "description": "Uncategorized or rare failure patterns not matching standard categories",
+    {
+      "name": "DependencyTimeout",
+      "level": 4,
+      "category": "Dependency Issues",
+      "description": "Timeouts connecting to external services or dependencies",
+      "severity": "high",
+      "indicators": [
+        "timeout connecting to",
+        "connection refused",
+        "service unavailable",
+        "upstream timeout",
+        "DNS lookup failed",
+        "network unreachable"
+      ],
+      "common_causes": [
+        "database unavailable",
+        "API timeout",
+        "network issues",
+        "service discovery failure"
+      ],
+      "resolution_priority": "high",
+      "example_message": "Timeout connecting to database: postgresql.default.svc.cluster.local:5432"
+    },
+    {
+      "name": "DatabaseConnectionFailure",
+      "level": 4,
+      "category": "Dependency Issues",
+      "description": "Cannot establish connection to database",
+      "severity": "high",
+      "indicators": [
+        "database connection failed",
+        "could not connect to database",
+        "SQL connection error",
+        "authentication failed database",
+        "database unreachable"
+      ],
+      "common_causes": [
+        "database not available",
+        "wrong connection string",
+        "authentication failures",
+        "network issues to database",
+        "database overloaded"
+      ],
+      "resolution_priority": "high",
+      "example_message": "Failed to connect to database: connection refused"
+    },
+    {
+      "name": "NetworkPolicyBlocked",
+      "level": 4,
+      "category": "Dependency Issues",
+      "description": "Network traffic blocked by network policy",
+      "severity": "medium",
+      "indicators": [
+        "network policy denied",
+        "connection blocked",
+        "traffic not allowed",
+        "policy rules prevented"
+      ],
+      "common_causes": [
+        "NetworkPolicy too restrictive",
+        "missing allow rules",
+        "wrong namespace selectors",
+        "missing pod labels"
+      ],
+      "resolution_priority": "medium",
+      "example_message": "Connection blocked by network policy"
+    },
+    {
+      "name": "DeploymentRollback",
+      "level": 5,
+      "category": "Deployment Process Issues",
+      "description": "Deployment was rolled back to a previous version",
+      "severity": "medium",
+      "indicators": [
+        "rollback",
+        "rolled back",
+        "revert",
+        "previous version",
+        "Progressing-False"
+      ],
+      "common_causes": [
+        "deployment failure",
+        "health check failures",
+        "configuration errors",
+        "errors detected post-deployment"
+      ],
+      "resolution_priority": "medium",
+      "example_message": "Deployment rolled back to revision 11"
+    },
+    {
+      "name": "ProgressDeadlineExceeded",
+      "level": 5,
+      "category": "Deployment Process Issues",
+      "description": "Deployment took longer than progress deadline",
+      "severity": "high",
+      "indicators": [
+        "ProgressDeadlineExceeded",
+        "deployment timed out",
+        "ReplicaSet progress failed",
+        "did not complete within timeout"
+      ],
+      "common_causes": [
+        "readiness probes taking too long",
+        "slow image pull",
+        "resource constraints",
+        "pod stuck in pending"
+      ],
+      "resolution_priority": "high",
+      "example_message": "Deployment exceeded progress deadline"
+    },
+    {
+      "name": "Other",
+      "level": 6,
+      "category": "Uncategorized",
+      "description": "Other failure patterns not matching standard categories",
       "severity": "variable",
-      "statistics": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "services_affected": {},
-        "images_affected": {}
-      },
-      "sample_failures": []
+      "indicators": [
+        "error",
+        "failed",
+        "failure",
+        "issue",
+        "unexpected"
+      ],
+      "common_causes": [
+        "various",
+        "unknown",
+        "multiple causes"
+      ],
+      "resolution_priority": "varies",
+      "example_message": "General error message"
     }
+  ],
+  "analysis_results": {
+    "current_dataset_status": "healthy",
+    "patterns_found": {
+      "Deployment_rollback": 1
+    },
+    "total_failures_detected": 1,
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "analysis_period": "30 days (2026-07-07 to 2026-08-06)",
+    "data_limitations": "Current dataset shows 100% success rate, limiting real-world failure pattern validation"
+  },
+  "matching_system": {
+    "approach": "hierarchical_matching",
+    "scoring": {
+      "primary_match": 10,
+      "secondary_match": 5,
+      "log_match": 3,
+      "threshold": 8
+    },
+    "priority_order": [
+      "critical_infrastructure",
+      "runtime_failures",
+      "health_check_failures",
+      "dependency_issues",
+      "deployment_process"
+    ],
+    "tie_breaking": "most_specific_match_wins"
+  },
+  "usage_notes": {
+    "input_requirements": [
+      "Pod status including phase and conditions",
+      "Container statuses with state and reason",
+      "Kubernetes events from the pod",
+      "Container logs if available",
+      "Deployment status for deployment-level issues"
+    ],
+    "output_format": {
+      "pattern_id": "string",
+      "confidence_score": "number (0-10)",
+      "matched_indicators": "array of strings",
+      "example_message": "string",
+      "suggested_investigation": "array of strings"
+    }
+  },
+  "recommendations": {
+    "monitoring": [
+      "Set up alerts for critical patterns (ImagePullBackOff, CrashLoopBackOff, OOMKilled)",
+      "Track deployment success rates over time",
+      "Monitor for new pattern occurrences"
+    ],
+    "data_collection": [
+      "Expand scope to more services and clusters",
+      "Collect 60-90 days of historical data",
+      "Integrate with incident management systems",
+      "Consider controlled failure injection tests"
+    ],
+    "pattern_enhancement": [
+      "Validate patterns against real failure scenarios",
+      "Refine scoring thresholds based on performance",
+      "Add service-specific custom rules",
+      "Consider ML integration for predictive detection"
+    ]
   }
 }
