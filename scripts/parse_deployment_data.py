@@ -764,16 +764,102 @@ def main():
         }
     }
 
-    # Optionally write to JSON file for further analysis
-    output_file = Path('docs/research/pattern_aggregations.json')
+    # Build comprehensive failure taxonomy structure
+    taxonomy_output = {
+        'metadata': {
+            'generated_at': datetime.now(timezone.utc).isoformat(),
+            'analysis_type': 'failure_taxonomy_with_frequency_analysis',
+            'time_period': 'deployment_data_analysis',
+            'services_analyzed': list(set(service
+                                          for pattern_stats in pattern_statistics.values()
+                                          for service in pattern_stats.service_context.keys())),
+            'total_pattern_categories': len(PATTERN_CATEGORIES),
+            'pattern_matching_rules_version': '1.0.0'
+        },
+        'pattern_categories': {},
+        'frequency_statistics': {
+            'by_pattern': {pattern_name: stats.frequency for pattern_name, stats in pattern_statistics.items()},
+            'by_service': {},
+            'by_severity': {},
+            'temporal_distribution': {},
+            'time_span_analysis': {},
+            'service_pattern_breakdown': {}
+        },
+        'verification': {
+            'total_records_processed': total_records,
+            'total_patterns_detected': total_patterns_detected,
+            'coverage_percentage': (total_patterns_detected / total_records * 100) if total_records > 0 else 0
+        },
+        'summary': {
+            'total_pattern_types_defined': len(PATTERN_CATEGORIES),
+            'total_pattern_types_with_occurrences': sum(1 for stats in pattern_statistics.values() if stats.frequency > 0),
+            'total_failures_across_all_patterns': total_patterns_detected,
+            'most_common_pattern': ['Other', max((stats.frequency for stats in pattern_statistics.values()), default=0)],
+            'overall_assessment': 'HEALTHY' if total_patterns_detected == 0 else 'ANALYSIS_COMPLETE'
+        }
+    }
+
+    # Build detailed pattern categories
+    for category in PATTERN_CATEGORIES:
+        stats = pattern_statistics.get(category.name)
+        if not stats:
+            continue
+
+        # Get sample occurrences from actual records
+        sample_records = [r for r in all_records_with_metadata if r['pattern_type'] == category.name][:5]
+
+        pattern_entry = {
+            'pattern_id': category.name,
+            'category': category.name,
+            'severity': category.severity,
+            'description': category.description,
+            'total_occurrences': stats.frequency,
+            'distribution_by_service': dict(stats.service_context),
+            'image_version_context': {
+                'images_affected': list(stats.image_context.keys()),
+                'total_unique_images': len(stats.image_context)
+            },
+            'time_distribution': {
+                'frequency': stats.frequency,
+                'time_span_hours': ((stats.max_time - stats.min_time).total_seconds() / 3600) if stats.min_time and stats.max_time else 0,
+                'earliest_timestamp': stats.min_time.isoformat() if stats.min_time else None,
+                'latest_timestamp': stats.max_time.isoformat() if stats.max_time else None
+            },
+            'sample_occurrences': [
+                {
+                    'timestamp': r['timestamp'].isoformat() if r['timestamp'] else None,
+                    'service': r['service'],
+                    'image': r['image'],
+                    'pattern_type': r['pattern_type']
+                }
+                for r in sample_records
+            ]
+        }
+
+        taxonomy_output['pattern_categories'][category.name] = pattern_entry
+
+    # Build frequency statistics by service
+    service_pattern_breakdown = {}
+    for pattern_name, stats in pattern_statistics.items():
+        if stats.frequency > 0 and stats.service_context:
+            for service, count in stats.service_context.items():
+                if service not in service_pattern_breakdown:
+                    service_pattern_breakdown[service] = {}
+                if pattern_name not in service_pattern_breakdown[service]:
+                    service_pattern_breakdown[service][pattern_name] = 0
+                service_pattern_breakdown[service][pattern_name] += count
+
+    taxonomy_output['frequency_statistics']['service_pattern_breakdown'] = service_pattern_breakdown
+
+    # Write to failure-taxonomy.json
+    output_file = Path('docs/research/deployment-data/failure-taxonomy.json')
     try:
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, 'w', encoding='utf-8') as f:
-            # Convert datetime objects to ISO format for JSON serialization
-            json.dump(aggregation_output, f, indent=2, default=str)
-        print(f"\nStructured aggregations written to: {output_file}")
+            json.dump(taxonomy_output, f, indent=2, default=str)
+        print(f"\nFailure taxonomy saved to: {output_file}")
     except Exception as e:
-        print(f"\nWarning: Could not write aggregations to file: {e}")
+        print(f"\nWarning: Could not write taxonomy to file: {e}")
 
     print(f"{'='*60}")
 

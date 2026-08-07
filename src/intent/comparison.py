@@ -79,6 +79,249 @@ def _safe_get(data: Dict[str, Any], field: str, default: Any = None) -> Any:
     return value if value is not None else default
 
 
+def compare_structured_fields(
+    dispatch_fields: Dict[str, Any],
+    test_fields: Dict[str, Any],
+    order_sensitive_fields: Optional[List[str]] = None,
+) -> Dict[str, bool]:
+    """
+    Compare structured result fields from classifications.
+
+    This function performs deep comparison of structured fields including:
+    - Nested dictionary comparison (recursive)
+    - List/array comparison (order-insensitive by default)
+    - Primitive type comparison (exact match for strings, tolerance for floats)
+
+    Args:
+        dispatch_fields: Fields from dispatch endpoint result
+        test_fields: Fields from test endpoint result
+        order_sensitive_fields: Optional list of field paths that require order-sensitive
+            list comparison (e.g., ["parameters", "entities"]). Uses dot notation for
+            nested fields like "metadata.steps" or "entities.tags".
+
+    Returns:
+        Dict mapping field paths to match status (True = match, False = mismatch).
+        Uses dot notation for nested fields (e.g., "parameters.project_slug").
+
+    Examples:
+        >>> # Simple flat comparison
+        >>> dispatch = {"project_slug": "aide-de-camp", "confidence": 0.9}
+        >>> test = {"project_slug": "aide-de-camp", "confidence": 0.899}
+        >>> result = compare_structured_fields(dispatch, test)
+        >>> assert result["project_slug"] is True
+        >>> assert result["confidence"] is True  # Within 0.01 tolerance
+
+        >>> # Nested dict comparison
+        >>> dispatch = {"parameters": {"project": "adc", "urgency": "high"}}
+        >>> test = {"parameters": {"project": "adc", "urgency": "high"}}
+        >>> result = compare_structured_fields(dispatch, test)
+        >>> assert result["parameters.project"] is True
+        >>> assert result["parameters.urgency"] is True
+
+        >>> # List comparison (order-insensitive by default)
+        >>> dispatch = {"entities": ["project", "status"]}
+        >>> test = {"entities": ["status", "project"]}
+        >>> result = compare_structured_fields(dispatch, test)
+        >>> assert result["entities"] is True  # Order insensitive
+
+        >>> # Order-sensitive list comparison
+        >>> dispatch = {"steps": ["step1", "step2"]}
+        >>> test = {"steps": ["step2", "step1"]}
+        >>> result = compare_structured_fields(dispatch, test, order_sensitive_fields=["steps"])
+        >>> assert result["steps"] is False  # Order sensitive
+    """
+    order_sensitive_fields = order_sensitive_fields or []
+    results: Dict[str, bool] = {}
+
+    def _get_all_keys(data: Dict[str, Any], prefix: str = "") -> List[str]:
+        """Get all keys from a nested dict using dot notation."""
+        keys = []
+        for key, value in data.items():
+            full_key = f"{prefix}.{key}" if prefix else key
+            keys.append(full_key)
+            if isinstance(value, dict):
+                keys.extend(_get_all_keys(value, full_key))
+        return keys
+
+    def _get_value_by_path(data: Dict[str, Any], path: str) -> Any:
+        """Get value from nested dict using dot-notation path."""
+        keys = path.split(".")
+        value = data
+        for key in keys:
+            if not isinstance(value, dict) or key not in value:
+                return None
+            value = value[key]
+        return value
+
+    def _compare_lists(
+        list1: List[Any],
+        list2: List[Any],
+        field_path: str,
+        order_sensitive: bool = False,
+    ) -> bool:
+        """
+        Compare two lists with configurable order sensitivity.
+
+        Args:
+            list1: First list to compare
+            list2: Second list to compare
+            field_path: Full field path (for nested recursion)
+            order_sensitive: If True, preserves order; if False, sorts before comparing
+
+        Returns:
+            True if lists match, False otherwise
+        """
+        if not isinstance(list1, list) or not isinstance(list2, list):
+            return False
+
+        if len(list1) != len(list2):
+            return False
+
+        if order_sensitive:
+            # Order-sensitive comparison
+            for i, (item1, item2) in enumerate(zip(list1, list2)):
+                if isinstance(item1, dict) and isinstance(item2, dict):
+                    # Recursively compare nested dicts in list items
+                    nested_results = _compare_dicts(
+                        item1,
+                        item2,
+                        prefix=field_path,
+                    )
+                    if not all(nested_results.values()):
+                        return False
+                elif item1 != item2:
+                    return False
+            return True
+        else:
+            # Order-insensitive comparison - sort if comparable
+            try:
+                # For primitives, use direct comparison after sorting
+                sorted1 = sorted(list1)
+                sorted2 = sorted(list2)
+                return sorted1 == sorted2
+            except TypeError:
+                # For complex types (dicts, mixed types), use multiset comparison
+                from collections import Counter
+
+                # For dicts, compare by structure
+                if all(isinstance(item, dict) for item in list1) and all(
+                    isinstance(item, dict) for item in list2
+                ):
+                    # Compare each dict by its keys (order-insensitive)
+                    matched_indices = set()
+                    for item1 in list1:
+                        found = False
+                        for i, item2 in enumerate(list2):
+                            if i in matched_indices:
+                                continue
+                            if _compare_dicts(item1, item2, prefix=field_path):
+                                matched_indices.add(i)
+                                found = True
+                                break
+                        if not found:
+                            return False
+                    return True
+                else:
+                    # Fall back to Counter comparison (hashable items only)
+                    try:
+                        return Counter(list1) == Counter(list2)
+                    except TypeError:
+                        # Unhashable items - compare element by element (slow but correct)
+                        list1_copy = list1.copy()
+                        for item2 in list2:
+                            if item2 in list1_copy:
+                                list1_copy.remove(item2)
+                            else:
+                                return False
+                        return len(list1_copy) == 0
+
+    def _compare_dicts(
+        dict1: Dict[str, Any],
+        dict2: Dict[str, Any],
+        prefix: str = "",
+    ) -> Dict[str, bool]:
+        """
+        Recursively compare two dicts, returning field-level match results.
+
+        Args:
+            dict1: First dict to compare
+            dict2: Second dict to compare
+            prefix: Current field path prefix for nested keys
+
+        Returns:
+            Dict mapping field paths to match status
+        """
+        local_results: Dict[str, bool] = {}
+
+        # Get all keys from both dicts
+        all_keys = set(dict1.keys()) | set(dict2.keys())
+
+        for key in all_keys:
+            full_key = f"{prefix}.{key}" if prefix else key
+
+            # Check for missing keys
+            if key not in dict1:
+                local_results[full_key] = False
+                continue
+            if key not in dict2:
+                local_results[full_key] = False
+                continue
+
+            value1 = dict1[key]
+            value2 = dict2[key]
+
+            # Handle nested dicts
+            if isinstance(value1, dict) and isinstance(value2, dict):
+                nested_results = _compare_dicts(value1, value2, full_key)
+                local_results.update(nested_results)
+                # Parent field matches if all children match
+                local_results[full_key] = all(nested_results.values())
+            # Handle lists
+            elif isinstance(value1, list) and isinstance(value2, list):
+                order_sensitive = full_key in order_sensitive_fields or any(
+                    full_key.startswith(f"{field}.") for field in order_sensitive_fields
+                )
+                local_results[full_key] = _compare_lists(
+                    value1, value2, full_key, order_sensitive
+                )
+            # Handle None values
+            elif value1 is None or value2 is None:
+                local_results[full_key] = value1 is None and value2 is None
+            # Handle float comparison with tolerance
+            elif isinstance(value1, float) and isinstance(value2, float):
+                import math
+
+                local_results[full_key] = math.isclose(value1, value2, abs_tol=0.01)
+            # Handle int/float mixed comparison
+            elif isinstance(value1, (int, float)) and isinstance(value2, (int, float)):
+                import math
+
+                local_results[full_key] = math.isclose(
+                    float(value1), float(value2), abs_tol=0.01
+                )
+            # Exact comparison for other types
+            else:
+                local_results[full_key] = value1 == value2
+
+        return local_results
+
+    # Handle edge cases
+    if dispatch_fields is None and test_fields is None:
+        return {}
+    if dispatch_fields is None or test_fields is None:
+        # One is None, treat all fields as mismatch
+        all_keys = _get_all_keys(dispatch_fields or test_fields)
+        return {key: False for key in all_keys}
+
+    if not isinstance(dispatch_fields, dict) or not isinstance(test_fields, dict):
+        return {"": False}
+
+    # Perform comparison
+    results.update(_compare_dicts(dispatch_fields, test_fields))
+
+    return results
+
+
 def _compare_values(
     field: str,
     test_value: Any,
