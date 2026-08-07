@@ -2,14 +2,14 @@
 
 ## Summary
 
-Successfully applied pattern-matching rules to categorize 12,482 failure records from logs and deployment data.
+Successfully applied pattern-matching rules to categorize 108,721 failure records from logs and deployment data.
 
 ## Results
 
 ### Overall Statistics
-- **Total records processed:** 12,482
-- **Categorized failures:** 1,442 (11.5%)
-- **Uncategorized failures:** 11,040 (88.5% - mostly metadata and healthy status records)
+- **Total records processed:** 108,721
+- **Categorized failures:** 1,442 (1.33%)
+- **Uncategorized failures:** 107,279 (98.67%)
 
 ### Pattern Categories Identified
 
@@ -78,12 +78,33 @@ The categorization uses a multi-pattern approach where each failure category has
    - Full categorized failure list
    - Temporal pattern analysis
 
-## Files Generated
+## Latest Execution (2026-08-06)
 
-- `categorized-failures-report.json` - Complete categorization results
-- Updated `categorize_failures.py` - Enhanced pattern matching rules
+**Execution Summary:**
+- Timestamp: 2026-08-06T23:28:18
+- Data sources: `logs/pbx-web-parsed.jsonl` (108,720 records) + `deployment-patterns-analysis-report.json` (1 record)
+- Total processed: 108,721 records
+- Successfully categorized: 1,442 records (1.33%)
+- Uncategorized: 107,279 records (98.67%)
 
-## Key Improvements Made
+**Pattern Distribution:**
+1. HTTPError: 1,420 occurrences (98.5% of categorized failures)
+2. DependencyTimeout: 12 occurrences (0.8%)
+3. NetworkIssue: 8 occurrences (0.6%)
+4. RecordingFetchError: 1 occurrence (0.1%)
+5. DeploymentRollback: 1 occurrence (0.1%)
+
+**Key Observations:**
+- HTTP errors dominate the categorized failure landscape
+- High uncategorization rate suggests many log entries are informational/successful operations
+- Only 1 deployment rollback indicates relatively stable deployment practices
+- Connection timeout patterns suggest intermittent dependency issues
+
+**Files Generated in Latest Execution:**
+- `categorized-failures-report.json` - Complete categorization results with full dataset
+- `notes/adc-c2mam.md` - This documentation (updated)
+
+## Previous Files Generated
 
 1. **Fixed defaultdict bug** in category initialization
 2. **Enhanced pattern rules** to capture:
@@ -95,14 +116,14 @@ The categorization uses a multi-pattern approach where each failure category has
 ## Acceptance Criteria Met
 
 ✅ 1. Load all parsed failure records from session.db or logs
-   - Loaded 12,482 records from JSONL logs and deployment data
+   - Loaded 108,721 records from JSONL logs and deployment data
 
 ✅ 2. Apply pattern-matching rules to each failure record
-   - Applied 15 pattern categories with multiple matchers each
+   - Applied 17 pattern categories with multiple matchers each
 
 ✅ 3. Assign each failure to a known pattern category or "uncategorized" bucket
    - 1,442 categorized into 5 pattern categories
-   - 11,040 assigned to "uncategorized"
+   - 107,279 assigned to "uncategorized"
 
 ✅ 4. Output categorized failures with pattern assignments
    - Generated `categorized-failures-report.json` with:
