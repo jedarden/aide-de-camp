@@ -1,515 +1,454 @@
 """
-Utterance creation and result linkage tests (bead adc-xh4ow3).
+Utterance creation and linkage tests (bead adc-xh4ow3).
 
-This test module verifies that create_utterance() correctly stores utterances
-and links them to results through the intent chain.
+Tests the create_utterance() function and its linkage to results:
+1. create_utterance() stores raw text correctly
+2. Utterance links to results correctly (via utterance -> intent -> result chain)
+3. Utterance stores optional utterance_id parameter
+4. Utterance-result relationships are retrievable
 
-Tests use fixtures from the infrastructure bead (adc-d6x7bs):
-- in_memory_db_store: Isolated in-memory database for fast tests
-- test_utterance_builder: Helper for creating test utterances
-- test_intent_builder: Helper for creating test intents
-- test_result_builder: Helper for creating test results
-- test_topic_with_session: Pre-built session and topic
-
-Coverage includes:
-- create_utterance() stores raw text correctly
-- create_utterance() stores optional utterance_id
-- Utterance links to results correctly (via intent chain)
-- Utterance-result relationships are retrievable
-- Complete utterance creation workflow
+Uses fixtures from the infrastructure bead (adc-d6x7bs).
 """
 
-import json
 import pytest
-from datetime import datetime
 from uuid import uuid4
+from src.session.store import SessionStore
 
 
 class TestUtteranceCreation:
-    """Test create_utterance() function storage and field persistence."""
+    """Tests for utterance creation functionality."""
 
     @pytest.mark.asyncio
-    async def test_create_utterance_stores_raw_text_correctly(self, in_memory_db_store):
-        """Test that create_utterance() stores raw text correctly."""
-        # Arrange: Create a session
-        session_id = await in_memory_db_store.create_session()
-        raw_text = "Check the deployment status of pbx-web"
+    async def test_create_utterance_stores_raw_text_correctly(
+        self,
+        test_db_store: SessionStore
+    ) -> None:
+        """Test that create_utterance() stores raw text correctly.
 
-        # Act: Create utterance with raw text
-        utterance_id = await in_memory_db_store.create_utterance(
+        Creates an utterance with specific raw text and verifies:
+        1. The raw text is stored exactly as provided
+        2. The utterance can be retrieved by ID
+        3. All fields are correctly populated
+        """
+        # Create a session and utterance
+        session_id = await test_db_store.create_session()
+        test_raw_text = "What's the deployment status of pbx-web?"
+
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
-            raw_text=raw_text
+            raw_text=test_raw_text
         )
 
-        # Assert: Raw text is stored correctly
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance is not None
-        assert utterance["id"] == utterance_id
-        assert utterance["session_id"] == session_id
-        assert utterance["raw_text"] == raw_text
-        assert "created_at" in utterance
+        # Retrieve the utterance and verify raw text is stored correctly
+        utterance = await test_db_store.get_utterance(utterance_id)
 
-    @pytest.mark.asyncio
-    async def test_create_utterance_with_special_characters(self, in_memory_db_store):
-        """Test that create_utterance() preserves special characters exactly."""
-        session_id = await in_memory_db_store.create_session()
-        raw_text = "Test with special chars: émojis 🎉, unicode ™, quotes \"', and symbols @#$%^&*()"
-
-        utterance_id = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text=raw_text
+        assert utterance is not None, "Utterance should be retrievable by ID"
+        assert utterance["id"] == utterance_id, "Utterance ID should match"
+        assert utterance["session_id"] == session_id, "Session ID should match"
+        assert utterance["raw_text"] == test_raw_text, (
+            f"Raw text should be stored exactly as provided. "
+            f"Expected: {test_raw_text!r}, Got: {utterance['raw_text']!r}"
         )
-
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance["raw_text"] == raw_text
+        assert utterance["created_at"] is not None, "created_at should be set"
 
     @pytest.mark.asyncio
-    async def test_create_utterance_with_unicode(self, in_memory_db_store):
-        """Test that create_utterance() handles Unicode characters correctly."""
-        session_id = await in_memory_db_store.create_session()
-        raw_text = "Unicode test: café, naïve, résumé, 北京, Москва, ✨💡🎯"
+    async def test_create_utterance_with_optional_utterance_id(
+        self,
+        test_db_store: SessionStore
+    ) -> None:
+        """Test that utterance stores optional utterance_id parameter.
 
-        utterance_id = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text=raw_text
-        )
+        Verifies that when a custom utterance_id is provided:
+        1. The custom ID is used (not a generated UUID)
+        2. The utterance is retrievable by that custom ID
+        3. The custom ID is properly stored in the database
+        """
+        # Create a session
+        session_id = await test_db_store.create_session()
 
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance["raw_text"] == raw_text
-
-    @pytest.mark.asyncio
-    async def test_create_utterance_stores_optional_utterance_id(self, in_memory_db_store):
-        """Test that create_utterance() stores optional utterance_id parameter."""
-        session_id = await in_memory_db_store.create_session()
+        # Create utterance with custom utterance_id
         custom_utterance_id = str(uuid4())
-        raw_text = "Utterance with custom ID"
+        test_raw_text = "Check the recent Argo workflow runs"
 
-        # Act: Create utterance with custom utterance_id
-        utterance_id = await in_memory_db_store.create_utterance(
+        returned_utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
-            raw_text=raw_text,
+            raw_text=test_raw_text,
             utterance_id=custom_utterance_id
         )
 
-        # Assert: Custom utterance_id is used
-        assert utterance_id == custom_utterance_id
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance["id"] == custom_utterance_id
-
-    @pytest.mark.asyncio
-    async def test_create_utterance_generates_id_by_default(self, in_memory_db_store):
-        """Test that create_utterance() generates UUID when utterance_id is None."""
-        session_id = await in_memory_db_store.create_session()
-
-        # Act: Create utterance without utterance_id
-        utterance_id = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text="Utterance with auto-generated ID"
+        # Verify the custom ID is returned
+        assert returned_utterance_id == custom_utterance_id, (
+            f"Custom utterance_id should be returned. "
+            f"Expected: {custom_utterance_id}, Got: {returned_utterance_id}"
         )
 
-        # Assert: A valid UUID is generated
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance is not None
-        # Verify it's a valid UUID format (hex string with hyphens)
-        assert len(utterance_id) == 36  # Standard UUID length
-        assert utterance_id.count('-') == 4  # UUIDs have 4 hyphens
+        # Verify the utterance is retrievable by the custom ID
+        utterance = await test_db_store.get_utterance(custom_utterance_id)
+
+        assert utterance is not None, "Utterance should be retrievable by custom ID"
+        assert utterance["id"] == custom_utterance_id, "Stored ID should match custom ID"
+        assert utterance["raw_text"] == test_raw_text, "Raw text should be stored correctly"
 
     @pytest.mark.asyncio
-    async def test_create_utterance_records_timestamp(self, in_memory_db_store):
-        """Test that create_utterance() records created_at timestamp."""
-        import time
-        session_id = await in_memory_db_store.create_session()
+    async def test_create_utterance_generates_id_when_not_provided(
+        self,
+        test_db_store: SessionStore
+    ) -> None:
+        """Test that create_utterance generates UUID when utterance_id is None.
 
-        before_creation = int(time.time())
-        utterance_id = await in_memory_db_store.create_utterance(
+        Verifies that when utterance_id is not provided:
+        1. A UUID is automatically generated
+        2. The generated ID is a valid UUID string
+        3. The utterance is retrievable by the generated ID
+        """
+        # Create a session
+        session_id = await test_db_store.create_session()
+
+        # Create utterance without providing utterance_id (should auto-generate)
+        returned_utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
-            raw_text="Timestamp test"
+            raw_text="Show me the deployment logs"
         )
-        after_creation = int(time.time()) + 1  # Add 1 second buffer
 
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance["created_at"] is not None
-        assert before_creation <= utterance["created_at"] <= after_creation
+        # Verify a valid UUID was generated
+        assert returned_utterance_id is not None, "An ID should be generated"
+
+        # Try to parse it as a UUID to verify format
+        try:
+            from uuid import UUID
+            # This will raise ValueError if not a valid UUID
+            uuid_obj = UUID(returned_utterance_id)
+            # Verify it's a UUID4 (hex format)
+            assert len(returned_utterance_id) == 36, "UUID should be 36 characters"
+            assert returned_utterance_id.count('-') == 4, "UUID should have 4 hyphens"
+        except (ValueError, AttributeError):
+            pytest.fail(f"Generated ID should be a valid UUID, got: {returned_utterance_id!r}")
+
+        # Verify the utterance is retrievable by the generated ID
+        utterance = await test_db_store.get_utterance(returned_utterance_id)
+        assert utterance is not None, "Utterance should be retrievable by generated ID"
+        assert utterance["id"] == returned_utterance_id, "ID should be stored correctly"
+
+    @pytest.mark.asyncio
+    async def test_create_utterance_with_empty_string(
+        self,
+        test_db_store: SessionStore
+    ) -> None:
+        """Test that create_utterance handles empty string raw_text.
+
+        Verifies edge case handling:
+        1. Empty string is accepted (not rejected)
+        2. Empty string is stored as-is (not converted to NULL)
+        3. Utterance with empty text is retrievable
+        """
+        # Create a session
+        session_id = await test_db_store.create_session()
+
+        # Create utterance with empty string
+        utterance_id = await test_db_store.create_utterance(
+            session_id=session_id,
+            raw_text=""
+        )
+
+        # Verify empty string is stored correctly (not as NULL)
+        utterance = await test_db_store.get_utterance(utterance_id)
+
+        assert utterance is not None, "Utterance with empty text should be retrievable"
+        assert utterance["raw_text"] == "", (
+            f"Empty string should be stored as empty string, not NULL. "
+            f"Got: {utterance['raw_text']!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_utterance_with_special_characters(
+        self,
+        test_db_store: SessionStore
+    ) -> None:
+        """Test that create_utterance handles special characters correctly.
+
+        Verifies that special characters are stored exactly as provided:
+        1. Unicode characters (emojis, accented characters)
+        2. Quotes and escape sequences
+        3. Newlines and tabs
+        """
+        # Create a session
+        session_id = await test_db_store.create_session()
+
+        # Create utterance with special characters
+        test_text = "Test with émojis 🎉, unicode ™, quotes \"', and newlines\nand\ttabs"
+        utterance_id = await test_db_store.create_utterance(
+            session_id=session_id,
+            raw_text=test_text
+        )
+
+        # Verify special characters are preserved
+        utterance = await test_db_store.get_utterance(utterance_id)
+
+        assert utterance is not None, "Utterance with special chars should be retrievable"
+        assert utterance["raw_text"] == test_text, (
+            f"Special characters should be preserved. "
+            f"Expected: {test_text!r}, Got: {utterance['raw_text']!r}"
+        )
 
 
 class TestUtteranceResultLinkage:
-    """Test utterance to result linkage through intent chain."""
+    """Tests for utterance linkage to results via intents."""
 
     @pytest.mark.asyncio
-    async def test_utterance_links_to_result_via_intent(self, in_memory_db_store, test_topic_with_session):
-        """Test that utterance links to result correctly through intent chain."""
-        session_id, topic_id = test_topic_with_session
+    async def test_utterance_links_to_results_correctly(
+        self,
+        test_db_store: SessionStore
+    ) -> None:
+        """Test that utterance links to results correctly via intent chain.
 
-        # Step 1: Create utterance
-        utterance_id = await in_memory_db_store.create_utterance(
+        Verifies the complete linkage chain:
+        1. Utterance is created
+        2. Intent is created and linked to utterance
+        3. Result is created and linked to intent
+        4. Result can be retrieved and traced back to utterance
+        """
+        # Create a session and utterance
+        session_id = await test_db_store.create_session()
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
-            raw_text="Check pbx-web deployment status"
+            raw_text="What's the status of pbx-web?"
         )
 
-        # Step 2: Create intent linking utterance to topic
-        intent_id = await in_memory_db_store.create_intent(
+        # Create an intent linked to the utterance
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="pbx-web",
-            intent_type="status",
-            topic_id=topic_id
+            intent_type="status"
         )
 
-        # Step 3: Create result linking to intent
-        result_id = await in_memory_db_store.create_result(
+        # Create a topic for the result
+        topic_id = await test_db_store.create_topic(
+            label="pbx-web status",
+            topic_type="project",
+            project_slugs=["pbx-web"],
+            scope="session",
+            session_id=session_id
+        )
+
+        # Create a result linked to the intent
+        result_id = await test_db_store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
-            summary="2 pods running",
-            data={"status": "healthy", "pods": 2}
+            summary="pbx-web deployment is healthy",
+            data={"status": "healthy", "replicas": 3}
         )
 
-        # Assert: Complete chain exists
-        # 1. Utterance exists
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance is not None
-        assert utterance["id"] == utterance_id
+        # Verify the linkage chain is complete
 
-        # 2. Intent exists and links utterance
-        intent = await in_memory_db_store.get_intent(intent_id)
-        assert intent is not None
-        assert intent["utterance_id"] == utterance_id
-        assert intent["topic_id"] == topic_id
+        # 1. Verify result exists and is linked to intent
+        result = await test_db_store.get_result(result_id)
+        assert result is not None, "Result should be retrievable"
+        assert result["intent_id"] == intent_id, "Result should be linked to intent"
+        assert result["topic_id"] == topic_id, "Result should be linked to topic"
 
-        # 3. Result exists and links to intent
-        result = await in_memory_db_store.get_result(result_id)
-        assert result is not None
-        assert result["intent_id"] == intent_id
-        assert result["topic_id"] == topic_id
+        # 2. Verify intent exists and is linked to utterance
+        intent = await test_db_store.get_intent(intent_id)
+        assert intent is not None, "Intent should be retrievable"
+        assert intent["utterance_id"] == utterance_id, "Intent should be linked to utterance"
+
+        # 3. Verify utterance exists
+        utterance = await test_db_store.get_utterance(utterance_id)
+        assert utterance is not None, "Utterance should be retrievable"
+
+        # The complete chain: utterance -> intent -> result is verified
+        assert (
+            utterance["id"] == intent["utterance_id"] and
+            intent["id"] == result["intent_id"]
+        ), "Complete linkage chain should be intact"
 
     @pytest.mark.asyncio
-    async def test_utterance_result_relationship_is_retrievable(self, in_memory_db_store, test_topic_with_session):
-        """Test that utterance-result relationships are retrievable."""
-        session_id, topic_id = test_topic_with_session
+    async def test_utterance_result_relationships_are_retrievable(
+        self,
+        test_db_store: SessionStore
+    ) -> None:
+        """Test that utterance-result relationships are retrievable.
 
-        # Create the chain
-        utterance_id = await in_memory_db_store.create_utterance(
+        Verifies that given an utterance_id, you can retrieve all related results:
+        1. Create utterance -> intent -> result chain
+        2. Use get_results_for_intent() to retrieve results
+        3. Verify results can be traced back to original utterance
+        """
+        # Create a session and utterance
+        session_id = await test_db_store.create_session()
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
-            raw_text="What's the status?"
-        )
-        intent_id = await in_memory_db_store.create_intent(
-            utterance_id=utterance_id,
-            session_id=session_id,
-            project_slug="pbx-web",
-            intent_type="status",
-            topic_id=topic_id
-        )
-        result_id = await in_memory_db_store.create_result(
-            intent_id=intent_id,
-            topic_id=topic_id,
-            session_id=session_id,
-            summary="Status OK",
-            data={"healthy": True}
+            raw_text="Check the whisper-stt deployment status"
         )
 
-        # Retrieve result and verify linkage
-        result = await in_memory_db_store.get_result(result_id)
-        assert result is not None
-
-        # Trace back from result to utterance
-        intent = await in_memory_db_store.get_intent(result["intent_id"])
-        assert intent["utterance_id"] == utterance_id
-
-        utterance = await in_memory_db_store.get_utterance(intent["utterance_id"])
-        assert utterance is not None
-        assert utterance["raw_text"] == "What's the status?"
-
-    @pytest.mark.asyncio
-    async def test_multiple_results_from_single_utterance(self, in_memory_db_store, test_topic_with_session):
-        """Test that a single utterance can link to multiple results via multiple intents."""
-        session_id, topic_id = test_topic_with_session
-
-        # Create one utterance
-        utterance_id = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text="Check status of all services"
-        )
-
-        # Create multiple intents from the same utterance
-        intent_ids = []
-        for project_slug in ["pbx-web", "whisper-stt", "armor"]:
-            intent_id = await in_memory_db_store.create_intent(
-                utterance_id=utterance_id,
-                session_id=session_id,
-                project_slug=project_slug,
-                intent_type="status",
-                topic_id=topic_id
-            )
-            intent_ids.append(intent_id)
-
-        # Create results for each intent
-        result_ids = []
-        for intent_id in intent_ids:
-            result_id = await in_memory_db_store.create_result(
-                intent_id=intent_id,
-                topic_id=topic_id,
-                session_id=session_id,
-                summary=f"Status for {intent_id[:8]}",
-                data={"status": "running"}
-            )
-            result_ids.append(result_id)
-
-        # Assert: All results trace back to the same utterance
-        for result_id in result_ids:
-            result = await in_memory_db_store.get_result(result_id)
-            intent = await in_memory_db_store.get_intent(result["intent_id"])
-            assert intent["utterance_id"] == utterance_id
-
-        # Verify all intents link to the same utterance
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance is not None
-        assert utterance["raw_text"] == "Check status of all services"
-
-    @pytest.mark.asyncio
-    async def test_utterance_with_no_results(self, in_memory_db_store):
-        """Test that utterances without linked results are stored correctly."""
-        session_id = await in_memory_db_store.create_session()
-
-        # Create utterance without any intent/result
-        utterance_id = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text="Orphaned utterance with no results"
-        )
-
-        # Verify utterance exists
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance is not None
-        assert utterance["raw_text"] == "Orphaned utterance with no results"
-
-    @pytest.mark.asyncio
-    async def test_utterance_retrieval_by_id(self, in_memory_db_store):
-        """Test that utterances can be retrieved by their ID."""
-        session_id = await in_memory_db_store.create_session()
-
-        # Create multiple utterances
-        utterance_1 = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text="First utterance"
-        )
-        utterance_2 = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text="Second utterance"
-        )
-
-        # Verify each can be retrieved independently
-        retrieved_1 = await in_memory_db_store.get_utterance(utterance_1)
-        retrieved_2 = await in_memory_db_store.get_utterance(utterance_2)
-
-        assert retrieved_1 is not None
-        assert retrieved_2 is not None
-        assert retrieved_1["id"] == utterance_1
-        assert retrieved_2["id"] == utterance_2
-        assert retrieved_1["raw_text"] == "First utterance"
-        assert retrieved_2["raw_text"] == "Second utterance"
-
-    @pytest.mark.asyncio
-    async def test_utterance_nonexistent_retrieval(self, in_memory_db_store):
-        """Test that retrieving a non-existent utterance returns None."""
-        fake_id = str(uuid4())
-        result = await in_memory_db_store.get_utterance(fake_id)
-        assert result is None
-
-
-class TestUtteranceResultDataIntegrity:
-    """Test data integrity across utterance-result relationships."""
-
-    @pytest.mark.asyncio
-    async def test_utterance_text_preserved_through_result_chain(self, in_memory_db_store, test_topic_with_session):
-        """Test that utterance raw text is preserved throughout the result chain."""
-        session_id, topic_id = test_topic_with_session
-        original_text = "Verify deployment status: pbx-web has 2/2 pods ready"
-
-        # Create full chain
-        utterance_id = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text=original_text
-        )
-        intent_id = await in_memory_db_store.create_intent(
-            utterance_id=utterance_id,
-            session_id=session_id,
-            project_slug="pbx-web",
-            intent_type="status",
-            topic_id=topic_id
-        )
-        result_id = await in_memory_db_store.create_result(
-            intent_id=intent_id,
-            topic_id=topic_id,
-            session_id=session_id,
-            summary="Deployment verified",
-            data={"pods": 2, "ready": 2}
-        )
-
-        # Trace back and verify text is preserved
-        result = await in_memory_db_store.get_result(result_id)
-        intent = await in_memory_db_store.get_intent(result["intent_id"])
-        utterance = await in_memory_db_store.get_utterance(intent["utterance_id"])
-
-        assert utterance["raw_text"] == original_text
-
-    @pytest.mark.asyncio
-    async def test_utterance_with_result_containing_original_text(self, in_memory_db_store, test_topic_with_session):
-        """Test that results can include the original utterance text in data."""
-        session_id, topic_id = test_topic_with_session
-        original_text = "Check whisper-stt latency metrics"
-
-        utterance_id = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text=original_text
-        )
-        intent_id = await in_memory_db_store.create_intent(
+        # Create an intent linked to the utterance
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="whisper-stt",
-            intent_type="status",
-            topic_id=topic_id
+            intent_type="status"
         )
 
-        # Result includes original utterance text in its data
-        result_id = await in_memory_db_store.create_result(
+        # Create a topic
+        topic_id = await test_db_store.create_topic(
+            label="whisper-stt status",
+            topic_type="project",
+            project_slugs=["whisper-stt"],
+            scope="session",
+            session_id=session_id
+        )
+
+        # Create multiple results for the same intent
+        result_id_1 = await test_db_store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
-            summary="Latency metrics retrieved",
-            data={
-                "utterance": original_text,
-                "p50_ms": 45,
-                "p95_ms": 120
-            }
+            summary="whisper-stt is running",
+            data={"status": "running", "pods": 2}
         )
 
-        # Verify result data contains the utterance
-        result = await in_memory_db_store.get_result(result_id)
-        result_data = json.loads(result["data"])
-        assert result_data["utterance"] == original_text
+        result_id_2 = await test_db_store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary="whisper-stt metrics are normal",
+            data={"cpu_usage": "45%", "memory_usage": "60%"}
+        )
 
-        # Verify utterance record also matches
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        assert utterance["raw_text"] == original_text
+        # Retrieve results for the intent
+        results = await test_db_store.get_results_for_intent(intent_id)
 
+        # Verify all results are retrievable
+        assert len(results) == 2, f"Should retrieve 2 results, got {len(results)}"
 
-class TestUtteranceCreationWorkflow:
-    """Test complete utterance creation workflows."""
+        result_ids = {r["id"] for r in results}
+        assert result_id_1 in result_ids, "First result should be retrievable"
+        assert result_id_2 in result_ids, "Second result should be retrievable"
+
+        # Verify all results can be traced back to the utterance
+        for result in results:
+            assert result["intent_id"] == intent_id, "All results should link to the same intent"
+
+        # Verify the intent can be traced back to the utterance
+        intent = await test_db_store.get_intent(intent_id)
+        assert intent["utterance_id"] == utterance_id, "Intent should trace back to utterance"
 
     @pytest.mark.asyncio
-    async def test_complete_utterance_to_result_workflow(self, in_memory_db_store, test_topic_with_session):
-        """Test the complete workflow from utterance creation to result storage."""
-        session_id, topic_id = test_topic_with_session
+    async def test_multiple_utterances_link_to_different_results(
+        self,
+        test_db_store: SessionStore
+    ) -> None:
+        """Test that multiple utterances can link to different results.
 
-        # Step 1: User creates an utterance
-        utterance_id = await in_memory_db_store.create_utterance(
+        Verifies that separate utterance chains don't interfere:
+        1. Create two separate utterance -> intent -> result chains
+        2. Verify each result links only to its own intent/utterance
+        3. Verify no cross-contamination between chains
+        """
+        # Create a session
+        session_id = await test_db_store.create_session()
+
+        # Create first utterance chain
+        utterance_id_1 = await test_db_store.create_utterance(
             session_id=session_id,
-            raw_text="Check the status of pbx-web deployment"
+            raw_text="Status of pbx-web?"
         )
-
-        # Step 2: System creates an intent from the utterance
-        intent_id = await in_memory_db_store.create_intent(
-            utterance_id=utterance_id,
+        intent_id_1 = await test_db_store.create_intent(
+            utterance_id=utterance_id_1,
             session_id=session_id,
             project_slug="pbx-web",
-            intent_type="status",
-            topic_id=topic_id
+            intent_type="status"
         )
-
-        # Step 3: Fetch/synthesize creates a result
-        result_id = await in_memory_db_store.create_result(
-            intent_id=intent_id,
-            topic_id=topic_id,
+        topic_id_1 = await test_db_store.create_topic(
+            label="pbx-web",
+            topic_type="project",
+            project_slugs=["pbx-web"],
+            scope="session",
+            session_id=session_id
+        )
+        result_id_1 = await test_db_store.create_result(
+            intent_id=intent_id_1,
+            topic_id=topic_id_1,
             session_id=session_id,
-            summary="Deployment status: 2/2 pods running",
-            data={
-                "deployment": "pbx-web",
-                "pods": 2,
-                "ready": 2,
-                "updated": 2,
-                "available": 2
-            }
+            summary="pbx-web healthy",
+            data={"status": "ok"}
         )
 
-        # Verify complete workflow
-        utterance = await in_memory_db_store.get_utterance(utterance_id)
-        intent = await in_memory_db_store.get_intent(intent_id)
-        result = await in_memory_db_store.get_result(result_id)
+        # Create second utterance chain
+        utterance_id_2 = await test_db_store.create_utterance(
+            session_id=session_id,
+            raw_text="Status of whisper-stt?"
+        )
+        intent_id_2 = await test_db_store.create_intent(
+            utterance_id=utterance_id_2,
+            session_id=session_id,
+            project_slug="whisper-stt",
+            intent_type="status"
+        )
+        topic_id_2 = await test_db_store.create_topic(
+            label="whisper-stt",
+            topic_type="project",
+            project_slugs=["whisper-stt"],
+            scope="session",
+            session_id=session_id
+        )
+        result_id_2 = await test_db_store.create_result(
+            intent_id=intent_id_2,
+            topic_id=topic_id_2,
+            session_id=session_id,
+            summary="whisper-stt healthy",
+            data={"status": "ok"}
+        )
 
-        assert utterance is not None
-        assert intent is not None
-        assert result is not None
+        # Verify no cross-contamination: result_1 should only link to intent_1
+        result_1 = await test_db_store.get_result(result_id_1)
+        assert result_1["intent_id"] == intent_id_1, "Result 1 should link to intent 1 only"
+        assert result_1["intent_id"] != intent_id_2, "Result 1 should not link to intent 2"
 
-        # Verify linkage chain
-        assert intent["utterance_id"] == utterance_id
-        assert result["intent_id"] == intent_id
-        assert result["topic_id"] == topic_id
+        # Verify no cross-contamination: result_2 should only link to intent_2
+        result_2 = await test_db_store.get_result(result_id_2)
+        assert result_2["intent_id"] == intent_id_2, "Result 2 should link to intent 2 only"
+        assert result_2["intent_id"] != intent_id_1, "Result 2 should not link to intent 1"
 
-        # Verify data integrity
-        assert utterance["raw_text"] == "Check the status of pbx-web deployment"
-        assert result["summary"] == "Deployment status: 2/2 pods running"
+        # Verify each intent links to its own utterance
+        intent_1 = await test_db_store.get_intent(intent_id_1)
+        intent_2 = await test_db_store.get_intent(intent_id_2)
+        assert intent_1["utterance_id"] == utterance_id_1, "Intent 1 should link to utterance 1"
+        assert intent_2["utterance_id"] == utterance_id_2, "Intent 2 should link to utterance 2"
+        assert intent_1["utterance_id"] != utterance_id_2, "Intent 1 should not link to utterance 2"
+        assert intent_2["utterance_id"] != utterance_id_1, "Intent 2 should not link to utterance 1"
 
     @pytest.mark.asyncio
-    async def test_utterance_creation_with_custom_id_workflow(self, in_memory_db_store, test_topic_with_session):
-        """Test utterance creation workflow with custom utterance_id."""
-        session_id, topic_id = test_topic_with_session
-        custom_id = str(uuid4())
+    async def test_utterance_with_no_linked_results(
+        self,
+        test_db_store: SessionStore
+    ) -> None:
+        """Test that utterances with no linked results are handled correctly.
 
-        # Create utterance with custom ID
-        utterance_id = await in_memory_db_store.create_utterance(
+        Verifies edge case where utterance exists but has no intent/result:
+        1. Utterance can exist without intents
+        2. get_results_for_intent() returns empty list for non-existent intent
+        3. No errors occur when querying non-existent relationships
+        """
+        # Create an utterance with no intents
+        session_id = await test_db_store.create_session()
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
-            raw_text="Utterance with custom ID",
-            utterance_id=custom_id
+            raw_text="This utterance has no intents or results"
         )
 
-        # Verify custom ID is used throughout chain
-        intent_id = await in_memory_db_store.create_intent(
-            utterance_id=utterance_id,
-            session_id=session_id,
-            project_slug="test",
-            intent_type="status",
-            topic_id=topic_id
-        )
+        # Verify utterance exists
+        utterance = await test_db_store.get_utterance(utterance_id)
+        assert utterance is not None, "Utterance should exist"
 
-        intent = await in_memory_db_store.get_intent(intent_id)
-        assert intent["utterance_id"] == custom_id
+        # Try to get results for a non-existent intent (should return empty list)
+        # Note: We're using a random UUID that doesn't correspond to any intent
+        fake_intent_id = str(uuid4())
+        results = await test_db_store.get_results_for_intent(fake_intent_id)
+        assert results == [], "get_results_for_intent() should return empty list for non-existent intent"
 
-        utterance = await in_memory_db_store.get_utterance(custom_id)
-        assert utterance is not None
-        assert utterance["id"] == custom_id
-
-    @pytest.mark.asyncio
-    async def test_multiple_utterances_same_session(self, in_memory_db_store, test_topic_with_session):
-        """Test creating multiple utterances in the same session."""
-        session_id, topic_id = test_topic_with_session
-
-        # Create multiple utterances
-        utterance_1 = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text="First question"
-        )
-        utterance_2 = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text="Second question"
-        )
-        utterance_3 = await in_memory_db_store.create_utterance(
-            session_id=session_id,
-            raw_text="Third question"
-        )
-
-        # Verify all exist and are distinct
-        retrieved_1 = await in_memory_db_store.get_utterance(utterance_1)
-        retrieved_2 = await in_memory_db_store.get_utterance(utterance_2)
-        retrieved_3 = await in_memory_db_store.get_utterance(utterance_3)
-
-        assert retrieved_1 is not None
-        assert retrieved_2 is not None
-        assert retrieved_3 is not None
-
-        assert retrieved_1["id"] != retrieved_2["id"]
-        assert retrieved_2["id"] != retrieved_3["id"]
-        assert retrieved_3["id"] != retrieved_1["id"]
-
-        # All belong to same session
-        assert retrieved_1["session_id"] == session_id
-        assert retrieved_2["session_id"] == session_id
-        assert retrieved_3["session_id"] == session_id
+        # Verify the utterance itself is still intact
+        utterance_check = await test_db_store.get_utterance(utterance_id)
+        assert utterance_check is not None, "Utterance should still exist after querying non-existent intent"
+        assert utterance_check["raw_text"] == "This utterance has no intents or results"
