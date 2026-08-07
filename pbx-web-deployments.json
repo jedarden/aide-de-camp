@@ -1,0 +1,40 @@
+{
+  "query_date": "2026-08-07T09:45:39.371300Z",
+  "time_period": "last_30_days",
+  "deployment_source": "argoCD_declarative_config",
+  "total_deployments": 4,
+  "deployments": [
+    {
+      "commit_hash": "0fb7b127a910aa970bf76613ac2a071bec8a20af",
+      "timestamp": "2026-07-28 13:24:42 -0400",
+      "author": "jedarden",
+      "message": "Revert \"feat(pbx-web): add WebRTC web client page behind Google OAuth\"",
+      "image_tag": "1.0.9",
+      "deployment_type": "argoCD"
+    },
+    {
+      "commit_hash": "7c3667ed6a4a9ae808bba4bf72bcfff128bf9e52",
+      "timestamp": "2026-07-28 13:03:33 -0400",
+      "author": "jedarden",
+      "message": "feat(pbx-web): add WebRTC web client page behind Google OAuth",
+      "image_tag": "1.0.9",
+      "deployment_type": "argoCD"
+    },
+    {
+      "commit_hash": "f20d55e5c3ad12eef64662bb795f8004492afda2",
+      "timestamp": "2026-07-13 14:15:32 -0400",
+      "author": "jedarden",
+      "message": "feat(pbx-web): bump image to 1.0.9 (copy transcript now includes timestamps)",
+      "image_tag": "1.0.9",
+      "deployment_type": "argoCD"
+    },
+    {
+      "commit_hash": "1cb0594b12609384dab318b9556e58f321ae134d",
+      "timestamp": "2026-07-13 14:05:26 -0400",
+      "author": "jedarden",
+      "message": "feat(pbx-web): bump image to 1.0.8 (copy-to-clipboard transcript button)",
+      "image_tag": "1.0.8",
+      "deployment_type": "argoCD"
+    }
+  ]
+}

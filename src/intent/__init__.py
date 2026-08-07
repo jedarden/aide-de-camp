@@ -15,10 +15,27 @@ from .router import (
     get_router,
 )
 
+from .comparison import (
+    compare_intent_type,
+    compare_confidence,
+    compare_classifications,
+    ComparisonMatchStatus,
+    FieldDifference,
+    ComparisonResult,
+)
+
 __all__ = [
     "IntentRouter",
     "IntentType",
     "IntentClassification",
     "RoutedIntent",
     "get_router",
+    # Comparison functions
+    "compare_intent_type",
+    "compare_confidence",
+    "compare_classifications",
+    # Comparison data structures
+    "ComparisonMatchStatus",
+    "FieldDifference",
+    "ComparisonResult",
 ]

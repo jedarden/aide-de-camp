@@ -344,34 +344,105 @@ class ThirtyDayCompletenessValidator:
             result.metrics.days_covered = days_covered
 
             if days_covered < 28:
+                # Enhanced error message with specific missing day information
+                missing_day_count = 28 - days_covered
+
+                # Calculate specific missing days if possible
+                date_range_start = oldest
+                date_range_end = newest
+
+                # Generate detailed missing day list
+                all_days_in_range = []
+                current = date_range_start
+                while current <= date_range_end:
+                    all_days_in_range.append(current.date().isoformat())
+                    current += timedelta(days=1)
+
+                # Determine which specific days are missing from replica_history
+                replica_dates = set()
+                for entry in replica_history:
+                    try:
+                        ts = self._parse_timestamp(entry.get('created_at'))
+                        replica_dates.add(ts.date().isoformat())
+                    except (ValueError, KeyError):
+                        continue
+
+                missing_days = [day for day in all_days_in_range if day not in replica_dates]
+
+                # Build comprehensive guidance message
+                guidance_parts = [
+                    f"Expected range: days 1-30 (28 minimum required)",
+                    f"Actual coverage: {days_covered} days ({(days_covered/30)*100:.1f}%)",
+                    f"Missing: {missing_day_count} days from expected range"
+                ]
+
+                if missing_days:
+                    if len(missing_days) <= 5:
+                        guidance_parts.append(f"Specific missing days: {', '.join(missing_days)}")
+                    else:
+                        guidance_parts.append(f"Missing days include: {', '.join(missing_days[:3])}... and {len(missing_days)-3} more")
+
+                guidance_parts.extend([
+                    f"Action required: Add deployment data for {missing_day_count} missing days",
+                    f"Check: ReplicaSet history for records between {oldest.date().isoformat()} and {newest.date().isoformat()}",
+                    f"Verify: Data collection covers full 30-day period from {metadata.get('data_period_start')}"
+                ])
+
                 result.errors.append(ValidationError(
                     rule_id="TV-001",
                     severity=Severity.CRITICAL,
-                    message=f"Insufficient 30-day coverage: {days_covered} days covered (< 28 required). Deployment data does not span the minimum required period.",
+                    message=f"Insufficient 30-day coverage: {days_covered} days covered (< 28 required). Deployment data does not span the minimum required period. Expected days 1-30, missing {missing_day_count} days: {', '.join(missing_days[:5])}{'...' if len(missing_days) > 5 else ''}",
                     details={
                         "days_covered": days_covered,
                         "required_minimum": 28,
                         "recommended_minimum": 30,
+                        "expected_day_range": "days 1-30",
                         "coverage_gap_days": 28 - days_covered,
                         "oldest_deployment": oldest.isoformat(),
                         "newest_deployment": newest.isoformat(),
-                        "actionable_guidance": f"Extend data collection period by {28 - days_covered} more days. Check if replica_history includes all ReplicaSets from the 30-day window starting {metadata.get('data_period_start')}."
+                        "missing_day_list": missing_days,
+                        "missing_day_count": len(missing_days),
+                        "actionable_guidance": " | ".join(guidance_parts)
                     }
                 ))
                 result.status = ValidationStatus.FAIL
             elif days_covered < 30:
+                # Enhanced warning message with specific missing day information
+                missing_day_count = 30 - days_covered
+
+                # Calculate specific missing days
+                all_days_in_range = []
+                current = oldest
+                while current <= newest:
+                    all_days_in_range.append(current.date().isoformat())
+                    current += timedelta(days=1)
+
+                replica_dates = set()
+                for entry in replica_history:
+                    try:
+                        ts = self._parse_timestamp(entry.get('created_at'))
+                        replica_dates.add(ts.date().isoformat())
+                    except (ValueError, KeyError):
+                        continue
+
+                missing_days = [day for day in all_days_in_range if day not in replica_dates]
+
                 result.warnings.append(ValidationError(
                     rule_id="TV-001",
                     severity=Severity.WARNING,
-                    message=f"Borderline coverage: {days_covered} days covered (< 30 recommended). Data coverage is near minimum threshold.",
+                    message=f"Borderline coverage: {days_covered} days covered (< 30 recommended). Expected days 1-30, missing {missing_day_count} days for complete coverage: {', '.join(missing_days[:3])}{'...' if len(missing_days) > 3 else ''}",
                     details={
                         "days_covered": days_covered,
                         "required_minimum": 28,
                         "recommended_minimum": 30,
+                        "expected_day_range": "days 1-30",
                         "coverage_gap_days": 30 - days_covered,
                         "oldest_deployment": oldest.isoformat(),
                         "newest_deployment": newest.isoformat(),
-                        "actionable_guidance": f"Consider extending data collection by {30 - days_covered} days to achieve full 30-day coverage. Current coverage: {(days_covered/30)*100:.1f}%"
+                        "missing_day_list": missing_days,
+                        "missing_day_count": len(missing_days),
+                        "coverage_percentage": f"{(days_covered/30)*100:.1f}%",
+                        "actionable_guidance": f"Expected: days 1-30. Actual: {days_covered} days. Missing: {missing_day_count} days. Add deployment data for: {', '.join(missing_days[:3])}{'...' if len(missing_days) > 3 else ''}. Current coverage: {(days_covered/30)*100:.1f}%"
                     }
                 ))
 
@@ -498,48 +569,139 @@ class ThirtyDayCompletenessValidator:
             warning_gaps = [g for g in gaps if g['severity'] == 'WARNING']
 
             if critical_gaps:
-                # Format gap details for error message
+                # Format gap details for error message with specific missing days
                 gap_details = []
+                missing_day_lists = []
+
                 for gap in critical_gaps:
                     gap_start = gap.get('gap_start', 'Unknown')
                     gap_end = gap.get('gap_end', 'Unknown')
                     gap_days = gap.get('gap_days', 0)
-                    gap_details.append(f"{gap_days} days ({gap_start} to {gap_end})")
+
+                    # Generate list of specific missing days in this gap
+                    try:
+                        start_date = datetime.fromisoformat(gap_start.replace('Z', '+00:00'))
+                        end_date = datetime.fromisoformat(gap_end.replace('Z', '+00:00'))
+
+                        missing_days_in_gap = []
+                        current = start_date + timedelta(days=1)  # Start from day after gap_start
+                        while current < end_date:
+                            missing_days_in_gap.append(current.date().isoformat())
+                            current += timedelta(days=1)
+
+                        if len(missing_days_in_gap) <= 5:
+                            missing_days_str = ', '.join(missing_days_in_gap)
+                        else:
+                            missing_days_str = f"{', '.join(missing_days_in_gap[:2])}... {len(missing_days_in_gap)-2} more"
+
+                        gap_details.append(f"{gap_days} days ({gap_start.split('T')[0]} to {gap_end.split('T')[0]})")
+                        missing_day_lists.append({
+                            "gap_duration_days": gap_days,
+                            "gap_start": gap_start.split('T')[0],
+                            "gap_end": gap_end.split('T')[0],
+                            "missing_days": missing_days_in_gap,
+                            "missing_days_summary": missing_days_str
+                        })
+                    except Exception:
+                        gap_details.append(f"{gap_days} days ({gap_start} to {gap_end})")
+
+                # Build comprehensive guidance
+                guidance_parts = [
+                    f"Expected: continuous coverage across days 1-30",
+                    f"Found: {len(critical_gaps)} critical gaps > 14 days each",
+                    f"Total missing days: {sum(g['gap_days'] for g in critical_gaps)} days"
+                ]
+
+                for i, gap_info in enumerate(missing_day_lists, 1):
+                    guidance_parts.append(f"Gap {i}: {gap_info['gap_duration_days']} days missing ({gap_info['gap_start']} to {gap_info['gap_end']}). Specific days: {gap_info['missing_days_summary']}")
+
+                guidance_parts.extend([
+                    f"Action: Fill missing deployment data or document deployment inactivity",
+                    f"Check: ReplicaSet history queries, data collection logs, service deployment records"
+                ])
 
                 result.errors.append(ValidationError(
                     rule_id="CV-002",
                     severity=Severity.CRITICAL,
-                    message=f"{len(critical_gaps)} critical coverage gaps detected (> 14 days each). Deployment data has significant temporal discontinuities that break 30-day completeness.",
+                    message=f"{len(critical_gaps)} critical coverage gaps detected (> 14 days each). Expected continuous days 1-30 coverage, found gaps totaling {sum(g['gap_days'] for g in critical_gaps)} missing days. Gap {1}: {critical_gaps[0]['gap_days']} days ({critical_gaps[0]['gap_start'].split('T')[0]} to {critical_gaps[0]['gap_end'].split('T')[0]}).",
                     details={
                         "critical_gaps": critical_gaps,
                         "total_gaps": len(gaps),
                         "critical_gap_count": len(critical_gaps),
+                        "total_missing_days": sum(g['gap_days'] for g in critical_gaps),
+                        "expected_coverage": "days 1-30 (continuous)",
                         "gap_descriptions": gap_details,
+                        "missing_day_details": missing_day_lists,
                         "largest_gap": max(g['gap_days'] for g in critical_gaps) if critical_gaps else 0,
-                        "actionable_guidance": f"Critical gaps indicate missing deployment data. Each gap represents {len(critical_gaps)}+ days with no deployment records. Check: (1) ReplicaSet history queries for missing records, (2) Data collection coverage during gap periods, (3) Service deployment activity during gaps. Fill gaps with missing ReplicaSet data or document why deployment was inactive."
+                        "actionable_guidance": " | ".join(guidance_parts)
                     }
                 ))
                 result.status = ValidationStatus.FAIL
             elif warning_gaps:
-                # Format gap details for warning message
+                # Format gap details for warning message with specific missing days
                 gap_details = []
+                missing_day_lists = []
+
                 for gap in warning_gaps:
                     gap_start = gap.get('gap_start', 'Unknown')
                     gap_end = gap.get('gap_end', 'Unknown')
                     gap_days = gap.get('gap_days', 0)
-                    gap_details.append(f"{gap_days} days ({gap_start} to {gap_end})")
+
+                    # Generate list of specific missing days in this gap
+                    try:
+                        start_date = datetime.fromisoformat(gap_start.replace('Z', '+00:00'))
+                        end_date = datetime.fromisoformat(gap_end.replace('Z', '+00:00'))
+
+                        missing_days_in_gap = []
+                        current = start_date + timedelta(days=1)
+                        while current < end_date:
+                            missing_days_in_gap.append(current.date().isoformat())
+                            current += timedelta(days=1)
+
+                        if len(missing_days_in_gap) <= 3:
+                            missing_days_str = ', '.join(missing_days_in_gap)
+                        else:
+                            missing_days_str = f"{', '.join(missing_days_in_gap[:2])}... {len(missing_days_in_gap)-2} more"
+
+                        gap_details.append(f"{gap_days} days ({gap_start.split('T')[0]} to {gap_end.split('T')[0]})")
+                        missing_day_lists.append({
+                            "gap_duration_days": gap_days,
+                            "gap_start": gap_start.split('T')[0],
+                            "gap_end": gap_end.split('T')[0],
+                            "missing_days": missing_days_in_gap,
+                            "missing_days_summary": missing_days_str
+                        })
+                    except Exception:
+                        gap_details.append(f"{gap_days} days ({gap_start} to {gap_end})")
+
+                # Build comprehensive guidance
+                guidance_parts = [
+                    f"Expected: near-continuous coverage across days 1-30",
+                    f"Found: {len(warning_gaps)} moderate gaps > 7 days each",
+                    f"Total missing days: {sum(g['gap_days'] for g in warning_gaps)} days"
+                ]
+
+                for i, gap_info in enumerate(missing_day_lists, 1):
+                    guidance_parts.append(f"Gap {i}: {gap_info['gap_duration_days']} days ({gap_info['gap_start']} to {gap_info['gap_end']}). Missing: {gap_info['missing_days_summary']}")
+
+                guidance_parts.extend([
+                    f"Action: Review ReplicaSet history, verify data collection, document if deployment was inactive"
+                ])
 
                 result.warnings.append(ValidationError(
                     rule_id="CV-002",
                     severity=Severity.WARNING,
-                    message=f"{len(warning_gaps)} coverage gaps detected (> 7 days each). Deployment data has moderate temporal discontinuities.",
+                    message=f"{len(warning_gaps)} coverage gaps detected (> 7 days each). Expected near-continuous days 1-30 coverage, found {len(warning_gaps)} gaps totaling {sum(g['gap_days'] for g in warning_gaps)} missing days. Gap {1}: {warning_gaps[0]['gap_days']} days ({warning_gaps[0]['gap_start'].split('T')[0]} to {warning_gaps[0]['gap_end'].split('T')[0]}).",
                     details={
                         "warning_gaps": warning_gaps,
                         "total_gaps": len(gaps),
                         "warning_gap_count": len(warning_gaps),
+                        "total_missing_days": sum(g['gap_days'] for g in warning_gaps),
+                        "expected_coverage": "days 1-30 (near-continuous)",
                         "gap_descriptions": gap_details,
+                        "missing_day_details": missing_day_lists,
                         "largest_gap": max(g['gap_days'] for g in warning_gaps) if warning_gaps else 0,
-                        "actionable_guidance": f"Moderate gaps may indicate missing deployment records or periods of deployment inactivity. Review gaps: {', '.join(gap_details)}. Consider: (1) Checking ReplicaSet history for missing records, (2) Verifying deployment activity during gap periods, (3) Extending data collection if gaps represent missing data."
+                        "actionable_guidance": " | ".join(guidance_parts)
                     }
                 ))
 
@@ -718,11 +880,6 @@ class ThirtyDayCompletenessValidator:
                     'gap_days': gap_days,
                     'severity': 'CRITICAL' if gap_days >= critical_threshold else 'WARNING'
                 })
-
-        # Update metrics
-        if gaps:
-            result.gaps_detected = gaps
-            result.largest_gap_days = max(g['gap_days'] for g in gaps)
 
         return gaps
 

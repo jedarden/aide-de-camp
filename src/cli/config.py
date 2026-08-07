@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from src.utils.atomic_write import atomic_write
+
 
 class Config:
     """CLI configuration manager."""
@@ -72,9 +74,8 @@ class Config:
         if not updated:
             new_lines.append(f'server_url = "{url}"\n')
 
-        # Write back
-        with open(self.config_file, "w") as f:
-            f.writelines(new_lines)
+        # Write back atomically
+        atomic_write(self.config_file, ''.join(new_lines))
 
     def get_session_id(self) -> Optional[str]:
         """Get the session ID from config."""
@@ -116,9 +117,8 @@ class Config:
         if not updated:
             new_lines.append(f'session_id = "{session_id}"\n')
 
-        # Write back
-        with open(self.config_file, "w") as f:
-            f.writelines(new_lines)
+        # Write back atomically
+        atomic_write(self.config_file, ''.join(new_lines))
 
 
 # Global config instance

@@ -273,6 +273,71 @@
     "collection_source": "whisper-openai-pod.log"
   },
   {
+    "pod_name": "whisper-openai-raw",
+    "namespace": "whisper-stt",
+    "log_file_path": "logs/whisper-openai-raw.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T23:02:09.215310",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T23:02:09.215310",
+    "file_modification_timestamp": "2026-08-06T23:02:09.215310",
+    "log_size_bytes": 5573013,
+    "has_analysis": false,
+    "collection_source": "whisper-openai-raw.log"
+  },
+  {
+    "pod_name": "whisper",
+    "namespace": "whisper-stt",
+    "log_file_path": "logs/whisper-openai.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-07-10T13:39:33",
+    "deletion_timestamp": "2026-08-07T02:18:34",
+    "file_creation_timestamp": "2026-08-07T02:18:35.956465",
+    "file_modification_timestamp": "2026-08-07T02:18:35.956465",
+    "log_size_bytes": 9179841,
+    "has_analysis": false,
+    "collection_source": "whisper-openai.log"
+  },
+  {
+    "pod_name": "whisper-stt-30day-raw",
+    "namespace": "whisper-stt",
+    "log_file_path": "logs/whisper-stt-30day-raw.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-07T02:59:18.085984",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-07T02:59:18.085984",
+    "file_modification_timestamp": "2026-08-07T02:59:18.085984",
+    "log_size_bytes": 0,
+    "has_analysis": false,
+    "collection_source": "whisper-stt-30day-raw.log"
+  },
+  {
+    "pod_name": "whisper-stt-main",
+    "namespace": "whisper-stt",
+    "log_file_path": "logs/whisper-stt-main.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-07T02:18:18.492541",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-07T02:18:18.492541",
+    "file_modification_timestamp": "2026-08-07T02:18:18.492541",
+    "log_size_bytes": 0,
+    "has_analysis": false,
+    "collection_source": "whisper-stt-main.log"
+  },
+  {
+    "pod_name": "whisper-stt-pod-raw",
+    "namespace": "whisper-stt",
+    "log_file_path": "logs/whisper-stt-pod-raw.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T23:02:07.555317",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T23:02:07.555317",
+    "file_modification_timestamp": "2026-08-06T23:02:07.555317",
+    "log_size_bytes": 0,
+    "has_analysis": false,
+    "collection_source": "whisper-stt-pod-raw.log"
+  },
+  {
     "pod_name": "whisper",
     "namespace": "whisper-stt",
     "log_file_path": "logs/whisper-stt-pod.log",
@@ -284,6 +349,19 @@
     "log_size_bytes": 0,
     "has_analysis": false,
     "collection_source": "whisper-stt-pod.log"
+  },
+  {
+    "pod_name": "svclb-whisper-stt-c02117d2-f72hg",
+    "namespace": "whisper-stt",
+    "log_file_path": "research/whisper-stt-30days/pod-logs/pod-svclb-whisper-stt-c02117d2-f72hg.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T21:48:05.590982",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T21:48:05.590982",
+    "file_modification_timestamp": "2026-08-06T21:48:05.590982",
+    "log_size_bytes": 951,
+    "has_analysis": false,
+    "collection_source": "pod-svclb-whisper-stt-c02117d2-f72hg.log"
   },
   {
     "pod_name": "whisper-openai-68966786fb-jsb5d",
@@ -349,6 +427,32 @@
     "log_size_bytes": 99,
     "has_analysis": true,
     "collection_source": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06.log"
+  },
+  {
+    "pod_name": "whisper-openai-68966786fb-tng29",
+    "namespace": "whisper-stt",
+    "log_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-tng29.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T21:46:04.915480",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T21:46:04.915480",
+    "file_modification_timestamp": "2026-08-06T21:46:04.915480",
+    "log_size_bytes": 5078,
+    "has_analysis": false,
+    "collection_source": "pod-whisper-openai-68966786fb-tng29.log"
+  },
+  {
+    "pod_name": "whisper-stt-847fd8d7b9-b8rsj",
+    "namespace": "whisper-stt",
+    "log_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-b8rsj.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T21:46:05.491477",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T21:46:05.491477",
+    "file_modification_timestamp": "2026-08-06T21:46:05.491477",
+    "log_size_bytes": 2566,
+    "has_analysis": false,
+    "collection_source": "pod-whisper-stt-847fd8d7b9-b8rsj.log"
   },
   {
     "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
@@ -429,6 +533,45 @@
     "collection_source": "whisper-openai-68966786fb-jsb5d.log"
   },
   {
+    "pod_name": "whisper-openai-ardenone-cluster",
+    "namespace": "whisper-stt",
+    "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-openai-ardenone-cluster.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T22:12:41.152136",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T22:12:41.152136",
+    "file_modification_timestamp": "2026-08-06T22:12:41.152136",
+    "log_size_bytes": 580083,
+    "has_analysis": false,
+    "collection_source": "whisper-openai-ardenone-cluster.log"
+  },
+  {
+    "pod_name": "whisper-openai-ardenone-manager",
+    "namespace": "whisper-stt",
+    "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-openai-ardenone-manager.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T22:12:48.664102",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T22:12:48.664102",
+    "file_modification_timestamp": "2026-08-06T22:12:48.664102",
+    "log_size_bytes": 83,
+    "has_analysis": false,
+    "collection_source": "whisper-openai-ardenone-manager.log"
+  },
+  {
+    "pod_name": "whisper",
+    "namespace": "whisper-stt",
+    "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-openai-current.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T23:01:04.719587",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T23:01:04.719587",
+    "file_modification_timestamp": "2026-08-06T23:01:04.719587",
+    "log_size_bytes": 580083,
+    "has_analysis": false,
+    "collection_source": "whisper-openai-current.log"
+  },
+  {
     "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
     "namespace": "whisper-stt",
     "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-stt-847fd8d7b9-v2rs5.log",
@@ -440,5 +583,44 @@
     "log_size_bytes": 0,
     "has_analysis": false,
     "collection_source": "whisper-stt-847fd8d7b9-v2rs5.log"
+  },
+  {
+    "pod_name": "whisper-stt-ardenone-cluster",
+    "namespace": "whisper-stt",
+    "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-stt-ardenone-cluster.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T22:12:38.212149",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T22:12:38.212149",
+    "file_modification_timestamp": "2026-08-06T22:12:38.212149",
+    "log_size_bytes": 0,
+    "has_analysis": false,
+    "collection_source": "whisper-stt-ardenone-cluster.log"
+  },
+  {
+    "pod_name": "whisper-stt-ardenone-manager",
+    "namespace": "whisper-stt",
+    "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-stt-ardenone-manager.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T22:12:47.656107",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T22:12:47.656107",
+    "file_modification_timestamp": "2026-08-06T22:12:47.656107",
+    "log_size_bytes": 0,
+    "has_analysis": false,
+    "collection_source": "whisper-stt-ardenone-manager.log"
+  },
+  {
+    "pod_name": "whisper",
+    "namespace": "whisper-stt",
+    "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-stt-current.log",
+    "analysis_file_path": null,
+    "creation_timestamp": "2026-08-06T23:01:04.719587",
+    "deletion_timestamp": null,
+    "file_creation_timestamp": "2026-08-06T23:01:04.719587",
+    "file_modification_timestamp": "2026-08-06T23:01:04.719587",
+    "log_size_bytes": 0,
+    "has_analysis": false,
+    "collection_source": "whisper-stt-current.log"
   }
 ]

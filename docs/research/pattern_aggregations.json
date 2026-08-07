@@ -1,0 +1,151 @@
+{
+  "summary": {
+    "files_processed": 28,
+    "successful": 28,
+    "errors": 0,
+    "total_records": 71,
+    "total_patterns_detected": 181
+  },
+  "pattern_statistics": {
+    "ImagePullBackOff": {
+      "pattern_name": "ImagePullBackOff",
+      "frequency": 0,
+      "time_distribution": {
+        "min_timestamp": null,
+        "max_timestamp": null,
+        "avg_timestamp": null,
+        "time_span_hours": 0
+      },
+      "service_context": {},
+      "image_context": {},
+      "top_services": [],
+      "top_images": []
+    },
+    "CrashLoopBackOff": {
+      "pattern_name": "CrashLoopBackOff",
+      "frequency": 0,
+      "time_distribution": {
+        "min_timestamp": null,
+        "max_timestamp": null,
+        "avg_timestamp": null,
+        "time_span_hours": 0
+      },
+      "service_context": {},
+      "image_context": {},
+      "top_services": [],
+      "top_images": []
+    },
+    "OOMKilled": {
+      "pattern_name": "OOMKilled",
+      "frequency": 0,
+      "time_distribution": {
+        "min_timestamp": null,
+        "max_timestamp": null,
+        "avg_timestamp": null,
+        "time_span_hours": 0
+      },
+      "service_context": {},
+      "image_context": {},
+      "top_services": [],
+      "top_images": []
+    },
+    "Probe_failure": {
+      "pattern_name": "Probe_failure",
+      "frequency": 0,
+      "time_distribution": {
+        "min_timestamp": null,
+        "max_timestamp": null,
+        "avg_timestamp": null,
+        "time_span_hours": 0
+      },
+      "service_context": {},
+      "image_context": {},
+      "top_services": [],
+      "top_images": []
+    },
+    "Dependency_timeout": {
+      "pattern_name": "Dependency_timeout",
+      "frequency": 0,
+      "time_distribution": {
+        "min_timestamp": null,
+        "max_timestamp": null,
+        "avg_timestamp": null,
+        "time_span_hours": 0
+      },
+      "service_context": {},
+      "image_context": {},
+      "top_services": [],
+      "top_images": []
+    },
+    "Other": {
+      "pattern_name": "Other",
+      "frequency": 181,
+      "time_distribution": {
+        "min_timestamp": "2026-05-02T11:29:50+00:00",
+        "max_timestamp": "2026-07-28T17:26:12+00:00",
+        "avg_timestamp": "2026-06-15T02:28:01+00:00",
+        "time_span_hours": 2093.9394444444442
+      },
+      "service_context": {
+        "pbx-web": 1,
+        "lab-rebuild-relay": 3,
+        "pbx-rebuild-relay": 3,
+        "whisper-openai": 6,
+        "whisper-stt": 15
+      },
+      "image_context": {
+        "ronaldraygun/pbx-web:1.0.8": 7,
+        "ronaldraygun/pbx-web:1.0.9": 12,
+        "python:3-slim": 12,
+        "ronaldraygun/whisper-stt:1.8.6": 12,
+        "ronaldraygun/whisper-stt:1.8.4": 6,
+        "ronaldraygun/whisper-stt:1.8.2": 6,
+        "fedirz/faster-whisper-server:latest-cpu": 3
+      },
+      "top_services": [
+        [
+          "whisper-stt",
+          15
+        ],
+        [
+          "whisper-openai",
+          6
+        ],
+        [
+          "lab-rebuild-relay",
+          3
+        ],
+        [
+          "pbx-rebuild-relay",
+          3
+        ],
+        [
+          "pbx-web",
+          1
+        ]
+      ],
+      "top_images": [
+        [
+          "ronaldraygun/pbx-web:1.0.9",
+          12
+        ],
+        [
+          "python:3-slim",
+          12
+        ],
+        [
+          "ronaldraygun/whisper-stt:1.8.6",
+          12
+        ],
+        [
+          "ronaldraygun/pbx-web:1.0.8",
+          7
+        ],
+        [
+          "ronaldraygun/whisper-stt:1.8.4",
+          6
+        ]
+      ]
+    }
+  }
+}

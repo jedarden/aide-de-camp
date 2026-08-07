@@ -62,6 +62,7 @@ from .environment.discovery import (
     get_last_scan_at,
 )
 from .registry import get_registry as get_yaml_registry
+from .config.retry import validate_retry_config
 
 
 logger = getLogger(__name__)
@@ -100,6 +101,13 @@ async def lifespan(app: FastAPI):
     global _ambient_monitor, _context_warmer, _background_processor
 
     logger.info("Starting aide-de-camp...")
+
+    # Validate retry configuration on startup
+    try:
+        validate_retry_config()
+    except ValueError as e:
+        logger.error(f"Invalid retry configuration: {e}")
+        raise
 
     # Discover local + remote environment (git repos + bead workspaces)
     registry = await scan_environment()

@@ -540,6 +540,10 @@ async def in_memory_db_store():
         instead of :memory: to ensure all connections within the process access
         the same in-memory database. Each test gets a unique cache name to ensure
         complete isolation between tests.
+
+        IMPORTANT: For in-memory databases, we must keep at least one connection
+        open at all times, otherwise SQLite destroys the database. This fixture
+        keeps a "keeper" connection open during the test to prevent this.
     """
     import aiosqlite
     import uuid
@@ -550,25 +554,26 @@ async def in_memory_db_store():
     cache_name = f"in_memory_db_{uuid.uuid4().hex}"
     db_path = f"file:{cache_name}?mode=memory&cache=shared"
 
-    # Initialize in-memory database with full schema
-    async with aiosqlite.connect(db_path) as db:
-        # Enable WAL mode for concurrent access
-        await db.execute("PRAGMA journal_mode=WAL")
-        await db.execute("PRAGMA synchronous=NORMAL")
+    # Create a keeper connection that will stay open during the test
+    # This prevents the in-memory database from being destroyed
+    keeper_conn = await aiosqlite.connect(db_path)
 
-        # Create schema with all migrations
-        await db.executescript(SCHEMA_SQL)
-        await db.commit()
+    # Initialize the database schema via the keeper connection
+    await keeper_conn.execute("PRAGMA journal_mode=WAL")
+    await keeper_conn.execute("PRAGMA synchronous=NORMAL")
+    await keeper_conn.executescript(SCHEMA_SQL)
+    await keeper_conn.commit()
 
-        # Run all migrations to ensure full schema compatibility
-        await SessionStore._migrate_additive_columns(db)
+    # Run migrations
+    await SessionStore._migrate_additive_columns(keeper_conn)
 
     # Create SessionStore with in-memory database
     store = SessionStore(db_path)
 
     yield store
 
-    # Cleanup: close the store (in-memory database is automatically destroyed)
+    # Cleanup: close the keeper connection first, then the store
+    await keeper_conn.close()
     await store.close()
 
 

@@ -16,7 +16,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from components.hot_reload import get_reload_manager
+from src.components.hot_reload import get_reload_manager
 
 
 async def test_router_prompt_hot_reload():

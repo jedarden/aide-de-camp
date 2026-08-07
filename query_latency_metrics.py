@@ -249,10 +249,9 @@ def main():
     print("Querying Latency Metrics for pbx-web and whisper-stt")
     print("="*70)
 
-    # Time range: 30 days ending today (2026-08-06)
-    # Using the same range as the test script
-    start_date = "2026-07-07T00:00:00Z"
-    end_date = "2026-08-06T23:59:59Z"
+    # Time range: 30 days from 2026-07-08 to 2026-08-07
+    start_date = "2026-07-08T00:00:00Z"
+    end_date = "2026-08-07T23:59:59Z"
 
     print(f"Time Range: {start_date} to {end_date} (30 days)")
     print(f"Services: pbx-web, whisper-stt")

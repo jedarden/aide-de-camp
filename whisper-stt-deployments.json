@@ -1,0 +1,17 @@
+{
+  "query_metadata": {
+    "cutoff_date": "2026-07-08T09:48:23Z",
+    "query_date": "2026-08-07T09:48:24Z",
+    "query_period_days": 30,
+    "cluster": "iad-ci",
+    "namespace": "argo-workflows",
+    "workflow_template": "whisper-stt-build",
+    "template_created": "2026-05-27T02:26:47Z"
+  },
+  "summary": {
+    "total_workflows_found": 0,
+    "status": "no_runs_in_period",
+    "note": "Workflow template exists but no runs found in the last 30 days. Template may have never been triggered or all previous runs have been cleaned up."
+  },
+  "workflows": []
+}

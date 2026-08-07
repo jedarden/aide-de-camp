@@ -327,11 +327,68 @@ CIRCUIT_BREAKER_AGE_THRESHOLD_HOURS = 24.0  # Fence after N hours without progre
 class SessionStore:
     """Session store with WAL mode for concurrent access and asyncio.Lock for critical sections."""
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, enable_connection_monitoring: bool = False):
         self.db_path = db_path
         # ASYNCIO LOCKING PROTECTION: Protect critical sections from concurrent access
         self._lock = asyncio.Lock()
         logger.debug("SessionStore lock initialized")
+
+        # Connection monitoring for leak detection (disabled by default)
+        self._enable_connection_monitoring = enable_connection_monitoring
+        self._connection_monitor = None
+        if enable_connection_monitoring:
+            from .connection_monitor import ConnectionMonitor
+            self._connection_monitor = ConnectionMonitor(
+                leak_threshold_seconds=10.0,
+                max_connections=100,
+                enable_stack_traces=True,
+            )
+            logger.info("SessionStore connection monitoring enabled")
+
+    async def _get_connection(self):
+        """
+        Get a database connection with optional monitoring.
+
+        Returns a connection context manager that tracks connection lifecycle
+        if monitoring is enabled. Returns a standard aiosqlite connection otherwise.
+        """
+        if self._connection_monitor is not None:
+            return self._connection_monitor.track_connection(str(self.db_path))
+        else:
+            # Standard aiosqlite connection without monitoring
+            return aiosqlite.connect(self.db_path)
+
+    async def get_connection_monitor(self):
+        """Get the connection monitor instance, or None if monitoring is disabled."""
+        return self._connection_monitor
+
+    async def assert_no_connection_leaks(self, allow_active: int = 0) -> None:
+        """
+        Assert that no connection leaks exist.
+
+        Args:
+            allow_active: Number of active connections to allow (for baseline tracking)
+
+        Raises:
+            ConnectionLeakError: If leaks are detected beyond allow_active threshold
+        """
+        if self._connection_monitor is not None:
+            from .connection_monitor import ConnectionLeakError
+            await self._connection_monitor.assert_no_leaks(
+                message="SessionStore connection leak detected",
+                allow_active=allow_active,
+            )
+        else:
+            logger.debug("Connection monitoring not enabled, skipping leak check")
+
+    async def get_connection_stats(self):
+        """Get connection monitoring statistics.
+
+        Returns None if monitoring is disabled.
+        """
+        if self._connection_monitor is not None:
+            return self._connection_monitor.get_stats()
+        return None
 
     async def initialize(self) -> None:
         """Initialize database with schema and WAL mode."""

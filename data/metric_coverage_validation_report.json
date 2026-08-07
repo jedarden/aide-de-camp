@@ -1,0 +1,136 @@
+{
+  "validation_timestamp": "2026-08-07T07:22:14.860791",
+  "task": "adc-39kyy",
+  "summary": {
+    "total_datasets": 4,
+    "datasets_with_full_coverage": 0,
+    "datasets_with_partial_coverage": 2,
+    "datasets_with_no_coverage": 2,
+    "critical_issues": 2,
+    "recommendations": []
+  },
+  "datasets": {
+    "pbx-web_error_rates": {
+      "time_range": {
+        "start": "2026-07-07T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "description": "Absolute 30-day window using ISO 8601 timestamps"
+      },
+      "coverage": {
+        "expected_days": 30,
+        "actual_days": 31,
+        "coverage_percentage": 103.33333333333334,
+        "has_data": true
+      },
+      "anomalies": [
+        {
+          "type": "zero_error_rate",
+          "query": "http_error_rate_from_nginx",
+          "message": "Zero error rate detected - may indicate missing data or perfect operation"
+        },
+        {
+          "type": "zero_error_rate",
+          "query": "oom_kill_rate_from_logs",
+          "message": "Zero error rate detected - may indicate missing data or perfect operation"
+        },
+        {
+          "type": "zero_error_rate",
+          "query": "overall_error_rate_all_sources",
+          "message": "Zero error rate detected - may indicate missing data or perfect operation"
+        }
+      ],
+      "gaps": []
+    },
+    "whisper-stt_error_rates": {
+      "time_range": {
+        "start": "2026-07-07T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "description": "Absolute 30-day window using ISO 8601 timestamps"
+      },
+      "coverage": {
+        "expected_days": 30,
+        "actual_days": 31,
+        "coverage_percentage": 103.33333333333334,
+        "has_data": true
+      },
+      "anomalies": [
+        {
+          "type": "zero_error_rate",
+          "query": "deployment_error_rate_from_k8s",
+          "message": "Zero error rate detected - may indicate missing data or perfect operation"
+        },
+        {
+          "type": "zero_error_rate",
+          "query": "oom_kill_rate_from_logs",
+          "message": "Zero error rate detected - may indicate missing data or perfect operation"
+        },
+        {
+          "type": "zero_error_rate",
+          "query": "overall_error_rate_all_sources",
+          "message": "Zero error rate detected - may indicate missing data or perfect operation"
+        }
+      ],
+      "gaps": []
+    },
+    "pbx-web_latency": {
+      "time_range": {
+        "start": "2026-07-08T00:00:00Z",
+        "end": "2026-08-07T23:59:59Z"
+      },
+      "coverage": {
+        "expected_days": 30,
+        "actual_days": 0,
+        "coverage_percentage": 0.0,
+        "has_data": false
+      },
+      "anomalies": [
+        {
+          "type": "critical_gap",
+          "message": "Complete data loss - no latency measurements available for entire 30-day period"
+        }
+      ],
+      "gaps": "ALL_30_DAYS_MISSING",
+      "status": "missing"
+    },
+    "whisper-stt_latency": {
+      "time_range": {
+        "start": "2026-07-08T00:00:00Z",
+        "end": "2026-08-07T23:59:59Z"
+      },
+      "coverage": {
+        "expected_days": 30,
+        "actual_days": 0,
+        "coverage_percentage": 0.0,
+        "has_data": false
+      },
+      "anomalies": [
+        {
+          "type": "critical_gap",
+          "message": "Complete data loss - no latency measurements available for entire 30-day period"
+        }
+      ],
+      "gaps": "ALL_30_DAYS_MISSING",
+      "status": "missing"
+    }
+  },
+  "consistency_analysis": [
+    {
+      "service": "pbx-web",
+      "issue": "dataset_mismatch",
+      "severity": "critical",
+      "message": "Error rate data exists but latency data is completely missing"
+    },
+    {
+      "service": "whisper-stt",
+      "issue": "dataset_mismatch",
+      "severity": "critical",
+      "message": "Error rate data exists but latency data is completely missing"
+    }
+  ],
+  "recommendations": [
+    "CRITICAL: Latency data is completely missing for both services - investigate data collection pipeline",
+    "CRITICAL: Error rate data has only 1 data point per service over 30 days - significantly increase data granularity",
+    "WARNING: Consider alternative latency data sources (Victorialogs, Prometheus) if available",
+    "INFO: Current error rate analysis may not be statistically significant with such low sample counts"
+  ]
+}
