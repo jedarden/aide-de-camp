@@ -15,6 +15,8 @@ from typing import Optional
 
 from logging import getLogger
 
+from .utils.atomic_write import atomic_write
+
 logger = getLogger(__name__)
 
 
@@ -77,7 +79,7 @@ def set_frozen(frozen: bool) -> None:
     """
     Set freeze state by creating or removing sentinel file.
 
-    Uses atomic file operations to prevent partial state issues.
+    Uses atomic_write utility to prevent partial state issues.
 
     Args:
         frozen: If True, create sentinel file; if False, remove it.
@@ -86,29 +88,12 @@ def set_frozen(frozen: bool) -> None:
         OSError: If atomic operations fail
     """
     if frozen:
-        # Atomic write using temp file + rename pattern
+        # Use atomic_write utility for atomic sentinel file creation
         try:
-            # Ensure directory exists
-            SENTINEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-            # Create temp file with unique name in same directory
-            temp_path = SENTINEL_PATH.parent / f".{SENTINEL_PATH.name}.{uuid.uuid4()}.tmp"
-
-            # Write to temp file
-            temp_path.write_text("Self-modification frozen via 'adc freeze' command\n")
-
-            # Atomic rename to target
-            temp_path.replace(SENTINEL_PATH)
-
+            content = "Self-modification frozen via 'adc freeze' command\n"
+            atomic_write(SENTINEL_PATH, content)
             logger.info(f"Created freeze sentinel: {SENTINEL_PATH}")
-
         except Exception as e:
-            # Clean up temp file if it exists
-            if 'temp_path' in locals() and temp_path.exists():
-                try:
-                    temp_path.unlink()
-                except Exception:
-                    pass
             logger.error(f"Failed to create freeze sentinel: {e}")
             raise OSError(f"Atomic write failed for freeze sentinel: {e}") from e
     else:

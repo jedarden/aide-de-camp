@@ -1,0 +1,48 @@
+{
+  "validation_date": "2026-08-07T06:47:50.439221",
+  "results": [
+    {
+      "file": "/home/coding/aide-de-camp/pbx-web-deployments.json",
+      "exists": true,
+      "valid_json": true,
+      "structure_valid": true,
+      "record_count": 4,
+      "errors": [],
+      "warnings": [],
+      "stats": {
+        "total_records": 4,
+        "has_timestamp": 4,
+        "has_commit_hash": 4,
+        "deployment_types": [
+          "argoCD"
+        ]
+      }
+    },
+    {
+      "file": "/home/coding/aide-de-camp/whisper-stt-deployments-30d.json",
+      "exists": true,
+      "valid_json": true,
+      "structure_valid": true,
+      "record_count": 1,
+      "errors": [],
+      "warnings": [],
+      "stats": {
+        "total_records": 1,
+        "has_timestamp": 1,
+        "has_event_type": 1,
+        "has_outcome": 1,
+        "successful_deployments": 1,
+        "failed_deployments": 0,
+        "outcome_types": [
+          "success"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "total_files": 2,
+    "valid_files": 2,
+    "total_errors": 0,
+    "total_warnings": 0
+  }
+}

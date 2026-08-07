@@ -606,3 +606,275 @@ class TestListComparison:
         result = compare_structured_fields(dispatch, test)
 
         assert result["items"] is False
+
+
+class TestEdgeCases:
+    """Test suite for comprehensive edge case handling.
+
+    This test class verifies that the comparison logic correctly handles
+    boundary conditions and None/empty value semantics.
+    """
+
+    def test_none_vs_none_matches(self):
+        """Test that None vs None results in a match for that field."""
+        dispatch = {"field": None}
+        test = {"field": None}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is True
+
+    def test_none_vs_value_mismatches(self):
+        """Test that None vs any non-None value results in mismatch."""
+        dispatch = {"field": None}
+        test = {"field": "value"}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is False
+
+    def test_value_vs_none_mismatches(self):
+        """Test that any non-None value vs None results in mismatch."""
+        dispatch = {"field": "value"}
+        test = {"field": None}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is False
+
+    def test_none_vs_empty_dict_mismatches(self):
+        """Test that None vs empty dict are semantically different (mismatch)."""
+        dispatch = {"field": None}
+        test = {"field": {}}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is False
+
+    def test_empty_dict_vs_none_mismatches(self):
+        """Test that empty dict vs None are semantically different (mismatch)."""
+        dispatch = {"field": {}}
+        test = {"field": None}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is False
+
+    def test_none_vs_empty_list_mismatches(self):
+        """Test that None vs empty list are semantically different (mismatch)."""
+        dispatch = {"field": None}
+        test = {"field": []}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is False
+
+    def test_empty_list_vs_none_mismatches(self):
+        """Test that empty list vs None are semantically different (mismatch)."""
+        dispatch = {"field": []}
+        test = {"field": None}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is False
+
+    def test_empty_dict_vs_empty_dict_matches(self):
+        """Test that empty dict vs empty dict results in match."""
+        dispatch = {"field": {}}
+        test = {"field": {}}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is True
+
+    def test_empty_list_vs_empty_list_matches(self):
+        """Test that empty list vs empty list results in match."""
+        dispatch = {"field": []}
+        test = {"field": []}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is True
+
+    def test_missing_key_in_dispatch_mismatches(self):
+        """Test that missing key in dispatch_fields results in mismatch."""
+        dispatch = {"other_field": "value"}
+        test = {"field": "value"}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert "field" in result
+        assert result["field"] is False
+
+    def test_missing_key_in_test_mismatches(self):
+        """Test that missing key in test_fields results in mismatch."""
+        dispatch = {"field": "value"}
+        test = {"other_field": "value"}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert "field" in result
+        assert result["field"] is False
+
+    def test_nested_empty_dict_vs_none_mismatches(self):
+        """Test that nested empty dict vs None results in mismatch."""
+        dispatch = {"outer": {}}
+        test = {"outer": None}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["outer"] is False
+
+    def test_nested_empty_list_vs_none_mismatches(self):
+        """Test that nested empty list vs None results in mismatch."""
+        dispatch = {"outer": []}
+        test = {"outer": None}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["outer"] is False
+
+    def test_nested_none_vs_empty_dict_mismatches(self):
+        """Test that nested None vs empty dict results in mismatch."""
+        dispatch = {"outer": None}
+        test = {"outer": {}}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["outer"] is False
+
+    def test_nested_none_vs_empty_list_mismatches(self):
+        """Test that nested None vs empty list results in mismatch."""
+        dispatch = {"outer": None}
+        test = {"outer": []}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["outer"] is False
+
+    def test_multiple_fields_with_none_and_values(self):
+        """Test multiple fields where some are None and some have values."""
+        dispatch = {
+            "field1": None,
+            "field2": "value",
+            "field3": None,
+        }
+        test = {
+            "field1": None,
+            "field2": "value",
+            "field3": "different",
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field1"] is True  # None vs None
+        assert result["field2"] is True  # value vs value
+        assert result["field3"] is False  # None vs value
+
+    def test_mixed_empty_and_none_fields(self):
+        """Test mix of empty dicts, empty lists, and None values."""
+        dispatch = {
+            "empty_dict": {},
+            "empty_list": [],
+            "none_field": None,
+            "normal_field": "value",
+        }
+        test = {
+            "empty_dict": {},
+            "empty_list": [],
+            "none_field": None,
+            "normal_field": "value",
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["empty_dict"] is True
+        assert result["empty_list"] is True
+        assert result["none_field"] is True
+        assert result["normal_field"] is True
+
+    def test_empty_vs_populated_dict_mismatches(self):
+        """Test that empty dict vs populated dict results in mismatch."""
+        dispatch = {"field": {}}
+        test = {"field": {"key": "value"}}
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Empty vs populated dict should be marked as mismatch
+        assert "field" in result or "field.key" in result
+        # At least one field should show mismatch
+        assert any(v is False for v in result.values())
+
+    def test_empty_vs_populated_list_mismatches(self):
+        """Test that empty list vs populated list results in mismatch."""
+        dispatch = {"field": []}
+        test = {"field": ["item"]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["field"] is False
+
+    def test_deeply_nested_with_none_at_leaf(self):
+        """Test deeply nested structure with None at leaf level."""
+        dispatch = {
+            "level1": {
+                "level2": {
+                    "level3": None
+                }
+            }
+        }
+        test = {
+            "level1": {
+                "level2": {
+                    "level3": None
+                }
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Should handle deep nesting with None values
+        assert "level1.level2.level3" in result
+        assert result["level1.level2.level3"] is True
+
+    def test_deeply_nested_none_vs_value(self):
+        """Test deeply nested structure with None vs value at leaf."""
+        dispatch = {
+            "level1": {
+                "level2": {
+                    "level3": None
+                }
+            }
+        }
+        test = {
+            "level1": {
+                "level2": {
+                    "level3": "value"
+                }
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert "level1.level2.level3" in result
+        assert result["level1.level2.level3"] is False
+
+    def test_none_in_list_vs_none_in_list(self):
+        """Test lists containing None values."""
+        dispatch = {"items": [None, "value", None]}
+        test = {"items": [None, "value", None]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Lists with None values should match
+        assert result["items"] is True
+
+    def test_none_in_list_vs_value_in_list(self):
+        """Test lists with different None/value patterns."""
+        dispatch = {"items": [None, "value"]}
+        test = {"items": ["different", "value"]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        # Different patterns should mismatch
+        assert result["items"] is False

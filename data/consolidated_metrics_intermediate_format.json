@@ -1,0 +1,417 @@
+{
+  "consolidated_metrics": {
+    "metadata": {
+      "generated_at": "2026-08-07T07:23:05.423120",
+      "time_period_days": 30,
+      "start_date": "2026-07-08T07:23:05.423110",
+      "end_date": "2026-08-07T07:23:05.423110",
+      "services": [
+        "pbx-web",
+        "whisper-stt"
+      ],
+      "metric_types": [
+        "error_rates",
+        "latency"
+      ],
+      "data_quality_status": "partial_latency_missing"
+    },
+    "services": {
+      "pbx-web": {
+        "service": "pbx-web",
+        "error_rates": {
+          "time_range": {
+            "start": "2026-07-07T00:00:00Z",
+            "end": "2026-08-06T23:59:59Z",
+            "description": "Absolute 30-day window using ISO 8601 timestamps"
+          },
+          "queries_executed": [
+            "pod_error_rate_from_logs",
+            "http_error_rate_from_nginx",
+            "oom_kill_rate_from_logs",
+            "overall_error_rate_all_sources"
+          ],
+          "query_results": {
+            "pod_error_rate_from_logs": {
+              "query_description": "Calculate error rate per pod from log analysis files",
+              "aggregation_functions": [
+                "SUM(error_counts) across all pods",
+                "COUNT(pods) with errors",
+                "AVG(error_rate_per_pod)"
+              ],
+              "error_rate_formula": "error_rate_per_pod = total_error_count / total_pods_analyzed",
+              "data_source": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/*-analysis.json",
+              "metrics": {
+                "total_pods_analyzed": 8,
+                "pods_with_errors": 1,
+                "pods_with_errors_percentage": 12.5,
+                "total_error_count": 5,
+                "error_rate_per_pod": 0.62,
+                "error_samples": [
+                  "[pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer",
+                  "Exception occurred during processing of request from ('127.0.0.1', 57008)"
+                ]
+              }
+            },
+            "http_error_rate_from_nginx": {
+              "query_description": "Calculate HTTP error rates from nginx access logs",
+              "aggregation_functions": [
+                "COUNT(requests) by status code (5xx, 4xx, 2xx, 3xx)",
+                "SUM(requests) for total request count",
+                "RATE(error_requests / total_requests)"
+              ],
+              "error_rate_formula": "http_5xx_error_rate = http_5xx_errors / total_http_requests",
+              "data_source": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/*nginx*.log",
+              "metrics": {
+                "total_http_requests": 33129,
+                "http_5xx_errors": 0,
+                "http_5xx_error_rate_percent": 0.0,
+                "http_4xx_errors": 2,
+                "http_4xx_error_rate_percent": 0.006,
+                "http_2xx_requests": 33125,
+                "http_3xx_requests": 2,
+                "error_samples": []
+              }
+            },
+            "oom_kill_rate_from_logs": {
+              "query_description": "Calculate OOM kill and pod restart rates from log analysis",
+              "aggregation_functions": [
+                "COUNT(OOM killed pods)",
+                "SUM(OOM kill events)",
+                "RATE(OOM_kills / total_pods)"
+              ],
+              "error_rate_formula": "oom_kill_rate = total_oom_kills / total_pods_analyzed",
+              "data_source": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/*-analysis.json",
+              "metrics": {
+                "total_pods_analyzed": 8,
+                "pods_with_oom_kills": 0,
+                "pods_with_oom_percentage": 0.0,
+                "total_oom_kill_count": 0,
+                "oom_kill_rate_per_pod": 0.0,
+                "oom_samples": []
+              }
+            },
+            "overall_error_rate_all_sources": {
+              "query_description": "Calculate overall error rate across all data sources",
+              "aggregation_functions": [
+                "SUM(all error types: pod_errors + OOM + HTTP_5xx + HTTP_4xx + deployment_failures)",
+                "COUNT(days) in time period",
+                "RATE(total_errors / days)"
+              ],
+              "error_rate_formula": "overall_error_rate_per_day = total_errors_all_sources / days_in_period",
+              "time_period_days": 30,
+              "metrics": {
+                "pod_errors": 5,
+                "oom_kills": 0,
+                "http_5xx_errors": 0,
+                "http_4xx_errors": 2,
+                "deployment_failures": 0,
+                "total_errors_all_sources": 7,
+                "error_rate_per_day": 0.23,
+                "error_breakdown": {
+                  "pod_errors_percent": 71.4,
+                  "oom_kills_percent": 0.0,
+                  "http_5xx_percent": 0.0,
+                  "http_4xx_percent": 28.6,
+                  "deployment_failures_percent": 0.0
+                }
+              }
+            }
+          },
+          "summary": {
+            "total_errors": 7,
+            "error_rate_per_day": 0.23,
+            "error_breakdown": {
+              "pod_errors_percent": 71.4,
+              "oom_kills_percent": 0.0,
+              "http_5xx_percent": 0.0,
+              "http_4xx_percent": 28.6,
+              "deployment_failures_percent": 0.0
+            }
+          }
+        },
+        "latency": {
+          "percentile_metrics": {
+            "count": 0,
+            "p50_seconds": 0,
+            "p75_seconds": 0,
+            "p90_seconds": 0,
+            "p95_seconds": 0,
+            "p99_seconds": 0,
+            "min_seconds": 0,
+            "max_seconds": 0
+          },
+          "temporal_coverage": {
+            "expected_days": 31,
+            "actual_days": 0,
+            "missing_days": 31,
+            "missing_day_list": [
+              "2026-07-08",
+              "2026-07-09",
+              "2026-07-10",
+              "2026-07-11",
+              "2026-07-12",
+              "2026-07-13",
+              "2026-07-14",
+              "2026-07-15",
+              "2026-07-16",
+              "2026-07-17",
+              "2026-07-18",
+              "2026-07-19",
+              "2026-07-20",
+              "2026-07-21",
+              "2026-07-22",
+              "2026-07-23",
+              "2026-07-24",
+              "2026-07-25",
+              "2026-07-26",
+              "2026-07-27",
+              "2026-07-28",
+              "2026-07-29",
+              "2026-07-30",
+              "2026-07-31",
+              "2026-08-01",
+              "2026-08-02",
+              "2026-08-03",
+              "2026-08-04",
+              "2026-08-05",
+              "2026-08-06",
+              "2026-08-07"
+            ],
+            "sparse_days": [],
+            "coverage_percentage": 0.0,
+            "daily_average": 0
+          },
+          "data_quality": {
+            "valid_records": 0,
+            "invalid_records": 0,
+            "errors_count": 0
+          },
+          "status": "no_data"
+        },
+        "coverage": {
+          "error_rate_coverage": 100.0,
+          "latency_coverage": 0.0,
+          "overall_coverage": 50.0,
+          "data_sources": [
+            "pod_error_rate_from_logs",
+            "http_error_rate_from_nginx",
+            "oom_kill_rate_from_logs",
+            "overall_error_rate_all_sources"
+          ]
+        },
+        "anomalies": [],
+        "data_gaps": [
+          {
+            "metric_type": "latency",
+            "gap_description": "COMPLETE - No latency measurements available for entire 30-day period",
+            "severity": "critical",
+            "affected_days": "ALL_30_DAYS"
+          },
+          {
+            "metric_type": "error_rates",
+            "gap_description": "LOW_GRANULARITY - Only aggregate error rates available, no daily breakdown",
+            "severity": "moderate",
+            "affected_days": "ALL_30_DAYS"
+          }
+        ]
+      },
+      "whisper-stt": {
+        "service": "whisper-stt",
+        "error_rates": {
+          "time_range": {
+            "start": "2026-07-07T00:00:00Z",
+            "end": "2026-08-06T23:59:59Z",
+            "description": "Absolute 30-day window using ISO 8601 timestamps"
+          },
+          "queries_executed": [
+            "pod_error_rate_from_logs",
+            "deployment_error_rate_from_k8s",
+            "oom_kill_rate_from_logs",
+            "overall_error_rate_all_sources"
+          ],
+          "query_results": {
+            "pod_error_rate_from_logs": {
+              "query_description": "Calculate error rate per pod from log analysis files",
+              "aggregation_functions": [
+                "SUM(error_counts) across all pods",
+                "COUNT(pods) with errors",
+                "AVG(error_rate_per_pod)"
+              ],
+              "error_rate_formula": "error_rate_per_pod = total_error_count / total_pods_analyzed",
+              "data_source": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/*-analysis.json",
+              "metrics": {
+                "total_pods_analyzed": 10,
+                "pods_with_errors": 2,
+                "pods_with_errors_percentage": 20.0,
+                "total_error_count": 2,
+                "error_rate_per_pod": 0.2,
+                "error_samples": [
+                  "error: You must be logged in to the server (the server has asked for the client to provide credentials)",
+                  "error: error from server (NotFound): namespaces \"whisper-stt\" not found in namespace \"whisper-stt\""
+                ]
+              }
+            },
+            "deployment_error_rate_from_k8s": {
+              "query_description": "Calculate deployment error/success rates from k8s deployment events",
+              "aggregation_functions": [
+                "COUNT(deployments) by status (failed, success)",
+                "SUM(deployments) for total deployment count",
+                "RATE(failed_deployments / total_deployments)"
+              ],
+              "error_rate_formula": "deployment_error_rate = failed_deployments / total_deployments",
+              "data_source": "/home/coding/aide-de-camp/research/whisper-stt-30days/deployments-30days.json",
+              "metrics": {
+                "total_deployments": 10,
+                "successful_deployments": 10,
+                "failed_deployments": 0,
+                "deployment_error_rate_percent": 0.0,
+                "deployment_success_rate_percent": 100.0,
+                "deployment_failures": []
+              }
+            },
+            "oom_kill_rate_from_logs": {
+              "query_description": "Calculate OOM kill and pod restart rates from log analysis",
+              "aggregation_functions": [
+                "COUNT(OOM killed pods)",
+                "SUM(OOM kill events)",
+                "RATE(OOM_kills / total_pods)"
+              ],
+              "error_rate_formula": "oom_kill_rate = total_oom_kills / total_pods_analyzed",
+              "data_source": "/home/coding/aide-de-camp/research/whisper-stt-30days/pod-logs/*-analysis.json",
+              "metrics": {
+                "total_pods_analyzed": 10,
+                "pods_with_oom_kills": 0,
+                "pods_with_oom_percentage": 0.0,
+                "total_oom_kill_count": 0,
+                "oom_kill_rate_per_pod": 0.0,
+                "oom_samples": []
+              }
+            },
+            "overall_error_rate_all_sources": {
+              "query_description": "Calculate overall error rate across all data sources",
+              "aggregation_functions": [
+                "SUM(all error types: pod_errors + OOM + HTTP_5xx + HTTP_4xx + deployment_failures)",
+                "COUNT(days) in time period",
+                "RATE(total_errors / days)"
+              ],
+              "error_rate_formula": "overall_error_rate_per_day = total_errors_all_sources / days_in_period",
+              "time_period_days": 30,
+              "metrics": {
+                "pod_errors": 2,
+                "oom_kills": 0,
+                "http_5xx_errors": 0,
+                "http_4xx_errors": 0,
+                "deployment_failures": 0,
+                "total_errors_all_sources": 2,
+                "error_rate_per_day": 0.07,
+                "error_breakdown": {
+                  "pod_errors_percent": 100.0,
+                  "oom_kills_percent": 0.0,
+                  "http_5xx_percent": 0.0,
+                  "http_4xx_percent": 0.0,
+                  "deployment_failures_percent": 0.0
+                }
+              }
+            }
+          },
+          "summary": {
+            "total_errors": 2,
+            "error_rate_per_day": 0.07,
+            "error_breakdown": {
+              "pod_errors_percent": 100.0,
+              "oom_kills_percent": 0.0,
+              "http_5xx_percent": 0.0,
+              "http_4xx_percent": 0.0,
+              "deployment_failures_percent": 0.0
+            }
+          }
+        },
+        "latency": {
+          "percentile_metrics": {
+            "count": 0,
+            "p50_seconds": 0,
+            "p75_seconds": 0,
+            "p90_seconds": 0,
+            "p95_seconds": 0,
+            "p99_seconds": 0,
+            "min_seconds": 0,
+            "max_seconds": 0
+          },
+          "temporal_coverage": {
+            "expected_days": 31,
+            "actual_days": 0,
+            "missing_days": 31,
+            "missing_day_list": [
+              "2026-07-08",
+              "2026-07-09",
+              "2026-07-10",
+              "2026-07-11",
+              "2026-07-12",
+              "2026-07-13",
+              "2026-07-14",
+              "2026-07-15",
+              "2026-07-16",
+              "2026-07-17",
+              "2026-07-18",
+              "2026-07-19",
+              "2026-07-20",
+              "2026-07-21",
+              "2026-07-22",
+              "2026-07-23",
+              "2026-07-24",
+              "2026-07-25",
+              "2026-07-26",
+              "2026-07-27",
+              "2026-07-28",
+              "2026-07-29",
+              "2026-07-30",
+              "2026-07-31",
+              "2026-08-01",
+              "2026-08-02",
+              "2026-08-03",
+              "2026-08-04",
+              "2026-08-05",
+              "2026-08-06",
+              "2026-08-07"
+            ],
+            "sparse_days": [],
+            "coverage_percentage": 0.0,
+            "daily_average": 0
+          },
+          "data_quality": {
+            "valid_records": 0,
+            "invalid_records": 0,
+            "errors_count": 0
+          },
+          "status": "no_data"
+        },
+        "coverage": {
+          "error_rate_coverage": 100.0,
+          "latency_coverage": 0.0,
+          "overall_coverage": 50.0,
+          "data_sources": [
+            "pod_error_rate_from_logs",
+            "deployment_error_rate_from_k8s",
+            "oom_kill_rate_from_logs",
+            "overall_error_rate_all_sources"
+          ]
+        },
+        "anomalies": [],
+        "data_gaps": [
+          {
+            "metric_type": "latency",
+            "gap_description": "COMPLETE - No latency measurements available for entire 30-day period",
+            "severity": "critical",
+            "affected_days": "ALL_30_DAYS"
+          },
+          {
+            "metric_type": "error_rates",
+            "gap_description": "LOW_GRANULARITY - Only aggregate error rates available, no daily breakdown",
+            "severity": "moderate",
+            "affected_days": "ALL_30_DAYS"
+          }
+        ]
+      }
+    }
+  }
+}

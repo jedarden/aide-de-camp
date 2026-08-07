@@ -21,6 +21,7 @@ from src.schemas.whisper_stt_deployment import (
     WhisperSTTDeploymentData,
     validate_deployment_data
 )
+from src.utils.atomic_write import atomic_write
 
 
 logger = logging.getLogger(__name__)
@@ -172,33 +173,19 @@ def persist_deployment_data(
                     except Exception:
                         pass
 
-        # Write to file with atomic operations to prevent partial state issues
+        # Write to file with atomic operations using atomic_write utility
         # Uses temp file + atomic rename pattern with unique naming (UUID4)
-        temp_path = Path(f"{filepath}.{uuid.uuid4()}.tmp")
-
         try:
-            # Write to temp file first
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(
+            atomic_write(
+                filepath,
+                json.dumps(
                     data_dict,
-                    f,
                     indent=indent,
                     ensure_ascii=False,
                     default=serialize_datetime
                 )
-                f.flush()
-                os.fsync(f.fileno())  # Ensure data is written to disk
-
-            # Atomic rename to target path
-            temp_path.replace(filepath)
-
+            )
         except Exception as e:
-            # Clean up temp file if it exists
-            if temp_path.exists():
-                try:
-                    temp_path.unlink()
-                except Exception:
-                    pass
             logger.error(f"Failed atomic write for {filepath}: {e}")
             raise
 

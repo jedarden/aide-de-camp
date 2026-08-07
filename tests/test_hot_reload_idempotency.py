@@ -23,7 +23,7 @@ import tracemalloc
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from components.hot_reload import get_reload_manager, HotReloadManager
+from src.components.hot_reload import get_reload_manager, HotReloadManager
 
 
 async def test_singleton_consistency():

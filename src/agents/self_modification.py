@@ -18,6 +18,8 @@ from ..components.hot_reload import get_reload_manager
 from ..components.library import get_library
 from ..escalate.llm import get_zai_client, ModelClass
 from ..freeze import ensure_unfrozen
+from ..utils.atomic_write import atomic_write
+from ..utils.git_retry import retry_on_transient_error, get_retry_tracker
 
 
 logger = getLogger(__name__)
@@ -35,11 +37,88 @@ class GitResult:
     timed_out: bool = False
 
 
+def _execute_git_command_internal(
+    args: List[str],
+    cwd: Path,
+    timeout: int,
+    check: bool
+) -> GitResult:
+    """
+    Internal implementation of git command execution.
+
+    This function contains the actual subprocess logic and is called
+    by the retry wrapper.
+    """
+    cmd = ['git'] + args
+
+    result = subprocess.run(
+        cmd,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=check,
+        timeout=timeout
+    )
+    return GitResult(
+        success=result.returncode == 0,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        returncode=result.returncode,
+        timed_out=False
+    )
+
+
+@retry_on_transient_error(max_retries=3, backoff_factor=1.5, initial_delay=1.0)
+def _run_git_command_with_retry(
+    args: List[str],
+    cwd: Path,
+    timeout: int,
+    check: bool
+) -> GitResult:
+    """
+    Run a git command with automatic retry on transient network failures.
+
+    This function is wrapped with retry logic that handles:
+    - Network timeouts
+    - Connection errors
+    - Temporary unavailability
+    - DNS issues
+
+    Non-transient errors (authentication, permission denied, etc.) are not retried.
+
+    Args:
+        args: Git command arguments (e.g., ['status', '--short'])
+        cwd: Working directory
+        timeout: Command timeout in seconds
+        check: If True, raise exception on non-zero exit
+
+    Returns:
+        GitResult with success status, stdout, stderr, returncode, and timeout flag
+
+    Raises:
+        subprocess.TimeoutExpired: On command timeout (after retries)
+        subprocess.CalledProcessError: On non-zero exit (if check=True)
+        Exception: On other errors (after retries)
+    """
+    try:
+        return _execute_git_command_internal(args, cwd, timeout, check)
+    except subprocess.TimeoutExpired as e:
+        # Re-raise as-is - the retry decorator will catch and retry
+        raise
+    except subprocess.CalledProcessError as e:
+        # Re-raise as-is - the retry decorator will determine if it's transient
+        raise
+    except Exception as e:
+        # Re-raise as-is - the retry decorator will determine if it's transient
+        raise
+
+
 def run_git_command(
     args: List[str],
     cwd: Optional[Path] = None,
     timeout: int = 10,
-    check: bool = False
+    check: bool = False,
+    retry_on_failure: bool = True
 ) -> GitResult:
     """
     Run a git command via subprocess and return structured output.
@@ -49,6 +128,7 @@ def run_git_command(
         cwd: Working directory (defaults to aide-de-camp repo root)
         timeout: Command timeout in seconds (default: 10)
         check: If True, raise exception on non-zero exit (default: False)
+        retry_on_failure: If True, retry on transient network failures (default: True)
 
     Returns:
         GitResult with success status, stdout, stderr, returncode, and timeout flag
@@ -56,25 +136,24 @@ def run_git_command(
     if cwd is None:
         cwd = Path("/home/coding/aide-de-camp")
 
-    cmd = ['git'] + args
+    retry_tracker = get_retry_tracker()
 
     try:
-        result = subprocess.run(
-            cmd,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            check=check,
-            timeout=timeout
-        )
-        return GitResult(
-            success=result.returncode == 0,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            returncode=result.returncode,
-            timed_out=False
-        )
+        if retry_on_failure:
+            # Use retry logic for network operations
+            result = _run_git_command_with_retry(args, cwd, timeout, check)
+            retry_tracker.record_attempt(f"git {' '.join(args)}", 0, result.success)
+            return result
+        else:
+            # Direct execution without retry
+            result = _execute_git_command_internal(args, cwd, timeout, check)
+            retry_tracker.record_attempt(f"git {' '.join(args)}", 0, result.success)
+            return result
+
     except subprocess.TimeoutExpired as e:
+        retry_tracker.record_attempt(
+            f"git {' '.join(args)}", 0, False, f"Timeout: {e}"
+        )
         return GitResult(
             success=False,
             stdout=e.stdout.decode() if e.stdout else "",
@@ -83,6 +162,9 @@ def run_git_command(
             timed_out=True
         )
     except subprocess.CalledProcessError as e:
+        retry_tracker.record_attempt(
+            f"git {' '.join(args)}", 0, False, f"Exit code {e.returncode}: {e.stderr}"
+        )
         return GitResult(
             success=False,
             stdout=e.stdout,
@@ -91,6 +173,9 @@ def run_git_command(
             timed_out=False
         )
     except Exception as e:
+        retry_tracker.record_attempt(
+            f"git {' '.join(args)}", 0, False, str(e)
+        )
         return GitResult(
             success=False,
             stdout="",
@@ -179,6 +264,108 @@ def git_rev_parse(ref: str, short: bool = False, cwd: Optional[Path] = None) -> 
         args.append('--short')
     args.append(ref)
     return run_git_command(args, cwd=cwd)
+
+
+def git_fetch(
+    remote: str = "origin",
+    branch: Optional[str] = None,
+    cwd: Optional[Path] = None,
+    timeout: int = 30
+) -> GitResult:
+    """
+    Fetch updates from a remote repository with automatic retry on network failures.
+
+    Args:
+        remote: Remote name (default: "origin")
+        branch: Optional branch to fetch (if None, fetches all branches)
+        cwd: Working directory (defaults to aide-de-camp repo root)
+        timeout: Command timeout in seconds (default: 30)
+
+    Returns:
+        GitResult with fetch output
+
+    Example:
+        result = git_fetch("origin", "main")
+        if result.success:
+            print("Fetch successful")
+        else:
+            print(f"Fetch failed: {result.stderr}")
+    """
+    args = ['fetch', remote]
+    if branch:
+        args.append(branch)
+
+    logger.info(f"Fetching from {remote}" + (f" {branch}" if branch else ""))
+    return run_git_command(args, cwd=cwd, timeout=timeout)
+
+
+def git_push(
+    remote: str = "origin",
+    branch: str = "main",
+    cwd: Optional[Path] = None,
+    timeout: int = 30,
+    force: bool = False
+) -> GitResult:
+    """
+    Push changes to a remote repository with automatic retry on network failures.
+
+    Args:
+        remote: Remote name (default: "origin")
+        branch: Branch to push (default: "main")
+        cwd: Working directory (defaults to aide-de-camp repo root)
+        timeout: Command timeout in seconds (default: 30)
+        force: If True, use force push (default: False, WARNING: use with caution)
+
+    Returns:
+        GitResult with push output
+
+    Example:
+        result = git_push("origin", "main")
+        if result.success:
+            print("Push successful")
+        else:
+            print(f"Push failed: {result.stderr}")
+    """
+    args = ['push', remote, branch]
+    if force:
+        args.append('--force')
+        logger.warning(f"Force push requested to {remote}/{branch}")
+
+    logger.info(f"Pushing to {remote}/{branch}")
+    return run_git_command(args, cwd=cwd, timeout=timeout)
+
+
+def git_pull(
+    remote: str = "origin",
+    branch: Optional[str] = None,
+    cwd: Optional[Path] = None,
+    timeout: int = 30
+) -> GitResult:
+    """
+    Pull changes from a remote repository with automatic retry on network failures.
+
+    Args:
+        remote: Remote name (default: "origin")
+        branch: Optional branch to pull (if None, uses current branch)
+        cwd: Working directory (defaults to aide-de-camp repo root)
+        timeout: Command timeout in seconds (default: 30)
+
+    Returns:
+        GitResult with pull output
+
+    Example:
+        result = git_pull("origin", "main")
+        if result.success:
+            print("Pull successful")
+        else:
+            print(f"Pull failed: {result.stderr}")
+    """
+    args = ['pull', remote]
+    if branch:
+        args.append(branch)
+
+    logger.info(f"Pulling from {remote}" + (f" {branch}" if branch else ""))
+    return run_git_command(args, cwd=cwd, timeout=timeout)
 
 
 def generate_self_mod_commit_message(file_path: Path, cwd: Optional[Path] = None) -> str:
@@ -625,8 +812,7 @@ class SelfModificationAgent:
         if not artifact:
             return False
 
-        with open(artifact.path, 'w') as f:
-            f.write(diff.after)
+        atomic_write(artifact.path, diff.after)
 
         # Force reload to pick up changes
         self.reload_mgr.force_reload(diff.artifact_name)
@@ -642,8 +828,7 @@ class SelfModificationAgent:
         if not artifact:
             return False
 
-        with open(artifact.path, 'w') as f:
-            f.write(diff.after)
+        atomic_write(artifact.path, diff.after)
 
         # Force reload
         self.reload_mgr.force_reload(diff.artifact_name)
@@ -702,8 +887,7 @@ class SelfModificationAgent:
             )
 
             if result.returncode == 0:
-                with open(artifact.path, 'w') as f:
-                    f.write(result.stdout)
+                atomic_write(artifact.path, result.stdout)
                 self.reload_mgr.force_reload(artifact_name)
                 return True
         except Exception as e:

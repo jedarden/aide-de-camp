@@ -37,6 +37,9 @@ from .git_validation import (
     detect_merge_conflicts,
 )
 
+# Import atomic write utility for safe file operations
+from src.utils.atomic_write import atomic_write
+
 logger = logging.getLogger(__name__)
 
 
@@ -420,9 +423,10 @@ class GitOpsCommitStep:
             return yaml.safe_load(f)
 
     def _write_manifest(self, manifest_path: Path, data: Any) -> None:
-        """Write data to YAML manifest."""
-        with open(manifest_path, "w") as f:
-            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+        """Write data to YAML manifest using atomic write operation."""
+        # Use atomic_write for safe file operations with temp file + atomic rename
+        yaml_content = yaml.dump(data, default_flow_style=False, sort_keys=False)
+        atomic_write(manifest_path, yaml_content)
 
     def _apply_substitutions(self, manifest: Any, fields: list[TemplateField]) -> Any:
         """Apply templated field substitutions to manifest."""

@@ -34,8 +34,9 @@ import traceback
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from components.hot_reload import get_reload_manager, HotReloadManager, _atomic_write
-from registry import get_registry, REGISTRY_PATH
+from src.components.hot_reload import get_reload_manager, HotReloadManager
+from src.utils.atomic_write import atomic_write
+from src.registry import get_registry, REGISTRY_PATH
 
 
 class ConcurrentAccessStats:
@@ -395,7 +396,7 @@ updated:
 version: 2.0
 """
 
-        _atomic_write(test_path, new_content)
+        atomic_write(test_path, new_content, max_retries=3, initial_delay=0.1)
 
         # Verify write was complete
         with open(test_path, 'r') as f:

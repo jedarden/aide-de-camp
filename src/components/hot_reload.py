@@ -21,8 +21,8 @@ from dataclasses import dataclass
 import yaml
 import threading
 import json
-import tempfile
-import shutil
+
+from ..utils.atomic_write import atomic_write
 
 logger = logging.getLogger(__name__)
 
@@ -87,111 +87,6 @@ class EmptyRegistryError(HotReloadError):
             f"Registry file is empty or contains no valid data: '{path}'. "
             f"Action: Ensure the file contains valid YAML or JSON configuration."
         )
-
-
-def _atomic_write(path: Path, content: str, max_retries: int = 3, initial_delay: float = 0.1) -> None:
-    """
-    Write content to a file atomically to prevent corruption, with retry logic.
-
-    ATOMIC FILE OPERATION:
-    =======================
-    This function ensures that file writes are atomic - either the entire
-    file is written successfully, or no write occurs at all. This prevents
-    partial file writes that can occur during crashes, power failures, or
-    concurrent access scenarios.
-
-    RETRY LOGIC FOR TRANSIENT FAILURES:
-    ====================================
-    Transient failures from concurrent file access, temporary filesystem issues,
-    or resource contention are handled with exponential backoff:
-    - Initial delay: 100ms (configurable)
-    - Backoff factor: 2x (100ms, 200ms, 400ms)
-    - Max retries: 3 (configurable)
-    - Jitter: ±50% to prevent thundering herd
-
-    Implementation:
-    1. Write to a temporary file in the same directory
-    2. Use os.fsync() to ensure data is written to disk
-    3. Use atomic os.rename() to replace the target file
-    4. Cleanup temporary file on failure
-    5. Retry entire sequence on transient failures
-
-    This approach ensures:
-    - No partial writes visible to readers
-    - No corruption if process crashes mid-write
-    - Safe concurrent access (readers see old or new, never partial)
-    - Works on all platforms (atomic rename is POSIX-compliant)
-    - Resilient to transient filesystem errors
-
-    Args:
-        path: Target file path to write
-        content: Content to write to the file
-        max_retries: Maximum number of retry attempts (default: 3)
-        initial_delay: Initial delay in seconds between retries (default: 0.1)
-
-    Raises:
-        OSError: If write operation fails after all retries
-        PermissionError: If file cannot be written after all retries
-    """
-    import random
-
-    delay = initial_delay
-    last_exception = None
-
-    for attempt in range(max_retries + 1):
-        try:
-            # Create temporary file in same directory as target
-            # This ensures os.rename() will work (same filesystem)
-            temp_fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix='.atomic_write_')
-
-            try:
-                # Write content to temporary file
-                with os.fdopen(temp_fd, 'w') as f:
-                    f.write(content)
-                    f.flush()
-                    # Ensure data is written to physical disk
-                    os.fsync(f.fileno())
-
-                # Atomic rename - replaces target file if it exists
-                # This is atomic on POSIX systems (Linux, macOS)
-                os.rename(temp_path, path)
-
-                logger.debug(f"Atomic write completed: {path}")
-                return  # Success - exit retry loop
-
-            except Exception as e:
-                # Clean up temporary file on failure
-                try:
-                    if os.path.exists(temp_path):
-                        os.unlink(temp_path)
-                except Exception:
-                    pass
-                raise  # Re-raise to trigger retry logic
-
-        except (OSError, PermissionError) as e:
-            last_exception = e
-            if attempt < max_retries:
-                # Log retry attempt with attempt number and error type
-                logger.info(
-                    f"Retry attempt {attempt + 1}/{max_retries} for atomic write to {path}: "
-                    f"{type(e).__name__}: {e}"
-                )
-                # Add jitter to prevent thundering herd problem
-                jittered_delay = delay * (0.5 + random.random() * 0.5)
-                time.sleep(jittered_delay)
-                delay *= 2.0  # Exponential backoff: 100ms, 200ms, 400ms
-            else:
-                # All retries exhausted - log final failure
-                logger.error(
-                    f"All {max_retries} retry attempts exhausted for atomic write to {path}: "
-                    f"{type(e).__name__}: {e}"
-                )
-                raise
-
-    # Should never reach here, but handle gracefully
-    if last_exception:
-        raise last_exception
-    raise RuntimeError(f"Unexpected error in atomic write for {path}")
 
 
 @dataclass
