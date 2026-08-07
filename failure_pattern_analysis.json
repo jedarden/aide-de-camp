@@ -1,0 +1,126 @@
+{
+  "analysis_metadata": {
+    "timestamp": "2026-08-07T08:50:35.000916",
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "analysis_type": "failure_pattern_identification"
+  },
+  "by_service": {
+    "pbx-web": {
+      "error_type_counts": {
+        "Scaled_Down_Or_Failed": 1,
+        "Rolled_Over": 4
+      },
+      "phase_breakdown": {
+        "Runtime": 5
+      },
+      "error_messages": [
+        "[pbx-web] ReplicaSet pbx-web-765bb76db8 with image ronaldraygun/pbx-web:1.0.9 was scaled down or failed",
+        "[pbx-web] ReplicaSet pbx-web-754f4cfdf7 with image ronaldraygun/pbx-web:1.0.8 was rolled over to new version",
+        "[pbx-web] ReplicaSet pbx-web-6d86477cdb with image ronaldraygun/pbx-web:1.0.7 was rolled over to new version",
+        "[pbx-web] ReplicaSet pbx-web-66f79fd6f9 with image ronaldraygun/pbx-web:1.0.6 was rolled over to new version",
+        "[pbx-web] ReplicaSet pbx-web-5cc966f86d with image ronaldraygun/pbx-web:1.0.5 was rolled over to new version"
+      ],
+      "deployment_failures": [
+        {
+          "timestamp": "2026-07-28T17:05:51Z",
+          "replicaSet": "pbx-web-765bb76db8",
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "status": "scaled_down_or_failed",
+          "phase": "Runtime",
+          "error_type": "Scaled_Down_Or_Failed"
+        }
+      ],
+      "top_error_patterns": [
+        {
+          "pattern": "[pbx-web] ReplicaSet [REPLICASET] with image [IMAGE] was rolled over to new version",
+          "frequency": 4,
+          "percentage": 80.0
+        },
+        {
+          "pattern": "[pbx-web] ReplicaSet [REPLICASET] with image [IMAGE] was scaled down or failed",
+          "frequency": 1,
+          "percentage": 20.0
+        }
+      ]
+    },
+    "whisper-stt": {
+      "error_type_counts": {
+        "Rolled_Over": 5
+      },
+      "phase_breakdown": {
+        "Runtime": 5
+      },
+      "error_messages": [
+        "[whisper-stt] ReplicaSet whisper-stt-6c497489fb with image ronaldraygun/whisper-stt:1.8.6 was rolled over to new version",
+        "[whisper-stt] ReplicaSet whisper-stt-5b8558f478 with image ronaldraygun/whisper-stt:1.8.4 was rolled over to new version",
+        "[whisper-stt] ReplicaSet whisper-stt-5dbff75cbd with image ronaldraygun/whisper-stt:1.8.2 was rolled over to new version",
+        "[whisper-stt] ReplicaSet whisper-stt-6b96f4569c with image ronaldraygun/whisper-stt:1.7.0 was rolled over to new version",
+        "[whisper-stt] ReplicaSet whisper-stt-6464bdf67b with image ronaldraygun/whisper-stt:1.6.0 was rolled over to new version"
+      ],
+      "deployment_failures": [],
+      "top_error_patterns": [
+        {
+          "pattern": "[whisper-stt] ReplicaSet [REPLICASET] with image [IMAGE] was rolled over to new version",
+          "frequency": 5,
+          "percentage": 100.0
+        }
+      ]
+    }
+  },
+  "shared_patterns": {
+    "error_types": [
+      "Rolled_Over"
+    ],
+    "phases": [
+      "Runtime"
+    ],
+    "error_message_patterns": []
+  },
+  "service_specific_patterns": {
+    "pbx-web": {
+      "specific_error_types": [
+        "Scaled_Down_Or_Failed"
+      ],
+      "specific_phases": [],
+      "specific_error_patterns": [
+        {
+          "pattern": "[pbx-web] ReplicaSet [REPLICASET] with image [IMAGE] was rolled over to new version",
+          "frequency": 4,
+          "percentage": 80.0
+        },
+        {
+          "pattern": "[pbx-web] ReplicaSet [REPLICASET] with image [IMAGE] was scaled down or failed",
+          "frequency": 1,
+          "percentage": 20.0
+        }
+      ]
+    },
+    "whisper-stt": {
+      "specific_error_types": [],
+      "specific_phases": [],
+      "specific_error_patterns": [
+        {
+          "pattern": "[whisper-stt] ReplicaSet [REPLICASET] with image [IMAGE] was rolled over to new version",
+          "frequency": 5,
+          "percentage": 100.0
+        }
+      ]
+    }
+  },
+  "executive_summary": {
+    "total_errors_analyzed": 10,
+    "services_with_failures": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "most_common_error_type": "Rolled_Over",
+    "most_common_phase": "Runtime",
+    "key_findings": [
+      "Failures detected in 2 service(s)",
+      "Shared failure patterns across services: 1 error types"
+    ]
+  }
+}
