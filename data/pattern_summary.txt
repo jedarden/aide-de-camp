@@ -1,0 +1,98 @@
+================================================================================
+DEPLOYMENT PATTERN ANALYSIS SUMMARY
+================================================================================
+
+## OVERALL STATISTICS
+
+### pbx-web
+  Total Events: 44
+  Success Rate: 13.64% (6 events)
+  Failure Rate: 0.0% (0 events)
+  Warning Rate: 4.55% (2 events)
+
+  Duration Statistics (seconds):
+    Mean: 4426988.68
+    Median: 3850327.23
+    Range: 831160.73 - 8369342.73
+
+  Time to Failure Statistics:
+    Mean: 462803.94 seconds
+    Median: 139634.50 seconds
+    Range: 1.00 - 3023627.00 seconds
+
+### whisper-stt
+  Total Events: 196,528
+  Success Rate: 0.0% (4 events)
+  Failure Rate: 0.0% (0 events)
+  Warning Rate: 0.0% (0 events)
+
+  Duration Statistics (seconds):
+    Mean: 3877730.07
+    Median: 4216990.23
+    Range: 2215510.73 - 4682068.73
+
+  Time to Failure Statistics:
+    Mean: 112116.27 seconds
+    Median: 514.50 seconds
+    Range: 1.00 - 921587.00 seconds
+
+## COMMON FAILURE PATTERNS
+
+### pbx-web - Top Error Codes
+  ClusterIPNotAllocated: 1 occurrences (2.27%)
+  deprecatedAnnotation: 1 occurrences (2.27%)
+
+### whisper-stt - Top Error Codes
+  No error codes recorded
+
+## EVENT TYPE PATTERNS
+
+### pbx-web - Top Event Types
+  unknown: 24 occurrences (54.55%)
+  timeout: 20 occurrences (45.45%)
+
+### whisper-stt - Top Event Types
+  unknown: 196,504 occurrences (99.99%)
+  timeout: 24 occurrences (0.01%)
+
+## SERVICE COMPARISON
+
+### Failure Rates
+  pbx-web: 0.0%
+  whisper-stt: 0.0%
+
+### Shared Error Codes
+  No shared error codes found
+
+### Unique Error Codes
+  pbx-web: deprecatedAnnotation, ClusterIPNotAllocated
+
+## TEMPORAL PATTERNS
+
+### pbx-web - Weekly Distribution
+  Monday: 6 events (28.6%)
+  Tuesday: 4 events (19.0%)
+  Wednesday: 2 events (9.5%)
+  Thursday: 4 events (19.0%)
+  Friday: 0 events (0.0%)
+  Saturday: 4 events (19.0%)
+  Sunday: 1 events (4.8%)
+
+### whisper-stt - Weekly Distribution
+  Monday: 0 events (0.0%)
+  Tuesday: 0 events (0.0%)
+  Wednesday: 5 events (20.8%)
+  Thursday: 3 events (12.5%)
+  Friday: 2 events (8.3%)
+  Saturday: 0 events (0.0%)
+  Sunday: 14 events (58.3%)
+
+## KEY FINDINGS
+
+• Highest failure rate: pbx-web (0.0%)
+• Lowest failure rate: pbx-web (0.0%)
+
+## RECOMMENDATIONS
+
+
+================================================================================
