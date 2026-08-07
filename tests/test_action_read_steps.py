@@ -7,7 +7,7 @@ to verify correct behavior without requiring live clusters.
 
 import json
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import yaml
@@ -389,10 +389,14 @@ class TestPodStatusStep:
         """HTTP error returns error result."""
         import httpx
 
+        # Create async mock for client.get that raises HTTPError
+        async def mock_get_error(*args, **kwargs):
+            raise httpx.HTTPError("Connection failed")
+
         mock_client = Mock()
-        mock_client.get = Mock(side_effect=httpx.HTTPError("Connection failed"))
-        mock_client_class.return_value.__aenter__.return_value = mock_client
-        mock_client_class.return_value.__aexit__.return_value = None
+        mock_client.get = mock_get_error
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
         step = PodStatusStep(proxy_url="http://test-proxy:8001")
         result = await step.execute(namespace="test-ns", cluster="test-cluster")
@@ -430,10 +434,14 @@ class TestPodStatusStep:
         mock_response.json.return_value = {"items": []}
         mock_response.raise_for_status = Mock()
 
+        # Create async mock for client.get
+        async def mock_get(*args, **kwargs):
+            return mock_response
+
         mock_client = Mock()
-        mock_client.get = Mock(return_value=mock_response)
-        mock_client_class.return_value.__aenter__.return_value = mock_client
-        mock_client_class.return_value.__aexit__.return_value = None
+        mock_client.get = mock_get
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
         step = PodStatusStep()
         result = await step.execute(namespace="test-ns", cluster="test-cluster")
@@ -463,10 +471,14 @@ class TestPodStatusStep:
         }
         mock_response.raise_for_status = Mock()
 
+        # Create async mock for client.get
+        async def mock_get(*args, **kwargs):
+            return mock_response
+
         mock_client = Mock()
-        mock_client.get = Mock(return_value=mock_response)
-        mock_client_class.return_value.__aenter__.return_value = mock_client
-        mock_client_class.return_value.__aexit__.return_value = None
+        mock_client.get = mock_get
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
         step = PodStatusStep(proxy_url="http://test-proxy:8001")
         result = await step.execute(namespace="test-ns")
