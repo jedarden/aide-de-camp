@@ -12,7 +12,7 @@ import tempfile
 import time
 import random
 from pathlib import Path
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, Any
 from contextlib import contextmanager
 import uuid
 
@@ -276,15 +276,25 @@ def _atomic_write_impl(
                 orphaned_files = _verify_no_orphaned_temps(filepath.parent, operation_id)
                 if orphaned_files:
                     logger.warning(
-                        f"[{operation_id}] Found orphaned temp files: {orphaned_files}"
+                        f"[{operation_id}] Found orphaned temp files from atomic write operation: {orphaned_files}"
                     )
-                    # Clean them up
+                    # Clean them up with enhanced error handling for atomic write failures
                     for orphan in orphaned_files:
                         try:
-                            orphan.unlink()
-                            logger.info(f"[{operation_id}] Cleaned up orphaned temp file: {orphan}")
+                            # Atomic unlink with idempotent cleanup (safe if file already deleted)
+                            # This handles cases where atomic write failures may have left temp files
+                            orphan.unlink(missing_ok=True)
+                            logger.info(f"[{operation_id}] Cleaned up orphaned temp file from atomic write: {orphan}")
+                        except PermissionError as e:
+                            logger.error(
+                                f"[{operation_id}] Permission denied cleaning up orphaned temp file {orphan}: {e}. "
+                                f"File may persist from atomic write failure. Manual cleanup may be required."
+                            )
                         except OSError as e:
-                            logger.error(f"[{operation_id}] Failed to cleanup orphaned temp file {orphan}: {e}")
+                            logger.error(
+                                f"[{operation_id}] Failed to cleanup orphaned temp file {orphan}: {e}. "
+                                f"File may persist from atomic write failure."
+                            )
 
             logger.info(
                 f"[{operation_id}] Atomic write completed successfully",
@@ -297,14 +307,20 @@ def _atomic_write_impl(
             return backup_path
 
         except Exception as e:
-            # Clean up temp file on any error
+            # Clean up temp file on any error with enhanced atomic write failure handling
             if temp_path_obj.exists():
                 try:
                     temp_path_obj.unlink()
-                    logger.info(f"[{operation_id}] Cleaned up temp file after error: {temp_path}")
+                    logger.info(f"[{operation_id}] Cleaned up temp file after atomic write error: {temp_path}")
+                except PermissionError as cleanup_error:
+                    logger.error(
+                        f"[{operation_id}] Permission denied cleaning up temp file {temp_path} after atomic write error: {cleanup_error}. "
+                        f"Temp file may persist. Manual cleanup may be required: 'rm {temp_path}'"
+                    )
                 except OSError as cleanup_error:
                     logger.error(
-                        f"[{operation_id}] Failed to cleanup temp file {temp_path}: {cleanup_error}"
+                        f"[{operation_id}] Failed to cleanup temp file {temp_path} after atomic write error: {cleanup_error}. "
+                        f"Temp file may persist from atomic write failure."
                     )
             raise
 
@@ -404,19 +420,27 @@ def atomic_write_rollback(filepath: Union[str, Path], mode: str = 'w'):
             raise
 
     except Exception:
-        # Error in context block - rollback (cleanup temp file)
+        # Error in context block - rollback (cleanup temp file) with enhanced error handling
         logger.warning(
-            f"[{operation_id}] Exception in context, rolling back",
+            f"[{operation_id}] Exception in context, rolling back atomic write operation",
             extra={"operation_id": operation_id}
         )
 
         if temp_path_obj.exists():
             try:
                 temp_path_obj.unlink()
-                logger.info(f"[{operation_id}] Rollback successful: cleaned up {temp_path}")
+                logger.info(f"[{operation_id}] Rollback successful: cleaned up temp file from atomic write: {temp_path}")
+            except PermissionError as e:
+                rollback_error = AtomicWriteRollbackError(
+                    f"Permission denied rolling back temp file {temp_path}: {e}. "
+                    f"Temp file may persist from atomic write rollback failure. Manual cleanup may be required."
+                )
+                logger.error(f"[{operation_id}] {rollback_error}")
+                raise rollback_error from e
             except OSError as e:
                 rollback_error = AtomicWriteRollbackError(
-                    f"Failed to rollback temp file {temp_path}: {e}"
+                    f"Failed to rollback temp file {temp_path}: {e}. "
+                    f"Temp file may persist from atomic write rollback failure."
                 )
                 logger.error(f"[{operation_id}] {rollback_error}")
                 raise rollback_error from e
@@ -439,9 +463,15 @@ def _verify_no_orphaned_temps(directory: Path, operation_id: str) -> list[Path]:
         return []
 
 
-def cleanup_orphaned_temp_files(directory: Union[str, Path], pattern: str = '*.tmp') -> int:
+def cleanup_orphaned_temp_files(
+    directory: Union[str, Path],
+    pattern: str = '*.tmp',
+    *,
+    return_details: bool = False,
+    raise_on_failure: bool = False
+) -> Union[int, dict[str, Any]]:
     """
-    Clean up orphaned temporary files in a directory.
+    Clean up orphaned temporary files in a directory with detailed error reporting.
 
     Useful for startup cleanup of any temp files that may have been left
     from previous crashes or interrupted operations.
@@ -449,30 +479,116 @@ def cleanup_orphaned_temp_files(directory: Union[str, Path], pattern: str = '*.t
     Args:
         directory: Directory to clean up
         pattern: Glob pattern for temp files (default: '*.tmp')
+        return_details: If True, returns dict with detailed results (default: False for backward compatibility)
+        raise_on_failure: If True, raises exception on cleanup failure (default: False)
 
     Returns:
-        Number of files cleaned up
+        If return_details=False (default): Number of files successfully cleaned up (int)
+        If return_details=True: Dictionary with detailed results:
+        - 'cleaned': int - Number of files successfully cleaned up
+        - 'failed': int - Number of files that failed to clean up
+        - 'errors': list[str] - List of error messages for failed cleanups
+        - 'directory': str - Directory that was cleaned
+
+    Raises:
+        OSError: If directory access fails and raise_on_failure=True
+        PermissionError: If lacking permissions and raise_on_failure=True
 
     Example:
-        >>> cleaned = cleanup_orphaned_temp_files('/tmp', '*.tmp')
-        >>> print(f"Cleaned up {cleaned} orphaned temp files")
+        >>> # Backward compatible - returns count
+        >>> count = cleanup_orphaned_temp_files('/tmp', '*.tmp')
+        >>> print(f"Cleaned up {count} orphaned temp files")
+
+        >>> # Detailed results
+        >>> result = cleanup_orphaned_temp_files('/tmp', '*.tmp', return_details=True)
+        >>> print(f"Cleaned up {result['cleaned']} orphaned temp files")
+        >>> if result['failed'] > 0:
+        ...     print(f"Failed to clean up {result['failed']} files")
     """
     directory = Path(directory)
-    count = 0
+    result = {
+        'cleaned': 0,
+        'failed': 0,
+        'errors': [],
+        'directory': str(directory)
+    }
 
+    # Check if directory exists first
     try:
-        for temp_file in directory.glob(pattern):
-            try:
-                temp_file.unlink()
-                count += 1
-                logger.info(f"Cleaned up orphaned temp file: {temp_file}")
-            except OSError as e:
-                logger.warning(f"Failed to cleanup temp file {temp_file}: {e}")
-    except Exception as e:
-        logger.error(f"Failed to cleanup temp files in {directory}: {e}")
+        if not directory.exists():
+            logger.warning(f"Directory does not exist for cleanup: {directory}")
+            if raise_on_failure:
+                raise OSError(f"Directory does not exist: {directory}")
+            return result if return_details else 0
 
-    logger.info(f"Cleanup complete: {count} files removed from {directory}")
-    return count
+        if not directory.is_dir():
+            logger.error(f"Path is not a directory for cleanup: {directory}")
+            if raise_on_failure:
+                raise NotADirectoryError(f"Path is not a directory: {directory}")
+            return result if return_details else 0
+
+    except OSError as e:
+        logger.error(f"Failed to access directory for cleanup {directory}: {e}")
+        if raise_on_failure:
+            raise
+        result['errors'].append(f"Directory access failed: {e}")
+        return result if return_details else 0
+
+    # Clean up temp files
+    try:
+        temp_files = list(directory.glob(pattern))
+        logger.debug(f"Found {len(temp_files)} temp files matching pattern '{pattern}' in {directory}")
+
+        for temp_file in temp_files:
+            try:
+                # Use missing_ok=True for idempotent cleanup (safe if file already deleted)
+                temp_file.unlink(missing_ok=True)
+                result['cleaned'] += 1
+                logger.debug(f"Cleaned up orphaned temp file: {temp_file}")
+
+            except PermissionError as e:
+                result['failed'] += 1
+                error_msg = f"Permission denied cleaning up {temp_file}: {e}"
+                result['errors'].append(error_msg)
+                logger.warning(error_msg)
+
+            except OSError as e:
+                result['failed'] += 1
+                error_msg = f"Failed to cleanup temp file {temp_file}: {e}"
+                result['errors'].append(error_msg)
+                logger.warning(error_msg)
+
+    except PermissionError as e:
+        error_msg = f"Permission denied listing temp files in {directory}: {e}"
+        logger.error(error_msg)
+        result['errors'].append(error_msg)
+        if raise_on_failure:
+            raise PermissionError(error_msg) from e
+
+    except OSError as e:
+        error_msg = f"Failed to list temp files in {directory}: {e}"
+        logger.error(error_msg)
+        result['errors'].append(error_msg)
+        if raise_on_failure:
+            raise OSError(error_msg) from e
+
+    # Log summary
+    if result['cleaned'] > 0 or result['failed'] > 0:
+        logger.info(
+            f"Cleanup complete for {directory}: {result['cleaned']} files removed, "
+            f"{result['failed']} failed"
+        )
+    else:
+        logger.debug(f"No temp files found for cleanup in {directory}")
+
+    # Raise if requested and there were failures
+    if raise_on_failure and result['failed'] > 0:
+        raise OSError(
+            f"Cleanup failed for {result['failed']} files in {directory}. "
+            f"Errors: {'; '.join(result['errors'][:3])}"
+        )
+
+    return result if return_details else result['cleaned']
 
 
 def atomic_append(
@@ -589,15 +705,24 @@ def atomic_append(
                 logger.info(f"[{operation_id}] Atomic append successful to {filepath}")
 
             except OSError as e:
-                # Cleanup temp file on error
+                # Cleanup temp file on error with enhanced atomic append failure handling
                 try:
                     os.close(temp_fd)
                 except:
                     pass
                 try:
                     Path(temp_path).unlink(missing_ok=True)
-                except:
-                    pass
+                    logger.debug(f"[{operation_id}] Cleaned up temp file after atomic append error: {temp_path}")
+                except PermissionError as cleanup_error:
+                    logger.warning(
+                        f"[{operation_id}] Permission denied cleaning up temp file {temp_path} after atomic append error: {cleanup_error}. "
+                        f"Temp file may persist from atomic append failure."
+                    )
+                except OSError as cleanup_error:
+                    logger.warning(
+                        f"[{operation_id}] Failed to cleanup temp file {temp_path} after atomic append error: {cleanup_error}. "
+                        f"Temp file may persist from atomic append failure."
+                    )
                 raise
 
             return  # Success
