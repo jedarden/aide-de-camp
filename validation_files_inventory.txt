@@ -1,0 +1,460 @@
+# Validation Files Inventory
+# Generated: 2026-08-07
+# aide-de-camp schema implementation validation catalog
+
+## CORE VALIDATION MODULES (src/validation/)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+### Primary Validation Files
+src/validation/deployment_validator.py
+  - Purpose: Core deployment data validation module
+  - Functions: validate_deployment_data(), field presence checks, data type validation
+  - Validates: Deployment data structures against expected schema
+
+src/validation/deployment_data.py
+  - Purpose: Deployment data validation logic
+  - Functions: Validation of deployment records and metadata
+  - Validates: Data integrity and schema compliance
+
+src/validation/completeness.py
+  - Purpose: JSON well-formedness and 30-day completeness validation
+  - Functions: validate_json_completeness(), chronological sequence validation
+  - Validates: No gaps, no duplicates, proper date coverage
+
+src/validation/runner.py
+  - Purpose: Validation execution orchestrator
+  - Functions: Run validation pipelines, aggregate results
+  - Coordinates: Multiple validation modules
+
+src/validation/integration.py
+  - Purpose: Integration validation across components
+  - Functions: Cross-component validation, end-to-end validation
+  - Validates: Component integration points
+
+src/validation/validate_completeness.py
+  - Purpose: Completeness validation implementation
+  - Functions: Specific completeness checks, gap detection
+  - Validates: Data completeness requirements
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## BEAD VALIDATION (src/bead_validation/)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+src/bead_validation/validator.py
+  - Purpose: Deterministic bead validator - safety checks before bead creation
+  - Functions: Deny-list of live cluster-mutation verbs, GitOps requirement checks
+  - Historical Context: Created after adc-*kubectl-delete* incident (2026-07-21/22)
+  - Validates: Bead scoping, cluster safety, mutation permissions
+
+src/bead_validation/__init__.py
+  - Purpose: Module initialization and exports
+  - Exports: Validator classes, validation models
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## SCHEMA DEFINITION FILES (schemas/)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+### JSON Schema Definitions
+schemas/core-deployment-schema.json
+  - Purpose: Core deployment data schema definition
+  - Defines: Required fields, data types, structure constraints
+  - Size: 14,312 bytes
+
+schemas/core-deployment-schema-30day-completeness.json
+  - Purpose: Extended schema with 30-day completeness requirements
+  - Defines: 30-day coverage validation, completeness constraints
+  - Size: 31,171 bytes
+
+schemas/core-deployment-schema-with-completeness.json
+  - Purpose: Combined schema with completeness validation
+  - Defines: Full schema including completeness attributes
+  - Size: 21,132 bytes
+
+### Schema Test Files
+schemas/test-core-deployment.json
+  - Purpose: Test data for core schema validation
+  - Contains: Sample deployment records
+
+schemas/test-data-valid-30day.json
+  - Purpose: Valid 30-day test dataset
+  - Contains: Complete 30-day coverage example
+
+schemas/test-data-with-gaps.json
+  - Purpose: Test dataset with intentional gaps
+  - Contains: Gap detection test cases
+
+schemas/test-data-insufficient-days.json
+  - Purpose: Test dataset with insufficient days
+  - Contains: Coverage validation failure cases
+
+### Schema Validation Scripts
+schemas/validate_core_schema.py
+  - Purpose: Core schema validation implementation
+  - Functions: Schema validation logic, test execution
+  - Size: 5,521 bytes
+
+schemas/validate_30day_completeness.py
+  - Purpose: 30-day completeness validation
+  - Functions: Date range validation, gap detection
+  - Size: 14,211 bytes
+
+schemas/validate_30day_completeness_combined.py
+  - Purpose: Combined 30-day completeness validation
+  - Functions: Comprehensive completeness checks
+  - Size: 21,100 bytes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## APPLICATION-LEVEL VALIDATORS (src/)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+src/api/models.py
+  - Purpose: API model validation with Pydantic
+  - Functions: Request/response validation, type checking
+
+src/action/executor.py
+  - Purpose: Action execution validation
+  - Functions: Pre-execution checks, safety guards
+
+src/action/manifest_template.py
+  - Purpose: Manifest template validation
+  - Functions: Template structure validation
+
+src/action/registry.py
+  - Purpose: Action registry validation
+  - Functions: Registration checks, duplicate prevention
+
+src/freeze.py
+  - Purpose: Freeze state validation
+  - Functions: State consistency checks
+
+src/schemas/whisper_stt_deployment.py
+  - Purpose: Whisper STT deployment schema
+  - Functions: Deployment-specific schema validation
+
+src/schemas/whisper_stt_simplified.py
+  - Purpose: Simplified deployment schema
+  - Functions: Lightweight validation for common cases
+
+src/session/store.py
+  - Purpose: Session storage validation
+  - Functions: Data integrity, schema compliance
+
+src/monitoring/config_loader.py
+  - Purpose: Monitoring configuration validation
+  - Functions: Config structure validation, safety checks
+
+src/monitoring/ambient.py
+  - Purpose: Ambient monitoring validation
+  - Functions: Monitoring data validation
+
+src/components/library.py
+  - Purpose: Component library validation
+  - Functions: Component registration validation
+
+src/components/hot_reload.py
+  - Purpose: Hot reload validation
+  - Functions: Reload safety checks
+
+src/registry.py
+  - Purpose: Registry validation
+  - Functions: Registration integrity checks
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## TEST FILES (tests/)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+### Unit Tests
+tests/unit/test_completeness_validation.py
+  - Purpose: Unit tests for completeness validation
+  - Tests: Gap detection, date range validation
+
+tests/unit/test_deployment_data_validation.py
+  - Purpose: Unit tests for deployment data validation
+  - Tests: Schema compliance, field validation
+
+tests/unit/test_validation_runner.py
+  - Purpose: Unit tests for validation runner
+  - Tests: Pipeline execution, result aggregation
+
+tests/unit/test_validation_integration.py
+  - Purpose: Integration tests for validation modules
+  - Tests: Cross-module validation
+
+tests/unit/test_json_parsing.py
+  - Purpose: JSON parsing validation tests
+  - Tests: Parse error handling, well-formedness
+
+### Validation-Specific Tests
+tests/validation/test_dispatch_request_validation.py
+  - Purpose: Dispatch request validation tests
+  - Tests: Request structure validation, required fields
+
+tests/validation/test_single_validation_failures.py
+  - Purpose: Single failure validation tests
+  - Tests: Individual validation failure cases
+
+tests/validation/test_multi_failure_validation.py
+  - Purpose: Multiple failure validation tests
+  - Tests: Concurrent validation failures
+
+tests/test_confirmation_validation.py
+  - Purpose: Confirmation validation tests
+  - Tests: Confirmation flow validation
+
+tests/test_dispatch_validation.py
+  - Purpose: Dispatch validation tests
+  - Tests: Dispatch pipeline validation
+
+tests/test_schema_initialization.py
+  - Purpose: Schema initialization tests
+  - Tests: Schema loading, initialization validation
+
+### E2E and Integration Tests
+tests/e2e/canvas_verification.py
+  - Purpose: Canvas rendering verification
+  - Tests: UI validation, rendering consistency
+
+tests/e2e/verify_storage_sse.py
+  - Purpose: Storage and SSE verification
+  - Tests: Data persistence, SSE broadcasting
+
+tests/e2e/verify_canvas_test_render.py
+  - Purpose: Canvas test rendering verification
+  - Tests: Test UI validation
+
+tests/e2e/test_fetch_strand_execution.py
+  - Purpose: Fetch strand execution validation
+  - Tests: Strand validation, execution safety
+
+tests/e2e/inject.py
+  - Purpose: Test data injection validation
+  - Tests: Injection safety, data validation
+
+tests/test_session_storage_verification.py
+  - Purpose: Session storage verification tests
+  - Tests: Storage integrity, data consistency
+
+tests/test_endpoint_verification.py
+  - Purpose: API endpoint verification
+  - Tests: Endpoint validation, response structure
+
+tests/test_monitoring_result_persistence.py
+  - Purpose: Monitoring result persistence validation
+  - Tests: Result storage, monitoring validation
+
+tests/test_escalate_stuck_intent.py
+  - Purpose: Escalation stuck intent validation
+  - Tests: Intent validation, escalation safety
+
+tests/test_exceptions_routing.py
+  - Purpose: Exception routing validation
+  - Tests: Exception handling, routing validation
+
+tests/test_fence_detection.py
+  - Purpose: Fence detection validation
+  - Tests: LLM fence detection, output validation
+
+tests/test_hot_reload_dispatch.py
+  - Purpose: Hot reload dispatch validation
+  - Tests: Reload safety, dispatch validation
+
+tests/test_hot_reload_edge_cases.py
+  - Purpose: Hot reload edge case validation
+  - Tests: Edge case handling, reload safety
+
+tests/test_intent_classification.py
+  - Purpose: Intent classification validation
+  - Tests: Classification accuracy, intent validation
+
+tests/test_load_categorized_failures.py
+  - Purpose: Categorized failures loading validation
+  - Tests: Failure categorization, data loading
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## STANDALONE VALIDATION SCRIPTS (root level)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+validate_deployment_data_schema.py
+  - Purpose: Standalone deployment schema validation
+  - Functions: Command-line schema validation
+
+validate_deployment_file.py
+  - Purpose: Single deployment file validation
+  - Functions: File-specific validation checks
+
+validate_deployment_files.py
+  - Purpose: Multiple deployment file validation
+  - Functions: Batch file validation
+
+validate_deployment_datasets.py
+  - Purpose: Deployment dataset validation
+  - Functions: Dataset-level validation
+
+validate_30day_completeness.py
+  - Purpose: 30-day completeness validation
+  - Functions: Date range coverage validation
+
+validate_30day_deployment_files.py
+  - Purpose: 30-day deployment file validation
+  - Functions: 30-day specific file validation
+
+validate_30day_deployment_coverage.py
+  - Purpose: 30-day deployment coverage validation
+  - Functions: Coverage completeness checks
+
+validate_pod_logs_index.py
+  - Purpose: Pod logs index validation
+  - Functions: Index structure validation
+
+validate_pod_logs_index_schema.py
+  - Purpose: Pod logs index schema validation
+  - Functions: Schema compliance for pod logs
+
+validate_categorized_failures.py
+  - Purpose: Categorized failures validation
+  - Functions: Failure categorization validation
+
+validate_coverage_and_gaps.py
+  - Purpose: Coverage and gap validation
+  - Functions: Gap detection, coverage analysis
+
+validate_workflow_labels.py
+  - Purpose: Workflow label validation
+  - Functions: Label structure, naming validation
+
+validate_whisper_stt_deployment.py
+  - Purpose: Whisper STT deployment validation
+  - Functions: Deployment-specific validation
+
+test_deployment_schema_validation.py
+  - Purpose: Schema validation tests
+  - Functions: Test schema validation logic
+
+test_integrated_validation.py
+  - Purpose: Integrated validation tests
+  - Functions: Multi-component validation
+
+test_required_fields_validation.py
+  - Purpose: Required fields validation tests
+  - Functions: Required field checking
+
+test_extraction_edge_cases.py
+  - Purpose: Extraction edge case validation
+  - Functions: Edge case handling tests
+
+test_extract_pod_metadata.py
+  - Purpose: Pod metadata extraction validation
+  - Functions: Metadata extraction tests
+
+test_schema_pbx_web_match.py
+  - Purpose: PBX web schema matching validation
+  - Functions: Schema compatibility tests
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## VERIFICATION AND QUALITY SCRIPTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+verify_extraction_results.py
+  - Purpose: Extraction results verification
+  - Functions: Result validation, data quality checks
+
+verify_migration.py
+  - Purpose: Migration verification
+  - Functions: Migration integrity validation
+
+verify_optimization.py
+  - Purpose: Optimization verification
+  - Functions: Optimization result validation
+
+verify_specific_file.py
+  - Purpose: Specific file verification
+  - Functions: File-specific validation
+
+verify_storage_and_sse.py
+  - Purpose: Storage and SSE verification
+  - Functions: Data persistence, SSE validation
+
+verify_timestamp_consistency.py
+  - Purpose: Timestamp consistency verification
+  - Functions: Timestamp validation, consistency checks
+
+detailed_verification.py
+  - Purpose: Detailed verification logic
+  - Functions: Comprehensive verification checks
+
+check_coverage_completeness.py
+  - Purpose: Coverage completeness checking
+  - Functions: Coverage analysis, completeness validation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## RESEARCH AND DOCUMENTATION VALIDATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+docs/research/whisper-stt-deployment-schema.py
+  - Purpose: Whisper STT deployment schema research
+  - Functions: Schema research, validation patterns
+
+docs/research/deployment-data/validate_deployment_data.py
+  - Purpose: Deployment data validation research
+  - Functions: Validation research, pattern discovery
+
+docs/research/deployment-data/validate_deployment_file.py
+  - Purpose: Deployment file validation research
+  - Functions: File validation patterns
+
+docs/research/deployment-data/verify_coverage.py
+  - Purpose: Coverage verification research
+  - Functions: Coverage validation patterns
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## SUMMARY STATISTICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Total validation-related files found: 350+
+Files categorized by type:
+  - Core validation modules: 6
+  - Bead validation: 2
+  - Schema definitions: 10
+  - Application validators: 20+
+  - Test files: 100+
+  - Standalone scripts: 30+
+  - Research/validation docs: 5+
+
+Primary validation areas covered:
+  - Deployment data validation
+  - Schema compliance
+  - Completeness checking
+  - Integration validation
+  - Safety validation
+  - Configuration validation
+  - API request validation
+  - Hot reload validation
+  - Monitoring validation
+  - Component validation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## VALIDATION PIPELINE FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Schema Definition (schemas/*.json)
+   ↓
+2. Core Validation Modules (src/validation/*.py)
+   ↓
+3. Application-Level Validators (src/*)
+   ↓
+4. Test Coverage (tests/**/*.py)
+   ↓
+5. Standalone Verification Scripts (validate_*.py)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+End of inventory report
