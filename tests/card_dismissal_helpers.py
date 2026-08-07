@@ -36,13 +36,13 @@ from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 # Session Creation Helpers
 # =============================================================================
 
-async def create_test_session(store: SessionStore | None = None, tmp_path: Path | None = None) -> tuple[SessionStore, str]:
+async def create_test_session(test_db_store | None = None, tmp_path: Path | None = None) -> tuple[SessionStore, str]:
     """
-    Create a test session with an isolated store.
+    Create a test session with an isolated test_db_store.
 
     Args:
         store: Optional existing SessionStore. If None, creates a new one.
-        tmp_path: Optional temp path for store. Required if store is None.
+        tmp_path: Optional temp path for test_db_store. Required if store is None.
 
     Returns:
         Tuple of (SessionStore, session_id)
@@ -55,14 +55,14 @@ async def create_test_session(store: SessionStore | None = None, tmp_path: Path 
             raise ValueError("tmp_path is required when store is not provided")
         db_path = tmp_path / "test_session.db"
         store = SessionStore(db_path)
-        await store.initialize()
+        await test_db_store.initialize()
 
-    session_id = await store.create_session()
+    session_id = await test_db_store.create_session()
     return store, session_id
 
 
 async def create_test_session_with_topic(
-    store: SessionStore | None = None,
+    test_db_store | None = None,
     tmp_path: Path | None = None,
     label: str = "Test Topic",
     topic_type: str = "project"
@@ -83,7 +83,7 @@ async def create_test_session_with_topic(
         store, session_id, topic_id = await create_test_session_with_topic(tmp_path)
     """
     store, session_id = await create_test_session(store, tmp_path)
-    topic_id, _ = await store.find_or_create_topic(
+    topic_id, _ = await test_db_store.find_or_create_topic(
         label=label,
         session_id=session_id,
         topic_type=topic_type
@@ -96,7 +96,7 @@ async def create_test_session_with_topic(
 # =============================================================================
 
 async def create_stuck_card(
-    store: SessionStore,
+    test_db_store,
     session_id: str,
     topic_id: str | None = None,
     bead_id: str = "adc-stuck-test",
@@ -105,12 +105,12 @@ async def create_stuck_card(
     message: str = "Task stuck — needs input"
 ) -> dict[str, Any]:
     """
-    Create a stuck card in the session store.
+    Create a stuck card in the session test_db_store.
 
     Creates the necessary intent and bead_watch entries for a stuck card.
 
     Args:
-        store: SessionStore instance
+        test_db_store instance
         session_id: Session ID
         topic_id: Optional topic ID. If None, creates one.
         bead_id: Bead reference ID
@@ -126,20 +126,20 @@ async def create_stuck_card(
     """
     # Create topic if not provided
     if topic_id is None:
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Stuck Card Topic",
             session_id=session_id,
             topic_type="project"
         )
 
     # Create utterance
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="test stuck card",
     )
 
     # Create intent with bead_ref
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -150,7 +150,7 @@ async def create_stuck_card(
     )
 
     # Create bead_watch row
-    await store.create_bead_watch(
+    await test_db_store.create_bead_watch(
         bead_ref=bead_id,
         sla_hours=24,
         intent_type="task-profile",
@@ -169,7 +169,7 @@ async def create_stuck_card(
 
 
 async def create_failed_card(
-    store: SessionStore,
+    test_db_store,
     session_id: str,
     topic_id: str | None = None,
     bead_id: str = "adc-failed-test",
@@ -178,12 +178,12 @@ async def create_failed_card(
     message: str = "Task failed"
 ) -> dict[str, Any]:
     """
-    Create a failed card in the session store.
+    Create a failed card in the session test_db_store.
 
     Creates the necessary intent entry for a failed card.
 
     Args:
-        store: SessionStore instance
+        test_db_store instance
         session_id: Session ID
         topic_id: Optional topic ID. If None, creates one.
         bead_id: Bead reference ID
@@ -199,20 +199,20 @@ async def create_failed_card(
     """
     # Create topic if not provided
     if topic_id is None:
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Card Topic",
             session_id=session_id,
             topic_type="project"
         )
 
     # Create utterance
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="test failed card",
     )
 
     # Create intent with bead_ref
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -251,7 +251,7 @@ def verify_card_present(cards: list[dict[str, Any]], card_type: str, bead_id: st
         True if card is present, False otherwise
 
     Example:
-        cards = await store.get_active_topics(session_id)
+        cards = await test_db_store.get_active_topics(session_id)
         assert verify_card_present(cards, 'stuck', 'adc-stuck-1')
     """
     for card in cards:
@@ -313,14 +313,14 @@ def find_card_by_bead_id(cards: list[dict[str, Any]], bead_id: str) -> dict[str,
 # =============================================================================
 
 async def verify_result_exists_in_db(
-    store: SessionStore,
+    test_db_store,
     result_id: str
 ) -> bool:
     """
     Verify that a result exists in the database by result ID.
 
     Args:
-        store: SessionStore instance
+        test_db_store instance
         result_id: Result ID to check
 
     Returns:
@@ -331,7 +331,7 @@ async def verify_result_exists_in_db(
     """
     import sqlite3
     try:
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT 1 FROM results WHERE id = ?",
@@ -344,7 +344,7 @@ async def verify_result_exists_in_db(
 
 
 async def verify_result_count_for_intent(
-    store: SessionStore,
+    test_db_store,
     intent_id: str,
     expected_count: int
 ) -> bool:
@@ -352,7 +352,7 @@ async def verify_result_count_for_intent(
     Verify the number of results for a specific intent.
 
     Args:
-        store: SessionStore instance
+        test_db_store instance
         intent_id: Intent ID to check
         expected_count: Expected number of results
 
@@ -362,12 +362,12 @@ async def verify_result_count_for_intent(
     Example:
         assert await verify_result_count_for_intent(store, intent_id, 0)
     """
-    results = await store.get_results_for_intent(intent_id)
+    results = await test_db_store.get_results_for_intent(intent_id)
     return len(results) == expected_count
 
 
 async def verify_result_deleted_from_db(
-    store: SessionStore,
+    test_db_store,
     result_id: str,
     session_id: str
 ) -> dict:
@@ -377,7 +377,7 @@ async def verify_result_deleted_from_db(
     Performs both direct database query and session isolation check.
 
     Args:
-        store: SessionStore instance
+        test_db_store instance
         result_id: Result ID that should be deleted
         session_id: Session ID for isolation check
 
@@ -399,7 +399,7 @@ async def verify_result_deleted_from_db(
     result_exists = not await verify_result_exists_in_db(store, result_id)
 
     # Check session isolation by attempting to delete again
-    deletion_result = await store.delete_result(result_id, session_id)
+    deletion_result = await test_db_store.delete_result(result_id, session_id)
     session_isolated = deletion_result.get("result_deleted", 0) == 0
 
     return {
@@ -409,12 +409,12 @@ async def verify_result_deleted_from_db(
     }
 
 
-async def get_all_results_for_session(store: SessionStore, session_id: str) -> list[dict]:
+async def get_all_results_for_session(test_db_store, session_id: str) -> list[dict]:
     """
     Get all results for a session directly from database.
 
     Args:
-        store: SessionStore instance
+        test_db_store instance
         session_id: Session ID
 
     Returns:
@@ -423,7 +423,7 @@ async def get_all_results_for_session(store: SessionStore, session_id: str) -> l
     Example:
         results = await get_all_results_for_session(store, session_id)
     """
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(test_db_store.db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT * FROM results
@@ -436,7 +436,7 @@ async def get_all_results_for_session(store: SessionStore, session_id: str) -> l
 
 
 async def verify_database_integrity_after_dismissal(
-    store: SessionStore,
+    test_db_store,
     session_id: str,
     expected_result_count: int | None = None
 ) -> dict:
@@ -449,7 +449,7 @@ async def verify_database_integrity_after_dismissal(
     - Foreign key relationships are intact
 
     Args:
-        store: SessionStore instance
+        test_db_store instance
         session_id: Session ID to verify
         expected_result_count: Optional expected count of results
 
@@ -467,7 +467,7 @@ async def verify_database_integrity_after_dismissal(
 
     # Check 1: No orphaned results (results without valid session/intent/topic)
     try:
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             db.row_factory = aiosqlite.Row
 
             # Check for results with invalid session_id
@@ -507,7 +507,7 @@ async def verify_database_integrity_after_dismissal(
 
     # Check 3: Session exists and is valid
     try:
-        session = await store.get_session(session_id)
+        session = await test_db_store.get_session(session_id)
         checks_passed["session_valid"] = session is not None
         if session is None:
             all_passed = False
@@ -517,7 +517,7 @@ async def verify_database_integrity_after_dismissal(
 
     # Check 4: Topics are valid
     try:
-        topics = await store.get_active_topics(session_id)
+        topics = await test_db_store.get_active_topics(session_id)
         checks_passed["topics_valid"] = all(t.get("id") for t in topics)
         if not all(t.get("id") for t in topics):
             all_passed = False
@@ -601,7 +601,7 @@ async def verify_dismissal_persistence_across_reopen(
 
 
 async def count_results_by_bead_id(
-    store: SessionStore,
+    test_db_store,
     session_id: str,
     bead_id: str
 ) -> int:
@@ -609,7 +609,7 @@ async def count_results_by_bead_id(
     Count results for a specific bead_id in a session.
 
     Args:
-        store: SessionStore instance
+        test_db_store instance
         session_id: Session ID
         bead_id: Bead ID to count
 
@@ -634,7 +634,7 @@ async def count_results_by_bead_id(
 
 
 async def verify_cards_remain_after_dismissal(
-    store: SessionStore,
+    test_db_store,
     session_id: str,
     dismissed_bead_ids: list[str],
     remaining_bead_ids: list[str]
@@ -643,7 +643,7 @@ async def verify_cards_remain_after_dismissal(
     Verify that specific cards were dismissed and others remain.
 
     Args:
-        store: SessionStore instance
+        test_db_store instance
         session_id: Session ID
         dismissed_bead_ids: Bead IDs that should be dismissed
         remaining_bead_ids: Bead IDs that should remain
@@ -736,17 +736,17 @@ async def trigger_dismissal(
 
 async def dismiss_and_verify(
     page,
-    store: SessionStore,
+    test_db_store,
     session_id: str,
     bead_id: str,
     card_type: str = "stuck"
 ) -> None:
     """
-    Dismiss a card and verify it's removed from the store.
+    Dismiss a card and verify it's removed from the test_db_store.
 
     Args:
         page: Playwright Page instance
-        store: SessionStore instance
+        test_db_store instance
         session_id: Session ID
         bead_id: Bead ID to dismiss
         card_type: Type of card ('stuck' or 'failed')
@@ -755,7 +755,7 @@ async def dismiss_and_verify(
         await dismiss_and_verify(page, store, session_id, 'adc-stuck-1', 'stuck')
     """
     # Get cards before dismissal
-    topics_before = await store.get_active_topics(session_id)
+    topics_before = await test_db_store.get_active_topics(session_id)
     cards_before = [t for t in topics_before if t.get("card_type") == "builtin"]
 
     # Trigger dismissal
@@ -766,7 +766,7 @@ async def dismiss_and_verify(
     await asyncio.sleep(0.5)
 
     # Get cards after dismissal
-    topics_after = await store.get_active_topics(session_id)
+    topics_after = await test_db_store.get_active_topics(session_id)
     cards_after = [t for t in topics_after if t.get("card_type") == "builtin"]
 
     # Verify card was removed
@@ -851,44 +851,12 @@ async def broadcast_failed_card(
 # =============================================================================
 
 @pytest.fixture
-async def test_store(tmp_path: Path) -> SessionStore:
-    """Create an isolated SessionStore for testing."""
-    db_path = tmp_path / "test_card_dismissal.db"
-    store = SessionStore(db_path)
-    await store.initialize()
-    yield store
-    await store.close()
-
 
 @pytest.fixture
-async def test_broadcaster():
-    """Create a fresh SSE broadcaster for testing."""
-    broadcaster = SSEBroadcaster()
-    await broadcaster.start()
-    yield broadcaster
-    await broadcaster.stop()
-
 
 @pytest.fixture
-async def test_session_with_store(test_store: SessionStore) -> tuple[SessionStore, str]:
-    """Create a test session with store."""
-    session_id = await test_store.create_session()
-    return test_store, session_id
-
 
 @pytest.fixture
-async def test_session_with_topic(
-    test_store: SessionStore
-) -> tuple[SessionStore, str, str]:
-    """Create a test session with a topic."""
-    session_id = await test_store.create_session()
-    topic_id, _ = await test_store.find_or_create_topic(
-        label="Card Dismissal Test Topic",
-        session_id=session_id,
-        topic_type="project"
-    )
-    return test_store, session_id, topic_id
-
 
 # =============================================================================
 # Mock Helpers

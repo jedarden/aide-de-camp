@@ -30,11 +30,6 @@ from src.render.hot_path import derive_result_type
 
 
 @pytest.fixture
-async def store():
-    """In-memory session store for testing with cleanup."""
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-        db_path = Path(f.name)
-
     s = SessionStore(db_path)
     await s.initialize()
 
@@ -46,24 +41,10 @@ async def store():
 
 
 @pytest.fixture
-def mock_broadcaster():
-    """Mock SSE broadcaster for testing."""
-    broadcaster = AsyncMock()
-    broadcaster.broadcast = AsyncMock(return_value=1)
-    return broadcaster
-
 
 @pytest.fixture
-def surface_router(store):
-    """Surface router instance for testing."""
-    return SurfaceRouter(store)
-
 
 @pytest.fixture
-def ambient_monitor(store):
-    """Create an AmbientMonitor instance with test store and exception rules."""
-    monitor = AmbientMonitor(session_store=store)
-
     # Set up a config with exception rules
     monitor.config = MonitoringConfig(
         active_topics=[],
@@ -92,27 +73,8 @@ def ambient_monitor(store):
 
 
 @pytest.fixture
-def sample_monitoring_rule():
-    """Create a sample monitoring rule for testing."""
-    return MonitoringRule(
-        topic_id="test-pipeline-status",
-        project_slug="test-pipeline",
-        intent_type="status",
-        check_interval=60,
-        urgency="normal",
-        filters=[],
-        notification_threshold="any_change",
-    )
-
 
 @pytest.fixture
-async def session_with_surface(store):
-    """Create a session with an active surface for testing."""
-    session_id = "test-session"
-    await store.create_session(session_id)
-    surface_id = await store.register_surface(session_id, "canvas")
-    return session_id, surface_id
-
 
 # --- Integration Tests ----------------------------------------------------------
 
@@ -151,7 +113,7 @@ async def test_state_change_rule_fire_result_row_sse_event_full_flow(
     )
 
     # Verify no results exist yet
-    session_results = [r for r in await store.get_all_results() if r["session_id"] == session_id]
+    session_results = [r for r in await test_db_store.get_all_results() if r["session_id"] == session_id]
     assert len(session_results) == 0, "No results should exist before state change"
 
     # Step 2: Simulate state change (phase goes to Failed)
@@ -189,7 +151,7 @@ async def test_state_change_rule_fire_result_row_sse_event_full_flow(
     )
 
     # Step 5: Verify result row was written with correct structure
-    session_results = [r for r in await store.get_all_results() if r["session_id"] == session_id]
+    session_results = [r for r in await test_db_store.get_all_results() if r["session_id"] == session_id]
     assert len(session_results) == 1, "One result should be created"
 
     result = session_results[0]
@@ -294,7 +256,7 @@ async def test_no_result_when_rule_does_not_fire(
     )
 
     # Verify result was still created (state change results are always written)
-    session_results = [r for r in await store.get_all_results() if r["session_id"] == session_id]
+    session_results = [r for r in await test_db_store.get_all_results() if r["session_id"] == session_id]
     assert len(session_results) == 1, "Result should be created even when no exception rules fire"
 
     # But no triggered_rules in data
@@ -365,7 +327,7 @@ async def test_multiple_rules_fire_on_single_state_change(
     )
 
     # Verify result captures all triggered rules
-    session_results = [r for r in await store.get_all_results() if r["session_id"] == session_id]
+    session_results = [r for r in await test_db_store.get_all_results() if r["session_id"] == session_id]
     assert len(session_results) == 1
 
     result = session_results[0]
@@ -414,7 +376,7 @@ async def test_surface_routing_processes_monitoring_results_like_any_other_resul
     )
 
     # Get the result
-    session_results = [r for r in await store.get_all_results() if r["session_id"] == session_id]
+    session_results = [r for r in await test_db_store.get_all_results() if r["session_id"] == session_id]
     assert len(session_results) == 1
     result = session_results[0]
 
@@ -538,7 +500,7 @@ async def test_result_type_format_monitoring_project_slug(
     )
 
     # Verify result_type format
-    session_results = [r for r in await store.get_all_results() if r["session_id"] == session_id]
+    session_results = [r for r in await test_db_store.get_all_results() if r["session_id"] == session_id]
     assert len(session_results) == 1
 
     result = session_results[0]
@@ -583,7 +545,7 @@ async def test_first_check_creates_no_result(
     assert changes_dict["is_first"] is True
 
     # Verify no result was created
-    session_results = [r for r in await store.get_all_results() if r["session_id"] == session_id]
+    session_results = [r for r in await test_db_store.get_all_results() if r["session_id"] == session_id]
     assert len(session_results) == 0, "No result should be created on first check"
 
     # Verify state was cached

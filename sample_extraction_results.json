@@ -1,0 +1,188 @@
+{
+  "timestamp": "2026-08-07T02:30:00Z",
+  "total_files": 10,
+  "successful": 10,
+  "failed": 0,
+  "results": [
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/whisper-stt-single-test.jsonl",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/whisper-stt-single-test.jsonl\",\n  \"file_exists\": true,\n  \"size_bytes\": 108960,\n  \"creation_timestamp\": \"2026-08-07T01:35:30.747703\",\n  \"modification_timestamp\": \"2026-08-07T01:35:30.747703\",\n  \"line_count\": 480,\n  \"first_timestamp\": null,\n  \"last_timestamp\": null,\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/whisper-stt-single-test.jsonl",
+        "file_exists": true,
+        "size_bytes": 108960,
+        "creation_timestamp": "2026-08-07T01:35:30.747703",
+        "modification_timestamp": "2026-08-07T01:35:30.747703",
+        "line_count": 480,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      }
+    },
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/pbx-web-nginx.log",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/pbx-web-nginx.log\",\n  \"file_exists\": true,\n  \"size_bytes\": 96000,\n  \"creation_timestamp\": \"2026-08-06T12:29:24.092070\",\n  \"modification_timestamp\": \"2026-08-06T12:29:24.092070\",\n  \"line_count\": 1000,\n  \"first_timestamp\": null,\n  \"last_timestamp\": null,\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/pbx-web-nginx.log",
+        "file_exists": true,
+        "size_bytes": 96000,
+        "creation_timestamp": "2026-08-06T12:29:24.092070",
+        "modification_timestamp": "2026-08-06T12:29:24.092070",
+        "line_count": 1000,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      }
+    },
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/pbx-web-site-generator.log",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/pbx-web-site-generator.log\",\n  \"file_exists\": true,\n  \"size_bytes\": 62833,\n  \"creation_timestamp\": \"2026-08-06T12:29:24.092070\",\n  \"modification_timestamp\": \"2026-08-06T12:29:24.092070\",\n  \"line_count\": 2761,\n  \"first_timestamp\": null,\n  \"last_timestamp\": null,\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/pbx-web-site-generator.log",
+        "file_exists": true,
+        "size_bytes": 62833,
+        "creation_timestamp": "2026-08-06T12:29:24.092070",
+        "modification_timestamp": "2026-08-06T12:29:24.092070",
+        "line_count": 2761,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      }
+    },
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/whisper-openai.log",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/whisper-openai.log\",\n  \"file_exists\": true,\n  \"size_bytes\": 9179841,\n  \"creation_timestamp\": \"2026-08-07T02:18:35.956465\",\n  \"modification_timestamp\": \"2026-08-07T02:18:35.956465\",\n  \"line_count\": 97658,\n  \"first_timestamp\": null,\n  \"last_timestamp\": \"2026-08-07T02:18:34\",\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/whisper-openai.log",
+        "file_exists": true,
+        "size_bytes": 9179841,
+        "creation_timestamp": "2026-08-07T02:18:35.956465",
+        "modification_timestamp": "2026-08-07T02:18:35.956465",
+        "line_count": 97658,
+        "first_timestamp": null,
+        "last_timestamp": "2026-08-07T02:18:34",
+        "error": null
+      }
+    },
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/whisper-openai-pod.log",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/whisper-openai-pod.log\",\n  \"file_exists\": true,\n  \"size_bytes\": 580000,\n  \"creation_timestamp\": \"2026-08-06T17:13:50.753227\",\n  \"modification_timestamp\": \"2026-08-06T17:13:50.753227\",\n  \"line_count\": 10000,\n  \"first_timestamp\": null,\n  \"last_timestamp\": null,\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/whisper-openai-pod.log",
+        "file_exists": true,
+        "size_bytes": 580000,
+        "creation_timestamp": "2026-08-06T17:13:50.753227",
+        "modification_timestamp": "2026-08-06T17:13:50.753227",
+        "line_count": 10000,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      }
+    },
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/whisper-openai-raw.log",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/whisper-openai-raw.log\",\n  \"file_exists\": true,\n  \"size_bytes\": 5573013,\n  \"creation_timestamp\": \"2026-08-06T23:02:09.215310\",\n  \"modification_timestamp\": \"2026-08-06T23:02:09.215310\",\n  \"line_count\": 96086,\n  \"first_timestamp\": null,\n  \"last_timestamp\": null,\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/whisper-openai-raw.log",
+        "file_exists": true,
+        "size_bytes": 5573013,
+        "creation_timestamp": "2026-08-06T23:02:09.215310",
+        "modification_timestamp": "2026-08-06T23:02:09.215310",
+        "line_count": 96086,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      }
+    },
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/whisper-stt-main.log",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/whisper-stt-main.log\",\n  \"file_exists\": true,\n  \"size_bytes\": 0,\n  \"creation_timestamp\": \"2026-08-07T02:18:18.492541\",\n  \"modification_timestamp\": \"2026-08-07T02:18:18.492541\",\n  \"line_count\": 0,\n  \"first_timestamp\": null,\n  \"last_timestamp\": null,\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/whisper-stt-main.log",
+        "file_exists": true,
+        "size_bytes": 0,
+        "creation_timestamp": "2026-08-07T02:18:18.492541",
+        "modification_timestamp": "2026-08-07T02:18:18.492541",
+        "line_count": 0,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      }
+    },
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/whisper-stt-pod.log",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/whisper-stt-pod.log\",\n  \"file_exists\": true,\n  \"size_bytes\": 0,\n  \"creation_timestamp\": \"2026-08-06T17:14:25.549078\",\n  \"modification_timestamp\": \"2026-08-06T17:14:25.549078\",\n  \"line_count\": 0,\n  \"first_timestamp\": null,\n  \"last_timestamp\": null,\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/whisper-stt-pod.log",
+        "file_exists": true,
+        "size_bytes": 0,
+        "creation_timestamp": "2026-08-06T17:14:25.549078",
+        "modification_timestamp": "2026-08-06T17:14:25.549078",
+        "line_count": 0,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      }
+    },
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/pbx-web-site-generator-recent.log",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/pbx-web-site-generator-recent.log\",\n  \"file_exists\": true,\n  \"size_bytes\": 94,\n  \"creation_timestamp\": \"2026-08-06T12:29:24.092070\",\n  \"modification_timestamp\": \"2026-08-06T12:29:24.092070\",\n  \"line_count\": 1,\n  \"first_timestamp\": null,\n  \"last_timestamp\": null,\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/pbx-web-site-generator-recent.log",
+        "file_exists": true,
+        "size_bytes": 94,
+        "creation_timestamp": "2026-08-06T12:29:24.092070",
+        "modification_timestamp": "2026-08-06T12:29:24.092070",
+        "line_count": 1,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      }
+    },
+    {
+      "file_path": "/home/coding/aide-de-camp/logs/whisper-stt-events.jsonl",
+      "success": true,
+      "stdout": "{\n  \"file_path\": \"/home/coding/aide-de-camp/logs/whisper-stt-events.jsonl\",\n  \"file_exists\": true,\n  \"size_bytes\": 0,\n  \"creation_timestamp\": \"2026-08-07T02:09:07.222938\",\n  \"modification_timestamp\": \"2026-08-07T02:09:07.222938\",\n  \"line_count\": 0,\n  \"first_timestamp\": null,\n  \"last_timestamp\": null,\n  \"error\": null\n}\n",
+      "stderr": "",
+      "returncode": 0,
+      "metadata": {
+        "file_path": "/home/coding/aide-de-camp/logs/whisper-stt-events.jsonl",
+        "file_exists": true,
+        "size_bytes": 0,
+        "creation_timestamp": "2026-08-07T02:09:07.222938",
+        "modification_timestamp": "2026-08-07T02:09:07.222938",
+        "line_count": 0,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      }
+    }
+  ]
+}

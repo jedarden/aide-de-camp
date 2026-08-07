@@ -40,29 +40,10 @@ from src.escalate.handler import handle_terminal_failure
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """Isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "test.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 @pytest.fixture
-async def broadcaster() -> SSEBroadcaster:
-    """Fresh SSEBroadcaster per test."""
-    b = SSEBroadcaster()
-    await b.start()
-    yield b
-    await b.stop()
-
 
 @pytest.fixture
-def router(store: SessionStore) -> IntentRouter:
-    """IntentRouter with test store."""
-    return IntentRouter(store=store)
-
 
 # --- 1. SSE Broadcast on Fence Event ------------------------------------------
 
@@ -71,17 +52,17 @@ class TestSSEBroadcastOnFenceEvent:
     """Test SSE broadcast behavior when fence events occur."""
 
     @pytest.mark.asyncio
-    async def test_stuck_card_broadcasts_on_fence_event(self, router: IntentRouter, store: SessionStore):
+    async def test_stuck_card_broadcasts_on_fence_event(self, router: IntentRouter, test_db_store):
         """Creating a stuck card from fence event broadcasts SSE event."""
         session_id = "test-session-fence"
         surface_id = "test-surface-fence"
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Implement stuck feature",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -128,16 +109,16 @@ class TestSSEBroadcastOnFenceEvent:
         assert event.target_session_id == session_id, "Should target correct session"
 
     @pytest.mark.asyncio
-    async def test_sse_event_contains_complete_stuck_data(self, router: IntentRouter, store: SessionStore):
+    async def test_sse_event_contains_complete_stuck_data(self, router: IntentRouter, test_db_store):
         """SSE event for stuck card contains all required data fields."""
         session_id = "test-session-complete"
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Complete test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -196,24 +177,24 @@ class TestSSEBroadcastOnFenceEvent:
 
 
 class TestStuckCardCreationSessionStore:
-    """Test stuck card creation and persistence in session store."""
+    """Test stuck card creation and persistence in session test_db_store."""
 
     @pytest.mark.asyncio
-    async def test_stuck_card_persists_with_correct_type_and_status(self, store: SessionStore):
+    async def test_stuck_card_persists_with_correct_type_and_status(self, test_db_store):
         """Stuck cards persist with intent_type='stuck' and status='stuck'."""
         session_id = "test-session-stuck-persist"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Stuck Topic",
             session_id=session_id,
             topic_type="project",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test stuck",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -223,14 +204,14 @@ class TestStuckCardCreationSessionStore:
         )
 
         # Update to stuck
-        await store.update_intent_type_and_status(
+        await test_db_store.update_intent_type_and_status(
             intent_id=intent_id,
             intent_type="stuck",
             status="stuck",
         )
 
         # Create stuck result
-        await store.create_result(
+        await test_db_store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -245,31 +226,31 @@ class TestStuckCardCreationSessionStore:
         )
 
         # Verify persistence
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["intent_type"] == "stuck"
         assert intent["status"] == "stuck"
 
-        result = await store.get_latest_result_for_topic(topic_id)
+        result = await test_db_store.get_latest_result_for_topic(topic_id)
         assert result is not None
         assert result["summary"] == "Task stuck — needs your input"
 
     @pytest.mark.asyncio
-    async def test_stuck_card_queryable_via_session_api(self, store: SessionStore):
+    async def test_stuck_card_queryable_via_session_api(self, test_db_store):
         """Stuck cards are queryable via session API."""
         session_id = "test-session-query"
 
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Query Topic",
             session_id=session_id,
             topic_type="project",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test query",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -278,13 +259,13 @@ class TestStuckCardCreationSessionStore:
             topic_id=topic_id,
         )
 
-        await store.update_intent_type_and_status(
+        await test_db_store.update_intent_type_and_status(
             intent_id=intent_id,
             intent_type="stuck",
             status="stuck",
         )
 
-        await store.create_result(
+        await test_db_store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -294,7 +275,7 @@ class TestStuckCardCreationSessionStore:
         )
 
         # Query via API
-        topics = await store.get_active_topics(session_id)
+        topics = await test_db_store.get_active_topics(session_id)
         assert len(topics) >= 1
 
         topic = next((t for t in topics if t["id"] == topic_id), None)
@@ -309,21 +290,21 @@ class TestTerminalFailureDetection:
     """Test terminal failure detection and failed card creation."""
 
     @pytest.mark.asyncio
-    async def test_terminal_failure_creates_failed_card(self, store: SessionStore):
-        """Terminal failure creates failed card in session store."""
+    async def test_terminal_failure_creates_failed_card(self, test_db_store):
+        """Terminal failure creates failed card in session test_db_store."""
         session_id = "test-session-failed"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Topic",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test failure",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -334,7 +315,7 @@ class TestTerminalFailureDetection:
         broadcaster_mock = AsyncMock()
 
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster_mock), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,
@@ -345,26 +326,26 @@ class TestTerminalFailureDetection:
             )
 
         # Verify intent status is failed
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
     @pytest.mark.asyncio
-    async def test_failed_card_persists_with_all_fields(self, store: SessionStore):
+    async def test_failed_card_persists_with_all_fields(self, test_db_store):
         """Failed card persists with all required fields."""
         session_id = "test-session-persist"
 
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Persist Topic",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test persist",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -375,7 +356,7 @@ class TestTerminalFailureDetection:
         broadcaster_mock = AsyncMock()
 
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster_mock), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,
@@ -386,22 +367,22 @@ class TestTerminalFailureDetection:
             )
 
         # Verify result contains failed card data
-        result = await store.get_latest_result_for_topic(topic_id)
+        result = await test_db_store.get_latest_result_for_topic(topic_id)
         assert result is not None
         assert result["summary"] == "Task Failed: Source Failure"
         assert result["urgency"] == "high"
 
     @pytest.mark.asyncio
-    async def test_failed_card_without_topic_creates_topic(self, store: SessionStore):
+    async def test_failed_card_without_topic_creates_topic(self, test_db_store):
         """handle_terminal_failure creates topic when topic_id is None."""
         session_id = "test-session-no-topic"
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test without topic",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -411,7 +392,7 @@ class TestTerminalFailureDetection:
         broadcaster_mock = AsyncMock()
 
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster_mock), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,
@@ -422,11 +403,11 @@ class TestTerminalFailureDetection:
             )
 
         # Verify intent status is failed
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
         # Verify topic was created
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         created_topic_id = intent.get("topic_id")
         assert created_topic_id is not None
 
@@ -467,22 +448,22 @@ class TestCardDismissalFunctionality:
     """Test card dismissal functionality for stuck and failed cards."""
 
     @pytest.mark.asyncio
-    async def test_stuck_card_can_be_dismissed(self, store: SessionStore):
+    async def test_stuck_card_can_be_dismissed(self, test_db_store):
         """Stuck cards can be dismissed via API."""
         session_id = "test-session-dismiss"
 
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Dismiss Topic",
             session_id=session_id,
             topic_type="project",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test dismiss",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -491,40 +472,40 @@ class TestCardDismissalFunctionality:
             topic_id=topic_id,
         )
 
-        await store.update_intent_type_and_status(
+        await test_db_store.update_intent_type_and_status(
             intent_id=intent_id,
             intent_type="stuck",
             status="stuck",
         )
 
         # Verify stuck status
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "stuck"
 
         # Simulate dismissal - update to cancelled
-        await store.update_intent_status(intent_id=intent_id, status="cancelled")
+        await test_db_store.update_intent_status(intent_id=intent_id, status="cancelled")
 
         # Verify dismissed
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "cancelled"
 
     @pytest.mark.asyncio
-    async def test_failed_card_can_be_dismissed(self, store: SessionStore):
+    async def test_failed_card_can_be_dismissed(self, test_db_store):
         """Failed cards can be dismissed via API."""
         session_id = "test-session-failed-dismiss"
 
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Dismiss",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test failed dismiss",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -532,17 +513,17 @@ class TestCardDismissalFunctionality:
             topic_id=topic_id,
         )
 
-        await store.update_intent_status(intent_id=intent_id, status="failed")
+        await test_db_store.update_intent_status(intent_id=intent_id, status="failed")
 
         # Verify failed status
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
         # Dismiss
-        await store.update_intent_status(intent_id=intent_id, status="cancelled")
+        await test_db_store.update_intent_status(intent_id=intent_id, status="cancelled")
 
         # Verify dismissed
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "cancelled"
 
 
@@ -553,52 +534,52 @@ class TestBothIntentsCoverage:
     """Test coverage for both 'stuck' and 'failed' intent types."""
 
     @pytest.mark.asyncio
-    async def test_stuck_intent_type_accepted(self, store: SessionStore):
+    async def test_stuck_intent_type_accepted(self, test_db_store):
         """Intent type 'stuck' is accepted."""
         session_id = "test-session-stuck-type"
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
             intent_type="task-profile",
         )
 
-        await store.update_intent_type_and_status(
+        await test_db_store.update_intent_type_and_status(
             intent_id=intent_id,
             intent_type="stuck",
             status="stuck",
         )
 
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["intent_type"] == "stuck"
         assert intent["status"] == "stuck"
 
     @pytest.mark.asyncio
-    async def test_failed_status_accepted(self, store: SessionStore):
+    async def test_failed_status_accepted(self, test_db_store):
         """Status 'failed' is accepted."""
         session_id = "test-session-failed-status"
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
             intent_type="action",
         )
 
-        await store.update_intent_status(intent_id=intent_id, status="failed")
+        await test_db_store.update_intent_status(intent_id=intent_id, status="failed")
 
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
     @pytest.mark.asyncio
@@ -642,16 +623,16 @@ class TestIntegrationScenarios:
     """Test complete integration scenarios."""
 
     @pytest.mark.asyncio
-    async def test_full_stuck_card_flow(self, router: IntentRouter, store: SessionStore):
+    async def test_full_stuck_card_flow(self, router: IntentRouter, test_db_store):
         """Complete flow: fence → stuck card → broadcast → canvas render."""
         session_id = "test-session-flow-stuck"
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Full flow test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -701,22 +682,22 @@ class TestIntegrationScenarios:
         assert captured_events[0].event_type == EventType.TASK_STUCK
 
     @pytest.mark.asyncio
-    async def test_full_failed_card_flow(self, store: SessionStore):
+    async def test_full_failed_card_flow(self, test_db_store):
         """Complete flow: terminal failure → failed card → broadcast."""
         session_id = "test-session-flow-failed"
 
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Flow Failed",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Flow failed test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -734,7 +715,7 @@ class TestIntegrationScenarios:
         broadcaster_mock.broadcast.side_effect = capture_broadcast
 
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster_mock), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,
@@ -745,7 +726,7 @@ class TestIntegrationScenarios:
             )
 
         # Verify complete flow
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
         assert len(captured_events) == 1

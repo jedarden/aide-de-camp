@@ -17,6 +17,11 @@ from src.action.steps.gitops import (
     GitOpsCommitStep,
     StepResult,
     TemplateField,
+    GitConflictError,
+    GitNetworkError,
+    GitAuthenticationError,
+    GitStateError,
+    GitError,
 )
 
 
@@ -67,6 +72,41 @@ spec:
     manifest_path.write_text(deployment_content)
 
     return manifest_path
+
+
+class TestGitExceptions:
+    """Test custom git exception types."""
+
+    def test_git_conflict_error_creation(self):
+        """GitConflictError can be created and raised."""
+        with pytest.raises(GitConflictError, match="merge conflict"):
+            raise GitConflictError("merge conflict detected")
+
+    def test_git_network_error_creation(self):
+        """GitNetworkError can be created and raised."""
+        with pytest.raises(GitNetworkError, match="network"):
+            raise GitNetworkError("network failure")
+
+    def test_git_authentication_error_creation(self):
+        """GitAuthenticationError can be created and raised."""
+        with pytest.raises(GitAuthenticationError, match="authentication"):
+            raise GitAuthenticationError("authentication failed")
+
+    def test_git_state_error_creation(self):
+        """GitStateError can be created and raised."""
+        with pytest.raises(GitStateError, match="not on main"):
+            raise GitStateError("not on main branch")
+
+    def test_git_error_base_class(self):
+        """All git errors inherit from GitError base class."""
+        with pytest.raises(GitError):
+            raise GitConflictError("test")
+        with pytest.raises(GitError):
+            raise GitNetworkError("test")
+        with pytest.raises(GitError):
+            raise GitAuthenticationError("test")
+        with pytest.raises(GitError):
+            raise GitStateError("test")
 
 
 class TestTemplateField:
@@ -186,7 +226,7 @@ class TestGitOpsCommitStep:
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
         # Mock the validation method to simulate non-git repository
-        with patch.object(step, '_validate_declarative_config_repo', side_effect=RuntimeError("Not a git repository")):
+        with patch.object(step, '_validate_declarative_config_repo', side_effect=GitStateError("Not a git repository")):
             result = await step.execute(
                 manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
                 template_fields=[{"path": "/spec/replicas", "value": 5}],
@@ -195,6 +235,83 @@ class TestGitOpsCommitStep:
 
         assert result.success is False
         assert "Not a git repository" in result.error
+
+    @patch("subprocess.run")
+    @pytest.mark.asyncio
+    async def test_execute_uncommitted_changes_fails(self, mock_run, mock_declarative_config_dir, mock_deployment_manifest):
+        """Uncommitted changes in repository returns error."""
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock the validation method to simulate uncommitted changes
+        with patch.object(step, '_validate_declarative_config_repo',
+                          side_effect=GitStateError("Repository has uncommitted changes")):
+            result = await step.execute(
+                manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+                template_fields=[{"path": "/spec/replicas", "value": 5}],
+                project_cfg={},
+            )
+
+        assert result.success is False
+        assert "uncommitted changes" in result.error.lower()
+
+    @patch("subprocess.run")
+    @pytest.mark.asyncio
+    async def test_execute_not_on_main_branch_fails_validation(self, mock_run, mock_declarative_config_dir, mock_deployment_manifest):
+        """Not being on main branch returns error during pre-flight validation."""
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock git status to show no uncommitted changes, then branch check to show wrong branch
+        mock_run.side_effect = [
+            # git status (no uncommitted changes)
+            Mock(returncode=0, stdout="", stderr=""),
+            # git branch (shows wrong branch)
+            Mock(returncode=0, stdout="feature-branch\n", stderr=""),
+        ]
+
+        result = await step.execute(
+            manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+            template_fields=[{"path": "/spec/replicas", "value": 5}],
+            project_cfg={},
+        )
+
+        assert result.success is False
+        assert "not on main branch" in result.error.lower()
+
+    @patch("subprocess.run")
+    @pytest.mark.asyncio
+    async def test_execute_git_authentication_fails(self, mock_run, mock_declarative_config_dir, mock_deployment_manifest):
+        """Git authentication failure returns error."""
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock the validation method to simulate auth failure
+        with patch.object(step, '_validate_declarative_config_repo',
+                          side_effect=GitAuthenticationError("Git authentication failed")):
+            result = await step.execute(
+                manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+                template_fields=[{"path": "/spec/replicas", "value": 5}],
+                project_cfg={},
+            )
+
+        assert result.success is False
+        assert "authentication" in result.error.lower()
+
+    @patch("subprocess.run")
+    @pytest.mark.asyncio
+    async def test_execute_git_network_failure_fails(self, mock_run, mock_declarative_config_dir, mock_deployment_manifest):
+        """Git network failure returns error."""
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock the validation method to simulate network failure
+        with patch.object(step, '_validate_declarative_config_repo',
+                          side_effect=GitNetworkError("Network timeout")):
+            result = await step.execute(
+                manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+                template_fields=[{"path": "/spec/replicas", "value": 5}],
+                project_cfg={},
+            )
+
+        assert result.success is False
+        assert "network" in result.error.lower()
 
     @pytest.mark.asyncio
     async def test_execute_invalid_field_spec(self, mock_declarative_config_dir, mock_deployment_manifest):
@@ -349,8 +466,6 @@ class TestGitOpsCommitStep:
             Mock(returncode=0, stdout="", stderr=""),
             # git rev-parse
             Mock(returncode=0, stdout="abc123def456\n", stderr=""),
-            # git branch --show-current
-            Mock(returncode=0, stdout="main\n", stderr=""),
             # git push
             Mock(returncode=0, stdout="", stderr=""),
         ]
@@ -367,6 +482,155 @@ class TestGitOpsCommitStep:
         assert result.success is True
         assert result.data["commit_sha"] == "abc123def456"
         assert result.data["branch"] == "main"
+
+    @patch("subprocess.run")
+    @pytest.mark.asyncio
+    async def test_push_network_retry_succeeds_on_second_attempt(self, mock_run, mock_declarative_config_dir, mock_deployment_manifest):
+        """Network retry logic retries push operation on transient failures."""
+        import time
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        call_count = [0]
+
+        def mock_git_command(*args, **kwargs):
+            call_count[0] += 1
+            # First push attempt fails with network error
+            if "push" in args and call_count[0] == 7:  # 7th call is the push
+                return Mock(returncode=1, stdout="", stderr="Connection timeout\n")
+            # Second push attempt succeeds
+            elif "push" in args and call_count[0] == 8:  # Retry happens immediately after
+                return Mock(returncode=0, stdout="", stderr="")
+            # All other commands succeed
+            return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_git_command
+
+        # Mock the validation method and sleep for retry
+        with patch.object(step, '_validate_declarative_config_repo'), \
+             patch('time.sleep'):  # Mock sleep to speed up test
+            result = await step.execute(
+                manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+                template_fields=[{"path": "/spec/replicas", "value": 5}],
+                project_cfg={"project_slug": "test-app", "cluster": "test-cluster"},
+                dry_run=False,
+            )
+
+        assert result.success is True
+        assert call_count[0] >= 7  # Should have tried at least the original push
+
+    @patch("subprocess.run")
+    @pytest.mark.asyncio
+    async def test_push_conflict_returns_commit_locally_flag(self, mock_run, mock_declarative_config_dir, mock_deployment_manifest):
+        """Push conflict returns structured error with commit_locally flag."""
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock git commands to succeed through commit, fail push with conflict
+        mock_run.side_effect = [
+            # git config user.email
+            Mock(returncode=0, stdout="", stderr=""),
+            # git config user.name
+            Mock(returncode=0, stdout="", stderr=""),
+            # git status (has changes)
+            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
+            # git add
+            Mock(returncode=0, stdout="", stderr=""),
+            # git commit
+            Mock(returncode=0, stdout="", stderr=""),
+            # git rev-parse
+            Mock(returncode=0, stdout="abc123def456\n", stderr=""),
+            # git push (fails with conflict)
+            Mock(returncode=1, stdout="", stderr="To github.com:jedarden/declarative-config.git\n ! [rejected] main -> main (non-fast-forward)\n"),
+        ]
+
+        # Mock the validation method to bypass git repo check
+        with patch.object(step, '_validate_declarative_config_repo'):
+            result = await step.execute(
+                manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+                template_fields=[{"path": "/spec/replicas", "value": 5}],
+                project_cfg={"project_slug": "test-app", "cluster": "test-cluster"},
+                dry_run=False,
+            )
+
+        assert result.success is False
+        assert result.data.get("commit_locally") is True
+        assert result.data.get("commit_sha") == "abc123def456"
+        assert "non-fast-forward" in result.error.lower()
+
+    @patch("subprocess.run")
+    @pytest.mark.asyncio
+    async def test_push_auth_error_returns_structured_error(self, mock_run, mock_declarative_config_dir, mock_deployment_manifest):
+        """Push authentication failure returns structured error without commit_locally flag."""
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock git commands to succeed through commit, fail push with auth error
+        mock_run.side_effect = [
+            # git config user.email
+            Mock(returncode=0, stdout="", stderr=""),
+            # git config user.name
+            Mock(returncode=0, stdout="", stderr=""),
+            # git status (has changes)
+            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
+            # git add
+            Mock(returncode=0, stdout="", stderr=""),
+            # git commit
+            Mock(returncode=0, stdout="", stderr=""),
+            # git rev-parse
+            Mock(returncode=0, stdout="abc123def456\n", stderr=""),
+            # git push (fails with auth error)
+            Mock(returncode=1, stdout="", stderr="fatal: Authentication failed\n"),
+        ]
+
+        # Mock the validation method to bypass git repo check
+        with patch.object(step, '_validate_declarative_config_repo'):
+            result = await step.execute(
+                manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+                template_fields=[{"path": "/spec/replicas", "value": 5}],
+                project_cfg={"project_slug": "test-app", "cluster": "test-cluster"},
+                dry_run=False,
+            )
+
+        assert result.success is False
+        assert result.data.get("commit_locally") is True
+        assert "authentication" in result.error.lower()
+
+    @patch("subprocess.run")
+    @pytest.mark.asyncio
+    async def test_commit_conflict_rolls_back_with_backup(self, mock_run, mock_declarative_config_dir, mock_deployment_manifest):
+        """Commit conflict triggers rollback with proper backup."""
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Read original manifest as YAML for comparison
+        original_manifest = yaml.safe_load(mock_deployment_manifest.read_text())
+
+        # Mock git commands to fail at commit with conflict
+        mock_run.side_effect = [
+            # git config user.email
+            Mock(returncode=0, stdout="", stderr=""),
+            # git config user.name
+            Mock(returncode=0, stdout="", stderr=""),
+            # git status (has changes)
+            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
+            # git add
+            Mock(returncode=0, stdout="", stderr=""),
+            # git commit (fails with conflict)
+            Mock(returncode=1, stdout="", stderr="fatal: Cannot commit: merge conflict\n"),
+        ]
+
+        # Mock the validation method to bypass git repo check
+        with patch.object(step, '_validate_declarative_config_repo'):
+            result = await step.execute(
+                manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+                template_fields=[{"path": "/spec/replicas", "value": 5}],
+                project_cfg={"project_slug": "test-app"},
+                dry_run=False,
+            )
+
+        assert result.success is False
+        assert "Failed to commit changes" in result.error
+
+        # Verify rollback occurred by comparing YAML content
+        rolled_back_manifest = yaml.safe_load(mock_deployment_manifest.read_text())
+        assert rolled_back_manifest == original_manifest
 
     @patch("subprocess.run")
     @pytest.mark.asyncio

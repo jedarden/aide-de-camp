@@ -1,0 +1,127 @@
+{
+  "generated_at": "2026-08-07T04:18:54.762310",
+  "pbx_web": {
+    "csv": {
+      "dataset_name": "pbx-web-csv",
+      "file_path": "./pbx-web-deployment-events-30days.csv",
+      "file_size_mb": 0.0009069442749023438,
+      "total_records": 5,
+      "first_timestamp": "2026-07-13T18:07:55+00:00",
+      "last_timestamp": "2026-07-28T17:26:12+00:00",
+      "time_span_days": 14.971030092592592,
+      "expected_days": 15,
+      "actual_days_with_data": 4,
+      "daily_coverage_pct": 26.666666666666668,
+      "gaps": [
+        {
+          "start": "2026-07-14",
+          "end": "2026-07-15",
+          "duration_days": 1,
+          "severity": "minor"
+        },
+        {
+          "start": "2026-07-16",
+          "end": "2026-07-27",
+          "duration_days": 11,
+          "severity": "critical"
+        }
+      ],
+      "total_gap_days": 12,
+      "daily_avg_records": 1.25,
+      "data_quality": "degraded"
+    },
+    "metadata": {
+      "error": "No valid timestamp records found",
+      "file_path": "./logs/pbx-web-30day.jsonl",
+      "dataset_name": "pbx-web-metadata",
+      "total_lines": 16
+    },
+    "parsed": {
+      "error": "No valid timestamp records found",
+      "file_path": "./logs/pbx-web-parsed.jsonl",
+      "dataset_name": "pbx-web-parsed",
+      "total_lines": 1438
+    },
+    "victoria_logs": {
+      "error": "No valid timestamp records found",
+      "file_path": "./logs/pbx-web-victorialogs-raw.jsonl",
+      "dataset_name": "pbx-web-victoria-logs",
+      "total_lines": 10000
+    },
+    "total_records": 5,
+    "data_sources": [
+      "csv",
+      "metadata",
+      "parsed_logs",
+      "victoria_logs"
+    ]
+  },
+  "whisper_stt": {
+    "csv": {
+      "dataset_name": "whisper-stt-csv",
+      "file_path": "./whisper-stt-deployment-events-30days.csv",
+      "file_size_mb": 0.0009565353393554688,
+      "total_records": 5,
+      "first_timestamp": "2026-06-14T04:11:57+00:00",
+      "last_timestamp": "2026-07-12T16:53:42+00:00",
+      "time_span_days": 28.528993055555556,
+      "expected_days": 29,
+      "actual_days_with_data": 3,
+      "daily_coverage_pct": 10.344827586206897,
+      "gaps": [
+        {
+          "start": "2026-06-15",
+          "end": "2026-07-08",
+          "duration_days": 23,
+          "severity": "critical"
+        },
+        {
+          "start": "2026-07-09",
+          "end": "2026-07-12",
+          "duration_days": 3,
+          "severity": "major"
+        }
+      ],
+      "total_gap_days": 26,
+      "daily_avg_records": 1.67,
+      "data_quality": "degraded"
+    },
+    "main": {
+      "dataset_name": "whisper-stt-30day",
+      "file_path": "./logs/whisper-stt-30day.jsonl",
+      "file_size_mb": 22.394437789916992,
+      "total_records": 98252,
+      "first_timestamp": "2026-07-10T13:39:33.767796-04:00",
+      "last_timestamp": "2026-08-07T03:32:44.147223-04:00",
+      "time_span_days": 27.578592354479166,
+      "expected_hours": 662,
+      "actual_hours_with_data": 207,
+      "hourly_coverage_pct": 31.268882175226587,
+      "daily_coverage_days": 11,
+      "gaps": [
+        {
+          "start": "2026-07-17T19:00:00-04:00",
+          "end": "2026-08-05T19:00:00-04:00",
+          "duration_hours": 456,
+          "severity": "critical"
+        }
+      ],
+      "total_gap_hours": 456,
+      "partial_periods": [],
+      "hourly_avg_records": 474.65,
+      "data_quality": "degraded"
+    },
+    "victoria_logs": {
+      "error": "No valid timestamp records found",
+      "file_path": "./logs/whisper-stt-30day-victorialogs.jsonl",
+      "dataset_name": "whisper-stt-victoria-logs",
+      "total_lines": 98252
+    },
+    "total_records": 98257,
+    "data_sources": [
+      "csv",
+      "main_logs",
+      "victoria_logs"
+    ]
+  }
+}

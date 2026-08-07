@@ -292,8 +292,8 @@
           "minimum": 30,
           "description": "Number of days covered by the deployment data. Must be at least 30 for completeness validation.",
           "errorMessage": {
-            "minimum": "Period coverage is {actual} days but must be at least 30 days for completeness validation. Extend the analysis period from '{data_period_start}' to '{data_period_end}' to ensure at least 30 days of coverage.",
-            "type": "Period coverage days must be an integer value representing the total days covered by deployment data."
+            "minimum": "Period coverage is only {actual} days. Required minimum: 30 days for completeness validation. SHORTFALL: {30 - actual} days. ACTION: Extend the data collection period from '{data_period_start}' to '{data_period_end}' by at least {30 - actual} more days, or expand the analysis period to cover a full 30-day window.",
+            "type": "Period coverage days must be an integer value representing the total days covered by deployment data. Current value: '{actual}' is invalid type."
           },
           "examples": [30, 31, 35]
         },
@@ -302,8 +302,8 @@
           "pattern": "^(100|[1-9]?[0-9])%$",
           "description": "Percentage of the 30-day period with deployment data coverage. For completeness validation, this should be 100% or meet the minimum threshold (default 95%).",
           "errorMessage": {
-            "pattern": "Data coverage percentage must be in format 'XX%' (e.g., '95%', '100%'). Current value: '{actual}'. Expected format: '100%', '95%', '87%', etc.",
-            "type": "Data coverage percent must be a string value like '95%' or '100%'."
+            "pattern": "Invalid data coverage percentage format: '{actual}'. REQUIRED FORMAT: 'XX%' with % symbol (e.g., '95%', '100%', '87%'). CURRENT VALUE: '{actual}' does not match pattern. ACTION: Provide coverage as a percentage string from '0%' to '100%' ending with % symbol.",
+            "type": "Data coverage percent must be a string value like '95%' or '100%'. Current type: {actual}."
           },
           "examples": ["100%", "95%", "87%"]
         },
@@ -311,16 +311,16 @@
           "type": "boolean",
           "description": "Whether data gaps were detected in the 30-day period. For completeness validation, this should be false.",
           "errorMessage": {
-            "type": "Gaps detected must be a boolean value (true/false). Current: '{actual}'.",
-            "custom": "Data gaps detected in deployment coverage. Check gap_details array for specific missing periods. Critical gaps (>7 days) indicate incomplete deployment history."
+            "type": "Gaps detected must be a boolean value (true/false). Current value: '{actual}' is invalid type. ACTION: Provide a boolean value: 'true' if gaps exist, 'false' if coverage is complete.",
+            "custom": "GAPS DETECTED: Data gaps found in deployment coverage. SEVERITY: See gap_details array. CRITICAL GAPS: >7 days prevent completeness validation. WARNING GAPS: 3-7 days indicate partial coverage. ACTION: Review gap_details array for specific missing periods (gap_start_days_ago, gap_end_days_ago, gap_duration_days). Fill missing deployment data or extend data collection period."
           }
         },
         "gap_details": {
           "type": "array",
           "description": "List of gaps detected in the deployment data. For completeness validation, this array should be empty or only contain gaps <3 days. Each gap includes start, end, duration, severity, and affected data types.",
           "errorMessage": {
-            "type": "Gap details must be an array of gap objects, even if empty.",
-            "custom": "Data gaps detected in coverage period. Review each gap entry for duration (gap_duration_days), severity (critical: >7 days, warning: 3-7 days, info: <3 days), and missing data types. Critical gaps prevent completeness validation."
+            "type": "Gap details must be an array of gap objects, even if empty. Current type: '{actual}'. ACTION: Provide an array (e.g., []) of gap objects with structure: {gap_start_days_ago, gap_end_days_ago, gap_duration_days, severity, missing_data_types}.",
+            "custom": "DATA GAPS FOUND: {length} gap(s) detected in coverage period. REVIEW REQUIRED: Each gap entry specifies duration (gap_duration_days), severity (critical: >7 days, warning: 3-7 days, info: <3 days), and missing data types. CRITICAL GAPS: Gaps >7 days prevent completeness validation. ACTION: 1) Identify missing periods from gap_details, 2) Collect missing deployment data for those periods, 3) Re-run completeness validation, or 4) Document why gaps are acceptable (e.g., service decommissioned)."
           },
           "items": {
             "type": "object",
@@ -331,8 +331,8 @@
                 "minimum": 0,
                 "description": "Days ago when the gap started (relative to data_period_end)",
                 "errorMessage": {
-                  "minimum": "Gap start days ago cannot be negative. Current: '{actual}'. Expected: 0 or more days ago.",
-                  "type": "Gap start days ago must be an integer relative to the analysis period end."
+                  "minimum": "INVALID GAP TIMING: gap_start_days_ago cannot be negative. CURRENT VALUE: '{actual}' days ago. REQUIRED: 0 or more days ago (relative to data_period_end). INTERPRETATION: Negative values indicate gap starts in the future, which is impossible. ACTION: Check gap calculation logic - ensure gap_start_days_ago = (data_period_end - gap_start_date).days is always non-negative.",
+                  "type": "Gap start days ago must be an integer relative to the analysis period end. Current value: '{actual}' has invalid type. ACTION: Provide integer representing days ago when gap started (e.g., 25 means gap started 25 days before period end)."
                 }
               },
               "gap_end_days_ago": {
@@ -340,8 +340,8 @@
                 "minimum": 0,
                 "description": "Days ago when the gap ended (relative to data_period_end)",
                 "errorMessage": {
-                  "minimum": "Gap end days ago cannot be negative. Current: '{actual}'. Expected: 0 or more days ago.",
-                  "type": "Gap end days ago must be an integer relative to the analysis period end."
+                  "minimum": "INVALID GAP TIMING: gap_end_days_ago cannot be negative. CURRENT VALUE: '{actual}' days ago. REQUIRED: 0 or more days ago (relative to data_period_end). INTERPRETATION: Negative values indicate gap ends in the future, which is impossible. ACTION: Verify gap_end_days_ago = (data_period_end - gap_end_date).days calculation produces non-negative result.",
+                  "type": "Gap end days ago must be an integer relative to the analysis period end. Current value: '{actual}' has invalid type. ACTION: Provide integer representing days ago when gap ended (e.g., 20 means gap ended 20 days before period end)."
                 }
               },
               "gap_duration_days": {
@@ -349,8 +349,8 @@
                 "minimum": 1,
                 "description": "Duration of the gap in days",
                 "errorMessage": {
-                  "minimum": "Gap duration must be at least 1 day. Current: '{actual}'. Gaps of 0 days should not be recorded.",
-                  "type": "Gap duration must be an integer representing days in the gap."
+                  "minimum": "INVALID GAP DURATION: gap_duration_days must be at least 1 day. CURRENT VALUE: '{actual}' days. REQUIRED: Minimum 1 day (gaps of 0 days should not be recorded as gaps). INTERPRETATION: 0-day gaps indicate no actual missing data. ACTION: Either remove this gap entry from gap_details (if no actual gap exists) or verify gap calculation: gap_duration_days = (gap_end_date - gap_start_date).days must be >= 1.",
+                  "type": "Gap duration must be an integer representing days in the gap. Current value: '{actual}' has invalid type. ACTION: Provide integer >= 1 representing the number of days in this gap."
                 }
               },
               "severity": {
@@ -358,8 +358,8 @@
                 "enum": ["critical", "warning", "info"],
                 "description": "Gap severity level based on duration. Critical: >7 days, Warning: 3-7 days, Info: <3 days",
                 "errorMessage": {
-                  "enum": "Severity must be one of: 'critical' (>7 days), 'warning' (3-7 days), or 'info' (<3 days). Current: '{actual}'.",
-                  "type": "Severity must be a string value."
+                  "enum": "INVALID SEVERITY LEVEL: Severity must be one of: 'critical', 'warning', or 'info'. CURRENT VALUE: '{actual}'. SEVERITY CLASSIFICATION: 'critical' = gap >7 days (prevents completeness validation), 'warning' = gap 3-7 days (partial coverage concern), 'info' = gap <3 days (minor gap, often acceptable). ACTION: Map gap_duration_days to correct severity: if gap_duration_days > 7 → 'critical', if 3 <= gap_duration_days <= 7 → 'warning', if gap_duration_days < 3 → 'info'.",
+                  "type": "Severity must be a string value. Current value: '{actual}' has invalid type. ACTION: Provide string value: 'critical', 'warning', or 'info' based on gap duration."
                 }
               },
               "missing_data_types": {
@@ -377,8 +377,8 @@
           "type": "boolean",
           "description": "Whether the deployment data meets the minimum completeness threshold (default: 95% coverage for 30-day period). For completeness validation, this should be true.",
           "errorMessage": {
-            "type": "Completeness threshold must be a boolean value (true/false). Current: '{actual}'.",
-            "custom": "Completeness threshold not met. Coverage: {data_coverage_percent} (required: {completeness_threshold_percent}). Action: Extend data collection period, fill missing deployment data, or adjust threshold if appropriate."
+            "type": "Completeness threshold must be a boolean value (true/false). Current value: '{actual}' is invalid type. ACTION: Provide boolean: 'true' if coverage meets threshold, 'false' if below threshold.",
+            "custom": "COMPLETENESS THRESHOLD NOT MET: Deployment data fails minimum coverage requirements. COVERAGE: {data_coverage_percent} actual vs {completeness_threshold_percent} required. SHORTFALL: Calculate missing percentage gap. ROOT CAUSES: 1) Data gaps in replica_history (see gap_details), 2) Insufficient period length (<30 days), 3) Missing deployment events. ACTIONS: 1) Extend data collection period to cover full 30-day window, 2) Fill missing deployment data from gap_details periods, 3) Verify replica_history has no gaps >7 days, 4) Consider adjusting completeness_threshold_percent if current threshold is too strict for this use case."
           }
         },
         "completeness_threshold_percent": {
@@ -387,8 +387,8 @@
           "default": "95%",
           "description": "Minimum completeness threshold required for 30-day validation. Default is 95%, but can be set to 100% for strict validation.",
           "errorMessage": {
-            "pattern": "Completeness threshold must be in format 'XX%' (e.g., '95%', '100%'). Current: '{actual}'. Expected format: percentage string with % symbol.",
-            "type": "Completeness threshold must be a string percentage value."
+            "pattern": "INVALID THRESHOLD FORMAT: Completeness threshold must be in format 'XX%' with % symbol. CURRENT VALUE: '{actual}'. REQUIRED FORMAT: Percentage string from '0%' to '100%' ending with % (e.g., '95%', '100%', '80%'). COMMON THRESHOLDS: '95%' (default, allows 5% gaps), '100%' (strict, requires zero gaps), '90%' (lenient). ACTION: Update completeness_threshold_percent to match pattern '^(100|[1-9]?[0-9])%$'.",
+            "type": "Completeness threshold must be a string percentage value. Current value: '{actual}' has invalid type. ACTION: Provide string like '95%' or '100%' with % symbol."
           },
           "examples": ["95%", "100%"]
         },
@@ -416,8 +416,8 @@
           "type": "boolean",
           "description": "Whether the minimum deployment days threshold is met. For completeness validation, this should be true.",
           "errorMessage": {
-            "type": "Deployment days threshold must be a boolean value (true/false). Current: '{actual}'.",
-            "custom": "Deployment days threshold not met. Actual: {actual_deployment_days} days (required: {minimum_deployment_days} days). Action: Verify deployment activity in the analysis period or adjust minimum_deployment_days threshold if appropriate."
+            "type": "Deployment days threshold must be a boolean value (true/false). Current value: '{actual}' is invalid type. ACTION: Provide boolean: 'true' if deployment days meet minimum, 'false' if below minimum.",
+            "custom": "DEPLOYMENT DAYS THRESHOLD NOT MET: Insufficient deployment activity in analysis period. ACTUAL DEPLOYMENT DAYS: {actual_deployment_days} distinct days with deployments vs REQUIRED MINIMUM: {minimum_deployment_days} days. SHORTFALL: {minimum_deployment_days - actual_deployment_days} deployment days missing. ROOT CAUSES: 1) New deployment with limited history, 2) Deployment paused during analysis period, 3) Insufficient replica_history coverage. ACTIONS: 1) Verify replica_history captures all deployment events, 2) Check deployment occurred on distinct days (not same day multiple times), 3) Extend analysis period to capture more deployment activity, 4) Adjust minimum_deployment_days if deployment frequency is lower than expected for this service."
           }
         }
       }

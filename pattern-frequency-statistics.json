@@ -1,0 +1,266 @@
+{
+  "generated_at": "2026-08-07T07:39:01.483098Z",
+  "total_categorized_failures": 1442,
+  "categories": {
+    "DependencyTimeout": {
+      "total_count": 12,
+      "service_distribution": {
+        "pbx-web-parsed": 12
+      },
+      "image_distribution": {},
+      "version_distribution": {},
+      "daily_distribution": {
+        "2026-07-28": 4,
+        "2026-08-04": 4,
+        "2026-08-05": 4
+      },
+      "time_span": {
+        "start": "2026-07-28",
+        "end": "2026-08-05",
+        "days": 3
+      },
+      "examples": [
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T20:23:24.870819612-04:00",
+          "day": "2026-07-28",
+          "error_type": "connection_reset",
+          "message": "2026-07-28T20:23:24.870819612-04:00 [pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T20:23:24.872445550-04:00",
+          "day": "2026-07-28",
+          "error_type": "connection_reset",
+          "message": "2026-07-28T20:23:24.872445550-04:00 ConnectionResetError: [Errno 104] Connection reset by peer"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T22:58:58.425954166-04:00",
+          "day": "2026-07-28",
+          "error_type": "connection_reset",
+          "message": "2026-07-28T22:58:58.425954166-04:00 [pbx-web] recording fetch error for 1785285870.480/20260729-004430_19148734884_1785285870.480.wav: [Errno 104] Connection reset by peer"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T22:58:58.427820643-04:00",
+          "day": "2026-07-28",
+          "error_type": "connection_reset",
+          "message": "2026-07-28T22:58:58.427820643-04:00 ConnectionResetError: [Errno 104] Connection reset by peer"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-08-04T14:35:02.254776922-04:00",
+          "day": "2026-08-04",
+          "error_type": "connection_reset",
+          "message": "2026-08-04T14:35:02.254776922-04:00 [pbx-web] recording fetch error for 1785864705.535/20260804-173145_19142698463_1785864705.535.wav: [Errno 104] Connection reset by peer"
+        }
+      ]
+    },
+    "DeploymentRollback": {
+      "total_count": 1,
+      "service_distribution": {
+        "unknown": 1
+      },
+      "image_distribution": {
+        "ronaldraygun/pbx-web": 1
+      },
+      "version_distribution": {
+        "1.0.8": 1
+      },
+      "daily_distribution": {
+        "2026-07-13": 1
+      },
+      "time_span": {
+        "start": "2026-07-13",
+        "end": "2026-07-13",
+        "days": 1
+      },
+      "examples": [
+        {
+          "service": "unknown",
+          "image": "ronaldraygun/pbx-web",
+          "version": "1.0.8",
+          "timestamp": "2026-07-13T18:07:55Z",
+          "day": "2026-07-13",
+          "error_type": "unknown",
+          "message": "N/A"
+        }
+      ]
+    },
+    "HTTPError": {
+      "total_count": 1420,
+      "service_distribution": {
+        "pbx-web-parsed": 1420
+      },
+      "image_distribution": {},
+      "version_distribution": {},
+      "daily_distribution": {
+        "2026-07-28": 26,
+        "2026-07-29": 10,
+        "2026-07-30": 5,
+        "2026-07-31": 7,
+        "2026-08-03": 147,
+        "2026-08-04": 463,
+        "2026-08-05": 514,
+        "2026-08-06": 248
+      },
+      "time_span": {
+        "start": "2026-07-28",
+        "end": "2026-08-06",
+        "days": 8
+      },
+      "examples": [
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T13:36:40.095001455-04:00",
+          "day": "2026-07-28",
+          "error_type": "http_500",
+          "message": "2026-07-28T13:36:40.095001455-04:00 Output:       \"/var/www/calls/pagefind\""
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T13:36:40.095003346-04:00",
+          "day": "2026-07-28",
+          "error_type": "http_500",
+          "message": "2026-07-28T13:36:40.095003346-04:00"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T13:36:40.095005482-04:00",
+          "day": "2026-07-28",
+          "error_type": "http_500",
+          "message": "2026-07-28T13:36:40.095005482-04:00 [Walking source directory]"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T13:37:29.514105025-04:00",
+          "day": "2026-07-28",
+          "error_type": "http_502",
+          "message": "2026-07-28T13:37:29.514105025-04:00 [Building search indexes]"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T13:38:48.475450285-04:00",
+          "day": "2026-07-28",
+          "error_type": "http_502",
+          "message": "2026-07-28T13:38:48.475450285-04:00   Indexed 6967 words"
+        }
+      ]
+    },
+    "NetworkIssue": {
+      "total_count": 8,
+      "service_distribution": {
+        "pbx-web-parsed": 6,
+        "pbx-web": 2
+      },
+      "image_distribution": {},
+      "version_distribution": {},
+      "daily_distribution": {
+        "2026-07-28": 2,
+        "2026-08-04": 2,
+        "2026-08-05": 2,
+        "unknown": 2
+      },
+      "time_span": {
+        "start": "2026-07-28",
+        "end": "2026-08-05",
+        "days": 3
+      },
+      "examples": [
+        {
+          "service": "pbx-web",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "unknown",
+          "day": "unknown",
+          "error_type": "recording_fetch_errors",
+          "message": "N/A"
+        },
+        {
+          "service": "pbx-web",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "unknown",
+          "day": "unknown",
+          "error_type": "recording_fetch_errors",
+          "message": "N/A"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T20:23:24.872959658-04:00",
+          "day": "2026-07-28",
+          "error_type": "broken_pipe",
+          "message": "2026-07-28T20:23:24.872959658-04:00 BrokenPipeError: [Errno 32] Broken pipe"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T22:58:58.428619967-04:00",
+          "day": "2026-07-28",
+          "error_type": "broken_pipe",
+          "message": "2026-07-28T22:58:58.428619967-04:00 BrokenPipeError: [Errno 32] Broken pipe"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-08-04T14:35:02.257225307-04:00",
+          "day": "2026-08-04",
+          "error_type": "broken_pipe",
+          "message": "2026-08-04T14:35:02.257225307-04:00 BrokenPipeError: [Errno 32] Broken pipe"
+        }
+      ]
+    },
+    "RecordingFetchError": {
+      "total_count": 1,
+      "service_distribution": {
+        "pbx-web": 1
+      },
+      "image_distribution": {},
+      "version_distribution": {},
+      "daily_distribution": {
+        "unknown": 1
+      },
+      "time_span": {
+        "start": "unknown",
+        "end": "unknown",
+        "days": 0
+      },
+      "examples": [
+        {
+          "service": "pbx-web",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "unknown",
+          "day": "unknown",
+          "error_type": "http_server_errors",
+          "message": "N/A"
+        }
+      ]
+    }
+  }
+}

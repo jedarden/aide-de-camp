@@ -1,0 +1,114 @@
+{
+  "extraction_summary": {
+    "task": "Execute extraction on all sample files",
+    "completion_date": "2026-08-07T01:48:41",
+    "total_files_processed": 10,
+    "successful_extractions": 10,
+    "failed_extractions": 0,
+    "total_execution_time_seconds": 0.303264666,
+    "average_execution_time_seconds": 0.0303264666,
+    "results_file": "sample_extraction_results.log"
+  },
+  "files_processed": [
+    {
+      "file": "logs/whisper-stt-raw.jsonl",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.032107142,
+      "metadata": {
+        "size_bytes": 2856767,
+        "line_count": 83671,
+        "creation_timestamp": "2026-08-06T23:57:28.757170"
+      }
+    },
+    {
+      "file": "logs/pbx-web-victorialogs-raw.jsonl",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.065796666,
+      "metadata": {
+        "size_bytes": 78016640,
+        "line_count": 10000,
+        "creation_timestamp": "2026-08-06T12:53:04.393679"
+      }
+    },
+    {
+      "file": "logs/whisper-stt-30day.jsonl",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.018502502,
+      "metadata": {
+        "size_bytes": 213280,
+        "line_count": 1027,
+        "creation_timestamp": "2026-08-06T17:33:23.667207"
+      }
+    },
+    {
+      "file": "logs/pbx-web-parsed.jsonl",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.025370335,
+      "metadata": {
+        "size_bytes": 331282,
+        "line_count": 1438,
+        "creation_timestamp": "2026-08-06T16:50:33.263745"
+      }
+    },
+    {
+      "file": "logs/pbx-web-nginx.log",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.030811978,
+      "metadata": {
+        "size_bytes": 96000,
+        "line_count": 1000,
+        "creation_timestamp": "2026-08-06T12:29:24.092070"
+      }
+    },
+    {
+      "file": "logs/whisper-openai-raw.log",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.040534053,
+      "metadata": {
+        "size_bytes": 5573013,
+        "line_count": 96086,
+        "creation_timestamp": "2026-08-06T23:02:09.215310"
+      }
+    },
+    {
+      "file": "logs/pbx-web-site-generator.log",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.020814359,
+      "metadata": {
+        "size_bytes": 62833,
+        "line_count": 2761,
+        "creation_timestamp": "2026-08-06T12:29:24.092070"
+      }
+    },
+    {
+      "file": "logs/whisper-stt-deployment-describe.txt",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.023192394,
+      "metadata": {
+        "size_bytes": 7560,
+        "line_count": 164,
+        "creation_timestamp": "2026-08-06T17:30:56.859961"
+      }
+    },
+    {
+      "file": "logs/pbx-web-pods-describe.txt",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.024356454,
+      "metadata": {
+        "size_bytes": 11075,
+        "line_count": 259,
+        "creation_timestamp": "2026-08-06T12:51:35.370218"
+      }
+    },
+    {
+      "file": "logs/whisper-stt-pod-raw.log",
+      "status": "SUCCESS",
+      "execution_time_seconds": 0.021777379,
+      "metadata": {
+        "size_bytes": 0,
+        "line_count": 0,
+        "creation_timestamp": "2026-08-06T23:02:07.555317"
+      }
+    }
+  ]
+}

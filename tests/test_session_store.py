@@ -25,28 +25,18 @@ from src.session.store import SessionStore
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """An isolated SessionStore on a tmp DB (same code as production session.db)."""
-    db_path = tmp_path / "session.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
-
-@pytest.fixture
-async def session_id(store: SessionStore) -> str:
+async def session_id(test_db_store) -> str:
     """Create a test session and return its ID."""
-    return await store.create_session()
+    return await test_db_store.create_session()
 
 
 # --- topic creation tests ---------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_topic_basic(store: SessionStore, session_id: str) -> None:
+async def test_create_topic_basic(test_db_store, session_id: str) -> None:
     """Test basic topic creation with required fields."""
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Test Topic",
         topic_type="project",
         scope="session",
@@ -54,7 +44,7 @@ async def test_create_topic_basic(store: SessionStore, session_id: str) -> None:
     )
 
     # Verify topic was persisted
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert len(topics) == 1, f"Expected 1 topic, got {len(topics)}"
 
     topic = topics[0]
@@ -67,9 +57,9 @@ async def test_create_topic_basic(store: SessionStore, session_id: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_topic_with_project_slugs(store: SessionStore, session_id: str) -> None:
+async def test_create_topic_with_project_slugs(test_db_store, session_id: str) -> None:
     """Test topic creation with project slugs."""
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Multi-Project Topic",
         topic_type="project",
         project_slugs=["k8s", "monitoring", "logs"],
@@ -77,7 +67,7 @@ async def test_create_topic_with_project_slugs(store: SessionStore, session_id: 
         session_id=session_id
     )
 
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert len(topics) == 1
 
     topic = topics[0]
@@ -88,9 +78,9 @@ async def test_create_topic_with_project_slugs(store: SessionStore, session_id: 
 
 
 @pytest.mark.asyncio
-async def test_find_or_create_topic_creates_new(store: SessionStore, session_id: str) -> None:
+async def test_find_or_create_topic_creates_new(test_db_store, session_id: str) -> None:
     """Test find_or_create_topic creates new topic when none exists."""
-    topic_id, created = await store.find_or_create_topic(
+    topic_id, created = await test_db_store.find_or_create_topic(
         label="New Topic",
         session_id=session_id,
         topic_type="research",
@@ -102,17 +92,17 @@ async def test_find_or_create_topic_creates_new(store: SessionStore, session_id:
     assert len(topic_id) > 0, "Topic ID should not be empty"
 
     # Verify it was persisted
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert len(topics) == 1
     assert topics[0]["label"] == "New Topic"
     assert topics[0]["type"] == "research"
 
 
 @pytest.mark.asyncio
-async def test_find_or_create_topic_returns_existing(store: SessionStore, session_id: str) -> None:
+async def test_find_or_create_topic_returns_existing(test_db_store, session_id: str) -> None:
     """Test find_or_create_topic returns existing topic on duplicate call."""
     # Create initial topic
-    first_id, first_created = await store.find_or_create_topic(
+    first_id, first_created = await test_db_store.find_or_create_topic(
         label="Shared Topic",
         session_id=session_id,
         topic_type="personal"
@@ -120,7 +110,7 @@ async def test_find_or_create_topic_returns_existing(store: SessionStore, sessio
     assert first_created is True, "First call should create topic"
 
     # Call again with same label and session
-    second_id, second_created = await store.find_or_create_topic(
+    second_id, second_created = await test_db_store.find_or_create_topic(
         label="Shared Topic",
         session_id=session_id,
         topic_type="personal"
@@ -129,18 +119,18 @@ async def test_find_or_create_topic_returns_existing(store: SessionStore, sessio
     assert second_id == first_id, "Should return same topic ID"
 
     # Verify only one topic exists
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert len(topics) == 1, "Should not have created duplicate topic"
 
 
 @pytest.mark.asyncio
-async def test_find_or_create_topic_different_sessions(store: SessionStore) -> None:
+async def test_find_or_create_topic_different_sessions(test_db_store) -> None:
     """Test find_or_create_topic is scoped per session."""
-    session1 = await store.create_session()
-    session2 = await store.create_session()
+    session1 = await test_db_store.create_session()
+    session2 = await test_db_store.create_session()
 
     # Create topic in session1
-    topic1_id, created = await store.find_or_create_topic(
+    topic1_id, created = await test_db_store.find_or_create_topic(
         label="Cross-Session Label",
         session_id=session1,
         topic_type="project"
@@ -148,7 +138,7 @@ async def test_find_or_create_topic_different_sessions(store: SessionStore) -> N
     assert created is True
 
     # Same label in session2 should create different topic
-    topic2_id, created = await store.find_or_create_topic(
+    topic2_id, created = await test_db_store.find_or_create_topic(
         label="Cross-Session Label",
         session_id=session2,
         topic_type="project"
@@ -157,18 +147,18 @@ async def test_find_or_create_topic_different_sessions(store: SessionStore) -> N
     assert topic2_id != topic1_id, "Topics should have different IDs"
 
     # Verify each session has its own topic
-    topics1 = await store.get_active_topics(session1)
-    topics2 = await store.get_active_topics(session2)
+    topics1 = await test_db_store.get_active_topics(session1)
+    topics2 = await test_db_store.get_active_topics(session2)
     assert len(topics1) == 1
     assert len(topics2) == 1
     assert topics1[0]["id"] != topics2[0]["id"]
 
 
 @pytest.mark.asyncio
-async def test_find_or_create_topic_archived_excluded(store: SessionStore, session_id: str) -> None:
+async def test_find_or_create_topic_archived_excluded(test_db_store, session_id: str) -> None:
     """Test find_or_create_topic excludes archived topics."""
     # Create initial topic
-    topic_id, created = await store.find_or_create_topic(
+    topic_id, created = await test_db_store.find_or_create_topic(
         label="Archive Me",
         session_id=session_id,
         topic_type="project"
@@ -177,7 +167,7 @@ async def test_find_or_create_topic_archived_excluded(store: SessionStore, sessi
 
     # Manually archive the topic
     now = int(datetime.now().timestamp())
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(test_db_store.db_path) as db:
         await db.execute(
             "UPDATE topics SET archived_at = ? WHERE id = ?",
             (now, topic_id)
@@ -185,7 +175,7 @@ async def test_find_or_create_topic_archived_excluded(store: SessionStore, sessi
         await db.commit()
 
     # Should create new topic despite same label (old one is archived)
-    new_id, created = await store.find_or_create_topic(
+    new_id, created = await test_db_store.find_or_create_topic(
         label="Archive Me",
         session_id=session_id,
         topic_type="project"
@@ -198,89 +188,89 @@ async def test_find_or_create_topic_archived_excluded(store: SessionStore, sessi
 
 
 @pytest.mark.asyncio
-async def test_topic_type_project(store: SessionStore, session_id: str) -> None:
+async def test_topic_type_project(test_db_store, session_id: str) -> None:
     """Test topic type 'project' is stored correctly."""
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Project Topic",
         topic_type="project",
         scope="session",
         session_id=session_id
     )
 
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert topics[0]["type"] == "project"
 
 
 @pytest.mark.asyncio
-async def test_topic_type_research(store: SessionStore, session_id: str) -> None:
+async def test_topic_type_research(test_db_store, session_id: str) -> None:
     """Test topic type 'research' is stored correctly."""
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Research Topic",
         topic_type="research",
         scope="session",
         session_id=session_id
     )
 
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert topics[0]["type"] == "research"
 
 
 @pytest.mark.asyncio
-async def test_topic_type_personal(store: SessionStore, session_id: str) -> None:
+async def test_topic_type_personal(test_db_store, session_id: str) -> None:
     """Test topic type 'personal' is stored correctly."""
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Personal Topic",
         topic_type="personal",
         scope="session",
         session_id=session_id
     )
 
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert topics[0]["type"] == "personal"
 
 
 @pytest.mark.asyncio
-async def test_topic_type_exception(store: SessionStore, session_id: str) -> None:
+async def test_topic_type_exception(test_db_store, session_id: str) -> None:
     """Test topic type 'exception' is stored correctly."""
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Exception Topic",
         topic_type="exception",
         scope="session",
         session_id=session_id
     )
 
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert topics[0]["type"] == "exception"
 
 
 @pytest.mark.asyncio
-async def test_topic_type_compound(store: SessionStore, session_id: str) -> None:
+async def test_topic_type_compound(test_db_store, session_id: str) -> None:
     """Test topic type 'compound' is stored correctly."""
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Compound Topic",
         topic_type="compound",
         scope="session",
         session_id=session_id
     )
 
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert topics[0]["type"] == "compound"
 
 
 @pytest.mark.asyncio
-async def test_all_topic_types_valid(store: SessionStore, session_id: str) -> None:
+async def test_all_topic_types_valid(test_db_store, session_id: str) -> None:
     """Test all valid topic types can be created."""
     valid_types = ("project", "research", "personal", "exception", "compound")
 
     for topic_type in valid_types:
-        await store.create_topic(
+        await test_db_store.create_topic(
             label=f"{topic_type.capitalize()} Topic",
             topic_type=topic_type,
             scope="session",
             session_id=session_id
         )
 
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     assert len(topics) == len(valid_types)
 
     # Verify each type was stored correctly
@@ -292,9 +282,9 @@ async def test_all_topic_types_valid(store: SessionStore, session_id: str) -> No
 
 
 @pytest.mark.asyncio
-async def test_create_utterance_basic(store: SessionStore, session_id: str) -> None:
+async def test_create_utterance_basic(test_db_store, session_id: str) -> None:
     """Test basic utterance creation."""
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="hello world"
     )
@@ -303,7 +293,7 @@ async def test_create_utterance_basic(store: SessionStore, session_id: str) -> N
     assert len(utterance_id) > 0, "Utterance ID should not be empty"
 
     # Verify it was persisted
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(test_db_store.db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM utterances WHERE id = ?",
@@ -316,10 +306,10 @@ async def test_create_utterance_basic(store: SessionStore, session_id: str) -> N
 
 
 @pytest.mark.asyncio
-async def test_create_utterance_with_custom_id(store: SessionStore, session_id: str) -> None:
+async def test_create_utterance_with_custom_id(test_db_store, session_id: str) -> None:
     """Test utterance creation with custom ID."""
     custom_id = "custom-utterance-id"
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="test utterance",
         utterance_id=custom_id
@@ -328,7 +318,7 @@ async def test_create_utterance_with_custom_id(store: SessionStore, session_id: 
     assert utterance_id == custom_id, "Should use custom ID"
 
     # Verify it was persisted with custom ID
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(test_db_store.db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM utterances WHERE id = ?",
@@ -339,26 +329,26 @@ async def test_create_utterance_with_custom_id(store: SessionStore, session_id: 
 
 
 @pytest.mark.asyncio
-async def test_create_utterance_for_topic(store: SessionStore, session_id: str) -> None:
+async def test_create_utterance_for_topic(test_db_store, session_id: str) -> None:
     """Test utterance is persisted to the correct session/topic context."""
     # Create multiple sessions
     session1 = session_id
-    session2 = await store.create_session()
+    session2 = await test_db_store.create_session()
 
     # Create utterance in session1
-    utterance1_id = await store.create_utterance(
+    utterance1_id = await test_db_store.create_utterance(
         session_id=session1,
         raw_text="session1 message"
     )
 
     # Create utterance in session2
-    utterance2_id = await store.create_utterance(
+    utterance2_id = await test_db_store.create_utterance(
         session_id=session2,
         raw_text="session2 message"
     )
 
     # Verify utterances are in correct sessions
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(test_db_store.db_path) as db:
         db.row_factory = aiosqlite.Row
 
         # Check session1 utterance
@@ -381,18 +371,18 @@ async def test_create_utterance_for_topic(store: SessionStore, session_id: str) 
 
 
 @pytest.mark.asyncio
-async def test_create_multiple_utterances(store: SessionStore, session_id: str) -> None:
+async def test_create_multiple_utterances(test_db_store, session_id: str) -> None:
     """Test creating multiple utterances in a session."""
     utterances = []
     for i in range(5):
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text=f"message {i}"
         )
         utterances.append(utterance_id)
 
     # Verify all were persisted
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(test_db_store.db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM utterances WHERE session_id = ?",
@@ -406,21 +396,21 @@ async def test_create_multiple_utterances(store: SessionStore, session_id: str) 
 
 
 @pytest.mark.asyncio
-async def test_independent_session_isolation(store: SessionStore) -> None:
+async def test_independent_session_isolation(test_db_store) -> None:
     """Test that session.store operations work independently across sessions."""
     # Create two independent sessions
-    session1 = await store.create_session()
-    session2 = await store.create_session()
+    session1 = await test_db_store.create_session()
+    session2 = await test_db_store.create_session()
 
     # Create topics in each session
-    topic1_id = await store.create_topic(
+    topic1_id = await test_db_store.create_topic(
         label="Session1 Topic",
         topic_type="project",
         scope="session",
         session_id=session1
     )
 
-    topic2_id = await store.create_topic(
+    topic2_id = await test_db_store.create_topic(
         label="Session2 Topic",
         topic_type="research",
         scope="session",
@@ -428,29 +418,29 @@ async def test_independent_session_isolation(store: SessionStore) -> None:
     )
 
     # Create utterances in each session
-    utterance1_id = await store.create_utterance(
+    utterance1_id = await test_db_store.create_utterance(
         session_id=session1,
         raw_text="session1 utterance"
     )
 
-    utterance2_id = await store.create_utterance(
+    utterance2_id = await test_db_store.create_utterance(
         session_id=session2,
         raw_text="session2 utterance"
     )
 
     # Verify session isolation
     # Session1 should only see its own data
-    topics1 = await store.get_active_topics(session1)
+    topics1 = await test_db_store.get_active_topics(session1)
     assert len(topics1) == 1, "Session1 should have 1 topic"
     assert topics1[0]["id"] == topic1_id
 
     # Session2 should only see its own data
-    topics2 = await store.get_active_topics(session2)
+    topics2 = await test_db_store.get_active_topics(session2)
     assert len(topics2) == 1, "Session2 should have 1 topic"
     assert topics2[0]["id"] == topic2_id
 
     # Verify utterances are isolated
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(test_db_store.db_path) as db:
         db.row_factory = aiosqlite.Row
 
         # Session1 utterance
@@ -471,20 +461,20 @@ async def test_independent_session_isolation(store: SessionStore) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_session_does_not_affect_other_sessions(store: SessionStore) -> None:
+async def test_delete_session_does_not_affect_other_sessions(test_db_store) -> None:
     """Test deleting one session doesn't affect other sessions."""
-    session1 = await store.create_session()
-    session2 = await store.create_session()
+    session1 = await test_db_store.create_session()
+    session2 = await test_db_store.create_session()
 
     # Create data in both sessions
-    topic1_id = await store.create_topic(
+    topic1_id = await test_db_store.create_topic(
         label="Session1 Topic",
         topic_type="project",
         scope="session",
         session_id=session1
     )
 
-    topic2_id = await store.create_topic(
+    topic2_id = await test_db_store.create_topic(
         label="Session2 Topic",
         topic_type="project",
         scope="session",
@@ -492,12 +482,12 @@ async def test_delete_session_does_not_affect_other_sessions(store: SessionStore
     )
 
     # Delete session1
-    result = await store.delete_session(session1)
+    result = await test_db_store.delete_session(session1)
     assert result["session_removed"] == 1
     assert result["topics_removed"] == 1
 
     # Session2 should still have its topic
-    topics2 = await store.get_active_topics(session2)
+    topics2 = await test_db_store.get_active_topics(session2)
     assert len(topics2) == 1, "Session2 should still have its topic"
     assert topics2[0]["id"] == topic2_id
 
@@ -511,17 +501,17 @@ from datetime import datetime  # noqa: E402 (needed for archived test)
 
 
 @pytest.mark.asyncio
-async def test_delete_result_basic(store: SessionStore, session_id: str) -> None:
+async def test_delete_result_basic(test_db_store, session_id: str) -> None:
     """Test basic result deletion by ID."""
     # Create a topic and result
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Dismiss Test Topic",
         topic_type="project",
         scope="session",
         session_id=session_id
     )
 
-    result_id = await store.create_result(
+    result_id = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic_id,
         session_id=session_id,
@@ -531,36 +521,36 @@ async def test_delete_result_basic(store: SessionStore, session_id: str) -> None
     )
 
     # Verify result exists
-    result_before = await store.get_latest_result_for_topic(topic_id)
+    result_before = await test_db_store.get_latest_result_for_topic(topic_id)
     assert result_before is not None
     assert result_before["id"] == result_id
 
     # Delete the result
-    delete_response = await store.delete_result(result_id, session_id)
+    delete_response = await test_db_store.delete_result(result_id, session_id)
     assert delete_response["result_deleted"] == 1
 
     # Verify result is gone
-    result_after = await store.get_latest_result_for_topic(topic_id)
+    result_after = await test_db_store.get_latest_result_for_topic(topic_id)
     assert result_after is None
 
 
 @pytest.mark.asyncio
-async def test_delete_stuck_card_from_results(store: SessionStore, session_id: str) -> None:
+async def test_delete_stuck_card_from_results(test_db_store, session_id: str) -> None:
     """Test stuck card removal from results (bead adc-cmzj5)."""
     # Create topic, utterance, and intent for stuck card
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Stuck Card Test",
         topic_type="exception",
         scope="session",
         session_id=session_id
     )
 
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="test stuck task"
     )
 
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -571,14 +561,14 @@ async def test_delete_stuck_card_from_results(store: SessionStore, session_id: s
     )
 
     # Update intent to stuck status
-    await store.update_intent_type_and_status(
+    await test_db_store.update_intent_type_and_status(
         intent_id=intent_id,
         intent_type="stuck",
         status="stuck"
     )
 
     # Create stuck card result
-    stuck_result_id = await store.create_result(
+    stuck_result_id = await test_db_store.create_result(
         intent_id=intent_id,
         topic_id=topic_id,
         session_id=session_id,
@@ -594,7 +584,7 @@ async def test_delete_stuck_card_from_results(store: SessionStore, session_id: s
     )
 
     # Verify stuck card exists
-    stuck_result_before = await store.get_latest_result_for_topic(topic_id)
+    stuck_result_before = await test_db_store.get_latest_result_for_topic(topic_id)
     assert stuck_result_before is not None
     assert stuck_result_before["id"] == stuck_result_id
     assert stuck_result_before["summary"] == "Task stuck — needs your input"
@@ -603,36 +593,36 @@ async def test_delete_stuck_card_from_results(store: SessionStore, session_id: s
     assert result_data["refusal_count"] == 3
 
     # Delete stuck card
-    delete_response = await store.delete_result(stuck_result_id, session_id)
+    delete_response = await test_db_store.delete_result(stuck_result_id, session_id)
     assert delete_response["result_deleted"] == 1
 
     # Verify stuck card is removed
-    stuck_result_after = await store.get_latest_result_for_topic(topic_id)
+    stuck_result_after = await test_db_store.get_latest_result_for_topic(topic_id)
     assert stuck_result_after is None
 
     # Verify intent still exists (deleting result doesn't delete intent)
-    intent = await store.get_intent(intent_id)
+    intent = await test_db_store.get_intent(intent_id)
     assert intent is not None
     assert intent["status"] == "stuck"
 
 
 @pytest.mark.asyncio
-async def test_delete_failed_card_from_results(store: SessionStore, session_id: str) -> None:
+async def test_delete_failed_card_from_results(test_db_store, session_id: str) -> None:
     """Test failed card removal from results (bead adc-cmzj5)."""
     # Create topic, utterance, and intent for failed card
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Failed Card Test",
         topic_type="exception",
         scope="session",
         session_id=session_id
     )
 
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="test failed task"
     )
 
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -643,10 +633,10 @@ async def test_delete_failed_card_from_results(store: SessionStore, session_id: 
     )
 
     # Update intent to failed status
-    await store.update_intent_status(intent_id=intent_id, status="failed")
+    await test_db_store.update_intent_status(intent_id=intent_id, status="failed")
 
     # Create failed card result
-    failed_result_id = await store.create_result(
+    failed_result_id = await test_db_store.create_result(
         intent_id=intent_id,
         topic_id=topic_id,
         session_id=session_id,
@@ -662,7 +652,7 @@ async def test_delete_failed_card_from_results(store: SessionStore, session_id: 
     )
 
     # Verify failed card exists
-    failed_result_before = await store.get_latest_result_for_topic(topic_id)
+    failed_result_before = await test_db_store.get_latest_result_for_topic(topic_id)
     assert failed_result_before is not None
     assert failed_result_before["id"] == failed_result_id
     assert failed_result_before["summary"] == "Task Failed: Worker Crash"
@@ -671,36 +661,36 @@ async def test_delete_failed_card_from_results(store: SessionStore, session_id: 
     assert result_data["error_type"] == "worker_crash"
 
     # Delete failed card
-    delete_response = await store.delete_result(failed_result_id, session_id)
+    delete_response = await test_db_store.delete_result(failed_result_id, session_id)
     assert delete_response["result_deleted"] == 1
 
     # Verify failed card is removed
-    failed_result_after = await store.get_latest_result_for_topic(topic_id)
+    failed_result_after = await test_db_store.get_latest_result_for_topic(topic_id)
     assert failed_result_after is None
 
     # Verify intent still exists
-    intent = await store.get_intent(intent_id)
+    intent = await test_db_store.get_intent(intent_id)
     assert intent is not None
     assert intent["status"] == "failed"
 
 
 @pytest.mark.asyncio
-async def test_delete_result_data_integrity_before_after(store: SessionStore, session_id: str) -> None:
+async def test_delete_result_data_integrity_before_after(test_db_store, session_id: str) -> None:
     """Test result data integrity before and after dismissal (bead adc-cmzj5)."""
     # Create multiple results for a topic
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Integrity Test Topic",
         topic_type="project",
         scope="session",
         session_id=session_id
     )
 
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="integrity test"
     )
 
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="test",
@@ -710,7 +700,7 @@ async def test_delete_result_data_integrity_before_after(store: SessionStore, se
     )
 
     # Create first result
-    result1_id = await store.create_result(
+    result1_id = await test_db_store.create_result(
         intent_id=intent_id,
         topic_id=topic_id,
         session_id=session_id,
@@ -720,7 +710,7 @@ async def test_delete_result_data_integrity_before_after(store: SessionStore, se
     )
 
     # Create second result
-    result2_id = await store.create_result(
+    result2_id = await test_db_store.create_result(
         intent_id=intent_id,
         topic_id=topic_id,
         session_id=session_id,
@@ -730,11 +720,11 @@ async def test_delete_result_data_integrity_before_after(store: SessionStore, se
     )
 
     # Verify both results exist via intent query
-    results_for_intent = await store.get_results_for_intent(intent_id)
+    results_for_intent = await test_db_store.get_results_for_intent(intent_id)
     assert len(results_for_intent) == 2
 
     # Get the latest result (whichever one it is)
-    latest_result = await store.get_latest_result_for_topic(topic_id)
+    latest_result = await test_db_store.get_latest_result_for_topic(topic_id)
     assert latest_result is not None
     latest_result_id_before = latest_result["id"]
 
@@ -746,17 +736,17 @@ async def test_delete_result_data_integrity_before_after(store: SessionStore, se
     remaining_status = "active" if result_to_delete == result2_id else "pending"
 
     # Delete the latest result
-    delete_response = await store.delete_result(result_to_delete, session_id)
+    delete_response = await test_db_store.delete_result(result_to_delete, session_id)
     assert delete_response["result_deleted"] == 1
 
     # Verify data integrity: only one result remains
-    results_after = await store.get_results_for_intent(intent_id)
+    results_after = await test_db_store.get_results_for_intent(intent_id)
     assert len(results_after) == 1
     assert results_after[0]["id"] == remaining_result_id
     assert results_after[0]["summary"] == remaining_summary
 
     # Verify latest result is now the remaining one
-    latest_after = await store.get_latest_result_for_topic(topic_id)
+    latest_after = await test_db_store.get_latest_result_for_topic(topic_id)
     assert latest_after is not None
     assert latest_after["id"] == remaining_result_id
     assert latest_after["summary"] == remaining_summary
@@ -768,21 +758,21 @@ async def test_delete_result_data_integrity_before_after(store: SessionStore, se
 
 
 @pytest.mark.asyncio
-async def test_delete_result_session_scoping(store: SessionStore) -> None:
+async def test_delete_result_session_scoping(test_db_store) -> None:
     """Test delete_result is scoped to session (security check, bead adc-cmzj5)."""
     # Create two sessions
-    session1 = await store.create_session()
-    session2 = await store.create_session()
+    session1 = await test_db_store.create_session()
+    session2 = await test_db_store.create_session()
 
     # Create topics in both sessions
-    topic1_id = await store.create_topic(
+    topic1_id = await test_db_store.create_topic(
         label="Session1 Topic",
         topic_type="project",
         scope="session",
         session_id=session1
     )
 
-    topic2_id = await store.create_topic(
+    topic2_id = await test_db_store.create_topic(
         label="Session2 Topic",
         topic_type="project",
         scope="session",
@@ -790,7 +780,7 @@ async def test_delete_result_session_scoping(store: SessionStore) -> None:
     )
 
     # Create results in both sessions
-    result1_id = await store.create_result(
+    result1_id = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic1_id,
         session_id=session1,
@@ -799,7 +789,7 @@ async def test_delete_result_session_scoping(store: SessionStore) -> None:
         urgency="normal"
     )
 
-    result2_id = await store.create_result(
+    result2_id = await test_db_store.create_result(
         intent_id=None,
         topic_id=topic2_id,
         session_id=session2,
@@ -809,54 +799,54 @@ async def test_delete_result_session_scoping(store: SessionStore) -> None:
     )
 
     # Verify both results exist
-    result1 = await store.get_latest_result_for_topic(topic1_id)
-    result2 = await store.get_latest_result_for_topic(topic2_id)
+    result1 = await test_db_store.get_latest_result_for_topic(topic1_id)
+    result2 = await test_db_store.get_latest_result_for_topic(topic2_id)
     assert result1 is not None
     assert result2 is not None
 
     # Try to delete session2's result using session1 credentials (should fail)
-    delete_response = await store.delete_result(result2_id, session1)
+    delete_response = await test_db_store.delete_result(result2_id, session1)
     assert delete_response["result_deleted"] == 0  # Not deleted, wrong session
 
     # Verify session2's result still exists
-    result2_after = await store.get_latest_result_for_topic(topic2_id)
+    result2_after = await test_db_store.get_latest_result_for_topic(topic2_id)
     assert result2_after is not None
     assert result2_after["id"] == result2_id
 
     # Delete session1's result using session1 credentials (should succeed)
-    delete_response = await store.delete_result(result1_id, session1)
+    delete_response = await test_db_store.delete_result(result1_id, session1)
     assert delete_response["result_deleted"] == 1
 
     # Verify session1's result is gone
-    result1_after = await store.get_latest_result_for_topic(topic1_id)
+    result1_after = await test_db_store.get_latest_result_for_topic(topic1_id)
     assert result1_after is None
 
 
 @pytest.mark.asyncio
-async def test_delete_result_returns_zero_for_nonexistent(store: SessionStore, session_id: str) -> None:
+async def test_delete_result_returns_zero_for_nonexistent(test_db_store, session_id: str) -> None:
     """Test delete_result returns 0 for nonexistent result (bead adc-cmzj5)."""
     # Try to delete a result that doesn't exist
     fake_result_id = "nonexistent-result-id"
-    delete_response = await store.delete_result(fake_result_id, session_id)
+    delete_response = await test_db_store.delete_result(fake_result_id, session_id)
     assert delete_response["result_deleted"] == 0
 
 
 @pytest.mark.asyncio
-async def test_delete_multiple_results_from_topic(store: SessionStore, session_id: str) -> None:
+async def test_delete_multiple_results_from_topic(test_db_store, session_id: str) -> None:
     """Test deleting multiple results from a topic (bead adc-cmzj5)."""
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Multi-dismiss Topic",
         topic_type="project",
         scope="session",
         session_id=session_id
     )
 
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="multiple results test"
     )
 
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="test",
@@ -868,7 +858,7 @@ async def test_delete_multiple_results_from_topic(store: SessionStore, session_i
     # Create multiple results
     result_ids = []
     for i in range(3):
-        result_id = await store.create_result(
+        result_id = await test_db_store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -879,41 +869,41 @@ async def test_delete_multiple_results_from_topic(store: SessionStore, session_i
         result_ids.append(result_id)
 
     # Verify all 3 results exist
-    results = await store.get_results_for_intent(intent_id)
+    results = await test_db_store.get_results_for_intent(intent_id)
     assert len(results) == 3
 
     # Delete results one by one
     for result_id in result_ids:
-        delete_response = await store.delete_result(result_id, session_id)
+        delete_response = await test_db_store.delete_result(result_id, session_id)
         assert delete_response["result_deleted"] == 1
 
     # Verify all results are gone
-    results_final = await store.get_results_for_intent(intent_id)
+    results_final = await test_db_store.get_results_for_intent(intent_id)
     assert len(results_final) == 0
 
     # Verify topic still exists
-    topics = await store.get_active_topics(session_id)
+    topics = await test_db_store.get_active_topics(session_id)
     topic = next((t for t in topics if t["id"] == topic_id), None)
     assert topic is not None
 
 
 @pytest.mark.asyncio
-async def test_get_all_results_includes_dismissable_cards(store: SessionStore, session_id: str) -> None:
+async def test_get_all_results_includes_dismissable_cards(test_db_store, session_id: str) -> None:
     """Test get_all_results includes stuck and failed cards (bead adc-cmzj5)."""
     # Create stuck card
-    stuck_topic = await store.create_topic(
+    stuck_topic = await test_db_store.create_topic(
         label="Stuck Topic",
         topic_type="exception",
         scope="session",
         session_id=session_id
     )
 
-    stuck_utterance = await store.create_utterance(
+    stuck_utterance = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="stuck test"
     )
 
-    stuck_intent = await store.create_intent(
+    stuck_intent = await test_db_store.create_intent(
         utterance_id=stuck_utterance,
         session_id=session_id,
         project_slug="adc",
@@ -923,13 +913,13 @@ async def test_get_all_results_includes_dismissable_cards(store: SessionStore, s
         topic_id=stuck_topic
     )
 
-    await store.update_intent_type_and_status(
+    await test_db_store.update_intent_type_and_status(
         intent_id=stuck_intent,
         intent_type="stuck",
         status="stuck"
     )
 
-    stuck_result_id = await store.create_result(
+    stuck_result_id = await test_db_store.create_result(
         intent_id=stuck_intent,
         topic_id=stuck_topic,
         session_id=session_id,
@@ -939,19 +929,19 @@ async def test_get_all_results_includes_dismissable_cards(store: SessionStore, s
     )
 
     # Create failed card
-    failed_topic = await store.create_topic(
+    failed_topic = await test_db_store.create_topic(
         label="Failed Topic",
         topic_type="exception",
         scope="session",
         session_id=session_id
     )
 
-    failed_utterance = await store.create_utterance(
+    failed_utterance = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="failed test"
     )
 
-    failed_intent = await store.create_intent(
+    failed_intent = await test_db_store.create_intent(
         utterance_id=failed_utterance,
         session_id=session_id,
         project_slug="adc",
@@ -961,9 +951,9 @@ async def test_get_all_results_includes_dismissable_cards(store: SessionStore, s
         topic_id=failed_topic
     )
 
-    await store.update_intent_status(intent_id=failed_intent, status="failed")
+    await test_db_store.update_intent_status(intent_id=failed_intent, status="failed")
 
-    failed_result_id = await store.create_result(
+    failed_result_id = await test_db_store.create_result(
         intent_id=failed_intent,
         topic_id=failed_topic,
         session_id=session_id,
@@ -973,34 +963,34 @@ async def test_get_all_results_includes_dismissable_cards(store: SessionStore, s
     )
 
     # Verify get_all_results includes both cards
-    all_results = await store.get_all_results()
+    all_results = await test_db_store.get_all_results()
     result_ids = [r["id"] for r in all_results]
     assert stuck_result_id in result_ids
     assert failed_result_id in result_ids
 
     # Delete stuck card
-    await store.delete_result(stuck_result_id, session_id)
+    await test_db_store.delete_result(stuck_result_id, session_id)
 
     # Verify stuck card is removed from all_results
-    all_results_after = await store.get_all_results()
+    all_results_after = await test_db_store.get_all_results()
     result_ids_after = [r["id"] for r in all_results_after]
     assert stuck_result_id not in result_ids_after
     assert failed_result_id in result_ids_after
 
     # Delete failed card
-    await store.delete_result(failed_result_id, session_id)
+    await test_db_store.delete_result(failed_result_id, session_id)
 
     # Verify failed card is also removed
-    all_results_final = await store.get_all_results()
+    all_results_final = await test_db_store.get_all_results()
     result_ids_final = [r["id"] for r in all_results_final]
     assert failed_result_id not in result_ids_final
 
 
 @pytest.mark.asyncio
-async def test_get_topic_with_project_slugs(store: SessionStore) -> None:
+async def test_get_topic_with_project_slugs(test_db_store) -> None:
     """Test that get_topic correctly parses project_slugs from JSON."""
     # Create a topic with project_slugs
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Test Project",
         topic_type="project",
         project_slugs=["pbx-web", "whisper-stt"],
@@ -1009,7 +999,7 @@ async def test_get_topic_with_project_slugs(store: SessionStore) -> None:
     )
 
     # Fetch the topic using get_topic
-    topic = await store.get_topic(topic_id)
+    topic = await test_db_store.get_topic(topic_id)
 
     assert topic is not None
     assert topic["id"] == topic_id
@@ -1020,10 +1010,10 @@ async def test_get_topic_with_project_slugs(store: SessionStore) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_topic_without_project_slugs(store: SessionStore) -> None:
+async def test_get_topic_without_project_slugs(test_db_store) -> None:
     """Test that get_topic handles topics without project_slugs."""
     # Create a topic without project_slugs
-    topic_id = await store.create_topic(
+    topic_id = await test_db_store.create_topic(
         label="Test Topic",
         topic_type="personal",
         project_slugs=None,
@@ -1032,7 +1022,7 @@ async def test_get_topic_without_project_slugs(store: SessionStore) -> None:
     )
 
     # Fetch the topic using get_topic
-    topic = await store.get_topic(topic_id)
+    topic = await test_db_store.get_topic(topic_id)
 
     assert topic is not None
     assert topic["id"] == topic_id
@@ -1041,7 +1031,7 @@ async def test_get_topic_without_project_slugs(store: SessionStore) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_topic_nonexistent(store: SessionStore) -> None:
+async def test_get_topic_nonexistent(test_db_store) -> None:
     """Test that get_topic returns None for nonexistent topic."""
-    topic = await store.get_topic("nonexistent-topic-id")
+    topic = await test_db_store.get_topic("nonexistent-topic-id")
     assert topic is None

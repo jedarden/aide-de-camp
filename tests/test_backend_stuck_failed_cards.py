@@ -38,29 +38,10 @@ from src.escalate.handler import (
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """Isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "test.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 @pytest.fixture
-async def broadcaster() -> SSEBroadcaster:
-    """Fresh SSEBroadcaster per test."""
-    b = SSEBroadcaster()
-    await b.start()
-    yield b
-    await b.stop()
-
 
 @pytest.fixture
-def router(store: SessionStore) -> IntentRouter:
-    """IntentRouter with test store."""
-    return IntentRouter(store=store)
-
 
 # --- Test Session Store Operations for Stuck Cards ---------------------------
 
@@ -69,12 +50,12 @@ class TestSessionStoreStuckCardOperations:
     """Test session.store operations for stuck card creation."""
 
     @pytest.mark.asyncio
-    async def test_create_utterance_returns_id(self, store: SessionStore):
+    async def test_create_utterance_returns_id(self, test_db_store):
         """create_utterance returns a valid utterance ID."""
         session_id = "test-session"
         raw_text = "test utterance"
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text=raw_text,
         )
@@ -84,11 +65,11 @@ class TestSessionStoreStuckCardOperations:
         assert len(utterance_id) > 0
 
     @pytest.mark.asyncio
-    async def test_find_or_create_topic_returns_tuple(self, store: SessionStore):
+    async def test_find_or_create_topic_returns_tuple(self, test_db_store):
         """find_or_create_topic returns (topic_id, created) tuple."""
         session_id = "test-session"
 
-        topic_id, created = await store.find_or_create_topic(
+        topic_id, created = await test_db_store.find_or_create_topic(
             label="Test Topic",
             session_id=session_id,
             topic_type="project",
@@ -101,7 +82,7 @@ class TestSessionStoreStuckCardOperations:
         assert created is True
 
         # Second call should find existing
-        topic_id2, created2 = await store.find_or_create_topic(
+        topic_id2, created2 = await test_db_store.find_or_create_topic(
             label="Test Topic",
             session_id=session_id,
             topic_type="project",
@@ -110,15 +91,15 @@ class TestSessionStoreStuckCardOperations:
         assert created2 is False
 
     @pytest.mark.asyncio
-    async def test_update_intent_type_and_status_to_stuck(self, store: SessionStore):
+    async def test_update_intent_type_and_status_to_stuck(self, test_db_store):
         """update_intent_type_and_status can set intent to stuck."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -126,33 +107,33 @@ class TestSessionStoreStuckCardOperations:
         )
 
         # Update to stuck
-        await store.update_intent_type_and_status(
+        await test_db_store.update_intent_type_and_status(
             intent_id=intent_id,
             intent_type="stuck",
             status="stuck",
         )
 
         # Verify
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["intent_type"] == "stuck"
         assert intent["status"] == "stuck"
 
     @pytest.mark.asyncio
-    async def test_link_intent_to_topic(self, store: SessionStore):
+    async def test_link_intent_to_topic(self, test_db_store):
         """link_intent_to_topic creates many-to-many relationship."""
         import aiosqlite
         session_id = "test-session"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Test Topic",
             session_id=session_id,
             topic_type="project",
         )
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -160,10 +141,10 @@ class TestSessionStoreStuckCardOperations:
         )
 
         # Link intent to topic
-        await store.link_intent_to_topic(intent_id, topic_id)
+        await test_db_store.link_intent_to_topic(intent_id, topic_id)
 
         # Verify the link was created in intent_topics
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM intent_topics WHERE intent_id = ? AND topic_id = ?",
@@ -175,21 +156,21 @@ class TestSessionStoreStuckCardOperations:
                 assert row["topic_id"] == topic_id
 
     @pytest.mark.asyncio
-    async def test_create_result_for_stuck_card(self, store: SessionStore):
+    async def test_create_result_for_stuck_card(self, test_db_store):
         """create_result stores stuck card data correctly."""
         session_id = "test-session"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Test Topic",
             session_id=session_id,
             topic_type="project",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -197,7 +178,7 @@ class TestSessionStoreStuckCardOperations:
         )
 
         # Create stuck result
-        result_id = await store.create_result(
+        result_id = await test_db_store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -215,7 +196,7 @@ class TestSessionStoreStuckCardOperations:
         assert result_id is not None
 
         # Verify result
-        result = await store.get_latest_result_for_topic(topic_id)
+        result = await test_db_store.get_latest_result_for_topic(topic_id)
         assert result is not None
         assert result["id"] == result_id
         assert result["summary"] == "Task stuck — needs your input"
@@ -227,18 +208,18 @@ class TestSessionStoreStuckCardOperations:
         assert result_data["refusal_count"] == 3
 
     @pytest.mark.asyncio
-    async def test_create_bead_watch_for_tracking(self, store: SessionStore):
+    async def test_create_bead_watch_for_tracking(self, test_db_store):
         """create_bead_watch initializes circuit breaker tracking."""
         bead_ref = "adc-test123"
 
-        await store.create_bead_watch(
+        await test_db_store.create_bead_watch(
             bead_ref=bead_ref,
             sla_hours=6,
             intent_type="task-profile",
         )
 
         # Verify watch row created
-        watch = await store.get_bead_watch(bead_ref)
+        watch = await test_db_store.get_bead_watch(bead_ref)
         assert watch is not None
         assert watch["bead_ref"] == bead_ref
         assert watch["refusal_count"] == 0
@@ -247,41 +228,41 @@ class TestSessionStoreStuckCardOperations:
         assert watch["fenced_at"] is None
 
     @pytest.mark.asyncio
-    async def test_fence_bead_sets_fenced_at(self, store: SessionStore):
+    async def test_fence_bead_sets_fenced_at(self, test_db_store):
         """fence_bead sets fenced_at timestamp."""
         bead_ref = "adc-fence123"
 
-        await store.create_bead_watch(
+        await test_db_store.create_bead_watch(
             bead_ref=bead_ref,
             sla_hours=6,
             intent_type="task-profile",
         )
 
         # Fence the bead
-        await store.fence_bead(bead_ref)
+        await test_db_store.fence_bead(bead_ref)
 
         # Verify fenced_at is set
-        watch = await store.get_bead_watch(bead_ref)
+        watch = await test_db_store.get_bead_watch(bead_ref)
         assert watch is not None
         assert watch["fenced_at"] is not None
         assert watch["fenced_at"] > 0
 
     @pytest.mark.asyncio
-    async def test_get_fenced_beads_for_session(self, store: SessionStore):
+    async def test_get_fenced_beads_for_session(self, test_db_store):
         """get_fenced_beads_for_session returns fenced beads."""
         session_id = "test-session"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Test",
             session_id=session_id,
             topic_type="project",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -290,11 +271,11 @@ class TestSessionStoreStuckCardOperations:
             topic_id=topic_id,
         )
 
-        await store.create_bead_watch(bead_ref="adc-fenced", sla_hours=6)
-        await store.fence_bead(bead_ref="adc-fenced")
+        await test_db_store.create_bead_watch(bead_ref="adc-fenced", sla_hours=6)
+        await test_db_store.fence_bead(bead_ref="adc-fenced")
 
         # Get fenced beads
-        fenced = await store.get_fenced_beads_for_session(session_id)
+        fenced = await test_db_store.get_fenced_beads_for_session(session_id)
 
         assert len(fenced) == 1
         assert fenced[0]["bead_ref"] == "adc-fenced"
@@ -309,15 +290,15 @@ class TestSessionStoreFailedCardOperations:
     """Test session.store operations for failed card creation."""
 
     @pytest.mark.asyncio
-    async def test_update_intent_status_to_failed(self, store: SessionStore):
+    async def test_update_intent_status_to_failed(self, test_db_store):
         """update_intent_status can set intent to failed."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -325,31 +306,31 @@ class TestSessionStoreFailedCardOperations:
         )
 
         # Update to failed
-        await store.update_intent_status(
+        await test_db_store.update_intent_status(
             intent_id=intent_id,
             status="failed",
         )
 
         # Verify
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
     @pytest.mark.asyncio
-    async def test_create_result_for_failed_card(self, store: SessionStore):
+    async def test_create_result_for_failed_card(self, test_db_store):
         """create_result stores failed card data correctly."""
         session_id = "test-session"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Topic",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -357,7 +338,7 @@ class TestSessionStoreFailedCardOperations:
         )
 
         # Create failed result
-        result_id = await store.create_result(
+        result_id = await test_db_store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -375,7 +356,7 @@ class TestSessionStoreFailedCardOperations:
         assert result_id is not None
 
         # Verify result
-        result = await store.get_latest_result_for_topic(topic_id)
+        result = await test_db_store.get_latest_result_for_topic(topic_id)
         assert result is not None
         assert result["id"] == result_id
         assert result["summary"] == "Task Failed: Worker Crash"
@@ -387,18 +368,18 @@ class TestSessionStoreFailedCardOperations:
         assert result_data["error_type"] == "worker_crash"
 
     @pytest.mark.asyncio
-    async def test_bead_watch_refusal_update(self, store: SessionStore):
+    async def test_bead_watch_refusal_update(self, test_db_store):
         """update_bead_watch_refusal increments refusal count."""
         bead_ref = "adc-refusal123"
 
-        await store.create_bead_watch(
+        await test_db_store.create_bead_watch(
             bead_ref=bead_ref,
             sla_hours=6,
             intent_type="task-profile",
         )
 
         # Add refusal
-        await store.update_bead_watch_refusal(
+        await test_db_store.update_bead_watch_refusal(
             bead_ref=bead_ref,
             refusal_reason="Test refusal",
             comment_index=0,
@@ -406,7 +387,7 @@ class TestSessionStoreFailedCardOperations:
         )
 
         # Verify
-        watch = await store.get_bead_watch(bead_ref)
+        watch = await test_db_store.get_bead_watch(bead_ref)
         assert watch["refusal_count"] == 1
         assert watch["last_refusal_reason"] == "Test refusal"
         assert watch["last_refusal_at"] is not None
@@ -573,23 +554,23 @@ class TestIntentRouterFenceDetection:
     """Test intent router fence detection logic."""
 
     @pytest.mark.asyncio
-    async def test_check_fence_for_bead_fenced(self, router: IntentRouter, store: SessionStore):
+    async def test_check_fence_for_bead_fenced(self, router: IntentRouter, test_db_store):
         """_check_fence_for_bead returns context for fenced bead."""
         bead_ref = "adc-fenced123"
 
         # Create bead watch with fence
-        await store.create_bead_watch(
+        await test_db_store.create_bead_watch(
             bead_ref=bead_ref,
             sla_hours=6,
             intent_type="task-profile",
         )
-        await store.update_bead_watch_refusal(
+        await test_db_store.update_bead_watch_refusal(
             bead_ref=bead_ref,
             refusal_reason="Test refusal",
             comment_index=0,
             refusal_count_add=3,
         )
-        await store.fence_bead(bead_ref)
+        await test_db_store.fence_bead(bead_ref)
 
         # Check fence
         fence_context = await router._check_fence_for_bead(bead_ref)
@@ -601,12 +582,12 @@ class TestIntentRouterFenceDetection:
         assert fence_context["fenced_at"] is not None
 
     @pytest.mark.asyncio
-    async def test_check_fence_for_bead_not_fenced(self, router: IntentRouter, store: SessionStore):
+    async def test_check_fence_for_bead_not_fenced(self, router: IntentRouter, test_db_store):
         """_check_fence_for_bead returns None for unfenced bead."""
         bead_ref = "adc-unfenced123"
 
         # Create bead watch without fence
-        await store.create_bead_watch(
+        await test_db_store.create_bead_watch(
             bead_ref=bead_ref,
             sla_hours=6,
             intent_type="task-profile",
@@ -625,15 +606,15 @@ class TestIntentRouterFenceDetection:
         assert fence_context is None
 
     @pytest.mark.asyncio
-    async def test_create_stuck_card_from_fence(self, router: IntentRouter, store: SessionStore):
+    async def test_create_stuck_card_from_fence(self, router: IntentRouter, test_db_store):
         """_create_stuck_card_from_fence creates stuck card and broadcasts."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -675,7 +656,7 @@ class TestIntentRouterFenceDetection:
         assert result["bead_id"] == "adc-fenced123"
 
         # Verify intent updated
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["intent_type"] == "stuck"
         assert intent["status"] == "stuck"
 
@@ -694,21 +675,21 @@ class TestTerminalFailureHandling:
     """Test terminal failure handling and failed card creation."""
 
     @pytest.mark.asyncio
-    async def test_handle_terminal_failure_creates_failed_card(self, store: SessionStore):
+    async def test_handle_terminal_failure_creates_failed_card(self, test_db_store):
         """handle_terminal_failure creates failed card and updates intent."""
         session_id = "test-session"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Topic",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -719,7 +700,7 @@ class TestTerminalFailureHandling:
         # Mock broadcaster
         broadcaster_mock = AsyncMock()
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster_mock), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,
@@ -730,11 +711,11 @@ class TestTerminalFailureHandling:
             )
 
         # Verify intent status
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
         # Verify failed result created
-        result = await store.get_latest_result_for_topic(topic_id)
+        result = await test_db_store.get_latest_result_for_topic(topic_id)
         assert result is not None
         assert result["intent_id"] == intent_id
         assert "Task Failed" in result["summary"]
@@ -751,15 +732,15 @@ class TestTerminalFailureHandling:
         assert event.data["failure_reason"] == "Test failure"
 
     @pytest.mark.asyncio
-    async def test_handle_terminal_failure_without_topic(self, store: SessionStore):
+    async def test_handle_terminal_failure_without_topic(self, test_db_store):
         """handle_terminal_failure creates topic when topic_id is None."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test failure",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -769,7 +750,7 @@ class TestTerminalFailureHandling:
         # Mock broadcaster
         broadcaster_mock = AsyncMock()
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster_mock), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,
@@ -780,30 +761,30 @@ class TestTerminalFailureHandling:
             )
 
         # Verify intent has topic now
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
         assert intent["topic_id"] is not None
 
         # Verify result created
-        result = await store.get_latest_result_for_topic(intent["topic_id"])
+        result = await test_db_store.get_latest_result_for_topic(intent["topic_id"])
         assert result is not None
 
     @pytest.mark.asyncio
-    async def test_handle_terminal_failure_with_bead_ref(self, store: SessionStore):
+    async def test_handle_terminal_failure_with_bead_ref(self, test_db_store):
         """handle_terminal_failure updates bead_watch when bead_ref provided."""
         session_id = "test-session"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Topic",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -813,7 +794,7 @@ class TestTerminalFailureHandling:
         )
 
         # Create bead watch
-        await store.create_bead_watch(
+        await test_db_store.create_bead_watch(
             bead_ref="adc-fail123",
             sla_hours=6,
             intent_type="task-profile",
@@ -822,7 +803,7 @@ class TestTerminalFailureHandling:
         # Mock broadcaster
         broadcaster_mock = AsyncMock()
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster_mock), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,
@@ -833,26 +814,26 @@ class TestTerminalFailureHandling:
             )
 
         # Verify bead_watch updated
-        watch = await store.get_bead_watch("adc-fail123")
+        watch = await test_db_store.get_bead_watch("adc-fail123")
         assert watch["last_refusal_reason"] == "Bead execution failed"
         assert watch["refusal_count"] == 1
 
     @pytest.mark.asyncio
-    async def test_handle_terminal_failure_broadcasts_sse(self, store: SessionStore, broadcaster: SSEBroadcaster):
+    async def test_handle_terminal_failure_broadcasts_sse(self, test_db_store, broadcaster: SSEBroadcaster):
         """handle_terminal_failure broadcasts task_failed SSE event."""
         session_id = "test-session"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Topic",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -894,16 +875,16 @@ class TestIntentTypeStatusHandling:
     """Test handling of both 'stuck' and 'failed' intent types."""
 
     @pytest.mark.asyncio
-    async def test_stuck_intent_type_accepted(self, store: SessionStore):
+    async def test_stuck_intent_type_accepted(self, test_db_store):
         """Intent type 'stuck' is accepted by create_intent."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
         # Create intent with stuck type (via update)
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -911,26 +892,26 @@ class TestIntentTypeStatusHandling:
         )
 
         # Update to stuck
-        await store.update_intent_type_and_status(
+        await test_db_store.update_intent_type_and_status(
             intent_id=intent_id,
             intent_type="stuck",
             status="stuck",
         )
 
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["intent_type"] == "stuck"
         assert intent["status"] == "stuck"
 
     @pytest.mark.asyncio
-    async def test_failed_status_accepted(self, store: SessionStore):
+    async def test_failed_status_accepted(self, test_db_store):
         """Status 'failed' is accepted by update_intent_status."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -938,24 +919,24 @@ class TestIntentTypeStatusHandling:
         )
 
         # Update to failed
-        await store.update_intent_status(
+        await test_db_store.update_intent_status(
             intent_id=intent_id,
             status="failed",
         )
 
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
     @pytest.mark.asyncio
-    async def test_get_intent_by_bead_ref_includes_stuck(self, store: SessionStore):
+    async def test_get_intent_by_bead_ref_includes_stuck(self, test_db_store):
         """get_intent_by_bead_ref finds intents with stuck status."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -964,10 +945,10 @@ class TestIntentTypeStatusHandling:
         )
 
         # Update to stuck
-        await store.update_intent_status(intent_id=intent_id, status="stuck")
+        await test_db_store.update_intent_status(intent_id=intent_id, status="stuck")
 
         # Find by bead_ref
-        intent = await store.get_intent_by_bead_ref("adc-stuck123")
+        intent = await test_db_store.get_intent_by_bead_ref("adc-stuck123")
         assert intent is not None
         assert intent["id"] == intent_id
         assert intent["status"] == "stuck"
@@ -980,15 +961,15 @@ class TestBackendIntegrationScenarios:
     """Test integration scenarios for stuck/failed card flows."""
 
     @pytest.mark.asyncio
-    async def test_full_stuck_card_flow(self, router: IntentRouter, store: SessionStore, broadcaster: SSEBroadcaster):
+    async def test_full_stuck_card_flow(self, router: IntentRouter, test_db_store, broadcaster: SSEBroadcaster):
         """Test full stuck card creation flow from fence detection to SSE."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test escalation",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1040,21 +1021,21 @@ class TestBackendIntegrationScenarios:
         assert event.data["stuck_reason"] == "Missing required context"
 
     @pytest.mark.asyncio
-    async def test_full_failed_card_flow(self, store: SessionStore, broadcaster: SSEBroadcaster):
+    async def test_full_failed_card_flow(self, test_db_store, broadcaster: SSEBroadcaster):
         """Test full failed card creation flow from failure to SSE."""
         session_id = "test-session"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Flow",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test failure",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1071,7 +1052,7 @@ class TestBackendIntegrationScenarios:
 
         # Patch get_broadcaster and get_store
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,
@@ -1082,10 +1063,10 @@ class TestBackendIntegrationScenarios:
             )
 
         # Verify failed card
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
-        result = await store.get_latest_result_for_topic(topic_id)
+        result = await test_db_store.get_latest_result_for_topic(topic_id)
         assert "Task Failed" in result["summary"]
 
         # Verify SSE event

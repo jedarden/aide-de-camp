@@ -251,7 +251,7 @@ class SSEBroadcaster:
         return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
     async def _cleanup_loop(self):
-        """Periodically clean up dead connections."""
+        """Periodically clean up dead connections using atomic operations."""
         while self._running:
             try:
                 await asyncio.sleep(30)  # Check every 30 seconds
@@ -259,22 +259,26 @@ class SSEBroadcaster:
                 now = datetime.now().timestamp()
                 timeout = 300  # 5 minutes
 
+                # Atomic cleanup: build list of dead connections first
                 dead_connections = [
                     cid for cid, conn in self.connections.items()
                     if (now - conn.last_heartbeat) > timeout
                 ]
 
+                # Process all dead connections in a single atomic batch
                 for cid in dead_connections:
                     logger.info(f"Cleaning up dead connection {cid}")
                     # Send disconnect event before removing
                     try:
-                        conn = self.connections[cid]
-                        conn.queue.put_nowait(SSEEvent(
-                            event_type="disconnect",
-                            data={"reason": "timeout"},
-                        ))
+                        conn = self.connections.get(cid)
+                        if conn:
+                            conn.queue.put_nowait(SSEEvent(
+                                event_type="disconnect",
+                                data={"reason": "timeout"},
+                            ))
                     except asyncio.QueueFull:
                         pass
+                    # Atomic removal using unregister
                     self.unregister(cid)
 
             except asyncio.CancelledError:

@@ -1,0 +1,261 @@
+{
+  "generated_at": "2026-08-07T06:55:19Z",
+  "analysis_metadata": {
+    "total_entries_parsed": 1438,
+    "log_files_processed": [
+      "logs/pbx-web-parsed.jsonl",
+      "logs/pbx-web-30day.jsonl"
+    ],
+    "categories_analyzed": 4,
+    "timezone_handling": "All timestamps normalized to UTC"
+  },
+  "categories": {
+    "Uncategorized": {
+      "total_failures": 1420,
+      "timestamps_analyzed": 1420,
+      "time_range": {
+        "first_occurrence": "2026-07-28T13:36:40Z",
+        "last_occurrence": "2026-08-06T13:35:34Z",
+        "span_days": 8
+      },
+      "gap_statistics": {
+        "average_gap_seconds": 547.945412202255,
+        "median_gap_seconds": 120.000004,
+        "min_gap_seconds": 2e-06,
+        "max_gap_seconds": 275344.971791,
+        "stddev_gap_seconds": 7894.581006813092
+      },
+      "daily_weekly_counts": {
+        "daily_counts": {
+          "2026-07-28": 26,
+          "2026-07-29": 10,
+          "2026-07-30": 5,
+          "2026-07-31": 7,
+          "2026-08-03": 147,
+          "2026-08-04": 463,
+          "2026-08-05": 514,
+          "2026-08-06": 248
+        },
+        "weekly_counts": {
+          "2026-W31": 48,
+          "2026-W32": 1372
+        }
+      },
+      "time_clusters": {
+        "clusters_found": 13,
+        "clusters": [
+          {
+            "start": "2026-07-28T18:38:51Z",
+            "end": "2026-07-28T23:29:28Z",
+            "duration_hours": 4.843686450833333,
+            "failure_count": 19,
+            "density_per_hour": 3.1666666666666665
+          },
+          {
+            "start": "2026-08-03T17:05:54Z",
+            "end": "2026-08-03T23:05:34Z",
+            "duration_hours": 5.994444446388888,
+            "failure_count": 126,
+            "density_per_hour": 21.0
+          },
+          {
+            "start": "2026-08-03T23:05:34Z",
+            "end": "2026-08-04T05:05:34Z",
+            "duration_hours": 5.999999998888889,
+            "failure_count": 103,
+            "density_per_hour": 17.166666666666668
+          },
+          {
+            "start": "2026-08-04T05:05:34Z",
+            "end": "2026-08-04T11:02:42Z",
+            "duration_hours": 5.952294439444445,
+            "failure_count": 124,
+            "density_per_hour": 20.666666666666668
+          },
+          {
+            "start": "2026-08-04T11:02:42Z",
+            "end": "2026-08-04T17:02:24Z",
+            "duration_hours": 5.994927910555555,
+            "failure_count": 135,
+            "density_per_hour": 22.5
+          },
+          {
+            "start": "2026-08-04T17:02:24Z",
+            "end": "2026-08-04T22:59:54Z",
+            "duration_hours": 5.958333333333333,
+            "failure_count": 114,
+            "density_per_hour": 19.0
+          },
+          {
+            "start": "2026-08-04T22:59:54Z",
+            "end": "2026-08-05T04:57:44Z",
+            "duration_hours": 5.963888751388889,
+            "failure_count": 110,
+            "density_per_hour": 18.333333333333332
+          },
+          {
+            "start": "2026-08-05T04:57:44Z",
+            "end": "2026-08-05T10:57:24Z",
+            "duration_hours": 5.994444303611111,
+            "failure_count": 135,
+            "density_per_hour": 22.5
+          },
+          {
+            "start": "2026-08-05T10:57:24Z",
+            "end": "2026-08-05T16:56:54Z",
+            "duration_hours": 5.991666754444445,
+            "failure_count": 124,
+            "density_per_hour": 20.666666666666668
+          },
+          {
+            "start": "2026-08-05T16:56:54Z",
+            "end": "2026-08-05T22:55:04Z",
+            "duration_hours": 5.96944462,
+            "failure_count": 137,
+            "density_per_hour": 22.833333333333332
+          },
+          {
+            "start": "2026-08-05T22:55:04Z",
+            "end": "2026-08-06T04:52:24Z",
+            "duration_hours": 5.955555441944444,
+            "failure_count": 118,
+            "density_per_hour": 19.666666666666668
+          },
+          {
+            "start": "2026-08-06T04:52:24Z",
+            "end": "2026-08-06T10:46:54Z",
+            "duration_hours": 5.908333424444444,
+            "failure_count": 110,
+            "density_per_hour": 18.333333333333332
+          },
+          {
+            "start": "2026-08-06T10:46:54Z",
+            "end": "2026-08-06T13:35:34Z",
+            "duration_hours": 2.811110985277778,
+            "failure_count": 47,
+            "density_per_hour": 7.833333333333333
+          }
+        ]
+      },
+      "category_info": {
+        "description": "Uncategorized failures"
+      }
+    },
+    "NetworkIssue": {
+      "total_failures": 18,
+      "timestamps_analyzed": 18,
+      "time_range": {
+        "first_occurrence": "2026-07-28T20:23:24Z",
+        "last_occurrence": "2026-08-05T16:14:35Z",
+        "span_days": 7
+      },
+      "gap_statistics": {
+        "average_gap_seconds": 39780.62749735294,
+        "median_gap_seconds": 0.001197,
+        "min_gap_seconds": 0.000371,
+        "max_gap_seconds": 574563.826157,
+        "stddev_gap_seconds": 138908.34047411146
+      },
+      "daily_weekly_counts": {
+        "daily_counts": {
+          "2026-07-28": 6,
+          "2026-08-04": 6,
+          "2026-08-05": 6
+        },
+        "weekly_counts": {
+          "2026-W31": 6,
+          "2026-W32": 12
+        }
+      },
+      "time_clusters": {
+        "clusters_found": 0,
+        "clusters": []
+      },
+      "category_info": {
+        "description": "Network allocation or connectivity problems",
+        "patterns": [
+          "BrokenPipeError",
+          "\\[Errno 32\\] Broken pipe",
+          "\\[Errno 104\\] Connection reset by peer"
+        ]
+      }
+    },
+    "RecordingFetchError": {
+      "total_failures": 6,
+      "timestamps_analyzed": 6,
+      "time_range": {
+        "first_occurrence": "2026-07-28T20:23:24Z",
+        "last_occurrence": "2026-08-05T16:14:35Z",
+        "span_days": 7
+      },
+      "gap_statistics": {
+        "average_gap_seconds": 135254.133216,
+        "median_gap_seconds": 20683.492023,
+        "min_gap_seconds": 1040.590032,
+        "max_gap_seconds": 574563.828822,
+        "stddev_gap_seconds": 247064.01246545685
+      },
+      "daily_weekly_counts": {
+        "daily_counts": {
+          "2026-07-28": 2,
+          "2026-08-04": 2,
+          "2026-08-05": 2
+        },
+        "weekly_counts": {
+          "2026-W31": 2,
+          "2026-W32": 4
+        }
+      },
+      "time_clusters": {
+        "clusters_found": 0,
+        "clusters": []
+      },
+      "category_info": {
+        "description": "Failed to fetch recordings from storage backend",
+        "patterns": [
+          "recording fetch error",
+          "500.*recording"
+        ]
+      }
+    },
+    "DependencyTimeout": {
+      "total_failures": 12,
+      "timestamps_analyzed": 12,
+      "time_range": {
+        "first_occurrence": "2026-07-28T20:23:24Z",
+        "last_occurrence": "2026-08-05T16:14:35Z",
+        "span_days": 7
+      },
+      "gap_statistics": {
+        "average_gap_seconds": 61479.15154918181,
+        "median_gap_seconds": 0.001866,
+        "min_gap_seconds": 0.00066,
+        "max_gap_seconds": 574563.826956,
+        "stddev_gap_seconds": 171480.13254606925
+      },
+      "daily_weekly_counts": {
+        "daily_counts": {
+          "2026-07-28": 4,
+          "2026-08-04": 4,
+          "2026-08-05": 4
+        },
+        "weekly_counts": {
+          "2026-W31": 4,
+          "2026-W32": 8
+        }
+      },
+      "time_clusters": {
+        "clusters_found": 0,
+        "clusters": []
+      },
+      "category_info": {
+        "description": "Timeout connecting to dependent services",
+        "patterns": [
+          "\\[Errno 104\\] Connection reset by peer",
+          "ConnectionResetError",
+          "timeout"
+        ]
+      }
+    }
+  }
+}

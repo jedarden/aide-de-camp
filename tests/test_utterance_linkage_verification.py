@@ -23,14 +23,6 @@ from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
 
 @pytest.fixture
-async def test_store(tmp_path: Path) -> SessionStore:
-    """An isolated SessionStore on a temp DB for testing."""
-    db_path = tmp_path / "test_session.db"
-    store = SessionStore(db_path)
-    await store.initialize()
-    yield store
-    await store.close()
-
 
 # --- test data ---------------------------------------------------------------
 
@@ -69,7 +61,7 @@ class TestUtteranceLinkageVerification:
     """
 
     @pytest.mark.asyncio
-    async def test_utterance_to_topic_linkage_via_intent(self, test_store: SessionStore) -> None:
+    async def test_utterance_to_topic_linkage_via_intent(self, test_test_db_store) -> None:
         """Verify utterance is linked to topic through the intent foreign key chain."""
         with patch('src.test.dispatch.get_store', return_value=test_store):
             request = SyntheticResultRequest(
@@ -119,7 +111,7 @@ class TestUtteranceLinkageVerification:
             assert intent["topic_id"] == topic["id"], "Intent → Topic linkage broken"
 
     @pytest.mark.asyncio
-    async def test_exact_text_field_matching(self, test_store: SessionStore) -> None:
+    async def test_exact_text_field_matching(self, test_test_db_store) -> None:
         """Verify that all text fields match the test payload exactly, character-for-character."""
         test_utterance = VERIFICATION_TEST_PAYLOAD["utterance"]
         test_topic_label = VERIFICATION_TEST_PAYLOAD["topic_label"]
@@ -184,7 +176,7 @@ class TestUtteranceLinkageVerification:
                         f"Result data mismatch: expected {test_data}, got {stored_data}"
 
     @pytest.mark.asyncio
-    async def test_foreign_key_relationships_integrity(self, test_store: SessionStore) -> None:
+    async def test_foreign_key_relationships_integrity(self, test_test_db_store) -> None:
         """Verify that all foreign key relationships are valid and intact."""
         with patch('src.test.dispatch.get_store', return_value=test_store):
             request = SyntheticResultRequest(
@@ -242,7 +234,7 @@ class TestUtteranceLinkageVerification:
                     assert topic is not None, "Topic referenced by intent does not exist"
 
     @pytest.mark.asyncio
-    async def test_complete_data_integrity_verification(self, test_store: SessionStore) -> None:
+    async def test_complete_data_integrity_verification(self, test_test_db_store) -> None:
         """Verify complete data integrity across all related records."""
         with patch('src.test.dispatch.get_store', return_value=test_store):
             request = SyntheticResultRequest(
@@ -298,7 +290,7 @@ class TestUtteranceLinkageVerification:
                 assert result_row["topic_id"] == response.topic_id, "Result not linked to topic"
 
     @pytest.mark.asyncio
-    async def test_utterance_linkage_with_special_characters(self, test_store: SessionStore) -> None:
+    async def test_utterance_linkage_with_special_characters(self, test_test_db_store) -> None:
         """Verify utterance linkage preserves special characters exactly."""
         special_text = "Test with special chars: émojis 🎉, unicode ™, quotes \"', and symbols @#$%^&*()"
 

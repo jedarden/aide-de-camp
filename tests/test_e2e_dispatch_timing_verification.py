@@ -37,26 +37,8 @@ from src.instrument.timings import DispatchTimings
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """Isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "test_e2e_timings.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 @pytest.fixture
-def sample_intent():
-    """A sample intent for testing timing instrumentation."""
-    return {
-        "intent_id": str(uuid.uuid4()),
-        "utterance_id": str(uuid.uuid4()),
-        "session_id": str(uuid.uuid4()),
-        "project_slug": "test-project",
-        "intent_type": "status",
-    }
-
 
 # =============================================================================
 # Main E2E Test
@@ -67,7 +49,7 @@ class TestE2EDispatchTimingVerification:
     """End-to-end verification of dispatch timing persistence through the full pipeline."""
 
     @pytest.mark.asyncio
-    async def test_full_dispatch_timing_pipeline(self, store: SessionStore, sample_intent: dict):
+    async def test_full_dispatch_timing_pipeline(self, test_db_store, sample_intent: dict):
         """
         E2E test: Simulated dispatch → complete server-side timing row → client merge → percentiles.
 
@@ -101,12 +83,12 @@ class TestE2EDispatchTimingVerification:
 
             # Stage 1: Router classification (simulated timing)
             router_ms = 125
-            await store.record_dispatch_timings(intent_id, router_ms=router_ms)
+            await test_db_store.record_dispatch_timings(intent_id, router_ms=router_ms)
 
             # Stage 2: Fetch orchestration (simulated timing)
             fetch_first_source_ms = 250
             fetch_total_ms = 450
-            await store.record_dispatch_timings(
+            await test_db_store.record_dispatch_timings(
                 intent_id,
                 fetch_first_source_ms=fetch_first_source_ms,
                 fetch_total_ms=fetch_total_ms,
@@ -115,7 +97,7 @@ class TestE2EDispatchTimingVerification:
             # Stage 3: Synthesize (LLM call) (simulated timing)
             synthesize_first_token_ms = 890
             synthesize_total_ms = 1250
-            await store.record_dispatch_timings(
+            await test_db_store.record_dispatch_timings(
                 intent_id,
                 synthesize_first_token_ms=synthesize_first_token_ms,
                 synthesize_total_ms=synthesize_total_ms,
@@ -123,13 +105,13 @@ class TestE2EDispatchTimingVerification:
 
             # Stage 4: SSE emit (simulated timing)
             sse_emit_ms = 15
-            await store.record_dispatch_timings(intent_id, sse_emit_ms=sse_emit_ms)
+            await test_db_store.record_dispatch_timings(intent_id, sse_emit_ms=sse_emit_ms)
 
             # ====================================================================
             # Step 2: Assert exactly one complete dispatch_timings row with all server stages
             # ====================================================================
 
-            timings = await store.get_dispatch_timings(intent_id)
+            timings = await test_db_store.get_dispatch_timings(intent_id)
 
             assert timings is not None, \
                 f"No dispatch_timings row found for intent_id: {intent_id}"
@@ -174,7 +156,7 @@ class TestE2EDispatchTimingVerification:
             # ====================================================================
 
             # Capture the server-side state before client merge
-            server_state_before = await store.get_dispatch_timings(intent_id)
+            server_state_before = await test_db_store.get_dispatch_timings(intent_id)
 
             # Report client timings
             client_stt_ms = 312
@@ -198,7 +180,7 @@ class TestE2EDispatchTimingVerification:
             # Step 4: Assert the merged row now has both server and client stages
             # ====================================================================
 
-            merged_timings = await store.get_dispatch_timings(intent_id)
+            merged_timings = await test_db_store.get_dispatch_timings(intent_id)
 
             # Verify server-side stages are UNCHANGED (not clobbered by client merge)
             for stage in required_server_stages.keys():
@@ -262,7 +244,7 @@ class TestE2EDispatchTimingVerification:
             # ====================================================================
 
             import aiosqlite
-            async with aiosqlite.connect(store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 # Count rows for this intent_id
                 cursor = await db.execute(
                     "SELECT COUNT(*) FROM dispatch_timings WHERE intent_id = ?",

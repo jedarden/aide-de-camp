@@ -13,8 +13,10 @@ Key security constraints:
 - Push to origin main only
 """
 
+import asyncio
 import logging
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +24,69 @@ from typing import Any
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+class GitError(RuntimeError):
+    """Base exception for git operation failures."""
+    pass
+
+
+class GitConflictError(GitError):
+    """Raised when git operations encounter merge conflicts or rejection."""
+    pass
+
+
+class GitNetworkError(GitError):
+    """Raised when git operations fail due to network issues."""
+    pass
+
+
+class GitAuthenticationError(GitError):
+    """Raised when git operations fail due to authentication issues."""
+    pass
+
+
+class GitStateError(GitError):
+    """Raised when git repository is in an unexpected state."""
+    pass
+
+
+def retry_on_network_failure(max_retries: int = 3, backoff_factor: float = 1.5):
+    """
+    Decorator to retry functions that fail with network errors.
+
+    Args:
+        max_retries: Maximum number of retry attempts
+        backoff_factor: Multiplier for exponential backoff between retries
+
+    Retries on GitNetworkError with exponential backoff.
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            last_error = None
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except GitNetworkError as e:
+                    last_error = e
+                    if attempt < max_retries:
+                        wait_time = backoff_factor ** attempt
+                        logger.warning(
+                            f"Network failure on attempt {attempt + 1}/{max_retries + 1}, "
+                            f"retrying in {wait_time:.1f}s: {e}"
+                        )
+                        time.sleep(wait_time)
+                    else:
+                        logger.error(f"Max retries ({max_retries}) exceeded for network operation")
+                        raise
+                except Exception as e:
+                    # Don't retry on non-network errors
+                    raise
+            # Shouldn't reach here, but just in case
+            if last_error:
+                raise last_error
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -155,7 +220,7 @@ class GitOpsCommitStep:
         if not dry_run:
             try:
                 self._validate_declarative_config_repo()
-            except (RuntimeError, subprocess.TimeoutExpired, FileNotFoundError) as e:
+            except (GitStateError, GitAuthenticationError, GitNetworkError, GitError) as e:
                 return StepResult(
                     success=False,
                     data={"manifest_path": manifest_path},
@@ -219,17 +284,34 @@ class GitOpsCommitStep:
             )
 
         # Commit changes
+        original_manifest_backup = None
         try:
+            # Backup original manifest for potential rollback
+            original_manifest_backup = manifest_data
+
             commit_sha = self._commit_changes(
                 manifest_path,
                 validated_fields,
                 project_cfg,
             )
-        except Exception as e:
-            # Rollback on commit failure
+        except (GitConflictError, GitAuthenticationError, GitStateError) as e:
+            # Rollback on commit failure for git-specific errors
             try:
-                self._write_manifest(full_manifest_path, manifest_data)
-                logger.info("Rolled back manifest changes after commit failure")
+                self._write_manifest(full_manifest_path, original_manifest_backup or manifest_data)
+                logger.info(f"Rolled back manifest changes after commit failure: {e}")
+            except Exception as rollback_error:
+                logger.error(f"Failed to rollback changes: {rollback_error}")
+
+            return StepResult(
+                success=False,
+                data={"manifest_path": manifest_path},
+                error=f"Failed to commit changes: {e}",
+            )
+        except Exception as e:
+            # Rollback on any other error
+            try:
+                self._write_manifest(full_manifest_path, original_manifest_backup or manifest_data)
+                logger.info(f"Rolled back manifest changes after unexpected error: {e}")
             except Exception as rollback_error:
                 logger.error(f"Failed to rollback changes: {rollback_error}")
 
@@ -242,6 +324,29 @@ class GitOpsCommitStep:
         # Push to origin
         try:
             self._push_changes()
+        except (GitConflictError, GitAuthenticationError) as e:
+            # Don't rollback on push failures - commit is local and valid
+            # User can resolve conflicts or auth issues and retry
+            return StepResult(
+                success=False,
+                data={
+                    "manifest_path": manifest_path,
+                    "commit_sha": commit_sha,
+                    "commit_locally": True,
+                },
+                error=f"Failed to push changes: {e}",
+            )
+        except GitNetworkError as e:
+            # Network failures might be transient
+            return StepResult(
+                success=False,
+                data={
+                    "manifest_path": manifest_path,
+                    "commit_sha": commit_sha,
+                    "commit_locally": True,
+                },
+                error=f"Failed to push changes (network): {e}",
+            )
         except Exception as e:
             return StepResult(
                 success=False,
@@ -267,12 +372,47 @@ class GitOpsCommitStep:
     def _validate_declarative_config_repo(self) -> None:
         """Validate that we're in the declarative-config repository."""
         if not self.declarative_config_path.exists():
-            raise RuntimeError(f"declarative-config path does not exist: {self.declarative_config_path}")
+            raise GitStateError(f"declarative-config path does not exist: {self.declarative_config_path}")
 
         # Check for git repository
         git_dir = self.declarative_config_path / ".git"
         if not git_dir.exists():
-            raise RuntimeError(f"Not a git repository: {self.declarative_config_path}")
+            raise GitStateError(f"Not a git repository: {self.declarative_config_path}")
+
+        # Check for uncommitted changes
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(self.declarative_config_path), "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+
+            if result.stdout.strip():
+                raise GitStateError(
+                    f"Repository has uncommitted changes. Please commit or stash them first:\n{result.stdout.strip()}"
+                )
+        except subprocess.TimeoutExpired:
+            raise GitNetworkError("Git status check timed out")
+        except FileNotFoundError:
+            raise GitError("Git command not found - ensure git is installed")
+
+        # Verify we're on main branch
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(self.declarative_config_path), "branch", "--show-current"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=True,
+            )
+
+            current_branch = result.stdout.strip()
+            if current_branch != "main":
+                raise GitStateError(f"Not on main branch: {current_branch}. Please switch to main branch first.")
+        except subprocess.TimeoutExpired:
+            raise GitNetworkError("Git branch check timed out")
 
         # Verify remote is jedarden/declarative-config
         try:
@@ -288,15 +428,15 @@ class GitOpsCommitStep:
             if result.returncode != 0:
                 error_output = result.stderr.lower()
                 if any(pattern in error_output for pattern in ["authentication", "permission denied", "credentials", "auth", "fatal"]):
-                    raise RuntimeError(f"Git authentication failed: {result.stderr.strip()}")
-                raise RuntimeError(f"Git remote check failed: {result.stderr.strip()}")
+                    raise GitAuthenticationError(f"Git authentication failed: {result.stderr.strip()}")
+                raise GitError(f"Git remote check failed: {result.stderr.strip()}")
 
             if "declarative-config" not in result.stdout:
-                raise RuntimeError("Git remote is not jedarden/declarative-config")
+                raise GitStateError("Git remote is not jedarden/declarative-config")
         except subprocess.TimeoutExpired:
-            raise RuntimeError("Git remote check timed out")
+            raise GitNetworkError("Git remote check timed out")
         except FileNotFoundError:
-            raise RuntimeError("Git command not found - ensure git is installed")
+            raise GitError("Git command not found - ensure git is installed")
 
     def _parse_and_validate_fields(self, template_fields: list[dict[str, Any]]) -> list[TemplateField]:
         """Parse and validate template field specifications."""
@@ -458,7 +598,7 @@ class GitOpsCommitStep:
             )
 
             if not result.stdout.strip():
-                raise RuntimeError("No changes to commit")
+                raise GitStateError("No changes to commit")
 
             # Build commit message
             commit_msg = self._build_commit_message(manifest_path, fields, project_cfg)
@@ -482,11 +622,11 @@ class GitOpsCommitStep:
                 error_output = result.stderr.strip().lower()
                 # Check for authentication failures
                 if any(pattern in error_output for pattern in ["authentication", "permission denied", "credentials", "auth"]):
-                    raise RuntimeError(f"Git authentication failed during commit: {result.stderr.strip()}")
-                # Check for other common errors
+                    raise GitAuthenticationError(f"Git authentication failed during commit: {result.stderr.strip()}")
+                # Check for merge conflicts
                 if "merge conflict" in error_output:
-                    raise RuntimeError(f"Merge conflict detected during commit: {result.stderr.strip()}")
-                raise RuntimeError(f"git commit failed: {result.stderr.strip()}")
+                    raise GitConflictError(f"Merge conflict detected during commit: {result.stderr.strip()}")
+                raise GitError(f"git commit failed: {result.stderr.strip()}")
 
             # Extract commit SHA
             result = subprocess.run(
@@ -500,9 +640,9 @@ class GitOpsCommitStep:
             return result.stdout.strip()
 
         except subprocess.TimeoutExpired:
-            raise RuntimeError("Git operation timed out during commit")
+            raise GitNetworkError("Git operation timed out during commit")
         except FileNotFoundError:
-            raise RuntimeError("Git command not found - ensure git is installed")
+            raise GitError("Git command not found - ensure git is installed")
 
     def _build_commit_message(
         self,
@@ -530,63 +670,45 @@ class GitOpsCommitStep:
 
         return "\n".join(lines)
 
+    @retry_on_network_failure(max_retries=3, backoff_factor=1.5)
     def _push_changes(self) -> None:
-        """Push changes to origin main."""
-        try:
-            # Check current branch
-            result = subprocess.run(
-                ["git", "-C", str(self.declarative_config_path), "branch", "--show-current"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=True,
-            )
+        """Push changes to origin main with retry logic for network failures."""
+        # Push to origin
+        result = subprocess.run(
+            ["git", "-C", str(self.declarative_config_path), "push", "origin", "main"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
 
-            current_branch = result.stdout.strip()
+        if result.returncode != 0:
+            error_msg = result.stderr.strip().lower()
+            stdout_msg = result.stdout.strip().lower()
 
-            if current_branch != "main":
-                raise RuntimeError(f"Not on main branch: {current_branch}")
+            # Detect authentication failures
+            if any(pattern in error_msg + stdout_msg for pattern in [
+                "authentication", "permission denied", "credentials",
+                "auth", "could not read", "fatal"
+            ]):
+                raise GitAuthenticationError(f"Git authentication failed during push: {result.stderr.strip()}")
 
-            # Push to origin
-            result = subprocess.run(
-                ["git", "-C", str(self.declarative_config_path), "push", "origin", "main"],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-            )
+            # Detect network failures (these will trigger retry)
+            if any(pattern in error_msg + stdout_msg for pattern in [
+                "connection", "network", "timeout", "unreachable", "dns", "host"
+            ]):
+                raise GitNetworkError(f"Network failure during git push: {result.stderr.strip()}")
 
-            if result.returncode != 0:
-                error_msg = result.stderr.strip().lower()
-                stdout_msg = result.stdout.strip().lower()
-
-                # Detect authentication failures
-                if any(pattern in error_msg + stdout_msg for pattern in [
-                    "authentication", "permission denied", "credentials",
-                    "auth", "could not read", "fatal"
-                ]):
-                    raise RuntimeError(f"Git authentication failed during push: {result.stderr.strip()}")
-
-                # Detect network failures
-                if any(pattern in error_msg + stdout_msg for pattern in [
-                    "connection", "network", "timeout", "unreachable", "dns", "host"
-                ]):
-                    raise RuntimeError(f"Network failure during git push: {result.stderr.strip()}")
-
-                # Detect common push failures
-                if "rejected" in error_msg or "rejected" in stdout_msg:
-                    raise RuntimeError(f"Push rejected: {result.stderr.strip()} - may need to pull remote changes first")
-                elif "merge conflict" in error_msg or "merge conflict" in stdout_msg:
-                    raise RuntimeError(f"Merge conflict detected: {result.stderr.strip()}")
-                elif "non-fast-forward" in error_msg or "non-fast-forward" in stdout_msg:
-                    raise RuntimeError(f"Non-fast-forward push: {result.stderr.strip()} - remote has new commits")
+            # Detect common push failures
+            if "rejected" in error_msg or "rejected" in stdout_msg:
+                if "non-fast-forward" in error_msg or "non-fast-forward" in stdout_msg:
+                    raise GitConflictError(f"Non-fast-forward push: {result.stderr.strip()} - remote has new commits, pull required")
                 else:
-                    raise RuntimeError(f"git push failed: {result.stderr.strip()}")
-
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("Git push timed out - check network connection")
-        except FileNotFoundError:
-            raise RuntimeError("Git command not found - ensure git is installed")
+                    raise GitConflictError(f"Push rejected: {result.stderr.strip()} - may need to pull remote changes first")
+            elif "merge conflict" in error_msg or "merge conflict" in stdout_msg:
+                raise GitConflictError(f"Merge conflict detected: {result.stderr.strip()}")
+            else:
+                raise GitError(f"git push failed: {result.stderr.strip()}")
 
     async def rollback(self, manifest_path: str, commit_sha: str) -> StepResult:
         """

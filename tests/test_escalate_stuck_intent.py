@@ -37,35 +37,12 @@ from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """Isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "test.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 @pytest.fixture
-async def broadcaster() -> SSEBroadcaster:
-    """Fresh SSEBroadcaster per test."""
-    b = SSEBroadcaster()
-    await b.start()
-    yield b
-    await b.stop()
-
 
 @pytest.fixture
-def router(store: SessionStore) -> IntentRouter:
-    """IntentRouter with test store."""
-    return IntentRouter(store=store)
-
 
 @pytest.fixture
-def escalate_handler(store: SessionStore) -> EscalateHandler:
-    """EscalateHandler with test store."""
-    return EscalateHandler(store=store)
-
 
 # --- Test Stuck Intent Classification -----------------------------------------
 
@@ -168,11 +145,11 @@ class TestEscalateHandlerStuckIntegration:
         assert request_dict["metadata"]["urgency"] == "high"
 
     @pytest.mark.asyncio
-    async def test_escalate_handler_get_store(self, escalate_handler: EscalateHandler, store: SessionStore):
+    async def test_escalate_handler_get_store(self, escalate_handler: EscalateHandler, test_db_store):
         """EscalateHandler can get store via _get_store."""
         retrieved_store = await escalate_handler._get_store()
         assert retrieved_store is store
-        assert retrieved_store.db_path == store.db_path
+        assert retrieved_store.db_path == test_db_store.db_path
 
 
 # --- Test Stuck Card Metadata -----------------------------------------------
@@ -182,15 +159,15 @@ class TestStuckCardMetadata:
     """Test that stuck cards contain proper metadata."""
 
     @pytest.mark.asyncio
-    async def test_stuck_card_includes_intent_classification(self, router: IntentRouter, store: SessionStore):
+    async def test_stuck_card_includes_intent_classification(self, router: IntentRouter, test_db_store):
         """Stuck card preserves intent classification data."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="I'm stuck on this task",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -199,14 +176,14 @@ class TestStuckCardMetadata:
 
         # Create fenced bead scenario
         bead_ref = "adc-stuck-123"
-        await store.create_bead_watch(bead_ref=bead_ref)
-        await store.update_bead_watch_refusal(
+        await test_db_store.create_bead_watch(bead_ref=bead_ref)
+        await test_db_store.update_bead_watch_refusal(
             bead_ref=bead_ref,
             refusal_reason="Missing user context",
             comment_index=0,
             refusal_count_add=3,
         )
-        await store.fence_bead(bead_ref=bead_ref)
+        await test_db_store.fence_bead(bead_ref=bead_ref)
 
         # Create router with stuck classification
         classification = IntentClassification(
@@ -248,15 +225,15 @@ class TestStuckCardMetadata:
         assert result["refusal_count"] == 3
 
     @pytest.mark.asyncio
-    async def test_stuck_card_confidence_preserved(self, router: IntentRouter, store: SessionStore):
+    async def test_stuck_card_confidence_preserved(self, router: IntentRouter, test_db_store):
         """Stuck card preserves classification confidence."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Stuck task",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -264,8 +241,8 @@ class TestStuckCardMetadata:
         )
 
         bead_ref = "adc-stuck-456"
-        await store.create_bead_watch(bead_ref=bead_ref)
-        await store.fence_bead(bead_ref=bead_ref)
+        await test_db_store.create_bead_watch(bead_ref=bead_ref)
+        await test_db_store.fence_bead(bead_ref=bead_ref)
 
         classification = IntentClassification(
             intent_type=IntentType.STUCK,
@@ -308,10 +285,10 @@ class TestFenceEventTriggersStuckDetection:
     """Test that fence events trigger stuck detection during escalation."""
 
     @pytest.mark.asyncio
-    async def test_fence_detection_before_escalation(self, router: IntentRouter, store: SessionStore):
+    async def test_fence_detection_before_escalation(self, router: IntentRouter, test_db_store):
         """Fence is detected BEFORE escalation to new bead."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="New task attempt",
         )
@@ -320,7 +297,7 @@ class TestFenceEventTriggersStuckDetection:
         existing_bead_ref = "adc-fenced-789"
 
         # Create intent with the bead_ref (so the join works)
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -328,17 +305,17 @@ class TestFenceEventTriggersStuckDetection:
             bead_ref=existing_bead_ref,
         )
 
-        await store.create_bead_watch(bead_ref=existing_bead_ref)
-        await store.update_bead_watch_refusal(
+        await test_db_store.create_bead_watch(bead_ref=existing_bead_ref)
+        await test_db_store.update_bead_watch_refusal(
             bead_ref=existing_bead_ref,
             refusal_reason="Previous attempt blocked",
             comment_index=0,
             refusal_count_add=3,
         )
-        await store.fence_bead(bead_ref=existing_bead_ref)
+        await test_db_store.fence_bead(bead_ref=existing_bead_ref)
 
         # Verify bead is fenced
-        fenced_beads = await store.get_fenced_beads_for_session(session_id)
+        fenced_beads = await test_db_store.get_fenced_beads_for_session(session_id)
         assert len(fenced_beads) == 1
         assert fenced_beads[0]["bead_ref"] == existing_bead_ref
 
@@ -366,15 +343,15 @@ class TestFenceEventTriggersStuckDetection:
         assert result["stuck_reason"] == "Previous attempt blocked"
 
     @pytest.mark.asyncio
-    async def test_no_fence_allows_normal_escalation(self, router: IntentRouter, store: SessionStore):
+    async def test_no_fence_allows_normal_escalation(self, router: IntentRouter, test_db_store):
         """No fence allows normal escalation (stuck card not created)."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Normal task",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -382,7 +359,7 @@ class TestFenceEventTriggersStuckDetection:
         )
 
         # No fenced beads in session
-        fenced_beads = await store.get_fenced_beads_for_session(session_id)
+        fenced_beads = await test_db_store.get_fenced_beads_for_session(session_id)
         assert len(fenced_beads) == 0
 
         classification = IntentClassification(
@@ -412,10 +389,10 @@ class TestFenceEventTriggersStuckDetection:
             assert result["status"] == "escalated"
 
     @pytest.mark.asyncio
-    async def test_fence_detection_checks_most_recent_bead(self, router: IntentRouter, store: SessionStore):
+    async def test_fence_detection_checks_most_recent_bead(self, router: IntentRouter, test_db_store):
         """When multiple fenced beads exist, most recent is selected."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Test task",
         )
@@ -425,7 +402,7 @@ class TestFenceEventTriggersStuckDetection:
         bead_ref_2 = "adc-fenced-2"
 
         # Create intents with bead_refs (so the join works)
-        intent_id_1 = await store.create_intent(
+        intent_id_1 = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -433,7 +410,7 @@ class TestFenceEventTriggersStuckDetection:
             bead_ref=bead_ref_1,
         )
 
-        intent_id_2 = await store.create_intent(
+        intent_id_2 = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -441,18 +418,18 @@ class TestFenceEventTriggersStuckDetection:
             bead_ref=bead_ref_2,
         )
 
-        await store.create_bead_watch(bead_ref=bead_ref_1)
-        await store.fence_bead(bead_ref=bead_ref_1)
+        await test_db_store.create_bead_watch(bead_ref=bead_ref_1)
+        await test_db_store.fence_bead(bead_ref=bead_ref_1)
 
         # Add delay to ensure different timestamps
         import asyncio
         await asyncio.sleep(1.1)
 
-        await store.create_bead_watch(bead_ref=bead_ref_2)
-        await store.fence_bead(bead_ref=bead_ref_2)
+        await test_db_store.create_bead_watch(bead_ref=bead_ref_2)
+        await test_db_store.fence_bead(bead_ref=bead_ref_2)
 
         # Get fenced beads - should be ordered by fenced_at DESC
-        fenced_beads = await store.get_fenced_beads_for_session(session_id)
+        fenced_beads = await test_db_store.get_fenced_beads_for_session(session_id)
         assert len(fenced_beads) == 2
         assert fenced_beads[0]["bead_ref"] == bead_ref_2  # Most recent
 
@@ -485,15 +462,15 @@ class TestTopicCreationForStuckCards:
     """Test that topics are created/found for stuck cards."""
 
     @pytest.mark.asyncio
-    async def test_stuck_card_creates_new_topic_when_none_exists(self, router: IntentRouter, store: SessionStore):
+    async def test_stuck_card_creates_new_topic_when_none_exists(self, router: IntentRouter, test_db_store):
         """Stuck card creates a new topic when no topic exists."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Stuck task",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -501,8 +478,8 @@ class TestTopicCreationForStuckCards:
         )
 
         bead_ref = "adc-stuck-topic-1"
-        await store.create_bead_watch(bead_ref=bead_ref)
-        await store.fence_bead(bead_ref=bead_ref)
+        await test_db_store.create_bead_watch(bead_ref=bead_ref)
+        await test_db_store.fence_bead(bead_ref=bead_ref)
 
         classification = IntentClassification(
             intent_type=IntentType.STUCK,
@@ -536,7 +513,7 @@ class TestTopicCreationForStuckCards:
         assert result["topic_id"] is not None
 
         # Verify result was created for the new stuck topic
-        result_for_topic = await store.get_latest_result_for_topic(result["topic_id"])
+        result_for_topic = await test_db_store.get_latest_result_for_topic(result["topic_id"])
         assert result_for_topic is not None
         assert result_for_topic["summary"] == "Task stuck — needs your input"
 
@@ -546,22 +523,22 @@ class TestTopicCreationForStuckCards:
         # many-to-many relationship without updating the denormalized topic_id)
 
     @pytest.mark.asyncio
-    async def test_stuck_card_uses_existing_topic_when_available(self, router: IntentRouter, store: SessionStore):
+    async def test_stuck_card_uses_existing_topic_when_available(self, router: IntentRouter, test_db_store):
         """Stuck card can use an existing topic."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Task with topic",
         )
 
         # Create existing topic
-        existing_topic_id, _ = await store.find_or_create_topic(
+        existing_topic_id, _ = await test_db_store.find_or_create_topic(
             label="Existing Topic",
             session_id=session_id,
             topic_type="project",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -570,8 +547,8 @@ class TestTopicCreationForStuckCards:
         )
 
         bead_ref = "adc-stuck-topic-2"
-        await store.create_bead_watch(bead_ref=bead_ref)
-        await store.fence_bead(bead_ref=bead_ref)
+        await test_db_store.create_bead_watch(bead_ref=bead_ref)
+        await test_db_store.fence_bead(bead_ref=bead_ref)
 
         classification = IntentClassification(
             intent_type=IntentType.STUCK,
@@ -605,7 +582,7 @@ class TestTopicCreationForStuckCards:
         assert result["topic_id"] is not None
 
         # Verify result was created for the topic
-        result_for_topic = await store.get_latest_result_for_topic(result["topic_id"])
+        result_for_topic = await test_db_store.get_latest_result_for_topic(result["topic_id"])
         assert result_for_topic is not None
         assert result_for_topic["intent_id"] == intent_id
 
@@ -615,15 +592,15 @@ class TestTopicCreationForStuckCards:
         # remains the original topic (current implementation behavior)
 
     @pytest.mark.asyncio
-    async def test_stuck_card_topic_includes_bead_reference(self, router: IntentRouter, store: SessionStore):
+    async def test_stuck_card_topic_includes_bead_reference(self, router: IntentRouter, test_db_store):
         """Stuck card topic includes reference to fenced bead."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Stuck with bead ref",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -631,14 +608,14 @@ class TestTopicCreationForStuckCards:
         )
 
         bead_ref = "adc-stuck-topic-3"
-        await store.create_bead_watch(bead_ref=bead_ref)
-        await store.update_bead_watch_refusal(
+        await test_db_store.create_bead_watch(bead_ref=bead_ref)
+        await test_db_store.update_bead_watch_refusal(
             bead_ref=bead_ref,
             refusal_reason="Missing context",
             comment_index=0,
             refusal_count_add=3,
         )
-        await store.fence_bead(bead_ref=bead_ref)
+        await test_db_store.fence_bead(bead_ref=bead_ref)
 
         classification = IntentClassification(
             intent_type=IntentType.STUCK,
@@ -672,7 +649,7 @@ class TestTopicCreationForStuckCards:
         assert result["bead_id"] == bead_ref
 
         # Verify the result contains the topic and bead reference
-        result_for_topic = await store.get_latest_result_for_topic(result["topic_id"])
+        result_for_topic = await test_db_store.get_latest_result_for_topic(result["topic_id"])
         assert result_for_topic is not None
         result_data = json.loads(result_for_topic["data"])
         assert result_data["bead_id"] == bead_ref
@@ -685,15 +662,15 @@ class TestSSEBroadcastForStuckCards:
     """Test SSE broadcasting for stuck card events."""
 
     @pytest.mark.asyncio
-    async def test_stuck_card_broadcasts_sse_event(self, router: IntentRouter, store: SessionStore, broadcaster: SSEBroadcaster):
+    async def test_stuck_card_broadcasts_sse_event(self, router: IntentRouter, test_db_store, broadcaster: SSEBroadcaster):
         """Stuck card creation broadcasts SSE event."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="SSE test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -701,8 +678,8 @@ class TestSSEBroadcastForStuckCards:
         )
 
         bead_ref = "adc-sse-stuck"
-        await store.create_bead_watch(bead_ref=bead_ref)
-        await store.fence_bead(bead_ref=bead_ref)
+        await test_db_store.create_bead_watch(bead_ref=bead_ref)
+        await test_db_store.fence_bead(bead_ref=bead_ref)
 
         classification = IntentClassification(
             intent_type=IntentType.STUCK,
@@ -749,15 +726,15 @@ class TestSSEBroadcastForStuckCards:
         assert "timestamp" in event.data
 
     @pytest.mark.asyncio
-    async def test_stuck_sse_event_contains_all_required_fields(self, router: IntentRouter, store: SessionStore, broadcaster: SSEBroadcaster):
+    async def test_stuck_sse_event_contains_all_required_fields(self, router: IntentRouter, test_db_store, broadcaster: SSEBroadcaster):
         """Stuck SSE event contains all required fields."""
         session_id = "test-session"
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Complete SSE test",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -765,14 +742,14 @@ class TestSSEBroadcastForStuckCards:
         )
 
         bead_ref = "adc-complete-sse"
-        await store.create_bead_watch(bead_ref=bead_ref)
-        await store.update_bead_watch_refusal(
+        await test_db_store.create_bead_watch(bead_ref=bead_ref)
+        await test_db_store.update_bead_watch_refusal(
             bead_ref=bead_ref,
             refusal_reason="Complete test refusal",
             comment_index=0,
             refusal_count_add=5,
         )
-        await store.fence_bead(bead_ref=bead_ref)
+        await test_db_store.fence_bead(bead_ref=bead_ref)
 
         classification = IntentClassification(
             intent_type=IntentType.STUCK,
@@ -847,7 +824,7 @@ class TestStuckLogicCoverage:
         assert escalate_handler._reload_manager is None
 
     @pytest.mark.asyncio
-    async def test_get_escalate_handler_singleton(self, store: SessionStore):
+    async def test_get_escalate_handler_singleton(self, test_db_store):
         """get_escalate_handler returns singleton instance."""
         handler1 = get_escalate_handler(store=store)
         handler2 = get_escalate_handler(store=store)
@@ -855,7 +832,7 @@ class TestStuckLogicCoverage:
         assert handler1 is handler2  # Same instance
 
     @pytest.mark.asyncio
-    async def test_router_fence_check_coverage(self, router: IntentRouter, store: SessionStore):
+    async def test_router_fence_check_coverage(self, router: IntentRouter, test_db_store):
         """Verify _check_fence_for_bead covers all scenarios."""
         bead_ref = "adc-coverage-test"
 
@@ -864,18 +841,18 @@ class TestStuckLogicCoverage:
         assert fence_context is None
 
         # Scenario 2: Watch exists but not fenced
-        await store.create_bead_watch(bead_ref=bead_ref)
+        await test_db_store.create_bead_watch(bead_ref=bead_ref)
         fence_context = await router._check_fence_for_bead(bead_ref)
         assert fence_context is None
 
         # Scenario 3: Watch exists and is fenced
-        await store.update_bead_watch_refusal(
+        await test_db_store.update_bead_watch_refusal(
             bead_ref=bead_ref,
             refusal_reason="Coverage test",
             comment_index=0,
             refusal_count_add=3,
         )
-        await store.fence_bead(bead_ref=bead_ref)
+        await test_db_store.fence_bead(bead_ref=bead_ref)
 
         fence_context = await router._check_fence_for_bead(bead_ref)
         assert fence_context is not None
@@ -885,26 +862,26 @@ class TestStuckLogicCoverage:
         assert fence_context["fenced_at"] is not None
 
     @pytest.mark.asyncio
-    async def test_stuck_intent_end_to_end_flow(self, router: IntentRouter, store: SessionStore, broadcaster: SSEBroadcaster):
+    async def test_stuck_intent_end_to_end_flow(self, router: IntentRouter, test_db_store, broadcaster: SSEBroadcaster):
         """Test complete end-to-end stuck intent flow."""
         session_id = "e2e-test-session"
-        surface_id = await store.register_surface(
+        surface_id = await test_db_store.register_surface(
             session_id=session_id,
             surface_type="canvas",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="I'm stuck on this feature",
         )
 
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Feature Implementation",
             session_id=session_id,
             topic_type="project",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -914,14 +891,14 @@ class TestStuckLogicCoverage:
 
         # Simulate fence event
         bead_ref = "adc-e2e-stuck"
-        await store.create_bead_watch(bead_ref=bead_ref)
-        await store.update_bead_watch_refusal(
+        await test_db_store.create_bead_watch(bead_ref=bead_ref)
+        await test_db_store.update_bead_watch_refusal(
             bead_ref=bead_ref,
             refusal_reason="E2E test: Missing requirements",
             comment_index=1,
             refusal_count_add=3,
         )
-        await store.fence_bead(bead_ref=bead_ref)
+        await test_db_store.fence_bead(bead_ref=bead_ref)
 
         # Register SSE connection
         conn = broadcaster.register(
@@ -966,7 +943,7 @@ class TestStuckLogicCoverage:
         assert classification.intent_type == IntentType.STUCK
 
         # 2. Stuck card created in session store
-        results = await store.get_results_for_intent(intent_id)
+        results = await test_db_store.get_results_for_intent(intent_id)
         assert len(results) == 1
         assert results[0]["summary"] == "Task stuck — needs your input"
 
@@ -981,12 +958,12 @@ class TestStuckLogicCoverage:
         assert result["topic_id"] is not None
 
         # Verify the topic is accessible through results
-        result_for_topic = await store.get_latest_result_for_topic(result["topic_id"])
+        result_for_topic = await test_db_store.get_latest_result_for_topic(result["topic_id"])
         assert result_for_topic is not None
         assert result_for_topic["summary"] == "Task stuck — needs your input"
 
         # 5. Intent updated to stuck status
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["intent_type"] == "stuck"
         assert intent["status"] == "stuck"
 

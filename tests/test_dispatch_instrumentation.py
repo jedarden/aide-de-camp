@@ -47,19 +47,8 @@ from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """Isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "test.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 @pytest.fixture
-def mock_clock() -> Callable[[], float]:
-    """Mock monotonic clock that returns deterministic timestamps.
-
     Returns a callable that advances 100ms (0.1s) per call.
     """
     timestamps = []
@@ -77,74 +66,14 @@ def mock_clock() -> Callable[[], float]:
 
 
 @pytest.fixture
-def mock_broadcaster() -> SSEBroadcaster:
-    """Mock SSE broadcaster that captures broadcast calls."""
-    broadcaster = MagicMock(spec=SSEBroadcaster)
-    broadcaster.broadcast = AsyncMock()
-    return broadcaster
-
 
 @pytest.fixture
-def mock_zai_client():
-    """Mock ZAI LLM client for router classification."""
-    client = AsyncMock()
-    # Return a simple status classification
-    client.call_simple.return_value = '''[
-        {
-            "intent_type": "status",
-            "project_slug": "test-project",
-            "confidence": 0.9,
-            "utterance_fragment": "check the status",
-            "reasoning": "Simple status check",
-            "urgency": "normal"
-        }
-    ]'''
-    return client
-
 
 @pytest.fixture
-def mock_task_profile_zai_client():
-    """Mock ZAI LLM client for task-profile classification."""
-    client = AsyncMock()
-    # Return a task-profile classification
-    client.call_simple.return_value = '''[
-        {
-            "intent_type": "task-profile",
-            "project_slug": "test-project",
-            "confidence": 0.9,
-            "utterance_fragment": "implement this feature",
-            "reasoning": "Requires implementation work",
-            "urgency": "normal"
-        }
-    ]'''
-    return client
-
 
 @pytest.fixture
-def mock_synthesize_llm():
-    """Mock LLM for synthesize strand."""
-    llm = AsyncMock()
-    llm.call_simple.return_value = '''{
-        "data": {
-            "type": "status-result",
-            "status": "operational"
-        },
-        "summary": "All systems operational",
-        "urgency": "normal"
-    }'''
-    return llm
-
 
 @pytest.fixture
-def mock_escalate_result():
-    """Mock escalate result."""
-    return EscalateResult(
-        intent_id="test-intent",
-        bead_id="bead-123",
-        pending_card={"title": "Test Task"},
-        status="escalated"
-    )
-
 
 # =============================================================================
 # HOT-PATH dispatch tests
@@ -157,7 +86,7 @@ class TestHotPathDispatchInstrumentation:
     @pytest.mark.asyncio
     async def test_hot_path_records_server_side_stages(
         self,
-        store: SessionStore,
+        test_db_store,
         mock_clock: Callable[[], float],
         mock_broadcaster: SSEBroadcaster,
         mock_zai_client,
@@ -246,7 +175,7 @@ class TestHotPathDispatchInstrumentation:
             assert result["intent_id"] == "test-intent-1"
 
         # Verify: Exactly one dispatch_timings row exists
-        timings = await store.get_dispatch_timings("test-intent-1")
+        timings = await test_db_store.get_dispatch_timings("test-intent-1")
         assert timings is not None, "dispatch_timings row should exist"
 
         # Verify: Server-side stages are populated
@@ -269,7 +198,7 @@ class TestHotPathDispatchInstrumentation:
     @pytest.mark.asyncio
     async def test_hot_path_fetch_first_source_ms_recorded(
         self,
-        store: SessionStore,
+        test_db_store,
         mock_zai_client,
     ):
         """HOT-PATH dispatch records fetch_first_source_ms when first source resolves."""
@@ -349,7 +278,7 @@ class TestHotPathDispatchInstrumentation:
 
             await router.process_intent(routed_intent)
 
-            timings = await store.get_dispatch_timings("test-intent-2")
+            timings = await test_db_store.get_dispatch_timings("test-intent-2")
             assert timings is not None
             assert timings["fetch_first_source_ms"] is not None, \
                 "fetch_first_source_ms should be recorded when first source resolves"
@@ -367,7 +296,7 @@ class TestTaskProfileDispatchInstrumentation:
     @pytest.mark.asyncio
     async def test_task_profile_records_escalate_ms(
         self,
-        store: SessionStore,
+        test_db_store,
         mock_task_profile_zai_client,
         mock_escalate_result,
     ):
@@ -404,7 +333,7 @@ class TestTaskProfileDispatchInstrumentation:
             assert result["bead_id"] == "bead-123"
 
         # Verify: Exactly one dispatch_timings row exists
-        timings = await store.get_dispatch_timings("test-intent-task-profile")
+        timings = await test_db_store.get_dispatch_timings("test-intent-task-profile")
         assert timings is not None, "dispatch_timings row should exist"
 
         # Verify: Router stage is recorded
@@ -436,7 +365,7 @@ class TestSSEEmitTiming:
     @pytest.mark.asyncio
     async def test_sse_emit_ms_recorded_after_broadcast(
         self,
-        store: SessionStore,
+        test_db_store,
     ):
         """src/main.py stream_results() records sse_emit_ms after broadcast.
 
@@ -448,7 +377,7 @@ class TestSSEEmitTiming:
         intent_id = "test-intent-sse-emit"
 
         # First, create a dispatch_timings row with router stages
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             router_ms=100,
             fetch_total_ms=500,
@@ -461,10 +390,10 @@ class TestSSEEmitTiming:
         sse_emit_ms = int((time.monotonic() - emit_start) * 1000)
 
         # Record the SSE emit timing (second upsert)
-        await store.record_dispatch_timings(intent_id, sse_emit_ms=sse_emit_ms)
+        await test_db_store.record_dispatch_timings(intent_id, sse_emit_ms=sse_emit_ms)
 
         # Verify: All stages are present in the same row
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings is not None
 
         # Verify: Original router stages are still present
@@ -488,7 +417,7 @@ class TestNonFatalPersistence:
     @pytest.mark.asyncio
     async def test_router_persistence_failure_does_not_break_dispatch(
         self,
-        store: SessionStore,
+        test_db_store,
         mock_zai_client,
     ):
         """A persistence failure in _persist_timings does not break the dispatch.
@@ -558,7 +487,7 @@ class TestSynthesizeFirstTokenNull:
     @pytest.mark.asyncio
     async def test_synthesize_first_token_ms_null_on_non_streaming(
         self,
-        store: SessionStore,
+        test_db_store,
         mock_zai_client,
     ):
         """synthesize_first_token_ms is NULL on current non-streaming call_simple path.
@@ -609,7 +538,7 @@ class TestSynthesizeFirstTokenNull:
 
             await router.process_intent(routed_intent)
 
-            timings = await store.get_dispatch_timings("test-intent-first-token")
+            timings = await test_db_store.get_dispatch_timings("test-intent-first-token")
             assert timings is not None
 
             # Verify: synthesize_first_token_ms is NULL (documented behavior)

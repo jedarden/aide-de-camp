@@ -5,6 +5,7 @@ Topics are persistent concerns that accumulate intents and results.
 The canvas shows one card per active topic, updated in place.
 """
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 from datetime import datetime

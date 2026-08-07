@@ -1,0 +1,52 @@
+{
+  "data_summary": {
+    "total_events": 97398,
+    "start_time": "2026-07-10T17:39:33.767796+00:00",
+    "end_time": "2026-08-07T05:46:12.908111+00:00",
+    "actual_duration_hours": 660.1108723097223,
+    "events_per_hour": 147.54794093786887,
+    "actual_hours_with_data": 205
+  },
+  "step_size_analysis": [
+    {
+      "step_size": "1-hour",
+      "hours_per_bucket": 1,
+      "estimated_buckets_for_30_days": 720,
+      "estimated_events_per_bucket": 147.54794093786887,
+      "manageability_score": "good",
+      "granularity": "high",
+      "within_target": true
+    },
+    {
+      "step_size": "6-hour",
+      "hours_per_bucket": 6,
+      "estimated_buckets_for_30_days": 120,
+      "estimated_events_per_bucket": 885.2876456272132,
+      "manageability_score": "excellent",
+      "granularity": "medium",
+      "within_target": true
+    },
+    {
+      "step_size": "12-hour",
+      "hours_per_bucket": 12,
+      "estimated_buckets_for_30_days": 60,
+      "estimated_events_per_bucket": 1770.5752912544265,
+      "manageability_score": "excellent",
+      "granularity": "medium",
+      "within_target": true
+    },
+    {
+      "step_size": "24-hour",
+      "hours_per_bucket": 24,
+      "estimated_buckets_for_30_days": 30,
+      "estimated_events_per_bucket": 3541.150582508853,
+      "manageability_score": "excellent",
+      "granularity": "low",
+      "within_target": true
+    }
+  ],
+  "recommendation": {
+    "step_size": "1-hour",
+    "justification": "Provides high granularity with good manageability (720 buckets for 30 days)"
+  }
+}

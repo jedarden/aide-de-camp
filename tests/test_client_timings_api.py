@@ -11,7 +11,7 @@ This test suite verifies:
 
 Acceptance criteria:
 - Client-reported fields merge into a server-written row; server stages untouched.
-- /percentiles returns the documented shape and matches store.get_latency_percentiles() output.
+- /percentiles returns the documented shape and matches test_db_store.get_latency_percentiles() output.
 - Full existing suite still passes.
 """
 
@@ -28,14 +28,6 @@ from src.main import report_client_timings, get_latency_percentiles_endpoint
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """Isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "test.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 # --- report_client_timings() tests ------------------------------------------
 
@@ -44,7 +36,7 @@ class TestReportClientTimings:
     """Test report_client_timings() endpoint function behavior."""
 
     @pytest.mark.asyncio
-    async def test_report_timings_creates_row_with_client_fields(self, store: SessionStore):
+    async def test_report_timings_creates_row_with_client_fields(self, test_db_store):
         """report_client_timings() creates a new row with client-reported fields."""
         intent_id = "test-client-1"
 
@@ -71,7 +63,7 @@ class TestReportClientTimings:
             assert set(response["recorded"]) == {"stt_ms", "first_render_ms"}
 
             # Verify in database
-            timings = await store.get_dispatch_timings(intent_id)
+            timings = await test_db_store.get_dispatch_timings(intent_id)
             assert timings is not None
             assert timings["intent_id"] == intent_id
             assert timings["stt_ms"] == 312
@@ -80,12 +72,12 @@ class TestReportClientTimings:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_report_timings_upserts_into_existing_row(self, store: SessionStore):
+    async def test_report_timings_upserts_into_existing_row(self, test_db_store):
         """Client-reported fields upsert into server-written row without clobbering server-side stages."""
         intent_id = "test-upsert-merge"
 
         # First, create a server-written row with server-side stages
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             router_ms=123,
             fetch_total_ms=456,
@@ -93,7 +85,7 @@ class TestReportClientTimings:
         )
 
         # Verify initial state
-        timings = await store.get_dispatch_timings(intent_id)
+        timings = await test_db_store.get_dispatch_timings(intent_id)
         assert timings["router_ms"] == 123
         assert timings["fetch_total_ms"] == 456
         assert timings["synthesize_total_ms"] == 789
@@ -121,7 +113,7 @@ class TestReportClientTimings:
             assert response["ok"] is True
 
             # Verify server stages are untouched, client fields added
-            timings = await store.get_dispatch_timings(intent_id)
+            timings = await test_db_store.get_dispatch_timings(intent_id)
             assert timings["router_ms"] == 123, "Server router_ms should be preserved"
             assert timings["fetch_total_ms"] == 456, "Server fetch_total_ms should be preserved"
             assert timings["synthesize_total_ms"] == 789, "Server synthesize_total_ms should be preserved"
@@ -131,12 +123,12 @@ class TestReportClientTimings:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_report_timings_partial_client_fields(self, store: SessionStore):
+    async def test_report_timings_partial_client_fields(self, test_db_store):
         """Report with only one client field (e.g., just stt_ms) works correctly."""
         intent_id = "test-partial-client"
 
         # Create server-written row
-        await store.record_dispatch_timings(
+        await test_db_store.record_dispatch_timings(
             intent_id,
             router_ms=100,
             synthesize_total_ms=200,
@@ -163,7 +155,7 @@ class TestReportClientTimings:
             assert response["recorded"] == ["stt_ms"]
 
             # Verify: server stages intact, stt_ms set, first_render_ms still NULL
-            timings = await store.get_dispatch_timings(intent_id)
+            timings = await test_db_store.get_dispatch_timings(intent_id)
             assert timings["router_ms"] == 100
             assert timings["synthesize_total_ms"] == 200
             assert timings["stt_ms"] == 312
@@ -172,7 +164,7 @@ class TestReportClientTimings:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_report_timings_ignores_unknown_fields(self, store: SessionStore):
+    async def test_report_timings_ignores_unknown_fields(self, test_db_store):
         """Unknown fields in request body are ignored gracefully."""
         intent_id = "test-unknown-fields"
 
@@ -198,7 +190,7 @@ class TestReportClientTimings:
             assert response["recorded"] == ["stt_ms"]
 
             # Verify only known field was written
-            timings = await store.get_dispatch_timings(intent_id)
+            timings = await test_db_store.get_dispatch_timings(intent_id)
             assert timings is not None
             assert timings["stt_ms"] == 312
             assert timings["first_render_ms"] is None
@@ -218,7 +210,7 @@ class TestReportClientTimings:
         assert "intent_id is required" in response.body.decode()
 
     @pytest.mark.asyncio
-    async def test_report_timings_handles_unknown_intent_id(self, store: SessionStore):
+    async def test_report_timings_handles_unknown_intent_id(self, test_db_store):
         """Unknown intent_id creates a new row (idempotent)."""
         unknown_intent_id = "test-unknown-intent-id-never-seen-before"
 
@@ -241,7 +233,7 @@ class TestReportClientTimings:
             assert response["ok"] is True
 
             # Verify row was created
-            timings = await store.get_dispatch_timings(unknown_intent_id)
+            timings = await test_db_store.get_dispatch_timings(unknown_intent_id)
             assert timings is not None
             assert timings["intent_id"] == unknown_intent_id
             assert timings["stt_ms"] == 312
@@ -249,7 +241,7 @@ class TestReportClientTimings:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_report_timings_string_to_int_conversion(self, store: SessionStore):
+    async def test_report_timings_string_to_int_conversion(self, test_db_store):
         """String values for timing fields are converted to int."""
         intent_id = "test-string-conv"
 
@@ -273,7 +265,7 @@ class TestReportClientTimings:
             assert response["ok"] is True
 
             # Verify values were converted to int
-            timings = await store.get_dispatch_timings(intent_id)
+            timings = await test_db_store.get_dispatch_timings(intent_id)
             assert timings["stt_ms"] == 312
             assert timings["first_render_ms"] == 90
             assert isinstance(timings["stt_ms"], int)
@@ -288,7 +280,7 @@ class TestLatencyPercentilesEndpoint:
     """Test get_latency_percentiles_endpoint() function behavior."""
 
     @pytest.mark.asyncio
-    async def test_get_percentiles_returns_empty_dict_when_no_data(self, store: SessionStore):
+    async def test_get_percentiles_returns_empty_dict_when_no_data(self, test_db_store):
         """get_latency_percentiles_endpoint() returns empty dict when no timing data exists."""
         # Mock get_store to return our test store
         from src import main as main_module
@@ -306,12 +298,12 @@ class TestLatencyPercentilesEndpoint:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_get_percentiles_returns_correct_shape(self, store: SessionStore):
+    async def test_get_percentiles_returns_correct_shape(self, test_db_store):
         """get_latency_percentiles_endpoint() returns {stage: {p50, p95, count}} for stages with data."""
         # Create sample data
         for i, ms in enumerate([100, 150, 200, 250, 300]):
             intent_id = f"test-percentiles-shape-{i}"
-            await store.record_dispatch_timings(intent_id, router_ms=ms)
+            await test_db_store.record_dispatch_timings(intent_id, router_ms=ms)
 
         # Mock get_store to return our test store
         from src import main as main_module
@@ -334,12 +326,12 @@ class TestLatencyPercentilesEndpoint:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_get_percentiles_multiple_stages(self, store: SessionStore):
+    async def test_get_percentiles_multiple_stages(self, test_db_store):
         """get_latency_percentiles_endpoint() returns percentiles for all stages with data."""
         # Create timings with multiple stages
         for i in range(3):
             intent_id = f"test-multi-stage-{i}"
-            await store.record_dispatch_timings(
+            await test_db_store.record_dispatch_timings(
                 intent_id,
                 router_ms=100 + i * 50,
                 fetch_total_ms=200 + i * 100,
@@ -365,12 +357,12 @@ class TestLatencyPercentilesEndpoint:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_get_percentiles_stages_with_all_null_rows_are_absent(self, store: SessionStore):
+    async def test_get_percentiles_stages_with_all_null_rows_are_absent(self, test_db_store):
         """Stages with all-NULL rows simply don't appear in response."""
         # Create rows only for router_ms (no fetch_total_ms data)
         for i in range(3):
             intent_id = f"test-null-stages-{i}"
-            await store.record_dispatch_timings(
+            await test_db_store.record_dispatch_timings(
                 intent_id,
                 router_ms=100 + i * 50,
             )
@@ -393,17 +385,17 @@ class TestLatencyPercentilesEndpoint:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_get_percentiles_with_since_windowing(self, store: SessionStore):
+    async def test_get_percentiles_with_since_windowing(self, test_db_store):
         """since query-param filters to recent dispatches only."""
         now = int(datetime.now(timezone.utc).timestamp())
 
         # Create old timing (1 hour ago)
         old_intent_id = "test-old-percentile"
-        await store.record_dispatch_timings(old_intent_id, router_ms=1000)
+        await test_db_store.record_dispatch_timings(old_intent_id, router_ms=1000)
 
         # Manually set created_at to 1 hour ago
         import aiosqlite
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             one_hour_ago = now - 3600
             await db.execute(
                 "UPDATE dispatch_timings SET created_at = ? WHERE intent_id = ?",
@@ -413,7 +405,7 @@ class TestLatencyPercentilesEndpoint:
 
         # Create recent timing (now)
         recent_intent_id = "test-recent-percentile"
-        await store.record_dispatch_timings(recent_intent_id, router_ms=100)
+        await test_db_store.record_dispatch_timings(recent_intent_id, router_ms=100)
 
         # Mock get_store to return our test store
         from src import main as main_module
@@ -438,13 +430,13 @@ class TestLatencyPercentilesEndpoint:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_get_percentiles_matches_store_output(self, store: SessionStore):
-        """Endpoint output matches store.get_latency_percentiles() for the same data."""
+    async def test_get_percentiles_matches_store_output(self, test_db_store):
+        """Endpoint output matches test_db_store.get_latency_percentiles() for the same data."""
         # Create sample data
         values = [100, 150, 200, 250, 300]
         for i, ms in enumerate(values):
             intent_id = f"test-store-match-{i}"
-            await store.record_dispatch_timings(intent_id, router_ms=ms)
+            await test_db_store.record_dispatch_timings(intent_id, router_ms=ms)
 
         # Mock get_store to return our test store
         from src import main as main_module
@@ -460,7 +452,7 @@ class TestLatencyPercentilesEndpoint:
             endpoint_data = await get_latency_percentiles_endpoint(since=None)
 
             # Get store output
-            store_data = await store.get_latency_percentiles()
+            store_data = await test_db_store.get_latency_percentiles()
 
             # They should match
             assert endpoint_data == store_data
@@ -468,12 +460,12 @@ class TestLatencyPercentilesEndpoint:
             main_module.get_store = original_get_store
 
     @pytest.mark.asyncio
-    async def test_get_percentiles_with_client_reported_fields(self, store: SessionStore):
+    async def test_get_percentiles_with_client_reported_fields(self, test_db_store):
         """Client-reported fields (stt_ms, first_render_ms) appear in percentiles."""
         # Create rows with client-reported fields
         for i, ms in enumerate([200, 250, 300]):
             intent_id = f"test-client-percentile-{i}"
-            await store.record_dispatch_timings(
+            await test_db_store.record_dispatch_timings(
                 intent_id,
                 stt_ms=ms,
                 first_render_ms=ms + 50,

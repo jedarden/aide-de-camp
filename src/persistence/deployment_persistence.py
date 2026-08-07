@@ -9,6 +9,7 @@ Matches pbx-web deployment data structure for comparative analysis.
 
 import json
 import os
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, Union
@@ -153,23 +154,53 @@ def persist_deployment_data(
 
         # Create backup if requested and file exists
         if create_backup and Path(filepath).exists():
-            backup_path = f"{filepath}.backup"
+            backup_path = Path(f"{filepath}.backup")
             try:
                 import shutil
-                shutil.copy2(filepath, backup_path)
+                # Use atomic temp file + rename for backup creation
+                temp_backup_path = Path(f"{filepath}.{uuid.uuid4()}.tmp_backup")
+                shutil.copy2(filepath, temp_backup_path)
+                # Atomic rename to final backup location
+                temp_backup_path.replace(backup_path)
                 logger.debug(f"Created backup: {backup_path}")
             except Exception as e:
                 logger.warning(f"Failed to create backup: {e}")
+                # Clean up temp backup if it exists
+                if 'temp_backup_path' in locals() and temp_backup_path.exists():
+                    try:
+                        temp_backup_path.unlink()
+                    except Exception:
+                        pass
 
-        # Write to file with proper JSON encoding
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(
-                data_dict,
-                f,
-                indent=indent,
-                ensure_ascii=False,
-                default=serialize_datetime
-            )
+        # Write to file with atomic operations to prevent partial state issues
+        # Uses temp file + atomic rename pattern with unique naming (UUID4)
+        temp_path = Path(f"{filepath}.{uuid.uuid4()}.tmp")
+
+        try:
+            # Write to temp file first
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(
+                    data_dict,
+                    f,
+                    indent=indent,
+                    ensure_ascii=False,
+                    default=serialize_datetime
+                )
+                f.flush()
+                os.fsync(f.fileno())  # Ensure data is written to disk
+
+            # Atomic rename to target path
+            temp_path.replace(filepath)
+
+        except Exception as e:
+            # Clean up temp file if it exists
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
+            logger.error(f"Failed atomic write for {filepath}: {e}")
+            raise
 
         logger.info(f"Successfully persisted deployment data to: {filepath}")
 

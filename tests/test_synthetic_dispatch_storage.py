@@ -29,21 +29,8 @@ from src.main import app
 
 
 @pytest.fixture
-async def test_store(tmp_path: Path) -> SessionStore:
-    """An isolated SessionStore on a temp DB for testing."""
-    db_path = tmp_path / "test_session.db"
-    store = SessionStore(db_path)
-    await store.initialize()
-    yield store
-    await store.close()
-
 
 @pytest.fixture
-async def clean_session(test_store: SessionStore) -> str:
-    """Create and return a clean test session."""
-    session_id = await test_store.create_session()
-    return session_id
-
 
 # --- test data ---------------------------------------------------------------
 
@@ -81,7 +68,7 @@ class TestSyntheticDispatchStorageVerification:
     """
 
     @pytest.mark.asyncio
-    async def test_session_record_created(self, test_store: SessionStore) -> None:
+    async def test_session_record_created(self, test_test_db_store) -> None:
         """Verify that a session record is created with correct session_id."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -104,7 +91,7 @@ class TestSyntheticDispatchStorageVerification:
             assert session["last_active"] is not None, "Session last_active is NULL"
 
     @pytest.mark.asyncio
-    async def test_utterance_record_created(self, test_store: SessionStore) -> None:
+    async def test_utterance_record_created(self, test_test_db_store) -> None:
         """Verify that an utterance record is created and linked to session."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -136,7 +123,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert utterance["created_at"] is not None, "Utterance created_at is NULL"
 
     @pytest.mark.asyncio
-    async def test_intent_record_created(self, test_store: SessionStore) -> None:
+    async def test_intent_record_created(self, test_test_db_store) -> None:
         """Verify that an intent record is created and linked to utterance."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -169,7 +156,7 @@ class TestSyntheticDispatchStorageVerification:
                     stored_intent_id = intent["id"]
 
     @pytest.mark.asyncio
-    async def test_topic_record_created(self, test_store: SessionStore) -> None:
+    async def test_topic_record_created(self, test_test_db_store) -> None:
         """Verify that a topic record is created with correct type and label."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -213,7 +200,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert slugs == [expected_project_slug], f"Project slugs mismatch: expected ['{expected_project_slug}'], got {slugs}"
 
     @pytest.mark.asyncio
-    async def test_result_record_created(self, test_store: SessionStore) -> None:
+    async def test_result_record_created(self, test_test_db_store) -> None:
         """Verify that a result record is created with all fields intact."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -259,7 +246,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert stored_data == expected_data, f"Result data mismatch: expected {expected_data}, got {stored_data}"
 
     @pytest.mark.asyncio
-    async def test_foreign_key_relationships(self, test_store: SessionStore) -> None:
+    async def test_foreign_key_relationships(self, test_test_db_store) -> None:
         """Verify that foreign key relationships are correctly established."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -334,7 +321,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert row["scope"] == "session", f"Topic scope should be 'session', got '{row['scope']}'"
 
     @pytest.mark.asyncio
-    async def test_text_fields_match_payload_exactly(self, test_store: SessionStore) -> None:
+    async def test_text_fields_match_payload_exactly(self, test_test_db_store) -> None:
         """Verify that all text fields match the test payload exactly."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -394,7 +381,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert row["summary"] == custom_summary, f"Result summary mismatch: expected '{custom_summary}', got '{row['summary']}'"
 
     @pytest.mark.asyncio
-    async def test_multiple_synthetic_results_in_same_session(self, test_store: SessionStore) -> None:
+    async def test_multiple_synthetic_results_in_same_session(self, test_test_db_store) -> None:
         """Verify that multiple synthetic results in the same session are stored correctly."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -481,12 +468,12 @@ class TestSyntheticDispatchStorageVerification:
 
 class TestSyntheticDispatchAPIEndpoint:
     """
-    Verify that the HTTP API endpoint correctly persists data to session store.
+    Verify that the HTTP API endpoint correctly persists data to session test_db_store.
     """
 
     @pytest.mark.asyncio
-    async def test_api_creates_records_in_store(self, test_store: SessionStore) -> None:
-        """Verify that calling the API endpoint creates records in the session store."""
+    async def test_api_creates_records_in_store(self, test_test_db_store) -> None:
+        """Verify that calling the API endpoint creates records in the session test_db_store."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
         with patch('src.test.dispatch.get_store', return_value=test_store):

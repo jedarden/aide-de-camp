@@ -8,6 +8,7 @@ Provides three-layer freeze protection for self-modification writes:
 """
 
 import os
+import uuid
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
@@ -76,17 +77,52 @@ def set_frozen(frozen: bool) -> None:
     """
     Set freeze state by creating or removing sentinel file.
 
+    Uses atomic file operations to prevent partial state issues.
+
     Args:
         frozen: If True, create sentinel file; if False, remove it.
+
+    Raises:
+        OSError: If atomic operations fail
     """
     if frozen:
-        SENTINEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-        SENTINEL_PATH.write_text("Self-modification frozen via 'adc freeze' command\n")
-        logger.info(f"Created freeze sentinel: {SENTINEL_PATH}")
+        # Atomic write using temp file + rename pattern
+        try:
+            # Ensure directory exists
+            SENTINEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+            # Create temp file with unique name in same directory
+            temp_path = SENTINEL_PATH.parent / f".{SENTINEL_PATH.name}.{uuid.uuid4()}.tmp"
+
+            # Write to temp file
+            temp_path.write_text("Self-modification frozen via 'adc freeze' command\n")
+
+            # Atomic rename to target
+            temp_path.replace(SENTINEL_PATH)
+
+            logger.info(f"Created freeze sentinel: {SENTINEL_PATH}")
+
+        except Exception as e:
+            # Clean up temp file if it exists
+            if 'temp_path' in locals() and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
+            logger.error(f"Failed to create freeze sentinel: {e}")
+            raise OSError(f"Atomic write failed for freeze sentinel: {e}") from e
     else:
-        if SENTINEL_PATH.exists():
-            SENTINEL_PATH.unlink()
+        # Atomic unlink with error handling
+        try:
+            # Use try/except directly on unlink to avoid race condition
+            SENTINEL_PATH.unlink(missing_ok=False)
             logger.info(f"Removed freeze sentinel: {SENTINEL_PATH}")
+        except FileNotFoundError:
+            # Already removed - this is idempotent
+            logger.debug(f"Freeze sentinel already removed: {SENTINEL_PATH}")
+        except Exception as e:
+            logger.error(f"Failed to remove freeze sentinel: {e}")
+            raise OSError(f"Failed to remove freeze sentinel: {e}") from e
 
 
 def get_status() -> dict:
