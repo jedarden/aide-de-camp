@@ -8,29 +8,28 @@ basic JSON parsing, with no field extraction logic.
 
 import json
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Iterator, Dict
 
 from logging import getLogger
 
 logger = getLogger(__name__)
 
 
-def load_jsonl(file_path: str | Path) -> List[Dict[str, Any]]:
+def load_jsonl(file_path: str) -> Iterator[Dict]:
     """
     Load a JSONL file and parse each line as a JSON object.
 
     Reads the file line by line, parsing each line as a separate JSON object.
-    Empty lines are skipped. Returns an empty list if the file is empty.
+    Empty lines are skipped. Yields individual parsed dict objects.
 
     Args:
-        file_path: Path to the JSONL file (str or Path object).
+        file_path: Path to the JSONL file (str).
 
-    Returns:
-        List of dictionaries, one per line in the file. Empty list if file is empty.
+    Yields:
+        Dict objects parsed from each line in the file.
 
     Raises:
         FileNotFoundError: If the specified file does not exist.
-        json.JSONDecodeError: If any line (excluding empty lines) contains invalid JSON.
     """
     path = Path(file_path)
 
@@ -39,8 +38,6 @@ def load_jsonl(file_path: str | Path) -> List[Dict[str, Any]]:
 
     if not path.is_file():
         raise ValueError(f"Path is not a file: {path}")
-
-    results: List[Dict[str, Any]] = []
 
     with path.open('r', encoding='utf-8') as f:
         for line_num, line in enumerate(f, 1):
@@ -52,14 +49,7 @@ def load_jsonl(file_path: str | Path) -> List[Dict[str, Any]]:
 
             try:
                 obj = json.loads(line)
-                results.append(obj)
+                yield obj
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse line {line_num} in {path}: {e}")
-                raise json.JSONDecodeError(
-                    f"Invalid JSON on line {line_num} in {path}: {e.msg}",
-                    e.doc,
-                    e.pos
-                )
-
-    logger.info(f"Loaded {len(results)} JSON objects from {path}")
-    return results
+                logger.warning(f"Failed to parse line {line_num} in {path}: {e}")
+                continue
