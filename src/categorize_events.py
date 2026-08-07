@@ -93,7 +93,11 @@ def categorize_event(log_data: Dict[str, Any]) -> EventType:
     if _is_image_pull_error(error_code, source_fields):
         return EventType.IMAGE_PULL_ERROR
 
-    # Check for readiness failures BEFORE network errors (readiness is more specific)
+    # Check for pod crashes BEFORE readiness failures (crashes are more specific)
+    if _is_pod_crash(event_type, status, error_code, source_fields):
+        return EventType.POD_CRASH
+
+    # Check for readiness failures AFTER pod crashes (readiness issues are less specific)
     if _is_readiness_failure(event_type, status, error_code, source_fields):
         return EventType.READINESS_FAIL
 
@@ -113,16 +117,12 @@ def categorize_event(log_data: Dict[str, Any]) -> EventType:
     if _is_probe_failure(error_code, source_fields):
         return EventType.PROBE_FAILURE
 
-    # Check for pod crashes (broader category than specific errors above)
-    if _is_pod_crash(event_type, status, error_code, source_fields):
-        return EventType.POD_CRASH
-
     # Check for deployment lifecycle events LAST (most generic)
     # These only apply if no error condition was detected
     if _is_deployment_start(event_type, status):
         return EventType.DEPLOYMENT_START
 
-    if _is_deployment_complete(event_type, status):
+    if _is_deployment_complete(event_type, status, source_fields):
         return EventType.DEPLOYMENT_COMPLETE
 
     # Fallback to unknown
@@ -207,7 +207,7 @@ def _is_deployment_start(event_type: str, status: str) -> bool:
     return False
 
 
-def _is_deployment_complete(event_type: str, status: str) -> bool:
+def _is_deployment_complete(event_type: str, status: str, source_fields: Dict[str, Any]) -> bool:
     """
     Check if event represents a deployment completion.
 
@@ -219,6 +219,7 @@ def _is_deployment_complete(event_type: str, status: str) -> bool:
     Args:
         event_type: Event type from parsed event
         status: Status from parsed event
+        source_fields: Original raw fields from the log entry
 
     Returns:
         True if event indicates deployment completion, False otherwise
@@ -227,8 +228,14 @@ def _is_deployment_complete(event_type: str, status: str) -> bool:
     if event_type == 'replicaset_status' and status == 'success':
         return True
 
-    # Pod ready and stable
+    # Pod ready and stable (must have ready=True)
     if event_type == 'pod_status' and status == 'success':
+        # Check if pod is actually ready
+        if isinstance(source_fields, dict):
+            ready = source_fields.get('ready')
+            # Only categorize as complete if ready is True or not set (assume ready)
+            if ready is False:
+                return False  # Not ready, so not complete
         return True
 
     # Kubernetes events indicating completion
@@ -349,6 +356,10 @@ def _is_readiness_failure(event_type: str, status: str, error_code: Optional[str
         if (event_type and 'readiness' in event_type.lower() or
             error_code and 'readiness' in str(error_code).lower() or
             reason and 'readiness' in reason.lower()):
+            return True
+        # If ready=False and event_type is pod_status, categorize as readiness failure
+        # This handles the case where a pod is not ready but hasn't failed otherwise
+        if event_type == 'pod_status':
             return True
 
     # Check pod conditions for readiness-specific failures
@@ -675,6 +686,29 @@ def get_all_event_types() -> List[EventType]:
         List of EventType enum values
     """
     return list(EventType)
+
+
+# -----------------------------------------------------------------------------
+# Module-level constants for backward compatibility and test imports
+# These constants provide direct access to EventType enum values
+# -----------------------------------------------------------------------------
+
+# Deployment lifecycle events
+EVENT_DEPLOYMENT_START = EventType.DEPLOYMENT_START
+EVENT_DEPLOYMENT_COMPLETE = EventType.DEPLOYMENT_COMPLETE
+
+# Failure event types
+EVENT_POD_CRASH = EventType.POD_CRASH
+EVENT_OOM = EventType.OOM
+EVENT_READINESS_FAIL = EventType.READINESS_FAIL
+EVENT_TIMEOUT = EventType.TIMEOUT
+EVENT_IMAGE_PULL_ERROR = EventType.IMAGE_PULL_ERROR
+EVENT_RESOURCE_LIMIT = EventType.RESOURCE_LIMIT
+EVENT_PROBE_FAILURE = EventType.PROBE_FAILURE
+EVENT_NETWORK_ERROR = EventType.NETWORK_ERROR
+
+# Uncategorized events
+EVENT_UNKNOWN = EventType.UNKNOWN
 
 
 def categorize_events_batch(events: List[Dict[str, Any]]) -> Dict[EventType, List[Dict[str, Any]]]:
