@@ -1,0 +1,39 @@
+{
+  "verification_timestamp": "2026-08-07T04:07:17.896937",
+  "total_records": 48,
+  "total_issues": 13,
+  "issues": [
+    "Record 19: File exists but no log_size_bytes",
+    "Record 20: File exists but no log_size_bytes",
+    "Record 24: File exists but no log_size_bytes",
+    "Record 25: File exists but no log_size_bytes",
+    "Record 26: File exists but no log_size_bytes",
+    "Record 27: File exists but no log_size_bytes",
+    "Record 37: File exists but no log_size_bytes",
+    "Record 39: File exists but no log_size_bytes",
+    "Record 40: File exists but no log_size_bytes",
+    "Record 45: File exists but no log_size_bytes",
+    "Record 46: File exists but no log_size_bytes",
+    "Record 47: File exists but no log_size_bytes",
+    "Record 48: File exists but no log_size_bytes"
+  ],
+  "statistics": {
+    "records_with_creation_timestamp": 48,
+    "records_with_deletion_timestamp": 0,
+    "records_with_log_size_bytes": 35,
+    "files_existing": 48,
+    "records_with_detected_patterns": 0,
+    "total_log_size_bytes": 42045034,
+    "total_log_size_mb": 40.09726905822754,
+    "namespaces": {
+      "pbx-web": {
+        "count": 20,
+        "total_size": 14834911
+      },
+      "whisper-stt": {
+        "count": 28,
+        "total_size": 27210123
+      }
+    }
+  }
+}

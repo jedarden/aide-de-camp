@@ -29,23 +29,8 @@ from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 
 
 @pytest.fixture
-async def store(tmp_path):
-    """Create a fresh session store for each test."""
-    db_path = tmp_path / "test.db"
-    store = SessionStore(db_path)
-    await store.initialize()
-    yield store
-    await store.close()
-
 
 @pytest.fixture
-async def broadcaster():
-    """Create a fresh SSE broadcaster for each test."""
-    broadcaster = SSEBroadcaster()
-    await broadcaster.start()
-    yield broadcaster
-    await broadcaster.stop()
-
 
 @pytest.mark.asyncio
 async def test_stuck_card_complete_flow(store, broadcaster):
@@ -61,18 +46,18 @@ async def test_stuck_card_complete_flow(store, broadcaster):
     6. All data persists correctly in session store
     """
     # Step 1: Create test data - session, utterance, topic, intent
-    session_id = await store.create_session()
-    surface_id = await store.register_surface(
+    session_id = await test_db_store.create_session()
+    surface_id = await test_db_store.register_surface(
         session_id=session_id,
         surface_type="canvas",
     )
 
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="Implement feature X",
     )
 
-    topic_id, _ = await store.find_or_create_topic(
+    topic_id, _ = await test_db_store.find_or_create_topic(
         label="Implement feature X",
         session_id=session_id,
         topic_type="project",
@@ -80,7 +65,7 @@ async def test_stuck_card_complete_flow(store, broadcaster):
     )
 
     bead_ref = "adc-stuck-test-123"
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -90,7 +75,7 @@ async def test_stuck_card_complete_flow(store, broadcaster):
     )
 
     # Step 2: Create bead_watch and fence it (simulating circuit breaker)
-    await store.create_bead_watch(
+    await test_db_store.create_bead_watch(
         bead_ref=bead_ref,
         sla_hours=24,
         intent_type="task-profile",
@@ -98,7 +83,7 @@ async def test_stuck_card_complete_flow(store, broadcaster):
 
     # Simulate refusals that triggered fencing
     refusal_reason = "Missing context: need clarification on feature X requirements"
-    await store.update_bead_watch_refusal(
+    await test_db_store.update_bead_watch_refusal(
         bead_ref=bead_ref,
         refusal_reason=refusal_reason,
         comment_index=2,
@@ -106,10 +91,10 @@ async def test_stuck_card_complete_flow(store, broadcaster):
     )
 
     # Fence the bead
-    await store.fence_bead(bead_ref=bead_ref)
+    await test_db_store.fence_bead(bead_ref=bead_ref)
 
     # Verify bead is fenced
-    fenced_beads = await store.get_fenced_beads_for_session(session_id)
+    fenced_beads = await test_db_store.get_fenced_beads_for_session(session_id)
     assert len(fenced_beads) == 1
     assert fenced_beads[0]["bead_ref"] == bead_ref
     assert fenced_beads[0]["fenced_at"] is not None
@@ -157,13 +142,13 @@ async def test_stuck_card_complete_flow(store, broadcaster):
 
     # Step 6: Verify data persists in session store
     # Intent should have type='stuck' and status='stuck'
-    intent = await store.get_intent(intent_id)
+    intent = await test_db_store.get_intent(intent_id)
     assert intent["intent_type"] == "stuck"
     assert intent["status"] == "stuck"
     assert intent["bead_ref"] == bead_ref
 
     # Result should contain stuck card data
-    results = await store.get_results_for_intent(intent_id)
+    results = await test_db_store.get_results_for_intent(intent_id)
     assert len(results) == 1
 
     stuck_result = results[0]
@@ -203,22 +188,22 @@ async def test_stuck_card_persists_refusal_reason(store, broadcaster):
     - Refusal reason is copied to stuck card result
     - Refusal reason is included in SSE event
     """
-    session_id = await store.create_session()
-    surface_id = await store.register_surface(session_id, "canvas")
+    session_id = await test_db_store.create_session()
+    surface_id = await test_db_store.register_surface(session_id, "canvas")
 
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="Test task",
     )
 
-    topic_id, _ = await store.find_or_create_topic(
+    topic_id, _ = await test_db_store.find_or_create_topic(
         label="Test",
         session_id=session_id,
         topic_type="project",
     )
 
     bead_ref = "adc-refusal-test"
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -229,17 +214,17 @@ async def test_stuck_card_persists_refusal_reason(store, broadcaster):
 
     # Create bead watch with specific refusal reason
     refusal_reason = "REFUSED: Missing user input for configuration"
-    await store.create_bead_watch(bead_ref=bead_ref)
-    await store.update_bead_watch_refusal(
+    await test_db_store.create_bead_watch(bead_ref=bead_ref)
+    await test_db_store.update_bead_watch_refusal(
         bead_ref=bead_ref,
         refusal_reason=refusal_reason,
         comment_index=0,
         refusal_count_add=1,
     )
-    await store.fence_bead(bead_ref=bead_ref)
+    await test_db_store.fence_bead(bead_ref=bead_ref)
 
     # Verify refusal reason persists in bead_watch
-    bead_watch = await store.get_bead_watch(bead_ref)
+    bead_watch = await test_db_store.get_bead_watch(bead_ref)
     assert bead_watch["last_refusal_reason"] == refusal_reason
 
     # Create router and process intent
@@ -268,7 +253,7 @@ async def test_stuck_card_persists_refusal_reason(store, broadcaster):
     assert result["stuck_reason"] == refusal_reason
 
     # Verify refusal reason in persisted result
-    results = await store.get_results_for_intent(intent_id)
+    results = await test_db_store.get_results_for_intent(intent_id)
     assert len(results) == 1
     import json
     result_data = json.loads(results[0]["data"])
@@ -289,21 +274,21 @@ async def test_stuck_card_stores_bead_reference(store, broadcaster):
     - bead_id is stored in result data
     - Bead reference is queryable via session API
     """
-    session_id = await store.create_session()
+    session_id = await test_db_store.create_session()
 
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="Test bead reference",
     )
 
-    topic_id, _ = await store.find_or_create_topic(
+    topic_id, _ = await test_db_store.find_or_create_topic(
         label="Bead Ref Test",
         session_id=session_id,
         topic_type="project",
     )
 
     bead_ref = "adc-bead-ref-456"
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -313,8 +298,8 @@ async def test_stuck_card_stores_bead_reference(store, broadcaster):
     )
 
     # Fence the bead
-    await store.create_bead_watch(bead_ref=bead_ref)
-    await store.fence_bead(bead_ref=bead_ref)
+    await test_db_store.create_bead_watch(bead_ref=bead_ref)
+    await test_db_store.fence_bead(bead_ref=bead_ref)
 
     # Process intent
     router = IntentRouter(store=store)
@@ -333,17 +318,17 @@ async def test_stuck_card_stores_bead_reference(store, broadcaster):
         await router._escalate_to_bead(routed_intent, MagicMock())
 
     # Verify bead_ref stored in intent
-    intent = await store.get_intent(intent_id)
+    intent = await test_db_store.get_intent(intent_id)
     assert intent["bead_ref"] == bead_ref
 
     # Verify bead_id stored in result data
-    results = await store.get_results_for_intent(intent_id)
+    results = await test_db_store.get_results_for_intent(intent_id)
     import json
     result_data = json.loads(results[0]["data"])
     assert result_data["bead_id"] == bead_ref
 
     # Verify bead is queryable via fenced beads API
-    fenced_beads = await store.get_fenced_beads_for_session(session_id)
+    fenced_beads = await test_db_store.get_fenced_beads_for_session(session_id)
     assert len(fenced_beads) == 1
     assert fenced_beads[0]["bead_ref"] == bead_ref
 
@@ -359,22 +344,22 @@ async def test_stuck_card_coverage_all_fields(store, broadcaster):
     - Result data: bead_id, stuck_reason, refusal_count, message, action_hint
     - SSE event: all required fields
     """
-    session_id = await store.create_session()
-    surface_id = await store.register_surface(session_id, "canvas")
+    session_id = await test_db_store.create_session()
+    surface_id = await test_db_store.register_surface(session_id, "canvas")
 
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="Full coverage test",
     )
 
-    topic_id, _ = await store.find_or_create_topic(
+    topic_id, _ = await test_db_store.find_or_create_topic(
         label="Coverage Test",
         session_id=session_id,
         topic_type="project",
     )
 
     bead_ref = "adc-coverage-test"
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -383,14 +368,14 @@ async def test_stuck_card_coverage_all_fields(store, broadcaster):
         topic_id=topic_id,
     )
 
-    await store.create_bead_watch(bead_ref=bead_ref)
-    await store.update_bead_watch_refusal(
+    await test_db_store.create_bead_watch(bead_ref=bead_ref)
+    await test_db_store.update_bead_watch_refusal(
         bead_ref=bead_ref,
         refusal_reason="Coverage test refusal",
         comment_index=0,
         refusal_count_add=3,
     )
-    await store.fence_bead(bead_ref=bead_ref)
+    await test_db_store.fence_bead(bead_ref=bead_ref)
 
     router = IntentRouter(store=store)
     routed_intent = RoutedIntent(
@@ -414,7 +399,7 @@ async def test_stuck_card_coverage_all_fields(store, broadcaster):
         result = await router._escalate_to_bead(routed_intent, MagicMock())
 
     # Verify all intent fields
-    intent = await store.get_intent(intent_id)
+    intent = await test_db_store.get_intent(intent_id)
     assert intent["intent_type"] == "stuck"
     assert intent["status"] == "stuck"
     assert intent["bead_ref"] == bead_ref
@@ -422,7 +407,7 @@ async def test_stuck_card_coverage_all_fields(store, broadcaster):
     assert intent["project_slug"] == "adc"
 
     # Verify all result fields
-    results = await store.get_results_for_intent(intent_id)
+    results = await test_db_store.get_results_for_intent(intent_id)
     assert len(results) == 1
     result_row = results[0]
 
@@ -475,14 +460,14 @@ async def test_multiple_fenced_beads_selects_most_recent(store, broadcaster):
     - Router selects the most recently fenced bead
     - Stuck card is created for the correct bead
     """
-    session_id = await store.create_session()
+    session_id = await test_db_store.create_session()
 
-    utterance_id = await store.create_utterance(
+    utterance_id = await test_db_store.create_utterance(
         session_id=session_id,
         raw_text="Test multiple fenced",
     )
 
-    topic_id, _ = await store.find_or_create_topic(
+    topic_id, _ = await test_db_store.find_or_create_topic(
         label="Multiple Fenced",
         session_id=session_id,
         topic_type="project",
@@ -493,7 +478,7 @@ async def test_multiple_fenced_beads_selects_most_recent(store, broadcaster):
     bead_ref_2 = "adc-fenced-2"
 
     # Create intents for both beads (so they're tracked in the session)
-    intent_id_1 = await store.create_intent(
+    intent_id_1 = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -503,7 +488,7 @@ async def test_multiple_fenced_beads_selects_most_recent(store, broadcaster):
     )
 
     # Create a second intent for the second bead
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -513,31 +498,31 @@ async def test_multiple_fenced_beads_selects_most_recent(store, broadcaster):
     )
 
     # Create and fence both beads
-    await store.create_bead_watch(bead_ref=bead_ref_1)
-    await store.update_bead_watch_refusal(
+    await test_db_store.create_bead_watch(bead_ref=bead_ref_1)
+    await test_db_store.update_bead_watch_refusal(
         bead_ref=bead_ref_1,
         refusal_reason="First refusal",
         comment_index=0,
         refusal_count_add=3,
     )
-    await store.fence_bead(bead_ref=bead_ref_1)
+    await test_db_store.fence_bead(bead_ref=bead_ref_1)
 
     # Add a delay to ensure different fenced_at timestamps (fenced_at is seconds precision)
     import asyncio
     await asyncio.sleep(1.1)
 
     # Second bead (more recent)
-    await store.create_bead_watch(bead_ref=bead_ref_2)
-    await store.update_bead_watch_refusal(
+    await test_db_store.create_bead_watch(bead_ref=bead_ref_2)
+    await test_db_store.update_bead_watch_refusal(
         bead_ref=bead_ref_2,
         refusal_reason="Second refusal",
         comment_index=0,
         refusal_count_add=3,
     )
-    await store.fence_bead(bead_ref=bead_ref_2)
+    await test_db_store.fence_bead(bead_ref=bead_ref_2)
 
     # Verify both are fenced
-    fenced_beads = await store.get_fenced_beads_for_session(session_id)
+    fenced_beads = await test_db_store.get_fenced_beads_for_session(session_id)
     assert len(fenced_beads) == 2
 
     # Most recently fenced should be first

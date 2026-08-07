@@ -720,7 +720,7 @@ class SessionStore:
         max_retries=3,
         base_delay=0.1,
         max_delay=1.0,
-        exceptions=(sqlite3.OperationalError, aiosqlite.Connection, asyncio.TimeoutError)
+        exceptions=(sqlite3.OperationalError, aiosqlite.OperationalError, asyncio.TimeoutError)
     )
     async def create_session(self, session_id: str | None = None) -> str:
         """Create a new session and return its ID."""
@@ -988,8 +988,7 @@ class SessionStore:
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
-                """SELECT id, intent_id, topic_id, session_id, summary, data, urgency, result_type, created_at
-                   FROM results WHERE id = ?""",
+                """SELECT * FROM results WHERE id = ?""",
                 (result_id,)
             ) as cursor:
                 row = await cursor.fetchone()
@@ -1033,7 +1032,7 @@ class SessionStore:
         max_retries=3,
         base_delay=0.1,
         max_delay=1.0,
-        exceptions=(sqlite3.OperationalError, aiosqlite.Connection, asyncio.TimeoutError)
+        exceptions=(sqlite3.OperationalError, aiosqlite.OperationalError, asyncio.TimeoutError)
     )
     async def create_intent(
         self,
@@ -1187,7 +1186,7 @@ class SessionStore:
         max_retries=3,
         base_delay=0.1,
         max_delay=1.0,
-        exceptions=(sqlite3.OperationalError, aiosqlite.Connection, asyncio.TimeoutError)
+        exceptions=(sqlite3.OperationalError, aiosqlite.OperationalError, asyncio.TimeoutError)
     )
     async def create_result(
         self,

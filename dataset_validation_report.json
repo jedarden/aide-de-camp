@@ -1,0 +1,58 @@
+{
+  "validation_timestamp": "2026-08-07T08:28:35.831980",
+  "checks": [
+    {
+      "service": "pbx-web",
+      "checks": [
+        {
+          "check": "has_records",
+          "passed": true,
+          "details": "20 records found"
+        },
+        {
+          "check": "has_timestamps",
+          "passed": true,
+          "details": "All records have timestamp field"
+        },
+        {
+          "check": "gap_records_flagged",
+          "passed": true,
+          "details": "All gap placeholders have metadata flags"
+        },
+        {
+          "check": "coverage_calculated",
+          "passed": true,
+          "details": "Coverage: 26.67%"
+        }
+      ],
+      "service_status": "passed"
+    },
+    {
+      "service": "whisper-stt",
+      "checks": [
+        {
+          "check": "has_records",
+          "passed": true,
+          "details": "34 records found"
+        },
+        {
+          "check": "has_timestamps",
+          "passed": true,
+          "details": "All records have timestamp field"
+        },
+        {
+          "check": "gap_records_flagged",
+          "passed": true,
+          "details": "All gap placeholders have metadata flags"
+        },
+        {
+          "check": "coverage_calculated",
+          "passed": true,
+          "details": "Coverage: 10.34%"
+        }
+      ],
+      "service_status": "passed"
+    }
+  ],
+  "overall_status": "passed"
+}

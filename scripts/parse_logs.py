@@ -43,6 +43,8 @@ DATA_SOURCES = {
     'whisper-stt': [
         'data/whisper-stt-pods.jsonl',
         'data/whisper-stt-replicasets.jsonl',
+        'logs/whisper-stt-30day.jsonl',
+        'logs/whisper-stt-30day-victorialogs.jsonl',
     ]
 }
 

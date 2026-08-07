@@ -46,6 +46,19 @@ def get_file_mtime(file_path: str) -> Optional[str]:
         return None
 
 
+def is_valid_iso_timestamp(timestamp: str) -> bool:
+    """Check if a string is a valid ISO 8601 timestamp."""
+    if not timestamp:
+        return False
+    try:
+        # Try to parse as ISO format, handling both Z and +00:00 timezone formats
+        normalized = timestamp.replace('Z', '+00:00')
+        datetime.fromisoformat(normalized)
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+
 def extract_deletion_timestamp_from_log(file_path: str) -> Optional[str]:
     """
     Extract deletion timestamp from log content if available.
@@ -54,6 +67,9 @@ def extract_deletion_timestamp_from_log(file_path: str) -> Optional[str]:
     - Pod deletion events
     - Container termination messages
     - Last log entries indicating shutdown
+
+    Returns:
+        ISO 8601 timestamp string or None. Invalid timestamp formats are filtered out.
     """
     try:
         with open(file_path, 'r', errors='ignore') as f:
@@ -84,12 +100,15 @@ def extract_deletion_timestamp_from_log(file_path: str) -> Optional[str]:
                         for i, part in enumerate(parts[:5]):  # Check first 5 parts
                             # Try ISO format
                             if 'T' in part and ('Z' in part or '+' in part):
-                                return part.split('+')[0].split('Z')[0]
+                                candidate = part.split('+')[0].split('Z')[0]
+                                if is_valid_iso_timestamp(candidate):
+                                    return candidate
                             # Try other common formats
                             try:
                                 # Try RFC3339-like format
                                 if '-' in part and ':' in part:
-                                    return part
+                                    if is_valid_iso_timestamp(part):
+                                        return part
                             except:
                                 pass
 

@@ -4,7 +4,7 @@ Persistence + SSE broadcast unit tests (bead adc-18as).
 Hermetic, network-free tests for the two modules that turn a synthesized
 result into something the user sees:
 
-- src/session/store.py — SessionStore persists topics, intents, and results
+- src/session/test_db_store.py — SessionStore persists topics, intents, and results
   to SQLite. The same code backs data/session.db in production; these tests
   point it at an isolated tmp DB so they never touch real session data.
 - src/sse/broadcaster.py — SSEBroadcaster routes events to connected
@@ -51,37 +51,20 @@ from src.sse.broadcaster import (
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """An isolated SessionStore on a tmp DB (same code as production session.db)."""
-    db_path = tmp_path / "session.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
 
-
-@pytest.fixture
-async def broadcaster() -> SSEBroadcaster:
-    """A fresh SSEBroadcaster per test — never the process-wide singleton."""
-    b = SSEBroadcaster()
-    await b.start()
-    yield b
-    await b.stop()
-
-
-async def _seed(store: SessionStore, topic_label: str = "K8s Status") -> dict:
+async def _seed(test_db_store, topic_label: str = "K8s Status") -> dict:
     """Create a full session→surface→utterance→intent→topic chain; return ids."""
-    session_id = await store.create_session()
-    surface_id = await store.register_surface(session_id, "canvas")
-    utterance_id = await store.create_utterance(session_id, "check pods")
-    topic_id = await store.create_topic(
+    session_id = await test_db_store.create_session()
+    surface_id = await test_db_store.register_surface(session_id, "canvas")
+    utterance_id = await test_db_store.create_utterance(session_id, "check pods")
+    topic_id = await test_db_store.create_topic(
         label=topic_label,
         topic_type="project",
         project_slugs=["k8s"],
         scope="session",
         session_id=session_id,
     )
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="k8s",
@@ -106,7 +89,7 @@ class TestResultPersistence:
     async def test_result_row_round_trips_all_fields(self, store):
         ids = await _seed(store)
         data = {"pods": [{"name": "web-0", "phase": "Running"}], "count": 1}
-        result_id = await store.create_result(
+        result_id = await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
@@ -115,7 +98,7 @@ class TestResultPersistence:
             urgency="normal",
         )
 
-        row = await store.get_latest_result_for_topic(ids["topic_id"])
+        row = await test_db_store.get_latest_result_for_topic(ids["topic_id"])
         assert row is not None
         assert row["id"] == result_id
         assert row["intent_id"] == ids["intent_id"]
@@ -129,7 +112,7 @@ class TestResultPersistence:
         ids = await _seed(store)
         data = {"a": 1, "nested": {"b": [2, 3]}, "ok": True}
 
-        await store.create_result(
+        await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
@@ -137,7 +120,7 @@ class TestResultPersistence:
             data=data,
         )
 
-        row = await store.get_latest_result_for_topic(ids["topic_id"])
+        row = await test_db_store.get_latest_result_for_topic(ids["topic_id"])
         # Stored as a JSON string; parsing must reproduce the exact dict.
         assert isinstance(row["data"], str)
         assert json.loads(row["data"]) == data
@@ -146,7 +129,7 @@ class TestResultPersistence:
     async def test_surfaced_at_set_on_creation(self, store):
         ids = await _seed(store)
 
-        await store.create_result(
+        await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
@@ -154,20 +137,20 @@ class TestResultPersistence:
             data={},
         )
 
-        row = await store.get_latest_result_for_topic(ids["topic_id"])
+        row = await test_db_store.get_latest_result_for_topic(ids["topic_id"])
         assert row["surfaced_at"] is not None
 
     @pytest.mark.asyncio
     async def test_latest_result_is_the_most_recent(self, store):
         ids = await _seed(store)
-        first = await store.create_result(
+        first = await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
             summary="first",
             data={"n": 1},
         )
-        second = await store.create_result(
+        second = await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
@@ -177,26 +160,26 @@ class TestResultPersistence:
         # created_at is integer-second resolution, so two rapid inserts can tie
         # and make ORDER BY created_at DESC ambiguous. Pin distinct ordered
         # timestamps so "second" is unambiguously the latest.
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             await db.execute("UPDATE results SET created_at = 100 WHERE id = ?", (first,))
             await db.execute("UPDATE results SET created_at = 200 WHERE id = ?", (second,))
             await db.commit()
 
-        row = await store.get_latest_result_for_topic(ids["topic_id"])
+        row = await test_db_store.get_latest_result_for_topic(ids["topic_id"])
         assert row["id"] == second
         assert row["summary"] == "second"
 
     @pytest.mark.asyncio
     async def test_diff_chain_links_sequential_results(self, store):
         ids = await _seed(store)
-        first = await store.create_result(
+        first = await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
             summary="first",
             data={"cpu": 50},
         )
-        second = await store.create_result(
+        second = await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
@@ -207,12 +190,12 @@ class TestResultPersistence:
             diff_data={"fields": [{"field_name": "cpu", "old_value": 50, "new_value": 60}]},
         )
         # See test_latest_result_is_the_most_recent: pin ordered timestamps.
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             await db.execute("UPDATE results SET created_at = 100 WHERE id = ?", (first,))
             await db.execute("UPDATE results SET created_at = 200 WHERE id = ?", (second,))
             await db.commit()
 
-        row = await store.get_latest_result_for_topic(ids["topic_id"])
+        row = await test_db_store.get_latest_result_for_topic(ids["topic_id"])
         assert row["id"] == second
         assert row["previous_result_id"] == first
         assert row["diff_summary"] == "cpu changed"
@@ -221,25 +204,25 @@ class TestResultPersistence:
     @pytest.mark.asyncio
     async def test_topic_result_count_increments(self, store):
         ids = await _seed(store)
-        assert (await store.get_active_topics(ids["session_id"]))[0]["result_count"] == 0
+        assert (await test_db_store.get_active_topics(ids["session_id"]))[0]["result_count"] == 0
 
-        await store.create_result(
+        await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
             summary="one",
             data={},
         )
-        assert (await store.get_active_topics(ids["session_id"]))[0]["result_count"] == 1
+        assert (await test_db_store.get_active_topics(ids["session_id"]))[0]["result_count"] == 1
 
-        await store.create_result(
+        await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
             summary="two",
             data={},
         )
-        assert (await store.get_active_topics(ids["session_id"]))[0]["result_count"] == 2
+        assert (await test_db_store.get_active_topics(ids["session_id"]))[0]["result_count"] == 2
 
 
 # --- 1b. production factory path -------------------------------------------
@@ -263,7 +246,7 @@ class TestStoreFactory:
         monkeypatch.setattr(store_mod, "_store", None)  # force a rebuild
 
         store = store_mod.get_store()
-        assert store.db_path == tmp_db
+        assert test_db_store.db_path == tmp_db
 
     def test_factory_caches_singleton(self, tmp_path, monkeypatch):
         """Repeated calls return the same cached instance — the router relies on
@@ -284,27 +267,27 @@ class TestStoreFactory:
         monkeypatch.setattr(store_mod, "_store", None)
 
         store = store_mod.get_store()
-        await store.initialize()
-        session_id = await store.create_session()
-        topic_id = await store.create_topic(
+        await test_db_store.initialize()
+        session_id = await test_db_store.create_session()
+        topic_id = await test_db_store.create_topic(
             label="K8s", topic_type="project", session_id=session_id
         )
-        utterance_id = await store.create_utterance(session_id, "check pods")
-        intent_id = await store.create_intent(
+        utterance_id = await test_db_store.create_utterance(session_id, "check pods")
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="k8s",
             intent_type="lookup",
         )
         data = {"pods": [{"name": "web-0"}], "count": 1}
-        result_id = await store.create_result(
+        result_id = await test_db_store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
             summary="1 pod running",
             data=data,
         )
-        await store.close()
+        await test_db_store.close()
 
         # Re-open the same file with a brand-new SessionStore — the row must
         # survive, proving it was flushed to disk and not held in memory.
@@ -324,8 +307,8 @@ class TestTopicRecords:
 
     @pytest.mark.asyncio
     async def test_create_topic_persists_type_scope_and_slugs(self, store):
-        session_id = await store.create_session()
-        topic_id = await store.create_topic(
+        session_id = await test_db_store.create_session()
+        topic_id = await test_db_store.create_topic(
             label="Options Pipeline",
             topic_type="project",
             project_slugs=["options"],
@@ -333,7 +316,7 @@ class TestTopicRecords:
             session_id=session_id,
         )
 
-        topics = await store.get_active_topics(session_id)
+        topics = await test_db_store.get_active_topics(session_id)
         assert len(topics) == 1
         t = topics[0]
         assert t["id"] == topic_id
@@ -344,30 +327,30 @@ class TestTopicRecords:
 
     @pytest.mark.asyncio
     async def test_find_or_create_returns_existing_without_duplicate(self, store):
-        session_id = await store.create_session()
+        session_id = await test_db_store.create_session()
 
-        first_id, created_first = await store.find_or_create_topic(
+        first_id, created_first = await test_db_store.find_or_create_topic(
             label="K8s", session_id=session_id, topic_type="project"
         )
-        again_id, created_again = await store.find_or_create_topic(
+        again_id, created_again = await test_db_store.find_or_create_topic(
             label="K8s", session_id=session_id, topic_type="project"
         )
 
         assert created_first is True
         assert created_again is False
         assert again_id == first_id
-        assert len(await store.get_active_topics(session_id)) == 1  # no duplicate
+        assert len(await test_db_store.get_active_topics(session_id)) == 1  # no duplicate
 
     @pytest.mark.asyncio
     async def test_find_or_create_is_session_scoped(self, store):
         """The same label in two different sessions yields two distinct topics."""
-        s1 = await store.create_session()
-        s2 = await store.create_session()
+        s1 = await test_db_store.create_session()
+        s2 = await test_db_store.create_session()
 
-        t1, c1 = await store.find_or_create_topic(
+        t1, c1 = await test_db_store.find_or_create_topic(
             label="Status", session_id=s1, topic_type="research"
         )
-        t2, c2 = await store.find_or_create_topic(
+        t2, c2 = await test_db_store.find_or_create_topic(
             label="Status", session_id=s2, topic_type="research"
         )
 
@@ -377,35 +360,35 @@ class TestTopicRecords:
     @pytest.mark.asyncio
     async def test_global_topic_visible_to_every_session(self, store):
         """A global-scope topic shows up in any session's active-topics query."""
-        s1 = await store.create_session()
-        s2 = await store.create_session()
-        await store.create_topic(
+        s1 = await test_db_store.create_session()
+        s2 = await test_db_store.create_session()
+        await test_db_store.create_topic(
             label="Global Thing",
             topic_type="project",
             scope="global",
             session_id=None,
         )
 
-        labels_s1 = {t["label"] for t in await store.get_active_topics(s1)}
-        labels_s2 = {t["label"] for t in await store.get_active_topics(s2)}
+        labels_s1 = {t["label"] for t in await test_db_store.get_active_topics(s1)}
+        labels_s2 = {t["label"] for t in await test_db_store.get_active_topics(s2)}
         assert "Global Thing" in labels_s1
         assert "Global Thing" in labels_s2
 
     @pytest.mark.asyncio
     async def test_update_topic_activity_bumps_last_active(self, store):
-        session_id = await store.create_session()
-        topic_id = await store.create_topic(
+        session_id = await test_db_store.create_session()
+        topic_id = await test_db_store.create_topic(
             label="X", topic_type="project", session_id=session_id
         )
         # Force an artificially old last_active so the bump is observable
         # without a 1-second wall-clock wait (timestamps are integer seconds).
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(test_db_store.db_path) as db:
             await db.execute("UPDATE topics SET last_active = 0 WHERE id = ?", (topic_id,))
             await db.commit()
 
-        await store.update_topic_activity(topic_id)
+        await test_db_store.update_topic_activity(topic_id)
 
-        assert (await store.get_active_topics(session_id))[0]["last_active"] > 0
+        assert (await test_db_store.get_active_topics(session_id))[0]["last_active"] > 0
 
 
 # --- 3. SSE result_created -------------------------------------------------
@@ -525,7 +508,7 @@ class TestPersistenceSSEIntegration:
 
         ids = await _seed(store)
         data = {"pods": [{"name": "web-0"}], "count": 1}
-        result_id = await store.create_result(
+        result_id = await test_db_store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
@@ -560,6 +543,6 @@ class TestPersistenceSSEIntegration:
         assert event.data["result_id"] == result_id
         assert event.data["summary"] == "1 pod running"
         # …and the store agrees the result exists for this topic.
-        row = await store.get_latest_result_for_topic(ids["topic_id"])
+        row = await test_db_store.get_latest_result_for_topic(ids["topic_id"])
         assert row["id"] == result_id
         assert json.loads(row["data"]) == data

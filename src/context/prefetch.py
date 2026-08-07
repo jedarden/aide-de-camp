@@ -433,17 +433,23 @@ class SpeculativePrefetcher:
         return result
 
     async def cleanup_expired(self) -> int:
-        """Clean up expired cache entries. Returns count of cleaned entries."""
+        """Clean up expired cache entries using atomic operations. Returns count of cleaned entries."""
         now = int(datetime.now(timezone.utc).timestamp())
+
+        # Atomic cleanup: build expired keys list first
         expired_keys = [
             key for key, cache in self._cache.items()
             if cache.expires_at < now
         ]
 
-        for key in expired_keys:
-            del self._cache[key]
-
+        # Atomic batch deletion using dict comprehension
         if expired_keys:
+            # Create new dict without expired keys (atomic operation)
+            self._cache = {
+                key: cache
+                for key, cache in self._cache.items()
+                if key not in expired_keys
+            }
             logger.info(f"Cleaned up {len(expired_keys)} expired prefetch entries")
 
         return len(expired_keys)

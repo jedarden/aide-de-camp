@@ -25,41 +25,16 @@ from src.watcher.daemon import BeadWatcher
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """An isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "session.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 @pytest.fixture
-async def broadcaster() -> SSEBroadcaster:
-    """A fresh SSEBroadcaster per test."""
-    b = SSEBroadcaster()
-    await b.start()
-    yield b
-    await b.stop()
-
 
 @pytest.fixture
-def router(store: SessionStore) -> SurfaceRouter:
-    """A SurfaceRouter for testing."""
-    return SurfaceRouter(store)
-
 
 @pytest.fixture
-def scratch_beads_workspace(tmp_path: Path) -> Path:
-    """A scratch .beads workspace for testing."""
-    workspace = tmp_path / ".beads"
-    workspace.mkdir()
-    return workspace
-
 
 @pytest.mark.asyncio
 async def test_bead_close_creates_result_and_sse(
-    store: SessionStore,
+    test_db_store,
     broadcaster: SSEBroadcaster,
     router: SurfaceRouter,
     scratch_beads_workspace: Path,
@@ -77,10 +52,10 @@ async def test_bead_close_creates_result_and_sse(
        - SSE result_created event fired on active surface
     """
     # Step 1: Set up session, surface, utterance, topic, and intent
-    session_id = await store.create_session()
-    surface_id = await store.register_surface(session_id, "canvas")
-    utterance_id = await store.create_utterance(session_id, "test escalation")
-    topic_id = await store.create_topic(
+    session_id = await test_db_store.create_session()
+    surface_id = await test_db_store.register_surface(session_id, "canvas")
+    utterance_id = await test_db_store.create_utterance(session_id, "test escalation")
+    topic_id = await test_db_store.create_topic(
         label="Test Bead",
         topic_type="project",
         project_slugs=["test"],
@@ -90,7 +65,7 @@ async def test_bead_close_creates_result_and_sse(
 
     # Create intent with bead_ref pointing at our test bead
     bead_id = "test-bead-123"
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="test",
@@ -146,7 +121,7 @@ async def test_bead_close_creates_result_and_sse(
         await watcher._check_for_events()
 
         # Step 5: Assert results row was written
-        results = await store.get_results_for_intent(intent_id)
+        results = await test_db_store.get_results_for_intent(intent_id)
         assert len(results) == 1
         result = results[0]
         assert result["intent_id"] == intent_id
@@ -156,7 +131,7 @@ async def test_bead_close_creates_result_and_sse(
         assert json.loads(result["data"])["bead_id"] == bead_id
 
         # Step 6: Assert intent was resolved
-        intent = await store.get_intent(intent_id)
+        intent = await test_db_store.get_intent(intent_id)
         assert intent["status"] == "resolved"
 
         # Step 7: Assert SSE event was fired on the active surface
@@ -169,7 +144,7 @@ async def test_bead_close_creates_result_and_sse(
 
 @pytest.mark.asyncio
 async def test_bead_close_with_no_intent_is_skipped(
-    store: SessionStore,
+    test_db_store,
     router: SurfaceRouter,
     scratch_beads_workspace: Path,
 ):
@@ -208,13 +183,13 @@ async def test_bead_close_with_no_intent_is_skipped(
     await watcher._check_for_events()
 
     # No results should exist
-    all_results = await store.get_all_results()
+    all_results = await test_db_store.get_all_results()
     assert len(all_results) == 0
 
 
 @pytest.mark.asyncio
 async def test_bead_close_with_missing_topic_id_is_skipped(
-    store: SessionStore,
+    test_db_store,
     router: SurfaceRouter,
     scratch_beads_workspace: Path,
 ):
@@ -223,12 +198,12 @@ async def test_bead_close_with_missing_topic_id_is_skipped(
 
     This handles edge cases where intent state is incomplete.
     """
-    session_id = await store.create_session()
-    utterance_id = await store.create_utterance(session_id, "test")
+    session_id = await test_db_store.create_session()
+    utterance_id = await test_db_store.create_utterance(session_id, "test")
 
     # Create intent with bead_ref but no topic_id
     bead_id = "orphan-bead-789"
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="test",
@@ -264,17 +239,17 @@ async def test_bead_close_with_missing_topic_id_is_skipped(
     await watcher._check_for_events()
 
     # Intent should still be pending (not resolved)
-    intent = await store.get_intent(intent_id)
+    intent = await test_db_store.get_intent(intent_id)
     assert intent["status"] == "pending"
 
     # No result should exist
-    results = await store.get_results_for_intent(intent_id)
+    results = await test_db_store.get_results_for_intent(intent_id)
     assert len(results) == 0
 
 
 @pytest.mark.asyncio
 async def test_highwater_mark_prevents_duplicate_delivery(
-    store: SessionStore,
+    test_db_store,
     broadcaster: SSEBroadcaster,
     router: SurfaceRouter,
     scratch_beads_workspace: Path,
@@ -286,10 +261,10 @@ async def test_highwater_mark_prevents_duplicate_delivery(
     First tick after start should baseline the mark and emit nothing.
     Only beads closed AFTER the mark should be delivered.
     """
-    session_id = await store.create_session()
-    surface_id = await store.register_surface(session_id, "canvas")
-    utterance_id = await store.create_utterance(session_id, "test")
-    topic_id = await store.create_topic(
+    session_id = await test_db_store.create_session()
+    surface_id = await test_db_store.register_surface(session_id, "canvas")
+    utterance_id = await test_db_store.create_utterance(session_id, "test")
+    topic_id = await test_db_store.create_topic(
         label="Test Topic",
         topic_type="project",
         project_slugs=["test"],
@@ -298,7 +273,7 @@ async def test_highwater_mark_prevents_duplicate_delivery(
     )
 
     bead_id = "baseline-bead-999"
-    intent_id = await store.create_intent(
+    intent_id = await test_db_store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="test",
@@ -341,11 +316,11 @@ async def test_highwater_mark_prevents_duplicate_delivery(
     await watcher._check_for_events()
 
     # No result should exist (bead was already closed)
-    results = await store.get_results_for_intent(intent_id)
+    results = await test_db_store.get_results_for_intent(intent_id)
     assert len(results) == 0
 
     # Intent should still be pending
-    intent = await store.get_intent(intent_id)
+    intent = await test_db_store.get_intent(intent_id)
     assert intent["status"] == "pending"
 
     # No SSE event should have been fired
@@ -356,5 +331,5 @@ async def test_highwater_mark_prevents_duplicate_delivery(
     await watcher._check_for_events()
 
     # Still no result
-    results = await store.get_results_for_intent(intent_id)
+    results = await test_db_store.get_results_for_intent(intent_id)
     assert len(results) == 0

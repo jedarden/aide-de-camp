@@ -1,8 +1,8 @@
 {
-  "inventory_date": "2026-08-06T21:04:21.991610",
-  "total_log_files": 34,
+  "inventory_date": "2026-08-07T04:03:22.195560",
+  "total_log_files": 48,
   "files_with_analysis": 18,
-  "files_without_analysis": 16,
+  "files_without_analysis": 30,
   "namespaces": {
     "pbx-web": {
       "count": 20,
@@ -11,10 +11,10 @@
       "total_lines": 162254
     },
     "whisper-stt": {
-      "count": 14,
+      "count": 28,
       "with_analysis": 10,
-      "total_size_bytes": 11288425,
-      "total_lines": 194623
+      "total_size_bytes": 27210123,
+      "total_lines": 408552
     }
   },
   "inventory": [
@@ -229,6 +229,56 @@
       "collection_source": "whisper-openai-pod.log"
     },
     {
+      "pod_name": "whisper-openai-raw",
+      "namespace": "whisper-stt",
+      "log_file_path": "logs/whisper-openai-raw.log",
+      "log_file_size_bytes": 5573013,
+      "log_line_count": 96086,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-openai-raw.log"
+    },
+    {
+      "pod_name": "whisper",
+      "namespace": "whisper-stt",
+      "log_file_path": "logs/whisper-openai.log",
+      "log_file_size_bytes": 9179841,
+      "log_line_count": 97658,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-openai.log"
+    },
+    {
+      "pod_name": "whisper-stt-30day-raw",
+      "namespace": "whisper-stt",
+      "log_file_path": "logs/whisper-stt-30day-raw.log",
+      "log_file_size_bytes": 0,
+      "log_line_count": 0,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-stt-30day-raw.log"
+    },
+    {
+      "pod_name": "whisper-stt-main",
+      "namespace": "whisper-stt",
+      "log_file_path": "logs/whisper-stt-main.log",
+      "log_file_size_bytes": 0,
+      "log_line_count": 0,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-stt-main.log"
+    },
+    {
+      "pod_name": "whisper-stt-pod-raw",
+      "namespace": "whisper-stt",
+      "log_file_path": "logs/whisper-stt-pod-raw.log",
+      "log_file_size_bytes": 0,
+      "log_line_count": 0,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-stt-pod-raw.log"
+    },
+    {
       "pod_name": "whisper",
       "namespace": "whisper-stt",
       "log_file_path": "logs/whisper-stt-pod.log",
@@ -237,6 +287,16 @@
       "has_analysis": false,
       "analysis_file_path": null,
       "collection_source": "whisper-stt-pod.log"
+    },
+    {
+      "pod_name": "svclb-whisper-stt-c02117d2-f72hg",
+      "namespace": "whisper-stt",
+      "log_file_path": "research/whisper-stt-30days/pod-logs/pod-svclb-whisper-stt-c02117d2-f72hg.log",
+      "log_file_size_bytes": 951,
+      "log_line_count": 5,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "pod-svclb-whisper-stt-c02117d2-f72hg.log"
     },
     {
       "pod_name": "whisper-openai-68966786fb-jsb5d",
@@ -287,6 +347,26 @@
       "has_analysis": true,
       "analysis_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-jsb5d-2026-08-06-analysis.json",
       "collection_source": "pod-whisper-openai-68966786fb-jsb5d-2026-08-06.log"
+    },
+    {
+      "pod_name": "whisper-openai-68966786fb-tng29",
+      "namespace": "whisper-stt",
+      "log_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-openai-68966786fb-tng29.log",
+      "log_file_size_bytes": 5078,
+      "log_line_count": 116,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "pod-whisper-openai-68966786fb-tng29.log"
+    },
+    {
+      "pod_name": "whisper-stt-847fd8d7b9-b8rsj",
+      "namespace": "whisper-stt",
+      "log_file_path": "research/whisper-stt-30days/pod-logs/pod-whisper-stt-847fd8d7b9-b8rsj.log",
+      "log_file_size_bytes": 2566,
+      "log_line_count": 61,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "pod-whisper-stt-847fd8d7b9-b8rsj.log"
     },
     {
       "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
@@ -349,6 +429,36 @@
       "collection_source": "whisper-openai-68966786fb-jsb5d.log"
     },
     {
+      "pod_name": "whisper-openai-ardenone-cluster",
+      "namespace": "whisper-stt",
+      "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-openai-ardenone-cluster.log",
+      "log_file_size_bytes": 580083,
+      "log_line_count": 10001,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-openai-ardenone-cluster.log"
+    },
+    {
+      "pod_name": "whisper-openai-ardenone-manager",
+      "namespace": "whisper-stt",
+      "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-openai-ardenone-manager.log",
+      "log_file_size_bytes": 83,
+      "log_line_count": 1,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-openai-ardenone-manager.log"
+    },
+    {
+      "pod_name": "whisper",
+      "namespace": "whisper-stt",
+      "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-openai-current.log",
+      "log_file_size_bytes": 580083,
+      "log_line_count": 10001,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-openai-current.log"
+    },
+    {
       "pod_name": "whisper-stt-847fd8d7b9-v2rs5",
       "namespace": "whisper-stt",
       "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-stt-847fd8d7b9-v2rs5.log",
@@ -357,6 +467,36 @@
       "has_analysis": false,
       "analysis_file_path": null,
       "collection_source": "whisper-stt-847fd8d7b9-v2rs5.log"
+    },
+    {
+      "pod_name": "whisper-stt-ardenone-cluster",
+      "namespace": "whisper-stt",
+      "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-stt-ardenone-cluster.log",
+      "log_file_size_bytes": 0,
+      "log_line_count": 0,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-stt-ardenone-cluster.log"
+    },
+    {
+      "pod_name": "whisper-stt-ardenone-manager",
+      "namespace": "whisper-stt",
+      "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-stt-ardenone-manager.log",
+      "log_file_size_bytes": 0,
+      "log_line_count": 0,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-stt-ardenone-manager.log"
+    },
+    {
+      "pod_name": "whisper",
+      "namespace": "whisper-stt",
+      "log_file_path": "research/whisper-stt-30days/pod-logs/whisper-stt-current.log",
+      "log_file_size_bytes": 0,
+      "log_line_count": 0,
+      "has_analysis": false,
+      "analysis_file_path": null,
+      "collection_source": "whisper-stt-current.log"
     }
   ]
 }

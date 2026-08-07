@@ -1,0 +1,336 @@
+{
+  "generated_at": "2026-08-07T04:15:02.008364",
+  "taxonomy_version": "comprehensive_v1",
+  "summary": {
+    "total_records": 403237,
+    "categories_found": 7,
+    "categorized_count": 204216,
+    "uncategorized_count": 199021,
+    "coverage_percentage": 50.64
+  },
+  "service_distribution": {
+    "whisper-stt": {
+      "HTTPHealthCheck": 98251,
+      "InfoLogging": 98253
+    },
+    "unknown": {
+      "uncategorized": 195645,
+      "RecordingFetchError": 2,
+      "HTTPError": 1067,
+      "DependencyTimeout": 12,
+      "NetworkIssue": 6
+    },
+    "pbx-web": {
+      "uncategorized": 3316
+    },
+    "pbx-rebuild-relay": {
+      "HTTPHealthCheck": 3313,
+      "uncategorized": 1
+    },
+    "lab-rebuild-relay": {
+      "HTTPHealthCheck": 3312,
+      "uncategorized": 58
+    },
+    "pbx_web": {
+      "uncategorized": 1
+    }
+  },
+  "time_distribution": {
+    "HTTPHealthCheck": {
+      "2026-07-10": 4964,
+      "2026-07-11": 11520,
+      "2026-07-12": 11520,
+      "2026-07-13": 11520,
+      "2026-07-14": 11520,
+      "2026-07-15": 11520,
+      "2026-07-16": 11520,
+      "2026-07-17": 8879,
+      "2026-08-05": 2065,
+      "2026-08-06": 18145,
+      "2026-08-07": 1703
+    },
+    "InfoLogging": {
+      "2026-07-12": 11522,
+      "2026-07-10": 4964,
+      "2026-07-11": 11520,
+      "2026-07-13": 11520,
+      "2026-07-14": 11520,
+      "2026-07-15": 11520,
+      "2026-07-16": 11520,
+      "2026-07-17": 8879,
+      "2026-08-05": 2065,
+      "2026-08-06": 11520,
+      "2026-08-07": 1703
+    },
+    "uncategorized": {
+      "2026-08-07": 2182,
+      "2026-07-10": 9928,
+      "2026-07-11": 23040,
+      "2026-07-12": 23040,
+      "2026-07-13": 23041,
+      "2026-07-14": 23040,
+      "2026-07-15": 23040,
+      "2026-07-16": 23040,
+      "2026-07-17": 17758,
+      "2026-08-05": 4130,
+      "2026-08-06": 26415
+    }
+  },
+  "categories": {
+    "HTTPHealthCheck": {
+      "count": 104876,
+      "severity": "info",
+      "description": "HTTP health check requests (normal traffic)",
+      "examples": [
+        {
+          "timestamp": "2026-07-10T13:39:33.767796087-04:00",
+          "source": "logs/whisper-stt-30day-victorialogs.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "10.42.2.1:43574 - \"GET /health HTTP/1.1\" 200 OK"
+        },
+        {
+          "timestamp": "2026-07-10T13:39:33.785904295-04:00",
+          "source": "logs/whisper-stt-30day-victorialogs.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "10.42.2.1:43590 - \"GET /health HTTP/1.1\" 200 OK"
+        },
+        {
+          "timestamp": "2026-07-10T13:39:43.786412348-04:00",
+          "source": "logs/whisper-stt-30day-victorialogs.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "10.42.2.1:55050 - \"GET /health HTTP/1.1\" 200 OK"
+        },
+        {
+          "timestamp": "2026-07-10T13:39:53.786262466-04:00",
+          "source": "logs/whisper-stt-30day-victorialogs.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "10.42.2.1:34184 - \"GET /health HTTP/1.1\" 200 OK"
+        },
+        {
+          "timestamp": "2026-07-10T13:40:03.767367024-04:00",
+          "source": "logs/whisper-stt-30day-victorialogs.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "10.42.2.1:43932 - \"GET /health HTTP/1.1\" 200 OK"
+        }
+      ],
+      "first_seen": "2026-07-10 13:39:33.767796-04:00",
+      "last_seen": "2026-08-07 03:32:44.147223-04:00"
+    },
+    "InfoLogging": {
+      "count": 98253,
+      "severity": "info",
+      "description": "General informational logging messages",
+      "examples": [
+        {
+          "timestamp": "2026-07-12T16:53:42Z",
+          "source": "logs/whisper-stt-30day-victorialogs.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "ReplicaSet whisper-stt-847fd8d7b9 - Replicas: 1"
+        },
+        {
+          "timestamp": "2026-07-10T13:39:33.767796087-04:00",
+          "source": "logs/whisper-stt-30day.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "10.42.2.1:43574 - \"GET /health HTTP/1.1\" 200 OK"
+        },
+        {
+          "timestamp": "2026-07-10T13:39:33.785904295-04:00",
+          "source": "logs/whisper-stt-30day.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "10.42.2.1:43590 - \"GET /health HTTP/1.1\" 200 OK"
+        },
+        {
+          "timestamp": "2026-07-10T13:39:43.786412348-04:00",
+          "source": "logs/whisper-stt-30day.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "10.42.2.1:55050 - \"GET /health HTTP/1.1\" 200 OK"
+        },
+        {
+          "timestamp": "2026-07-10T13:39:53.786262466-04:00",
+          "source": "logs/whisper-stt-30day.jsonl",
+          "service": "whisper-stt",
+          "sample_data": "10.42.2.1:34184 - \"GET /health HTTP/1.1\" 200 OK"
+        }
+      ],
+      "first_seen": "2026-07-10 13:39:33.767796-04:00",
+      "last_seen": "2026-08-07 03:32:44.147223-04:00"
+    },
+    "uncategorized": {
+      "count": 199021,
+      "severity": "unknown",
+      "description": "Unknown pattern",
+      "examples": [
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-30day.jsonl",
+          "service": "unknown",
+          "sample_data": ""
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-30day.jsonl",
+          "service": "unknown",
+          "sample_data": ""
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-30day.jsonl",
+          "service": "unknown",
+          "sample_data": ""
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-30day.jsonl",
+          "service": "unknown",
+          "sample_data": ""
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-30day.jsonl",
+          "service": "unknown",
+          "sample_data": ""
+        }
+      ],
+      "first_seen": "2026-07-10 13:39:33.767796-04:00",
+      "last_seen": "2026-08-07 01:46:14.146291-04:00"
+    },
+    "RecordingFetchError": {
+      "count": 2,
+      "severity": "medium",
+      "description": "Failed to fetch recordings from storage backend",
+      "examples": [
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-30day.jsonl",
+          "service": "unknown",
+          "sample_data": ""
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-30day.jsonl",
+          "service": "unknown",
+          "sample_data": ""
+        }
+      ],
+      "first_seen": null,
+      "last_seen": null
+    },
+    "HTTPError": {
+      "count": 1067,
+      "severity": "medium",
+      "description": "HTTP error responses (4xx, 5xx)",
+      "examples": [
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T13:36:40.095001455-04:00 Output:       \"/var/www/calls/pagefind\""
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T13:36:40.095003346-04:00"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T13:36:40.095005482-04:00 [Walking source directory]"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T13:37:29.514105025-04:00 [Building search indexes]"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T13:38:48.475450285-04:00   Indexed 6967 words"
+        }
+      ],
+      "first_seen": null,
+      "last_seen": null
+    },
+    "DependencyTimeout": {
+      "count": 12,
+      "severity": "medium",
+      "description": "Timeout connecting to dependent services",
+      "examples": [
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T20:23:24.870819612-04:00 [pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T20:23:24.872445550-04:00 ConnectionResetError: [Errno 104] Connection reset by peer"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T22:58:58.425954166-04:00 [pbx-web] recording fetch error for 1785285870.480/20260729-004430_19148734884_1785285870.480.wav: [Errno 104] Connection reset by peer"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T22:58:58.427820643-04:00 ConnectionResetError: [Errno 104] Connection reset by peer"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-08-04T14:35:02.254776922-04:00 [pbx-web] recording fetch error for 1785864705.535/20260804-173145_19142698463_1785864705.535.wav: [Errno 104] Connection reset by peer"
+        }
+      ],
+      "first_seen": null,
+      "last_seen": null
+    },
+    "NetworkIssue": {
+      "count": 6,
+      "severity": "low",
+      "description": "Network allocation or connectivity problems",
+      "examples": [
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T20:23:24.872959658-04:00 BrokenPipeError: [Errno 32] Broken pipe"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-07-28T22:58:58.428619967-04:00 BrokenPipeError: [Errno 32] Broken pipe"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-08-04T14:35:02.257225307-04:00 BrokenPipeError: [Errno 32] Broken pipe"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-08-04T14:52:22.846721840-04:00 BrokenPipeError: [Errno 32] Broken pipe"
+        },
+        {
+          "timestamp": "",
+          "source": "logs/pbx-web-parsed.jsonl",
+          "service": "unknown",
+          "sample_data": "2026-08-05T10:29:52.045907676-04:00 BrokenPipeError: [Errno 32] Broken pipe"
+        }
+      ],
+      "first_seen": null,
+      "last_seen": null
+    }
+  }
+}

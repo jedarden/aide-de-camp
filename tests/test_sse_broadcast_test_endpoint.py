@@ -22,11 +22,6 @@ from src.main import app
 
 
 @pytest.fixture
-async def isolated_store(tmp_path: Path, monkeypatch) -> SessionStore:
-    """Isolated session store for each test (never touches data/session.db)."""
-    tmp_db = tmp_path / "test-sse-test-endpoint.db"
-    monkeypatch.setenv("ADC_DB_PATH", str(tmp_db))
-
     import src.session.store as store_mod
     import src.main as main_mod
 
@@ -37,7 +32,7 @@ async def isolated_store(tmp_path: Path, monkeypatch) -> SessionStore:
     main_mod._store = None
 
     store = store_mod.get_store()
-    await store.initialize()
+    await test_db_store.initialize()
 
     yield store
 
@@ -98,7 +93,7 @@ class TestSSEBroadcastFromCreateTopicEndpoint:
     """Verify SSE broadcast from POST /api/v1/test/create-topic endpoint."""
 
     async def test_create_topic_broadcasts_result_created_event(
-        self, isolated_store: SessionStore
+        self, isolated_test_db_store
     ):
         """Verify that event_type='result_created' is broadcast when topic is created."""
         broadcaster = await _started_broadcaster()
@@ -155,7 +150,7 @@ class TestSSEBroadcastFromCreateTopicEndpoint:
             broadcaster.unregister(conn.connection_id)
 
     async def test_broadcast_targets_session_correctly(
-        self, isolated_store: SessionStore
+        self, isolated_test_db_store
     ):
         """Verify that broadcast targets the correct session_id."""
         broadcaster = await _started_broadcaster()
@@ -216,7 +211,7 @@ class TestSSEBroadcastFromCreateTopicEndpoint:
             broadcaster.unregister(conn_b.connection_id)
 
     async def test_broadcast_timing_matches_dispatch_pattern(
-        self, isolated_store: SessionStore
+        self, isolated_test_db_store
     ):
         """Verify that broadcast timing matches /dispatch pattern (synchronous completion)."""
         broadcaster = await _started_broadcaster()
@@ -261,7 +256,7 @@ class TestSSEBroadcastFromCreateTopicEndpoint:
             broadcaster.unregister(conn.connection_id)
 
     async def test_multiple_surfaces_in_session_receive_broadcast(
-        self, isolated_store: SessionStore
+        self, isolated_test_db_store
     ):
         """Verify that multiple surfaces in the same session all receive the broadcast."""
         broadcaster = await _started_broadcaster()
@@ -327,7 +322,7 @@ class TestSSEBroadcastFromCreateTopicEndpoint:
             broadcaster.unregister(conn3.connection_id)
 
     async def test_event_payload_structure_matches_dispatch(
-        self, isolated_store: SessionStore
+        self, isolated_test_db_store
     ):
         """Verify that event payload structure matches /dispatch endpoint pattern."""
         broadcaster = await _started_broadcaster()
@@ -381,7 +376,7 @@ class TestSSEBroadcastFromCreateTopicEndpoint:
             broadcaster.unregister(conn.connection_id)
 
     async def test_backdated_topic_broadcasts_correctly(
-        self, isolated_store: SessionStore
+        self, isolated_test_db_store
     ):
         """Verify that backdated topics (staleness_seconds > 0) broadcast correctly."""
         broadcaster = await _started_broadcaster()
@@ -420,7 +415,7 @@ class TestSSEBroadcastFromCreateTopicEndpoint:
             broadcaster.unregister(conn.connection_id)
 
     async def test_no_connected_surface_still_succeeds(
-        self, isolated_store: SessionStore
+        self, isolated_test_db_store
     ):
         """Verify that endpoint succeeds even when no SSE surface is connected."""
         session_id = "test-no-surface-session"
@@ -447,7 +442,7 @@ class TestSSEBroadcastFromCreateTopicEndpoint:
         assert data["status"] == "created"
 
     async def test_consecutive_topic_creates_broadcast_independently(
-        self, isolated_store: SessionStore
+        self, isolated_test_db_store
     ):
         """Verify that consecutive topic creations each broadcast independently."""
         broadcaster = await _started_broadcaster()

@@ -1,0 +1,421 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-07T03:44:06.444155",
+    "source_analysis": "Child 2 (adc-3hwmn) - Pattern Frequency Statistics",
+    "taxonomy_version": "1.0",
+    "analysis_period": "2026-08-07T07:39:01.483098Z",
+    "total_categorized_failures": 1442,
+    "pattern_categories_count": 5
+  },
+  "pattern_categories": {
+    "DependencyTimeout": {
+      "description": "Timeouts connecting to external services or dependencies",
+      "total_count": 12,
+      "severity": "high",
+      "service_distribution": {
+        "pbx-web-parsed": 12
+      },
+      "image_distribution": {},
+      "version_distribution": {},
+      "daily_distribution": {
+        "2026-07-28": 4,
+        "2026-08-04": 4,
+        "2026-08-05": 4
+      },
+      "time_span": {
+        "start": "2026-07-28",
+        "end": "2026-08-05",
+        "days": 3
+      },
+      "examples": [
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T20:23:24.870819612-04:00",
+          "day": "2026-07-28",
+          "error_type": "connection_reset",
+          "message": "2026-07-28T20:23:24.870819612-04:00 [pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T20:23:24.872445550-04:00",
+          "day": "2026-07-28",
+          "error_type": "connection_reset",
+          "message": "2026-07-28T20:23:24.872445550-04:00 ConnectionResetError: [Errno 104] Connection reset by peer"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T22:58:58.425954166-04:00",
+          "day": "2026-07-28",
+          "error_type": "connection_reset",
+          "message": "2026-07-28T22:58:58.425954166-04:00 [pbx-web] recording fetch error for 1785285870.480/20260729-004430_19148734884_1785285870.480.wav: [Errno 104] Connection reset by peer"
+        }
+      ]
+    },
+    "DeploymentRollback": {
+      "description": "Deployment was rolled back to a previous version",
+      "total_count": 1,
+      "severity": "medium",
+      "service_distribution": {
+        "unknown": 1
+      },
+      "image_distribution": {
+        "ronaldraygun/pbx-web": 1
+      },
+      "version_distribution": {
+        "1.0.8": 1
+      },
+      "daily_distribution": {
+        "2026-07-13": 1
+      },
+      "time_span": {
+        "start": "2026-07-13",
+        "end": "2026-07-13",
+        "days": 1
+      },
+      "examples": [
+        {
+          "service": "unknown",
+          "image": "ronaldraygun/pbx-web",
+          "version": "1.0.8",
+          "timestamp": "2026-07-13T18:07:55Z",
+          "day": "2026-07-13",
+          "error_type": "unknown",
+          "message": "N/A"
+        }
+      ]
+    },
+    "HTTPError": {
+      "description": "HTTP error responses during deployment or operation",
+      "total_count": 1420,
+      "severity": "medium",
+      "service_distribution": {
+        "pbx-web-parsed": 1420
+      },
+      "image_distribution": {},
+      "version_distribution": {},
+      "daily_distribution": {
+        "2026-07-28": 26,
+        "2026-07-29": 10,
+        "2026-07-30": 5,
+        "2026-07-31": 7,
+        "2026-08-03": 147,
+        "2026-08-04": 463,
+        "2026-08-05": 514,
+        "2026-08-06": 248
+      },
+      "time_span": {
+        "start": "2026-07-28",
+        "end": "2026-08-06",
+        "days": 8
+      },
+      "examples": [
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T13:36:40.095001455-04:00",
+          "day": "2026-07-28",
+          "error_type": "http_500",
+          "message": "2026-07-28T13:36:40.095001455-04:00 Output:       \"/var/www/calls/pagefind\""
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T13:36:40.095003346-04:00",
+          "day": "2026-07-28",
+          "error_type": "http_500",
+          "message": "2026-07-28T13:36:40.095003346-04:00"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T13:36:40.095005482-04:00",
+          "day": "2026-07-28",
+          "error_type": "http_500",
+          "message": "2026-07-28T13:36:40.095005482-04:00 [Walking source directory]"
+        }
+      ]
+    },
+    "NetworkIssue": {
+      "description": "Network-related failures including connection issues",
+      "total_count": 8,
+      "severity": "medium",
+      "service_distribution": {
+        "pbx-web-parsed": 6,
+        "pbx-web": 2
+      },
+      "image_distribution": {},
+      "version_distribution": {},
+      "daily_distribution": {
+        "2026-07-28": 2,
+        "2026-08-04": 2,
+        "2026-08-05": 2,
+        "unknown": 2
+      },
+      "time_span": {
+        "start": "2026-07-28",
+        "end": "2026-08-05",
+        "days": 3
+      },
+      "examples": [
+        {
+          "service": "pbx-web",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "unknown",
+          "day": "unknown",
+          "error_type": "recording_fetch_errors",
+          "message": "N/A"
+        },
+        {
+          "service": "pbx-web",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "unknown",
+          "day": "unknown",
+          "error_type": "recording_fetch_errors",
+          "message": "N/A"
+        },
+        {
+          "service": "pbx-web-parsed",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "2026-07-28T20:23:24.872959658-04:00",
+          "day": "2026-07-28",
+          "error_type": "broken_pipe",
+          "message": "2026-07-28T20:23:24.872959658-04:00 BrokenPipeError: [Errno 32] Broken pipe"
+        }
+      ]
+    },
+    "RecordingFetchError": {
+      "description": "Errors fetching recordings from storage",
+      "total_count": 1,
+      "severity": "low",
+      "service_distribution": {
+        "pbx-web": 1
+      },
+      "image_distribution": {},
+      "version_distribution": {},
+      "daily_distribution": {
+        "unknown": 1
+      },
+      "time_span": {
+        "start": "unknown",
+        "end": "unknown",
+        "days": 0
+      },
+      "examples": [
+        {
+          "service": "pbx-web",
+          "image": "unknown",
+          "version": "unknown",
+          "timestamp": "unknown",
+          "day": "unknown",
+          "error_type": "http_server_errors",
+          "message": "N/A"
+        }
+      ]
+    }
+  },
+  "service_distribution": {
+    "pbx-web-parsed": {
+      "total_failures": 1438,
+      "patterns_by_type": {
+        "DependencyTimeout": 12,
+        "HTTPError": 1420,
+        "NetworkIssue": 6
+      },
+      "images_involved": []
+    },
+    "unknown": {
+      "total_failures": 1,
+      "patterns_by_type": {
+        "DeploymentRollback": 1
+      },
+      "images_involved": [
+        "ronaldraygun/pbx-web"
+      ]
+    },
+    "pbx-web": {
+      "total_failures": 3,
+      "patterns_by_type": {
+        "NetworkIssue": 2,
+        "RecordingFetchError": 1
+      },
+      "images_involved": []
+    }
+  },
+  "temporal_analysis": {
+    "daily_failures_by_pattern": {
+      "2026-07-28": {
+        "DependencyTimeout": 4,
+        "HTTPError": 26,
+        "NetworkIssue": 2
+      },
+      "2026-08-04": {
+        "DependencyTimeout": 4,
+        "HTTPError": 463,
+        "NetworkIssue": 2
+      },
+      "2026-08-05": {
+        "DependencyTimeout": 4,
+        "HTTPError": 514,
+        "NetworkIssue": 2
+      },
+      "2026-07-13": {
+        "DeploymentRollback": 1
+      },
+      "2026-07-29": {
+        "HTTPError": 10
+      },
+      "2026-07-30": {
+        "HTTPError": 5
+      },
+      "2026-07-31": {
+        "HTTPError": 7
+      },
+      "2026-08-03": {
+        "HTTPError": 147
+      },
+      "2026-08-06": {
+        "HTTPError": 248
+      },
+      "unknown": {
+        "NetworkIssue": 2,
+        "RecordingFetchError": 1
+      }
+    },
+    "time_spans": {
+      "DependencyTimeout": {
+        "start": "2026-07-28",
+        "end": "2026-08-05",
+        "days": 3
+      },
+      "DeploymentRollback": {
+        "start": "2026-07-13",
+        "end": "2026-07-13",
+        "days": 1
+      },
+      "HTTPError": {
+        "start": "2026-07-28",
+        "end": "2026-08-06",
+        "days": 8
+      },
+      "NetworkIssue": {
+        "start": "2026-07-28",
+        "end": "2026-08-05",
+        "days": 3
+      },
+      "RecordingFetchError": {
+        "start": "unknown",
+        "end": "unknown",
+        "days": 0
+      }
+    },
+    "active_days": [
+      "2026-07-13",
+      "2026-07-28",
+      "2026-07-29",
+      "2026-07-30",
+      "2026-07-31",
+      "2026-08-03",
+      "2026-08-04",
+      "2026-08-05",
+      "2026-08-06"
+    ],
+    "total_active_days": 9
+  },
+  "image_context": {
+    "ronaldraygun/pbx-web": {
+      "total_failures": 1,
+      "patterns_by_type": {
+        "DeploymentRollback": 1
+      },
+      "services_affected": [
+        "unknown"
+      ]
+    }
+  },
+  "summary": {
+    "total_categorized_failures": 1442,
+    "total_pattern_categories": 5,
+    "top_categories": [
+      {
+        "category": "HTTPError",
+        "count": 1420,
+        "severity": "medium",
+        "services": [
+          "pbx-web-parsed"
+        ],
+        "time_span_days": 8
+      },
+      {
+        "category": "DependencyTimeout",
+        "count": 12,
+        "severity": "high",
+        "services": [
+          "pbx-web-parsed"
+        ],
+        "time_span_days": 3
+      },
+      {
+        "category": "NetworkIssue",
+        "count": 8,
+        "severity": "medium",
+        "services": [
+          "pbx-web-parsed",
+          "pbx-web"
+        ],
+        "time_span_days": 3
+      },
+      {
+        "category": "DeploymentRollback",
+        "count": 1,
+        "severity": "medium",
+        "services": [
+          "unknown"
+        ],
+        "time_span_days": 1
+      },
+      {
+        "category": "RecordingFetchError",
+        "count": 1,
+        "severity": "low",
+        "services": [
+          "pbx-web"
+        ],
+        "time_span_days": 0
+      }
+    ],
+    "services_analyzed": [
+      "pbx-web-parsed",
+      "unknown",
+      "pbx-web"
+    ],
+    "total_services": 3,
+    "images_analyzed": [
+      "ronaldraygun/pbx-web"
+    ],
+    "total_images": 1,
+    "active_days": [
+      "2026-07-13",
+      "2026-07-28",
+      "2026-07-29",
+      "2026-07-30",
+      "2026-07-31",
+      "2026-08-03",
+      "2026-08-04",
+      "2026-08-05",
+      "2026-08-06"
+    ],
+    "analysis_duration_days": 9
+  }
+}

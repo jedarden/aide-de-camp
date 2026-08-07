@@ -39,29 +39,10 @@ from src.escalate.handler import handle_terminal_failure
 
 
 @pytest.fixture
-async def store(tmp_path: Path) -> SessionStore:
-    """Isolated SessionStore on a tmp DB."""
-    db_path = tmp_path / "test.db"
-    s = SessionStore(db_path)
-    await s.initialize()
-    yield s
-    await s.close()
-
 
 @pytest.fixture
-async def broadcaster() -> SSEBroadcaster:
-    """Fresh SSEBroadcaster per test."""
-    b = SSEBroadcaster()
-    await b.start()
-    yield b
-    await b.stop()
-
 
 @pytest.fixture
-def router(store: SessionStore) -> IntentRouter:
-    """IntentRouter with test store."""
-    return IntentRouter(store=store)
-
 
 # --- Test broadcaster.broadcast() is called on stuck card creation ---------
 
@@ -70,17 +51,17 @@ class TestStuckCardBroadcastCalls:
     """Test that broadcaster.broadcast() is called when stuck cards are created."""
 
     @pytest.mark.asyncio
-    async def test_stuck_card_creation_calls_broadcast(self, router: IntentRouter, store: SessionStore):
+    async def test_stuck_card_creation_calls_broadcast(self, router: IntentRouter, test_db_store):
         """Creating a stuck card calls broadcaster.broadcast() with correct parameters."""
         session_id = "test-session-stuck"
         surface_id = "test-surface-stuck"
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Implement stuck feature",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -130,16 +111,16 @@ class TestStuckCardBroadcastCalls:
         assert event.target_session_id == session_id, "Should target correct session"
 
     @pytest.mark.asyncio
-    async def test_stuck_card_broadcast_event_data_complete(self, router: IntentRouter, store: SessionStore):
+    async def test_stuck_card_broadcast_event_data_complete(self, router: IntentRouter, test_db_store):
         """Stuck card broadcast includes all required card data in payload."""
         session_id = "test-session-data"
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="Test stuck data",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -205,21 +186,21 @@ class TestFailedCardBroadcastCalls:
     """Test that broadcaster.broadcast() is called when failed cards are created."""
 
     @pytest.mark.asyncio
-    async def test_failed_card_creation_calls_broadcast(self, store: SessionStore):
+    async def test_failed_card_creation_calls_broadcast(self, test_db_store):
         """Creating a failed card calls broadcaster.broadcast() with correct parameters."""
         session_id = "test-session-failed"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Topic",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test failure",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -232,7 +213,7 @@ class TestFailedCardBroadcastCalls:
         broadcaster_mock.broadcast.return_value = 1
 
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster_mock), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,
@@ -255,21 +236,21 @@ class TestFailedCardBroadcastCalls:
         assert event.target_session_id == session_id, "Should target correct session"
 
     @pytest.mark.asyncio
-    async def test_failed_card_broadcast_event_data_complete(self, store: SessionStore):
+    async def test_failed_card_broadcast_event_data_complete(self, test_db_store):
         """Failed card broadcast includes all required card data in payload."""
         session_id = "test-session-payload"
-        topic_id, _ = await store.find_or_create_topic(
+        topic_id, _ = await test_db_store.find_or_create_topic(
             label="Failed Payload",
             session_id=session_id,
             topic_type="exception",
         )
 
-        utterance_id = await store.create_utterance(
+        utterance_id = await test_db_store.create_utterance(
             session_id=session_id,
             raw_text="test payload",
         )
 
-        intent_id = await store.create_intent(
+        intent_id = await test_db_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -288,7 +269,7 @@ class TestFailedCardBroadcastCalls:
         broadcaster_mock.broadcast.side_effect = capture_broadcast
 
         with patch("src.sse.broadcaster.get_broadcaster", return_value=broadcaster_mock), \
-             patch("src.session.store.get_store", return_value=store):
+             patch("src.session.test_db_store.get_store", return_value=store):
             await handle_terminal_failure(
                 intent_id=intent_id,
                 session_id=session_id,

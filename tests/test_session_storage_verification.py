@@ -311,38 +311,22 @@ class StorageVerificationAssertions:
 
 
 @pytest.fixture
-async def test_store_path(tmp_path: Path) -> Path:
-    """Provide isolated test database path."""
-    return tmp_path / "test_session_verification.db"
-
 
 @pytest.fixture
-async def verification_store(test_store_path: Path) -> SessionStore:
-    """SessionStore configured for test database."""
-    import os
-    # Set environment variable to use test database
-    os.environ["ADC_DB_PATH"] = str(test_store_path)
-
     # Import after setting env var so the store picks it up
     from src.session.store import SessionStore
 
     # Initialize the test database
     store = SessionStore(test_store_path)
-    await store.initialize()
+    await test_db_store.initialize()
     yield store
-    await store.close()
+    await test_db_store.close()
 
     # Cleanup
     del os.environ["ADC_DB_PATH"]
 
 
 @pytest.fixture
-def sync_verification_client(verification_store: SessionStore):
-    """Synchronous TestClient for testing with mocked store."""
-    from fastapi.testclient import TestClient
-    from src.main import app
-    from unittest.mock import patch
-
     with patch("src.test.dispatch.get_store", return_value=verification_store):
         with TestClient(app) as client:
             yield client
@@ -352,7 +336,7 @@ def sync_verification_client(verification_store: SessionStore):
 
 
 @pytest.mark.asyncio
-async def test_synthetic_result_session_storage(verification_store: SessionStore, sync_verification_client, test_store_path: Path) -> None:
+async def test_synthetic_result_session_storage(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
     """Verify complete session storage for synthetic result endpoint."""
     assertions = StorageVerificationAssertions()
 
@@ -449,7 +433,7 @@ async def test_synthetic_result_session_storage(verification_store: SessionStore
 
 
 @pytest.mark.asyncio
-async def test_synthetic_result_custom_data_persistence(verification_store: SessionStore, sync_verification_client, test_store_path: Path) -> None:
+async def test_synthetic_result_custom_data_persistence(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
     """Verify that custom test data is persisted exactly as provided."""
     assertions = StorageVerificationAssertions()
 
@@ -493,7 +477,7 @@ async def test_synthetic_result_custom_data_persistence(verification_store: Sess
 
 
 @pytest.mark.asyncio
-async def test_multiple_synthetic_results_same_session(verification_store: SessionStore, sync_verification_client, test_store_path: Path) -> None:
+async def test_multiple_synthetic_results_same_session(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
     """Verify multiple results can be stored in the same session."""
     assertions = StorageVerificationAssertions()
 
@@ -537,7 +521,7 @@ async def test_multiple_synthetic_results_same_session(verification_store: Sessi
 
 
 @pytest.mark.asyncio
-async def test_session_isolation(verification_store: SessionStore, sync_verification_client, test_store_path: Path) -> None:
+async def test_session_isolation(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
     """Verify that different sessions maintain proper isolation."""
     assertions = StorageVerificationAssertions()
 
@@ -594,7 +578,7 @@ async def test_session_isolation(verification_store: SessionStore, sync_verifica
 
 
 @pytest.mark.asyncio
-async def test_text_field_exact_matching(verification_store: SessionStore, sync_verification_client, test_store_path: Path) -> None:
+async def test_text_field_exact_matching(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
     """Verify that all text fields match the payload exactly, including special characters."""
     assertions = StorageVerificationAssertions()
 
