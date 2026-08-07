@@ -12,6 +12,8 @@ from logging import getLogger
 from pathlib import Path
 from typing import Optional
 
+from ..utilities.retry import retry_with_exponential_backoff
+
 logger = getLogger(__name__)
 
 HOME = Path("/home/coding")
@@ -267,6 +269,12 @@ async def _scan_remote(alias: str, host: str, user: str, home: str) -> dict[str,
     return repos
 
 
+@retry_with_exponential_backoff(
+    max_retries=3,
+    base_delay=0.1,
+    max_delay=1.0,
+    exceptions=(PermissionError, OSError, asyncio.TimeoutError)
+)
 async def _build_local_entry(path: Path) -> RepoEntry:
     name = path.name
     slug = _normalize(name)
@@ -291,6 +299,12 @@ async def _build_local_entry(path: Path) -> RepoEntry:
     )
 
 
+@retry_with_exponential_backoff(
+    max_retries=3,
+    base_delay=0.1,
+    max_delay=1.0,
+    exceptions=(PermissionError, OSError, asyncio.TimeoutError)
+)
 async def _get_local_remote_url(path: Path) -> str | None:
     try:
         proc = await asyncio.create_subprocess_exec(

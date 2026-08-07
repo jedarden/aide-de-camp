@@ -18,6 +18,8 @@ from uuid import uuid4
 
 import httpx
 
+from ..utilities.retry import retry_with_exponential_backoff
+
 logger = logging.getLogger(__name__)
 
 # Default DB path. Overridable via ADC_DB_PATH env var so tests can point at an
@@ -714,6 +716,12 @@ class SessionStore:
             await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     # Session operations
+    @retry_with_exponential_backoff(
+        max_retries=3,
+        base_delay=0.1,
+        max_delay=1.0,
+        exceptions=(sqlite3.OperationalError, aiosqlite.Connection, asyncio.TimeoutError)
+    )
     async def create_session(self, session_id: str | None = None) -> str:
         """Create a new session and return its ID."""
         if not session_id:
@@ -1021,6 +1029,12 @@ class SessionStore:
             await db.commit()
 
     # Intent operations
+    @retry_with_exponential_backoff(
+        max_retries=3,
+        base_delay=0.1,
+        max_delay=1.0,
+        exceptions=(sqlite3.OperationalError, aiosqlite.Connection, asyncio.TimeoutError)
+    )
     async def create_intent(
         self,
         utterance_id: str,
@@ -1169,6 +1183,12 @@ class SessionStore:
                 return dict(row) if row else None
 
     # Result operations
+    @retry_with_exponential_backoff(
+        max_retries=3,
+        base_delay=0.1,
+        max_delay=1.0,
+        exceptions=(sqlite3.OperationalError, aiosqlite.Connection, asyncio.TimeoutError)
+    )
     async def create_result(
         self,
         intent_id: str | None,
