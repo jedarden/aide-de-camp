@@ -1,0 +1,3877 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "20"
+                },
+                "creationTimestamp": "2026-06-14T04:11:57Z",
+                "generation": 3,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "55bb9fb46f"
+                },
+                "name": "whisper-openai-55bb9fb46f",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178248772",
+                "uid": "9c6df6f7-c6d4-4c93-bf3e-6330a2c2ec20"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "55bb9fb46f"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "55bb9fb46f"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/uvicorn",
+                                    "faster_whisper_server.main:create_app",
+                                    "--factory",
+                                    "--host",
+                                    "0.0.0.0",
+                                    "--port",
+                                    "8000"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    },
+                                    {
+                                        "name": "HF_HOME",
+                                        "value": "/root/.cache/huggingface"
+                                    },
+                                    {
+                                        "name": "HF_HUB_OFFLINE",
+                                        "value": "1"
+                                    },
+                                    {
+                                        "name": "PRELOAD_MODELS",
+                                        "value": "[\"large-v3-turbo\"]"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "startupProbe": {
+                                    "failureThreshold": 30,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "initContainers": [
+                            {
+                                "args": [
+                                    "set -e\nVENV=\"/root/faster-whisper-server/.venv\"\nHF_CACHE=\"/root/.cache/huggingface/hub\"\n\nmkdir -p \"$HF_CACHE\"\n\nDEEPDML_DIR=\"$HF_CACHE/models--deepdml--faster-whisper-large-v3-turbo-ct2\"\nif [ -d \"$DEEPDML_DIR/snapshots\" ]; then\n  echo \"Model already cached at $DEEPDML_DIR, skipping download\"\nelse\n  echo \"Downloading deepdml/faster-whisper-large-v3-turbo-ct2 (public CT2 model)...\"\n  \"$VENV/bin/python\" -c \"\nfrom huggingface_hub import snapshot_download\nresult = snapshot_download(\n    repo_id='deepdml/faster-whisper-large-v3-turbo-ct2',\n    cache_dir='$HF_CACHE',\n)\nprint('Downloaded to:', result)\n\"\nfi\n\n# Systran/faster-whisper-large-v3-turbo is gated (401 as of June 2026).\n# faster_whisper maps short name 'large-v3-turbo' -\u003e Systran repo.\n# Symlink makes the Systran cache path resolve to the deepdml model.\nSYSTRAN_DIR=\"$HF_CACHE/models--Systran--faster-whisper-large-v3-turbo\"\nif [ ! -e \"$SYSTRAN_DIR\" ]; then\n  ln -s \"models--deepdml--faster-whisper-large-v3-turbo-ct2\" \"$SYSTRAN_DIR\"\n  echo \"Created symlink: $SYSTRAN_DIR -\u003e models--deepdml--faster-whisper-large-v3-turbo-ct2\"\nelse\n  echo \"Systran dir already present: $SYSTRAN_DIR\"\nfi\n\necho \"Model cache ready\"\n"
+                                ],
+                                "command": [
+                                    "/bin/sh",
+                                    "-c"
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "model-download",
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "2",
+                                        "memory": "2Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "500m",
+                                        "memory": "512Mi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 3,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "16"
+                },
+                "creationTimestamp": "2026-06-14T03:53:06Z",
+                "generation": 3,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "685c49f459"
+                },
+                "name": "whisper-openai-685c49f459",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178228287",
+                "uid": "667316d6-c0b0-4a6c-971a-4f5640c6e272"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "685c49f459"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "685c49f459"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/uvicorn",
+                                    "faster_whisper_server.main:create_app",
+                                    "--factory",
+                                    "--host",
+                                    "0.0.0.0",
+                                    "--port",
+                                    "8000"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    },
+                                    {
+                                        "name": "WHISPER__PRELOAD_MODELS",
+                                        "value": "[\"large-v3-turbo\"]"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 30,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 15,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 3,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "23"
+                },
+                "creationTimestamp": "2026-06-14T04:52:13Z",
+                "generation": 3,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "6885fc878b"
+                },
+                "name": "whisper-openai-6885fc878b",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178267799",
+                "uid": "b0eec5de-f8c3-4e3b-b960-bd852ae8b1b3"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "6885fc878b"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "6885fc878b"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/python",
+                                    "/root/.cache/huggingface/launch.py"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    },
+                                    {
+                                        "name": "HF_HOME",
+                                        "value": "/root/.cache/huggingface"
+                                    },
+                                    {
+                                        "name": "HF_HUB_OFFLINE",
+                                        "value": "1"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "startupProbe": {
+                                    "failureThreshold": 30,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "initContainers": [
+                            {
+                                "args": [
+                                    "set -e\nVENV=\"/root/faster-whisper-server/.venv\"\nHF_CACHE=\"/root/.cache/huggingface/hub\"\n\nmkdir -p \"$HF_CACHE\"\n\nDEEPDML_DIR=\"$HF_CACHE/models--deepdml--faster-whisper-large-v3-turbo-ct2\"\nif [ -d \"$DEEPDML_DIR/snapshots\" ]; then\n  echo \"Model already cached, skipping download\"\nelse\n  echo \"Downloading deepdml/faster-whisper-large-v3-turbo-ct2...\"\n  \"$VENV/bin/python\" -c \"\nfrom huggingface_hub import snapshot_download\nresult = snapshot_download(\n    repo_id='deepdml/faster-whisper-large-v3-turbo-ct2',\n    cache_dir='$HF_CACHE',\n)\nprint('Downloaded to:', result)\n\"\nfi\n\n# Systran/faster-whisper-large-v3-turbo is gated. Symlink so offline\n# cache lookup for \"large-v3-turbo\" resolves to the deepdml model.\nSYSTRAN_DIR=\"$HF_CACHE/models--Systran--faster-whisper-large-v3-turbo\"\nif [ ! -e \"$SYSTRAN_DIR\" ]; then\n  ln -s \"models--deepdml--faster-whisper-large-v3-turbo-ct2\" \"$SYSTRAN_DIR\"\n  echo \"Created symlink Systran -\u003e deepdml\"\nelse\n  echo \"Systran symlink already present\"\nfi\n\n# Write launcher script via base64 to avoid YAML indentation issues.\n# Script patches _MODELS to accept \"large-v3-turbo\" (older faster-whisper\n# doesn't know this size; _MODELS is a tuple so we use concatenation).\necho 'aW1wb3J0IHN5cwpzeXMucGF0aC5pbnNlcnQoMCwgJy9yb290L2Zhc3Rlci13aGlzcGVyLXNlcnZlcicpCgppbXBvcnQgZmFzdGVyX3doaXNwZXIudXRpbHMgYXMgX2Z3X3V0aWxzCmlmICdsYXJnZS12My10dXJibycgbm90IGluIF9md191dGlscy5fTU9ERUxTOgogICAgX2Z3X3V0aWxzLl9NT0RFTFNbJ2xhcmdlLXYzLXR1cmJvJ10gPSAnU3lzdHJhbi9mYXN0ZXItd2hpc3Blci1sYXJnZS12My10dXJibycKICAgIHByaW50KCdQYXRjaGVkIF9NT0RFTFMgdG8gaW5jbHVkZSBsYXJnZS12My10dXJibycpCgppbXBvcnQgdXZpY29ybgp1dmljb3JuLnJ1bigKICAgICdmYXN0ZXJfd2hpc3Blcl9zZXJ2ZXIubWFpbjpjcmVhdGVfYXBwJywKICAgIGZhY3Rvcnk9VHJ1ZSwKICAgIGhvc3Q9JzAuMC4wLjAnLAogICAgcG9ydD04MDAwLAopCg==' | base64 -d \u003e /root/.cache/huggingface/launch.py\necho \"launch.py written\"\necho \"Init complete\"\n"
+                                ],
+                                "command": [
+                                    "/bin/sh",
+                                    "-c"
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "model-download",
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "2",
+                                        "memory": "2Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "500m",
+                                        "memory": "512Mi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 3,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "24"
+                },
+                "creationTimestamp": "2026-06-14T04:55:48Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "68966786fb"
+                },
+                "name": "whisper-openai-68966786fb",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "213682487",
+                "uid": "87a638f1-5f06-4af7-8e18-ada7e20dc26b"
+            },
+            "spec": {
+                "replicas": 1,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "68966786fb"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "68966786fb"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/python",
+                                    "/root/.cache/huggingface/launch.py"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    },
+                                    {
+                                        "name": "HF_HOME",
+                                        "value": "/root/.cache/huggingface"
+                                    },
+                                    {
+                                        "name": "HF_HUB_OFFLINE",
+                                        "value": "1"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "IfNotPresent",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "startupProbe": {
+                                    "failureThreshold": 30,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "initContainers": [
+                            {
+                                "args": [
+                                    "set -e\nVENV=\"/root/faster-whisper-server/.venv\"\nHF_CACHE=\"/root/.cache/huggingface/hub\"\n\nmkdir -p \"$HF_CACHE\"\n\nDEEPDML_DIR=\"$HF_CACHE/models--deepdml--faster-whisper-large-v3-turbo-ct2\"\nif [ -d \"$DEEPDML_DIR/snapshots\" ]; then\n  echo \"Model already cached, skipping download\"\nelse\n  echo \"Downloading deepdml/faster-whisper-large-v3-turbo-ct2...\"\n  \"$VENV/bin/python\" -c \"\nfrom huggingface_hub import snapshot_download\nresult = snapshot_download(\n    repo_id='deepdml/faster-whisper-large-v3-turbo-ct2',\n    cache_dir='$HF_CACHE',\n)\nprint('Downloaded to:', result)\n\"\nfi\n\n# Systran/faster-whisper-large-v3-turbo is gated. Symlink so offline\n# cache lookup for \"large-v3-turbo\" resolves to the deepdml model.\nSYSTRAN_DIR=\"$HF_CACHE/models--Systran--faster-whisper-large-v3-turbo\"\nif [ ! -e \"$SYSTRAN_DIR\" ]; then\n  ln -s \"models--deepdml--faster-whisper-large-v3-turbo-ct2\" \"$SYSTRAN_DIR\"\n  echo \"Created symlink Systran -\u003e deepdml\"\nelse\n  echo \"Systran symlink already present\"\nfi\n\n# Write launcher script via base64 to avoid YAML indentation issues.\n# Script patches _MODELS to accept \"large-v3-turbo\" (older faster-whisper\n# doesn't know this size; _MODELS is a tuple so we use concatenation).\necho 'aW1wb3J0IHN5cwpzeXMucGF0aC5pbnNlcnQoMCwgJy9yb290L2Zhc3Rlci13aGlzcGVyLXNlcnZlcicpCgppbXBvcnQgZmFzdGVyX3doaXNwZXIudXRpbHMgYXMgX2Z3X3V0aWxzCmlmICdsYXJnZS12My10dXJibycgbm90IGluIF9md191dGlscy5fTU9ERUxTOgogICAgX2Z3X3V0aWxzLl9NT0RFTFNbJ2xhcmdlLXYzLXR1cmJvJ10gPSAnU3lzdHJhbi9mYXN0ZXItd2hpc3Blci1sYXJnZS12My10dXJibycKICAgIHByaW50KCdQYXRjaGVkIF9NT0RFTFMgdG8gaW5jbHVkZSBsYXJnZS12My10dXJibycpCgppbXBvcnQgdXZpY29ybgp1dmljb3JuLnJ1bigKICAgICdmYXN0ZXJfd2hpc3Blcl9zZXJ2ZXIubWFpbjpjcmVhdGVfYXBwJywKICAgIGZhY3Rvcnk9VHJ1ZSwKICAgIGhvc3Q9JzAuMC4wLjAnLAogICAgcG9ydD04MDAwLAopCg==' | base64 -d \u003e /root/.cache/huggingface/launch.py\necho \"launch.py written\"\necho \"Init complete\"\n"
+                                ],
+                                "command": [
+                                    "/bin/sh",
+                                    "-c"
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "model-download",
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "2",
+                                        "memory": "2Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "500m",
+                                        "memory": "512Mi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "availableReplicas": 1,
+                "fullyLabeledReplicas": 1,
+                "observedGeneration": 2,
+                "readyReplicas": 1,
+                "replicas": 1
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "22"
+                },
+                "creationTimestamp": "2026-06-14T04:48:36Z",
+                "generation": 3,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "6b75db654f"
+                },
+                "name": "whisper-openai-6b75db654f",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178265081",
+                "uid": "8fe5c1d1-d8a5-4f6f-81ff-090ead1df07a"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "6b75db654f"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "6b75db654f"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/python",
+                                    "/root/.cache/huggingface/launch.py"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    },
+                                    {
+                                        "name": "HF_HOME",
+                                        "value": "/root/.cache/huggingface"
+                                    },
+                                    {
+                                        "name": "HF_HUB_OFFLINE",
+                                        "value": "1"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "startupProbe": {
+                                    "failureThreshold": 30,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "initContainers": [
+                            {
+                                "args": [
+                                    "set -e\nVENV=\"/root/faster-whisper-server/.venv\"\nHF_CACHE=\"/root/.cache/huggingface/hub\"\n\nmkdir -p \"$HF_CACHE\"\n\nDEEPDML_DIR=\"$HF_CACHE/models--deepdml--faster-whisper-large-v3-turbo-ct2\"\nif [ -d \"$DEEPDML_DIR/snapshots\" ]; then\n  echo \"Model already cached, skipping download\"\nelse\n  echo \"Downloading deepdml/faster-whisper-large-v3-turbo-ct2...\"\n  \"$VENV/bin/python\" -c \"\nfrom huggingface_hub import snapshot_download\nresult = snapshot_download(\n    repo_id='deepdml/faster-whisper-large-v3-turbo-ct2',\n    cache_dir='$HF_CACHE',\n)\nprint('Downloaded to:', result)\n\"\nfi\n\n# Systran/faster-whisper-large-v3-turbo is gated. Symlink so offline\n# cache lookup for \"large-v3-turbo\" resolves to the deepdml model.\nSYSTRAN_DIR=\"$HF_CACHE/models--Systran--faster-whisper-large-v3-turbo\"\nif [ ! -e \"$SYSTRAN_DIR\" ]; then\n  ln -s \"models--deepdml--faster-whisper-large-v3-turbo-ct2\" \"$SYSTRAN_DIR\"\n  echo \"Created symlink Systran -\u003e deepdml\"\nelse\n  echo \"Systran symlink already present\"\nfi\n\n# Write launcher script via base64 to avoid YAML indentation issues.\n# Script patches _MODELS to accept \"large-v3-turbo\" (older faster-whisper\n# doesn't know this size; _MODELS is a tuple so we use concatenation).\necho 'aW1wb3J0IHN5cwpzeXMucGF0aC5pbnNlcnQoMCwgJy9yb290L2Zhc3Rlci13aGlzcGVyLXNlcnZlcicpCgppbXBvcnQgZmFzdGVyX3doaXNwZXIudXRpbHMgYXMgX2Z3X3V0aWxzCmlmICdsYXJnZS12My10dXJibycgbm90IGluIF9md191dGlscy5fTU9ERUxTOgogICAgX2Z3X3V0aWxzLl9NT0RFTFMgPSB0dXBsZShfZndfdXRpbHMuX01PREVMUykgKyAoJ2xhcmdlLXYzLXR1cmJvJywpCiAgICBwcmludCgnUGF0Y2hlZCBfTU9ERUxTIHRvIGluY2x1ZGUgbGFyZ2UtdjMtdHVyYm8nKQoKaW1wb3J0IHV2aWNvcm4KdXZpY29ybi5ydW4oCiAgICAnZmFzdGVyX3doaXNwZXJfc2VydmVyLm1haW46Y3JlYXRlX2FwcCcsCiAgICBmYWN0b3J5PVRydWUsCiAgICBob3N0PScwLjAuMC4wJywKICAgIHBvcnQ9ODAwMCwKKQo=' | base64 -d \u003e /root/.cache/huggingface/launch.py\necho \"launch.py written\"\necho \"Init complete\"\n"
+                                ],
+                                "command": [
+                                    "/bin/sh",
+                                    "-c"
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "model-download",
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "2",
+                                        "memory": "2Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "500m",
+                                        "memory": "512Mi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 3,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "19"
+                },
+                "creationTimestamp": "2026-06-14T04:06:40Z",
+                "generation": 3,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "745d9c487d"
+                },
+                "name": "whisper-openai-745d9c487d",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178237504",
+                "uid": "7d8c78f3-0db6-4453-98ed-5bd8787ee60e"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "745d9c487d"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "745d9c487d"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/uvicorn",
+                                    "faster_whisper_server.main:create_app",
+                                    "--factory",
+                                    "--host",
+                                    "0.0.0.0",
+                                    "--port",
+                                    "8000"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    },
+                                    {
+                                        "name": "HF_HOME",
+                                        "value": "/root/.cache/huggingface"
+                                    },
+                                    {
+                                        "name": "HF_HUB_OFFLINE",
+                                        "value": "1"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "startupProbe": {
+                                    "failureThreshold": 30,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "initContainers": [
+                            {
+                                "args": [
+                                    "set -e\nVENV=\"/root/faster-whisper-server/.venv\"\nHF_CACHE=\"/root/.cache/huggingface/hub\"\n\nmkdir -p \"$HF_CACHE\"\n\nDEEPDML_DIR=\"$HF_CACHE/models--deepdml--faster-whisper-large-v3-turbo-ct2\"\nif [ -d \"$DEEPDML_DIR/snapshots\" ]; then\n  echo \"Model already cached at $DEEPDML_DIR, skipping download\"\nelse\n  echo \"Downloading deepdml/faster-whisper-large-v3-turbo-ct2 (public CT2 model)...\"\n  \"$VENV/bin/python\" -c \"\nfrom huggingface_hub import snapshot_download\nresult = snapshot_download(\n    repo_id='deepdml/faster-whisper-large-v3-turbo-ct2',\n    cache_dir='$HF_CACHE',\n)\nprint('Downloaded to:', result)\n\"\nfi\n\n# Systran/faster-whisper-large-v3-turbo is gated (401 as of June 2026).\n# faster_whisper maps short name 'large-v3-turbo' -\u003e Systran repo.\n# Symlink makes the Systran cache path resolve to the deepdml model.\nSYSTRAN_DIR=\"$HF_CACHE/models--Systran--faster-whisper-large-v3-turbo\"\nif [ ! -e \"$SYSTRAN_DIR\" ]; then\n  ln -s \"models--deepdml--faster-whisper-large-v3-turbo-ct2\" \"$SYSTRAN_DIR\"\n  echo \"Created symlink: $SYSTRAN_DIR -\u003e models--deepdml--faster-whisper-large-v3-turbo-ct2\"\nelse\n  echo \"Systran dir already present: $SYSTRAN_DIR\"\nfi\n\necho \"Model cache ready\"\n"
+                                ],
+                                "command": [
+                                    "/bin/sh",
+                                    "-c"
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "model-download",
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "2",
+                                        "memory": "2Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "500m",
+                                        "memory": "512Mi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 3,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "17"
+                },
+                "creationTimestamp": "2026-06-14T03:56:31Z",
+                "generation": 3,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "7548956b49"
+                },
+                "name": "whisper-openai-7548956b49",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178230968",
+                "uid": "0d59161f-2a85-4978-893a-5d8993116dc3"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "7548956b49"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "7548956b49"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/uvicorn",
+                                    "faster_whisper_server.main:create_app",
+                                    "--factory",
+                                    "--host",
+                                    "0.0.0.0",
+                                    "--port",
+                                    "8000"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    },
+                                    {
+                                        "name": "HF_HOME",
+                                        "value": "/root/.cache/huggingface"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "startupProbe": {
+                                    "failureThreshold": 30,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "initContainers": [
+                            {
+                                "args": [
+                                    "import os\nhf_cache = '/root/.cache/huggingface/hub'\nmodel_dir = os.path.join(hf_cache, 'models--Systran--faster-whisper-large-v3-turbo')\nif os.path.isdir(model_dir):\n    print('Model already cached, skipping download')\nelse:\n    print('Downloading Systran/faster-whisper-large-v3-turbo...')\n    from huggingface_hub import snapshot_download\n    snapshot_download(\n        repo_id='Systran/faster-whisper-large-v3-turbo',\n        cache_dir=hf_cache,\n    )\n    print('Download complete')\n"
+                                ],
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/python",
+                                    "-c"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "HF_HOME",
+                                        "value": "/root/.cache/huggingface"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "model-download",
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "4",
+                                        "memory": "4Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "500m",
+                                        "memory": "2Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 3,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "15"
+                },
+                "creationTimestamp": "2026-06-14T03:50:27Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "7558965d58"
+                },
+                "name": "whisper-openai-7558965d58",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178226270",
+                "uid": "d75ec740-e636-4a19-b732-717bdfd7e939"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "7558965d58"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "7558965d58"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/uvicorn",
+                                    "faster_whisper_server.main:create_app",
+                                    "--factory",
+                                    "--host",
+                                    "0.0.0.0",
+                                    "--port",
+                                    "8000"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 30,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 15,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "18"
+                },
+                "creationTimestamp": "2026-06-14T04:01:11Z",
+                "generation": 3,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "7b756c458"
+                },
+                "name": "whisper-openai-7b756c458",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178233927",
+                "uid": "7a3a41ef-85a8-44a1-a064-6369256b9b71"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "7b756c458"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "7b756c458"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/uvicorn",
+                                    "faster_whisper_server.main:create_app",
+                                    "--factory",
+                                    "--host",
+                                    "0.0.0.0",
+                                    "--port",
+                                    "8000"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    },
+                                    {
+                                        "name": "HF_HOME",
+                                        "value": "/root/.cache/huggingface"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "startupProbe": {
+                                    "failureThreshold": 30,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "initContainers": [
+                            {
+                                "args": [
+                                    "echo \"=== stt_router.py ===\"\ncat /root/faster-whisper-server/faster_whisper_server/routers/stt.py\necho \"=== dependencies.py ===\"\ncat /root/faster-whisper-server/faster_whisper_server/dependencies.py\necho \"=== config.py ===\"\ncat /root/faster-whisper-server/faster_whisper_server/config.py\necho \"=== model_manager.py head ===\"\nhead -60 /root/faster-whisper-server/faster_whisper_server/model_manager.py\necho \"DONE\"\n"
+                                ],
+                                "command": [
+                                    "/bin/sh",
+                                    "-c"
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "model-download",
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "500m",
+                                        "memory": "512Mi"
+                                    },
+                                    "requests": {
+                                        "cpu": "100m",
+                                        "memory": "256Mi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 3,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "14"
+                },
+                "creationTimestamp": "2026-06-14T03:44:24Z",
+                "generation": 3,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "7ccf9f655b"
+                },
+                "name": "whisper-openai-7ccf9f655b",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178222426",
+                "uid": "a59c0d73-7395-4f7c-930c-fd5464d22587"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "7ccf9f655b"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "7ccf9f655b"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "args": [
+                                    "VENV=/root/faster-whisper-server/.venv\necho \"=== main.py app-related attributes ===\"\n\"$VENV/bin/python\" -c \"\nimport faster_whisper_server.main as m\nprint('main.py attrs:', [a for a in dir(m) if not a.startswith('_')])\n\" 2\u003e\u00261\necho \"=== __init__.py attributes ===\"\n\"$VENV/bin/python\" -c \"\nimport faster_whisper_server as f\nprint('__init__.py attrs:', [a for a in dir(f) if not a.startswith('_')])\n\" 2\u003e\u00261\necho \"=== Check __main__.py ===\"\ncat /root/faster-whisper-server/faster_whisper_server/__main__.py 2\u003e/dev/null || echo \"No __main__.py\"\necho \"=== Check __init__.py ===\"\ncat /root/faster-whisper-server/faster_whisper_server/__init__.py 2\u003e/dev/null\necho \"=== Full main.py ===\"\ncat /root/faster-whisper-server/faster_whisper_server/main.py 2\u003e/dev/null\necho \"=== Sleeping ===\"\nsleep 3600\n"
+                                ],
+                                "command": [
+                                    "/bin/sh",
+                                    "-c"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "exec": {
+                                        "command": [
+                                            "/bin/sh",
+                                            "-c",
+                                            "exit 0"
+                                        ]
+                                    },
+                                    "failureThreshold": 3,
+                                    "initialDelaySeconds": 5,
+                                    "periodSeconds": 60,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "exec": {
+                                        "command": [
+                                            "/bin/sh",
+                                            "-c",
+                                            "exit 0"
+                                        ]
+                                    },
+                                    "failureThreshold": 3,
+                                    "initialDelaySeconds": 5,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 5,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 3,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-openai",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "21"
+                },
+                "creationTimestamp": "2026-06-14T04:27:44Z",
+                "generation": 3,
+                "labels": {
+                    "app": "whisper-openai",
+                    "pod-template-hash": "85b44d79b4"
+                },
+                "name": "whisper-openai-85b44d79b4",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-openai",
+                        "uid": "72ff869b-ab97-4913-893b-a43f43240a30"
+                    }
+                ],
+                "resourceVersion": "178262806",
+                "uid": "445dbd71-c93b-4202-8bd6-73005891010b"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-openai",
+                        "pod-template-hash": "85b44d79b4"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-openai",
+                            "pod-template-hash": "85b44d79b4"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/root/faster-whisper-server/.venv/bin/python",
+                                    "/root/.cache/huggingface/launch.py"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "WHISPER__MODEL",
+                                        "value": "large-v3-turbo"
+                                    },
+                                    {
+                                        "name": "WHISPER__INFERENCE_DEVICE",
+                                        "value": "cpu"
+                                    },
+                                    {
+                                        "name": "HF_HOME",
+                                        "value": "/root/.cache/huggingface"
+                                    },
+                                    {
+                                        "name": "HF_HUB_OFFLINE",
+                                        "value": "1"
+                                    }
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 5,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-openai",
+                                "ports": [
+                                    {
+                                        "containerPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "startupProbe": {
+                                    "failureThreshold": 30,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8000,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 10,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "initContainers": [
+                            {
+                                "args": [
+                                    "set -e\nVENV=\"/root/faster-whisper-server/.venv\"\nHF_CACHE=\"/root/.cache/huggingface/hub\"\n\nmkdir -p \"$HF_CACHE\"\n\nDEEPDML_DIR=\"$HF_CACHE/models--deepdml--faster-whisper-large-v3-turbo-ct2\"\nif [ -d \"$DEEPDML_DIR/snapshots\" ]; then\n  echo \"Model already cached, skipping download\"\nelse\n  echo \"Downloading deepdml/faster-whisper-large-v3-turbo-ct2...\"\n  \"$VENV/bin/python\" -c \"\nfrom huggingface_hub import snapshot_download\nresult = snapshot_download(\n    repo_id='deepdml/faster-whisper-large-v3-turbo-ct2',\n    cache_dir='$HF_CACHE',\n)\nprint('Downloaded to:', result)\n\"\nfi\n\n# Systran/faster-whisper-large-v3-turbo is gated. Symlink so offline\n# cache lookup for \"large-v3-turbo\" resolves to the deepdml model.\nSYSTRAN_DIR=\"$HF_CACHE/models--Systran--faster-whisper-large-v3-turbo\"\nif [ ! -e \"$SYSTRAN_DIR\" ]; then\n  ln -s \"models--deepdml--faster-whisper-large-v3-turbo-ct2\" \"$SYSTRAN_DIR\"\n  echo \"Created symlink Systran -\u003e deepdml\"\nelse\n  echo \"Systran symlink already present\"\nfi\n\n# Write launcher script to PVC so the main container can run it.\n# The launcher monkeypatches faster_whisper._MODELS to add \"large-v3-turbo\"\n# (this fedirz image bundles a faster-whisper version that doesn't know turbo).\ncat \u003e /root/.cache/huggingface/launch.py \u003c\u003c 'PYEOF'\nimport sys, os\nsys.path.insert(0, '/root/faster-whisper-server')\n\n# Patch _MODELS before any model loading so \"large-v3-turbo\" is accepted.\n# faster-whisper maps it to Systran/faster-whisper-large-v3-turbo which is\n# symlinked in the HF cache to the public deepdml CT2 model.\nimport faster_whisper.utils as _fw_utils\nif isinstance(_fw_utils._MODELS, frozenset):\n    _fw_utils._MODELS = _fw_utils._MODELS | {\"large-v3-turbo\"}\nelse:\n    _fw_utils._MODELS.add(\"large-v3-turbo\")\n\nimport uvicorn\nuvicorn.run(\n    \"faster_whisper_server.main:create_app\",\n    factory=True,\n    host=\"0.0.0.0\",\n    port=8000,\n)\nPYEOF\n\necho \"launch.py written\"\necho \"Init complete\"\n"
+                                ],
+                                "command": [
+                                    "/bin/sh",
+                                    "-c"
+                                ],
+                                "image": "fedirz/faster-whisper-server:latest-cpu",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "model-download",
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "2",
+                                        "memory": "2Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "500m",
+                                        "memory": "512Mi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ],
+                                "workingDir": "/root/faster-whisper-server"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-openai-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 3,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "24",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-06-25T14:10:16Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "558c7cf44"
+                },
+                "name": "whisper-stt-558c7cf44",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "186493504",
+                "uid": "0f4d8bdb-33e0-43ec-bf7d-fd2c89225586"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "558c7cf44"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "558c7cf44"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.3.1",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "30",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-07-08T03:16:13Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "5b8558f478"
+                },
+                "name": "whisper-stt-5b8558f478",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "194298808",
+                "uid": "778a28f4-36fd-49d3-96ac-4d11c57fa622"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "5b8558f478"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "5b8558f478"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.8.4",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "26",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-06-26T16:33:34Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "5b884b75f4"
+                },
+                "name": "whisper-stt-5b884b75f4",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "190055450",
+                "uid": "a46592de-ec3c-4aa5-b15a-01c7c1d8e73b"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "5b884b75f4"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "5b884b75f4"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.5.1",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "29",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-07-08T03:09:35Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "5dbff75cbd"
+                },
+                "name": "whisper-stt-5dbff75cbd",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "194293352",
+                "uid": "8c5856fb-8ed6-4e1e-8b01-a7c7ebce3942"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "5dbff75cbd"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "5dbff75cbd"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.8.2",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "27",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-07-01T19:46:33Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "6464bdf67b"
+                },
+                "name": "whisper-stt-6464bdf67b",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "190238820",
+                "uid": "23167297-c504-4f83-a5bd-00f7264631be"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "6464bdf67b"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "6464bdf67b"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.6.0",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "23",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-06-25T14:08:07Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "65fb7f8dd9"
+                },
+                "name": "whisper-stt-65fb7f8dd9",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "185859391",
+                "uid": "b4a40b38-81f7-42aa-a67e-566f997a4098"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "65fb7f8dd9"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "65fb7f8dd9"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.3.0",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "28",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-07-02T02:20:33Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "6b96f4569c"
+                },
+                "name": "whisper-stt-6b96f4569c",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "194289954",
+                "uid": "d0d2498f-901b-4d05-91dd-3384508d7229"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "6b96f4569c"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "6b96f4569c"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.7.0",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "31",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-07-08T03:26:44Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "6c497489fb"
+                },
+                "name": "whisper-stt-6c497489fb",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "197347202",
+                "uid": "68216329-6f95-46aa-a30e-409c2a5fad6a"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "6c497489fb"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "6c497489fb"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.8.6",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "22",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-06-24T20:55:36Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "75c848b8d6"
+                },
+                "name": "whisper-stt-75c848b8d6",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "185857585",
+                "uid": "5693f161-bbe7-41ac-8b36-6763cdb85ad6"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "75c848b8d6"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "75c848b8d6"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.2.5",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "25",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-06-26T12:42:03Z",
+                "generation": 2,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "78bbf5f57f"
+                },
+                "name": "whisper-stt-78bbf5f57f",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "186603489",
+                "uid": "2165b71b-46bc-48ea-996e-d383da495168"
+            },
+            "spec": {
+                "replicas": 0,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "78bbf5f57f"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "78bbf5f57f"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.4.1",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "observedGeneration": 2,
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt-ns-ardenone-cluster:apps/Deployment:whisper-stt/whisper-stt",
+                    "deployment.kubernetes.io/desired-replicas": "1",
+                    "deployment.kubernetes.io/max-replicas": "1",
+                    "deployment.kubernetes.io/revision": "32",
+                    "reloader.stakater.com/auto": "true"
+                },
+                "creationTimestamp": "2026-07-12T16:53:42Z",
+                "generation": 1,
+                "labels": {
+                    "app": "whisper-stt",
+                    "pod-template-hash": "847fd8d7b9"
+                },
+                "name": "whisper-stt-847fd8d7b9",
+                "namespace": "whisper-stt",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Deployment",
+                        "name": "whisper-stt",
+                        "uid": "b48947ac-776f-44b2-8566-d077b13518ed"
+                    }
+                ],
+                "resourceVersion": "197348428",
+                "uid": "3e1d7d18-8574-4e6a-9ab5-61ff19cfeb27"
+            },
+            "spec": {
+                "replicas": 1,
+                "selector": {
+                    "matchLabels": {
+                        "app": "whisper-stt",
+                        "pod-template-hash": "847fd8d7b9"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "whisper-stt",
+                            "pod-template-hash": "847fd8d7b9"
+                        }
+                    },
+                    "spec": {
+                        "affinity": {
+                            "nodeAffinity": {
+                                "preferredDuringSchedulingIgnoredDuringExecution": [
+                                    {
+                                        "preference": {
+                                            "matchExpressions": [
+                                                {
+                                                    "key": "kubernetes.io/hostname",
+                                                    "operator": "In",
+                                                    "values": [
+                                                        "k3s-agent-minisforum"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "weight": 100
+                                    },
+                                    {
+                                        "preference": {
+                                            "matchExpressions": [
+                                                {
+                                                    "key": "kubernetes.io/hostname",
+                                                    "operator": "In",
+                                                    "values": [
+                                                        "k3s-lenovo-tiny"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "weight": 90
+                                    }
+                                ]
+                            }
+                        },
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "POD",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "WHISPER_MODEL",
+                                        "value": "distil-large-v3"
+                                    }
+                                ],
+                                "envFrom": [
+                                    {
+                                        "secretRef": {
+                                            "name": "whisper-stt-secret"
+                                        }
+                                    }
+                                ],
+                                "image": "ronaldraygun/whisper-stt:1.8.6",
+                                "imagePullPolicy": "Always",
+                                "livenessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 120,
+                                    "periodSeconds": 30,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "name": "whisper-stt",
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "failureThreshold": 3,
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "timeoutSeconds": 1
+                                },
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "8",
+                                        "memory": "8Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "1",
+                                        "memory": "4Gi"
+                                    }
+                                },
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "volumeMounts": [
+                                    {
+                                        "mountPath": "/root/.cache/huggingface",
+                                        "name": "model-cache"
+                                    },
+                                    {
+                                        "mountPath": "/data",
+                                        "name": "jobs-data"
+                                    }
+                                ]
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "imagePullSecrets": [
+                            {
+                                "name": "docker-hub-registry"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "schedulerName": "default-scheduler",
+                        "securityContext": {},
+                        "terminationGracePeriodSeconds": 30,
+                        "volumes": [
+                            {
+                                "name": "model-cache",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-model-cache"
+                                }
+                            },
+                            {
+                                "name": "jobs-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "whisper-stt-jobs"
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "status": {
+                "availableReplicas": 1,
+                "fullyLabeledReplicas": 1,
+                "observedGeneration": 1,
+                "readyReplicas": 1,
+                "replicas": 1
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
