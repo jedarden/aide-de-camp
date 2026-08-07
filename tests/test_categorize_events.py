@@ -731,6 +731,110 @@ class TestNetworkErrorDetection:
 class TestUnknownEventCategorization:
     """Tests for unknown event categorization."""
 
+    @pytest.mark.parametrize("event_config,expected_description", [
+        # Basic uncategorizable events
+        ({
+            'event_type': 'random_event',
+            'status': 'unknown',
+            'error_code': None,
+            'metadata': {'source_fields': {'random_field': 'random_value'}}
+        }, "Random event with no categorizable features"),
+
+        # Events with completely nonsense event types
+        ({
+            'event_type': 'foobar_baz_event',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'some_field': 'some_value'}}
+        }, "Event with nonsense event_type"),
+
+        # Events with custom metrics
+        ({
+            'event_type': 'custom_metric_event',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {'source_fields': {'metric_name': 'custom_latency', 'metric_value': 123.45}}
+        }, "Custom metric event"),
+
+        # Events with unrecognized error codes
+        ({
+            'event_type': 'pod_status',
+            'status': 'warning',
+            'error_code': 'CustomAppError',
+            'metadata': {'source_fields': {'message': 'Custom application error occurred'}}
+        }, "Event with unrecognized error code"),
+
+        # Scaling events (benign, not error-related)
+        ({
+            'event_type': 'scaling_event',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {'source_fields': {'scaling_action': 'horizontal_pod_autoscaler', 'replicas': 5}}
+        }, "Horizontal autoscaler scaling event"),
+
+        # Config update events
+        ({
+            'event_type': 'config_update',
+            'status': 'completed',
+            'error_code': None,
+            'duration_ms': 5000,
+            'metadata': {'source_fields': {'configmap': 'app-config', 'version': 'v1.2.3'}}
+        }, "ConfigMap update completion event"),
+
+        # Audit/log events
+        ({
+            'event_type': 'audit_log_entry',
+            'status': 'logged',
+            'error_code': None,
+            'metadata': {'source_fields': {'audit_id': 'abc123', 'user': 'system', 'action': 'config_read'}}
+        }, "Audit log entry event"),
+
+        # Volume/mount events
+        ({
+            'event_type': 'volume_mount_event',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'volume_name': 'data-volume', 'mount_path': '/app/data'}}
+        }, "Volume mount success event"),
+
+        # Security/auth events
+        ({
+            'event_type': 'auth_event',
+            'status': 'allowed',
+            'error_code': None,
+            'metadata': {'source_fields': {'user': 'service-account', 'operation': 'create', 'resource': 'pod'}}
+        }, "Authorization allowed event"),
+
+        # Generic status update events
+        ({
+            'event_type': 'status_update',
+            'status': 'pending',
+            'error_code': None,
+            'metadata': {'source_fields': {'previous_status': 'initializing', 'current_status': 'pending'}}
+        }, "Generic status update event"),
+
+        # Long-running tasks below timeout threshold
+        ({
+            'event_type': 'long_running_task',
+            'status': 'completed',
+            'error_code': None,
+            'duration_ms': 300000,
+            'metadata': {'source_fields': {'task': 'data_processing', 'records_processed': 1000}}
+        }, "Long-running task below timeout threshold"),
+    ])
+    def test_parametrized_unknown_events(self, base_parsed_event, event_config, expected_description):
+        """Parametrized test for various unknown event patterns.
+
+        Each event configuration represents a realistic event that should
+        not match any known categorization pattern and should be categorized
+        as EVENT_UNKNOWN.
+        """
+        base_parsed_event.update(event_config)
+        result = categorize_event(base_parsed_event)
+
+        # Assert the event is categorized as unknown
+        assert result == EVENT_UNKNOWN, f"Failed for: {expected_description}"
+
     def test_uncategorizable_event_is_unknown(self, base_parsed_event):
         """Event with no categorizable features is unknown."""
         base_parsed_event.update({
@@ -760,6 +864,499 @@ class TestUnknownEventCategorization:
         })
         result = categorize_event(base_parsed_event)
         assert result != EVENT_UNKNOWN
+
+    def test_event_with_nonsense_event_type_is_unknown(self, base_parsed_event):
+        """Event with completely nonsense event_type is unknown."""
+        base_parsed_event.update({
+            'event_type': 'foobar_baz_event',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'some_field': 'some_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_event_with_valid_structure_no_indicators_is_unknown(self, base_parsed_event):
+        """Event with valid structure but no recognizable indicators is unknown."""
+        base_parsed_event.update({
+            'event_type': 'custom_metric_event',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'metric_name': 'custom_latency',
+                    'metric_value': 123.45
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_event_with_custom_error_code_not_recognized_is_unknown(self, base_parsed_event):
+        """Event with unrecognized error code is unknown."""
+        base_parsed_event.update({
+            'event_type': 'pod_status',
+            'status': 'warning',
+            'error_code': 'CustomAppError',
+            'metadata': {
+                'source_fields': {
+                    'message': 'Custom application error occurred'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_event_with_benign_status_no_error_indicators_is_unknown(self, base_parsed_event):
+        """Event with benign status and no error indicators is unknown."""
+        base_parsed_event.update({
+            'event_type': 'scaling_event',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'scaling_action': 'horizontal_pod_autoscaler',
+                    'replicas': 5
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_event_with_mixed_fields_no_pattern_match_is_unknown(self, base_parsed_event):
+        """Event with mixed fields that don't form a recognized pattern is unknown."""
+        base_parsed_event.update({
+            'event_type': 'config_update',
+            'status': 'completed',
+            'error_code': None,
+            'duration_ms': 5000,
+            'metadata': {
+                'source_fields': {
+                    'configmap': 'app-config',
+                    'version': 'v1.2.3'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_audit_event_with_no_deployment_indicators_is_unknown(self, base_parsed_event):
+        """Audit/logging event with no deployment indicators is unknown."""
+        base_parsed_event.update({
+            'event_type': 'audit_log_entry',
+            'status': 'logged',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'audit_id': 'abc123',
+                    'user': 'system',
+                    'action': 'config_read'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    @pytest.mark.parametrize("field_modifications,expected_description", [
+        # Missing critical fields
+        ({
+            'event_type': None,
+            'status': None,
+            'error_code': None,
+            'metadata': {'source_fields': {}}
+        }, "All key fields are None"),
+
+        # Empty critical fields
+        ({
+            'event_type': '',
+            'status': '',
+            'error_code': '',
+            'metadata': {'source_fields': {'message': '', 'reason': ''}}
+        }, "All key fields are empty strings"),
+
+        # Missing metadata entirely
+        ({
+            'event_type': 'some_event',
+            'status': 'success',
+            'error_code': None,
+            'metadata': None
+        }, "Missing metadata field entirely"),
+
+        # Missing source_fields
+        ({
+            'event_type': 'pod_status',
+            'status': 'warning',
+            'error_code': None,
+            'metadata': {'source_fields': None}
+        }, "Missing source_fields in metadata"),
+
+        # Invalid data types for fields
+        ({
+            'event_type': 12345,  # Should be string
+            'status': [],      # Should be string
+            'error_code': {},  # Should be string or None
+            'metadata': {'source_fields': 'invalid'}  # Should be dict
+        }, "Invalid data types for all fields"),
+
+        # Mixed None and invalid types
+        ({
+            'event_type': None,
+            'status': 'invalid_status_type',
+            'error_code': None,
+            'metadata': {'source_fields': {'nested': 'invalid_value'}}  # String instead of None
+        }, "Mixed None values and invalid types"),
+
+        # Missing required timestamp field (implicitly tested via base fixture)
+        ({
+            'timestamp': None,
+            'service': None,
+            'event_type': 'test',
+            'status': 'test',
+            'error_code': None,
+            'cluster': None,
+            'namespace': None,
+            'metadata': {'source_fields': {}}
+        }, "Missing identifying fields (timestamp, service, cluster)"),
+
+        # Extremely long event_type that doesn't match patterns
+        ({
+            'event_type': 'a' * 1000,  # Unrealistically long
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {}}
+        }, "Unrealistically long event_type"),
+
+        # Unicode/special characters in event_type
+        ({
+            'event_type': '🚀🌟💥',  # Emoji-only event type
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {}}
+        }, "Unicode emoji event_type"),
+
+        # Numeric string where string expected
+        ({
+            'event_type': '12345',
+            'status': '67890',
+            'error_code': '99999',
+            'metadata': {'source_fields': {'exitCode': 'not_a_number'}}
+        }, "Numeric strings where text expected"),
+
+        # Boolean as string (should be actual boolean)
+        ({
+            'event_type': 'custom_event',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {'source_fields': {'ready': 'true', 'restartCount': 'false'}}
+        }, "Boolean values as strings"),
+
+        # Negative numeric values where inappropriate
+        ({
+            'event_type': 'custom_metric',
+            'status': 'warning',
+            'error_code': None,
+            'duration_ms': -5000,  # Invalid negative duration
+            'metadata': {'source_fields': {'restartCount': -1}}
+        }, "Negative numeric values"),
+
+        # Future timestamp (unrealistic)
+        ({
+            'timestamp': '2099-12-31T23:59:59Z',
+            'event_type': 'future_event',
+            'status': 'pending',
+            'error_code': None,
+            'metadata': {'source_fields': {}}
+        }, "Future timestamp event"),
+    ])
+    def test_parametrized_invalid_and_missing_fields(self, base_parsed_event, field_modifications, expected_description):
+        """Parametrized test for events with missing or invalid field values.
+
+        Tests edge cases where events have:
+        - None values in critical fields
+        - Empty strings
+        - Invalid data types
+        - Missing nested structures
+        - Unrealistic values
+
+        All should be categorized as EVENT_UNKNOWN after validation fails.
+        """
+        # Clear the base fixture and apply modifications
+        base_parsed_event.clear()
+        base_parsed_event.update(field_modifications)
+        base_parsed_event.setdefault('timestamp', '2026-08-06T12:00:00Z')
+        base_parsed_event.setdefault('service', 'test-service')
+        base_parsed_event.setdefault('cluster', 'test-cluster')
+        base_parsed_event.setdefault('namespace', 'test-ns')
+        base_parsed_event.setdefault('duration_ms', None)
+
+        result = categorize_event(base_parsed_event)
+
+        # Assert the event is categorized as unknown due to invalid/missing fields
+        assert result == EVENT_UNKNOWN, f"Failed for: {expected_description}"
+
+    def test_unknown_event_with_none_values_is_unknown(self, base_parsed_event):
+        """Event with None values in key fields is unknown."""
+        base_parsed_event.update({
+            'event_type': None,
+            'status': None,
+            'error_code': None,
+            'metadata': {
+                'source_fields': {}
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_unknown_event_with_empty_strings_is_unknown(self, base_parsed_event):
+        """Event with empty strings in key fields is unknown."""
+        base_parsed_event.update({
+            'event_type': '',
+            'status': '',
+            'error_code': '',
+            'metadata': {
+                'source_fields': {
+                    'message': '',
+                    'reason': ''
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_event_similar_to_timeout_but_below_threshold_is_unknown(self, base_parsed_event):
+        """Event with duration below timeout threshold and no timeout indicators is unknown."""
+        base_parsed_event.update({
+            'event_type': 'long_running_task',
+            'status': 'completed',
+            'error_code': None,
+            'duration_ms': 300000,  # 5 minutes - below 10 minute threshold
+            'metadata': {
+                'source_fields': {
+                    'task': 'data_processing',
+                    'records_processed': 1000
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_event_with_generic_status_no_error_patterns_is_unknown(self, base_parsed_event):
+        """Event with generic status field but no error patterns is unknown."""
+        base_parsed_event.update({
+            'event_type': 'status_update',
+            'status': 'pending',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'previous_status': 'initializing',
+                    'current_status': 'pending'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_volume_mount_event_with_no_deployment_indicators_is_unknown(self, base_parsed_event):
+        """Volume/mount event with no deployment indicators is unknown."""
+        base_parsed_event.update({
+            'event_type': 'volume_mount_event',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'volume_name': 'data-volume',
+                    'mount_path': '/app/data'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+    def test_security_event_with_no_deployment_indicators_is_unknown(self, base_parsed_event):
+        """Security/auth event with no deployment indicators is unknown."""
+        base_parsed_event.update({
+            'event_type': 'auth_event',
+            'status': 'allowed',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'user': 'service-account',
+                    'operation': 'create',
+                    'resource': 'pod'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_UNKNOWN
+
+
+class TestUnexpectedEventTypes:
+    """Parametrized tests for events with completely unexpected event types."""
+
+    @pytest.mark.parametrize("unexpected_type_config,description", [
+        # Completely novel event type names
+        ({
+            'event_type': 'quantum_entanglement_event',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'qubits': 42, 'entangled': True}}
+        }, "Quantum computing event type"),
+
+        # Events from other systems (non-Kubernetes)
+        ({
+            'event_type': 'aws_cloudwatch_alarm',
+            'status': 'ALARM',
+            'error_code': None,
+            'metadata': {'source_fields': {'alarm_name': 'HighCPU', 'metric': 'CPUUtilization'}}
+        }, "AWS CloudWatch alarm event"),
+
+        # Database-specific events (non-Kubernetes)
+        ({
+            'event_type': 'postgresql_slow_query',
+            'status': 'detected',
+            'error_code': None,
+            'metadata': {'source_fields': {'query_duration_ms': 5000, 'table': 'users'}}
+        }, "PostgreSQL slow query event"),
+
+        # Application-level events (non-infrastructure)
+        ({
+            'event_type': 'user_login_event',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'user_id': 'user123', 'method': 'OAuth'}}
+        }, "User authentication event"),
+
+        # CI/CD pipeline events
+        ({
+            'event_type': 'jenkins_build_complete',
+            'status': 'SUCCESS',
+            'error_code': None,
+            'metadata': {'source_fields': {'build_number': 42, 'job_name': 'deploy'}}
+        }, "Jenkins CI build event"),
+
+        # Monitoring/alerting system events
+        ({
+            'event_type': 'prometheus_alert_fired',
+            'status': 'firing',
+            'error_code': None,
+            'metadata': {'source_fields': {'alert_name': 'HighMemory', 'severity': 'warning'}}
+        }, "Prometheus alerting event"),
+
+        # Service mesh events (not core Kubernetes)
+        ({
+            'event_type': 'istio_circuit_breaker_open',
+            'status': 'open',
+            'error_code': None,
+            'metadata': {'source_fields': {'service': 'api', 'consecutive_errors': 5}}
+        }, "Istio circuit breaker event"),
+
+        # Storage system events (non-Kubernetes)
+        ({
+            'event_type': 'nfs_mount_timeout',
+            'status': 'timeout',
+            'error_code': None,
+            'metadata': {'source_fields': {'server': 'nfs.example.com', 'export': '/data'}}
+        }, "NFS storage timeout event"),
+
+        # Custom application domain events
+        ({
+            'event_type': 'payment_gateway_declined',
+            'status': 'declined',
+            'error_code': 'INSUFFICIENT_FUNDS',
+            'metadata': {'source_fields': {'transaction_id': 'txn123', 'amount': 99.99}}
+        }, "Payment processing event"),
+
+        # Backup/disaster recovery events
+        ({
+            'event_type': 'backup_job_completed',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'backup_type': 'snapshot', 'size_gb': 10}}
+        }, "Backup job completion event"),
+
+        # Machine learning pipeline events
+        ({
+            'event_type': 'model_training_complete',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'model_name': 'predictor_v2', 'accuracy': 0.95}}
+        }, "ML model training event"),
+
+        # Security incident events
+        ({
+            'event_type': 'intrusion_detection_alert',
+            'status': 'alert',
+            'error_code': 'SUSPICIOUS_ACTIVITY',
+            'metadata': {'source_fields': {'source_ip': '192.168.1.100', 'severity': 'high'}}
+        }, "Security intrusion detection event"),
+
+        # CDN/edge network events
+        ({
+            'event_type': 'cloudflare_cache_purge',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'zone_id': 'abc123', 'files_purged': 42}}
+        }, "CDN cache purge event"),
+
+        # Message queue events
+        ({
+            'event_type': 'rabbitmq_queue_empty',
+            'status': 'warning',
+            'error_code': None,
+            'metadata': {'source_fields': {'queue_name': 'jobs', 'consumer_count': 0}}
+        }, "Message queue event"),
+
+        # Custom orchestration events
+        ({
+            'event_type': 'airflow_task_failure',
+            'status': 'failed',
+            'error_code': 'TaskFailed',
+            'metadata': {'source_fields': {'dag_id': 'etl', 'task_id': 'extract', 'attempt': 3}}
+        }, "Airflow workflow event"),
+
+        # Legacy system events
+        ({
+            'event_type': 'mainframe_job_complete',
+            'status': 'SUCCESS',
+            'error_code': None,
+            'metadata': {'source_fields': {'job_name': 'BATCH_PROCESS', 'return_code': 0}}
+        }, "Mainframe batch job event"),
+
+        # Internet of Things events
+        ({
+            'event_type': 'iot_sensor_reading',
+            'status': 'measured',
+            'error_code': None,
+            'metadata': {'source_fields': {'device_id': 'sensor01', 'temperature_c': 25.5}}
+        }, "IoT sensor reading event"),
+
+        # Blockchain/cryptocurrency events
+        ({
+            'event_type': 'ethereum_transaction_mined',
+            'status': 'confirmed',
+            'error_code': None,
+            'metadata': {'source_fields': {'tx_hash': '0xabc...', 'block_number': 12345}}
+        }, "Blockchain transaction event"),
+    ])
+    def test_parametrized_unexpected_event_types(self, base_parsed_event, unexpected_type_config, description):
+        """Parametrized test for events with completely unexpected event types.
+
+        These events represent realistic scenarios from various systems
+        (cloud providers, databases, CI/CD, monitoring, security, etc.) that
+        don't match any Kubernetes deployment or pod event patterns.
+
+        All should be categorized as EVENT_UNKNOWN despite having valid
+        structure and realistic fields.
+        """
+        base_parsed_event.update(unexpected_type_config)
+        result = categorize_event(base_parsed_event)
+
+        # Assert the event is categorized as unknown
+        assert result == EVENT_UNKNOWN, f"Failed for: {description}"
 
 
 # -----------------------------------------------------------------------------
@@ -971,3 +1568,210 @@ class TestRealLogSamples:
         }
         result = categorize_event(event)
         assert result == EVENT_IMAGE_PULL_ERROR
+
+
+# -----------------------------------------------------------------------------
+# Tests for unknown event fallback exclusivity
+# -----------------------------------------------------------------------------
+
+class TestUnknownEventFallbackExclusivity:
+    """Tests to verify unknown fallback is ONLY triggered when no patterns match."""
+
+    def test_oom_always_takes_precedence_over_unknown(self, base_parsed_event):
+        """OOM pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'obscure_event_name',
+            'status': 'obscure_status',
+            'error_code': 'OOMKilled',
+            'metadata': {
+                'source_fields': {
+                    'obscure_field': 'obscure_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_OOM
+        assert result != EVENT_UNKNOWN
+
+    def test_pod_crash_always_takes_precedence_over_unknown(self, base_parsed_event):
+        """Pod crash pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'weird_event',
+            'status': 'failure',
+            'error_code': 'crashloopbackoff',
+            'metadata': {
+                'source_fields': {
+                    'weird_field': 'weird_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_POD_CRASH
+        assert result != EVENT_UNKNOWN
+
+    def test_deployment_start_takes_precedence_over_unknown(self, base_parsed_event):
+        """Deployment start pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'deployment_initial_deployment',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'random_field': 'random_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+        assert result != EVENT_UNKNOWN
+
+    def test_deployment_complete_takes_precedence_over_unknown(self, base_parsed_event):
+        """Deployment complete pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'replicaset_status',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'replicas': 3,
+                    'readyReplicas': 3,
+                    'unusual_field': 'unusual_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_COMPLETE
+        assert result != EVENT_UNKNOWN
+
+    def test_readiness_failure_takes_precedence_over_unknown(self, base_parsed_event):
+        """Readiness failure pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'random_event',
+            'status': 'warning',
+            'error_code': 'ReadinessFailed',
+            'metadata': {
+                'source_fields': {
+                    'random_data': 'random_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_READINESS_FAIL
+        assert result != EVENT_UNKNOWN
+
+    def test_timeout_takes_precedence_over_unknown(self, base_parsed_event):
+        """Timeout pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'obscure_timeout',
+            'status': 'warning',
+            'error_code': 'ConnectionTimeout',
+            'metadata': {
+                'source_fields': {
+                    'obscure_info': 'obscure_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_TIMEOUT
+        assert result != EVENT_UNKNOWN
+
+    def test_image_pull_error_takes_precedence_over_unknown(self, base_parsed_event):
+        """Image pull error pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'unknown_image_event',
+            'status': 'warning',
+            'error_code': 'ErrImagePull',
+            'metadata': {
+                'source_fields': {
+                    'unknown_field': 'unknown_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_IMAGE_PULL_ERROR
+        assert result != EVENT_UNKNOWN
+
+    def test_resource_limit_takes_precedence_over_unknown(self, base_parsed_event):
+        """Resource limit pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'strange_resource_event',
+            'status': 'warning',
+            'error_code': 'FailedScheduling',
+            'metadata': {
+                'source_fields': {
+                    'reason': 'FailedScheduling',
+                    'message': 'Insufficient cpu',
+                    'strange_field': 'strange_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_RESOURCE_LIMIT
+        assert result != EVENT_UNKNOWN
+
+    def test_probe_failure_takes_precedence_over_unknown(self, base_parsed_event):
+        """Probe failure pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'unusual_probe_event',
+            'status': 'warning',
+            'error_code': 'LivenessProbeFailed',
+            'metadata': {
+                'source_fields': {
+                    'unusual_info': 'unusual_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_PROBE_FAILURE
+        assert result != EVENT_UNKNOWN
+
+    def test_network_error_takes_precedence_over_unknown(self, base_parsed_event):
+        """Network error pattern always matches, never falls back to unknown."""
+        base_parsed_event.update({
+            'event_type': 'obscure_network_event',
+            'status': 'warning',
+            'error_code': 'NetworkError',
+            'metadata': {
+                'source_fields': {
+                    'obscure_data': 'obscure_value'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_NETWORK_ERROR
+        assert result != EVENT_UNKNOWN
+
+    def test_unknown_only_when_no_error_indicators(self, base_parsed_event):
+        """Unknown is only returned when there are truly no error indicators."""
+        # This should match pod crash, not unknown
+        base_parsed_event.update({
+            'event_type': 'pod_status',
+            'status': 'failure',
+            'error_code': 'crashloopbackoff',
+            'metadata': {
+                'source_fields': {
+                    'restartCount': 5
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_POD_CRASH
+        assert result != EVENT_UNKNOWN
+
+    def test_unknown_only_when_no_deployment_indicators(self, base_parsed_event):
+        """Unknown is only returned when there are truly no deployment indicators."""
+        # This should match deployment start, not unknown
+        base_parsed_event.update({
+            'event_type': 'deployment_created',
+            'status': 'created',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'deployment': 'my-app',
+                    'namespace': 'production'
+                }
+            }
+        })
+        result = categorize_event(base_parsed_event)
+        assert result == EVENT_DEPLOYMENT_START
+        assert result != EVENT_UNKNOWN
