@@ -4,12 +4,30 @@ Query whisper-stt latency metrics from VictoriaLogs for 30-day window
 
 This script:
 1. Queries VictoriaLogs for whisper-stt latency data (30-day window)
-2. Calculates p50, p95, p99 processing duration percentiles
-3. Stores raw results in intermediate format
-4. Generates query log with timestamps and result counts
+2. Uses time-bucketed aggregation with configurable step size (optimal: 6h)
+3. Calculates p50, p95, p99 processing duration percentiles per time bucket
+4. Stores raw results in intermediate format
+5. Generates query log with timestamps and result counts
+
+Time Step Configuration:
+    The step parameter controls time-bucketed aggregation granularity.
+    Format: "<number><unit>" where unit is s (seconds), m (minutes), h (hours), d (days)
+    Example: "6h" = 6-hour buckets, "1d" = 1-day buckets
+
+    Optimal Configuration (from config/time_step_granularity.yaml):
+    - Default: "6h" (6-hour buckets)
+    - 30-day window → 120 buckets (30 days × 24 hours ÷ 6 hours)
+    - ~876 entries per bucket (based on actual whisper-stt data rate: 146 entries/hour)
+    - Balances query performance with statistical significance
+
+    Alternative Configurations:
+    - "1h": Detailed hourly trends (720 buckets for 30 days)
+    - "1d": High-level daily trends (30 buckets for 30 days)
+    - "15m": Fine-grained analysis (use only for <7 day windows)
 
 Usage:
     python query_whisper_stt_victorialogs_latency.py
+    python query_whisper_stt_victorialogs_latency.py --test  # Run step parameter tests
 """
 
 import json
@@ -734,5 +752,62 @@ def main():
     return results
 
 
+def test_step_parameter():
+    """Test step parameter configuration with various formats."""
+    print("\n" + "=" * 70)
+    print("STEP PARAMETER CONFIGURATION TEST")
+    print("=" * 70)
+
+    test_cases = [
+        ("6h", 6, "Standard 6-hour granularity"),
+        ("1h", 1, "Detailed 1-hour granularity"),
+        ("1d", 24, "Daily granularity"),
+        ("30m", 0, "30-minute (rounded down to 0 hours)"),
+        ("15s", 0, "15-second (rounded down to 0 hours)"),
+        ("invalid", 1, "Invalid format (fallback to 1 hour)"),
+    ]
+
+    print("\nTesting step parameter parsing:")
+    all_passed = True
+
+    for step_input, expected_hours, description in test_cases:
+        try:
+            # Create a test query instance
+            query = WhisperSTTVictoriaLogsQuery(
+                "2026-08-01T00:00:00Z",
+                "2026-08-01T23:59:59Z",
+                step=step_input
+            )
+
+            actual_hours = query.step_hours
+            status = "✅" if actual_hours == expected_hours else "❌"
+
+            print(f"{status} {step_input:10s} → {actual_hours} hours | {description}")
+
+            if actual_hours != expected_hours:
+                all_passed = False
+                print(f"   ERROR: Expected {expected_hours} hours, got {actual_hours}")
+
+        except Exception as e:
+            print(f"❌ {step_input:10s} → ERROR: {e}")
+            all_passed = False
+
+    print("\n" + "=" * 70)
+    if all_passed:
+        print("✅ ALL TESTS PASSED - Step parameter configuration working correctly")
+    else:
+        print("❌ SOME TESTS FAILED - Review step parameter parsing logic")
+    print("=" * 70)
+
+    return all_passed
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+
+    # Check if we should run tests
+    if len(sys.argv) > 1 and sys.argv[1] == "--test":
+        test_passed = test_step_parameter()
+        sys.exit(0 if test_passed else 1)
+    else:
+        main()
