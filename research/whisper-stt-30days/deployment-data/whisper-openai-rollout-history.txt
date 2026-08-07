@@ -1,0 +1,14 @@
+deployment.apps/whisper-openai 
+REVISION  CHANGE-CAUSE
+14        <none>
+15        <none>
+16        <none>
+17        <none>
+18        <none>
+19        <none>
+20        <none>
+21        <none>
+22        <none>
+23        <none>
+24        <none>
+

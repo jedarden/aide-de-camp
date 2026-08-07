@@ -1,0 +1,200 @@
+[
+  {
+    "name": "whisper-openai-55bb9fb46f",
+    "created": "2026-06-14T04:11:57Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-685c49f459",
+    "created": "2026-06-14T03:53:06Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-6885fc878b",
+    "created": "2026-06-14T04:52:13Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-68966786fb",
+    "created": "2026-06-14T04:55:48Z",
+    "replicas": 1,
+    "availableReplicas": 1,
+    "readyReplicas": 1,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-6b75db654f",
+    "created": "2026-06-14T04:48:36Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-745d9c487d",
+    "created": "2026-06-14T04:06:40Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-7548956b49",
+    "created": "2026-06-14T03:56:31Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-7558965d58",
+    "created": "2026-06-14T03:50:27Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-7b756c458",
+    "created": "2026-06-14T04:01:11Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-7ccf9f655b",
+    "created": "2026-06-14T03:44:24Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-openai-85b44d79b4",
+    "created": "2026-06-14T04:27:44Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "fedirz/faster-whisper-server:latest-cpu"
+  },
+  {
+    "name": "whisper-stt-558c7cf44",
+    "created": "2026-06-25T14:10:16Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.3.1"
+  },
+  {
+    "name": "whisper-stt-5b8558f478",
+    "created": "2026-07-08T03:16:13Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.8.4"
+  },
+  {
+    "name": "whisper-stt-5b884b75f4",
+    "created": "2026-06-26T16:33:34Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.5.1"
+  },
+  {
+    "name": "whisper-stt-5dbff75cbd",
+    "created": "2026-07-08T03:09:35Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.8.2"
+  },
+  {
+    "name": "whisper-stt-6464bdf67b",
+    "created": "2026-07-01T19:46:33Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.6.0"
+  },
+  {
+    "name": "whisper-stt-65fb7f8dd9",
+    "created": "2026-06-25T14:08:07Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.3.0"
+  },
+  {
+    "name": "whisper-stt-6b96f4569c",
+    "created": "2026-07-02T02:20:33Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.7.0"
+  },
+  {
+    "name": "whisper-stt-6c497489fb",
+    "created": "2026-07-08T03:26:44Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.8.6"
+  },
+  {
+    "name": "whisper-stt-75c848b8d6",
+    "created": "2026-06-24T20:55:36Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.2.5"
+  },
+  {
+    "name": "whisper-stt-78bbf5f57f",
+    "created": "2026-06-26T12:42:03Z",
+    "replicas": 0,
+    "availableReplicas": null,
+    "readyReplicas": null,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.4.1"
+  },
+  {
+    "name": "whisper-stt-847fd8d7b9",
+    "created": "2026-07-12T16:53:42Z",
+    "replicas": 1,
+    "availableReplicas": 1,
+    "readyReplicas": 1,
+    "conditions": null,
+    "image": "ronaldraygun/whisper-stt:1.8.6"
+  }
+]

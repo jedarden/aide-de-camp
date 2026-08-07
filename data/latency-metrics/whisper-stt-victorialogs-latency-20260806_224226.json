@@ -1,0 +1,23 @@
+{
+  "query_metadata": {
+    "timestamp": "2026-08-06T22:42:26.414976",
+    "time_period_days": 30,
+    "start_date": "2026-07-07T00:00:00Z",
+    "end_date": "2026-08-06T23:59:59Z",
+    "service": "whisper-stt",
+    "metrics_queried": [
+      "p50",
+      "p95",
+      "p99",
+      "mean",
+      "median",
+      "min",
+      "max"
+    ]
+  },
+  "latency_metrics": {},
+  "raw_data": [],
+  "query_log": [],
+  "processing_stats": {},
+  "error": "No local VictoriaLogs files found and direct query failed"
+}

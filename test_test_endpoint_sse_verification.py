@@ -124,15 +124,15 @@ async def test_sse_broadcast_verification():
         print(f"    Events received: {[e.event_type for e in events_received]}")
         all_passed = False
 
-    # Criterion 2: Event data includes result_id and surface_id
-    print(f"\n[2] Event data includes result_id and surface_id")
+    # Criterion 2: Event data includes result_id, and event routing includes target_surface_id
+    print(f"\n[2] Event data includes result_id, and event routing includes target_surface_id")
 
     if result_created_events:
         event = result_created_events[0]
         event_data = event.data
 
         has_result_id = "result_id" in event_data
-        has_surface_id = "surface_id" in event_data
+        has_target_surface = event.target_surface_id is not None
 
         if has_result_id:
             print(f"  ✓ PASS: result_id present in event data")
@@ -142,11 +142,11 @@ async def test_sse_broadcast_verification():
             print(f"    Event data keys: {list(event_data.keys())}")
             all_passed = False
 
-        if has_surface_id:
-            print(f"  ✓ PASS: surface_id present in event data")
-            print(f"    surface_id: {event_data.get('surface_id', 'N/A')[:8]}...")
+        if has_target_surface:
+            print(f"  ✓ PASS: target_surface_id present in event routing")
+            print(f"    target_surface_id: {event.target_surface_id[:8]}...")
         else:
-            print(f"  ✗ FAIL: surface_id missing from event data")
+            print(f"  ✗ FAIL: target_surface_id missing from event routing")
             all_passed = False
     else:
         print(f"  ✗ FAIL: Cannot verify - no result_created events found")

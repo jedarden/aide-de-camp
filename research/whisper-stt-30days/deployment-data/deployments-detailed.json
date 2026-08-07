@@ -1,0 +1,30 @@
+[
+  {
+    "name": "whisper-openai",
+    "created": "2026-06-14T02:10:48Z",
+    "labels": {
+      "app": "whisper-openai"
+    },
+    "replicas": 1,
+    "selector": {
+      "matchLabels": {
+        "app": "whisper-openai"
+      }
+    },
+    "image": "fedirz/faster-whisper-server:latest-cpu",
+    "revisionHistoryLimit": 10
+  },
+  {
+    "name": "whisper-stt",
+    "created": "2026-05-01T17:26:49Z",
+    "labels": null,
+    "replicas": 1,
+    "selector": {
+      "matchLabels": {
+        "app": "whisper-stt"
+      }
+    },
+    "image": "ronaldraygun/whisper-stt:1.8.6",
+    "revisionHistoryLimit": 10
+  }
+]
