@@ -233,6 +233,41 @@ class FailurePatternAnalyzer:
                         'source': 'deployment_events'
                     })
 
+        # Process comprehensive deployment events data
+        comprehensive_events = parsed_data.get('raw_data', {}).get('deployment-events-30days-comprehensive.json', {})
+        if comprehensive_events:
+            print("  Processing comprehensive deployment events...")
+            for service_name, service_data in comprehensive_events.items():
+                if service_name == 'metadata' or service_name == 'summary':
+                    continue
+                if not isinstance(service_data, dict):
+                    continue
+
+                # Extract from various event types
+                for event_type in ['deployment_events', 'pod_events', 'replicaset_events']:
+                    events = service_data.get(event_type, [])
+                    for event in events:
+                        if isinstance(event, dict):
+                            # Check for failure indicators
+                            outcome = event.get('outcome', '')
+                            status = event.get('status', '')
+                            event_type_str = event.get('type', event.get('event_type', ''))
+
+                            # Include events that indicate issues
+                            if any(negative in str(outcome + status + event_type_str).lower()
+                                   for negative in ['fail', 'error', 'timeout', 'rollback', 'crash', 'backoff']):
+                                failures.append({
+                                    'timestamp': event.get('timestamp') or event.get('created_at'),
+                                    'service': service_name,
+                                    'event_type': event_type_str,
+                                    'outcome': outcome or status,
+                                    'image': event.get('image') or event.get('container_image'),
+                                    'notes': event.get('reason') or event.get('message'),
+                                    'pod_name': event.get('pod_name'),
+                                    'restart_count': event.get('restart_count', event.get('restarts')),
+                                    'source': f'comprehensive_{event_type}'
+                                })
+
         # Process raw data files for additional failure information
         for filename, content in parsed_data.get('raw_data', {}).items():
             if 'failure' in filename.lower() or 'taxonomy' in filename.lower():
@@ -357,7 +392,7 @@ class FailurePatternAnalyzer:
 
         print("✓ Time distribution calculated")
 
-    def generate_taxonomy_report(self) -> Dict[str, Any]:
+    def generate_taxonomy_report(self, correlations: Dict[str, Any]) -> Dict[str, Any]:
         """Generate comprehensive taxonomy report."""
         print("\nGenerating taxonomy report...")
 
@@ -379,7 +414,7 @@ class FailurePatternAnalyzer:
         return {
             'metadata': {
                 'generated_at': datetime.now().isoformat(),
-                'analysis_type': 'failure_pattern_analysis',
+                'analysis_type': 'failure_pattern_analysis_with_correlations',
                 'time_period': 'deployment_data_analysis',
                 'services_analyzed': list(set(
                     f.get('service', 'unknown')
@@ -392,6 +427,7 @@ class FailurePatternAnalyzer:
                 pid: p.to_dict() for pid, p in self.patterns.items()
             },
             'frequency_statistics': frequency_stats,
+            'temporal_correlations': correlations,
             'verification': {
                 'total_records_processed': len(self.raw_failures),
                 'total_patterns_detected': sum(p.total_occurrences for p in self.patterns.values()),
@@ -407,9 +443,71 @@ class FailurePatternAnalyzer:
                     [(pid, p.total_occurrences) for pid, p in self.patterns.items()],
                     key=lambda x: x[1]
                 ) if self.patterns else (None, 0),
+                'deployment_failure_clusters_found': len(correlations.get('deployment_failure_clusters', [])),
                 'overall_assessment': 'ANALYSIS_COMPLETE'
             }
         }
+
+    def analyze_temporal_correlations(self) -> Dict[str, Any]:
+        """Analyze correlations between deployment timestamps and failure spikes."""
+        print("\nAnalyzing temporal correlations between deployments and failures...")
+
+        correlations = {
+            'deployment_failure_clusters': [],
+            'high_frequency_periods': [],
+            'service_specific_patterns': {}
+        }
+
+        # Group failures by service and time window
+        service_failures = defaultdict(list)
+        for failure in self.raw_failures:
+            if failure.get('timestamp') and failure.get('service'):
+                try:
+                    dt = datetime.fromisoformat(failure['timestamp'].replace('Z', '+00:00'))
+                    if dt.tzinfo is not None:
+                        dt = dt.replace(tzinfo=None)
+                    service_failures[failure['service']].append((dt, failure))
+                except (ValueError, AttributeError):
+                    continue
+
+        # Look for clusters within 24-hour windows
+        for service, failures in service_failures.items():
+            if len(failures) < 2:
+                continue
+
+            failures.sort(key=lambda x: x[0])
+
+            # Find time clusters (failures within 24 hours)
+            clusters = []
+            current_cluster = [failures[0]]
+
+            for dt, failure in failures[1:]:
+                time_diff = (dt - current_cluster[0][0]).total_seconds() / 3600
+                if time_diff <= 24:  # Within 24 hours
+                    current_cluster.append((dt, failure))
+                else:
+                    if len(current_cluster) >= 2:
+                        clusters.append(current_cluster)
+                    current_cluster = [(dt, failure)]
+
+            if len(current_cluster) >= 2:
+                clusters.append(current_cluster)
+
+            # Record significant clusters
+            for cluster in clusters:
+                if len(cluster) >= 2:
+                    time_span = (cluster[-1][0] - cluster[0][0]).total_seconds() / 3600
+                    correlations['deployment_failure_clusters'].append({
+                        'service': service,
+                        'failure_count': len(cluster),
+                        'time_span_hours': round(time_span, 2),
+                        'start_time': cluster[0][0].isoformat(),
+                        'end_time': cluster[-1][0].isoformat(),
+                        'patterns': list(set(f.get('pattern_type', 'Other') for _, f in cluster))
+                    })
+
+        print(f"✓ Found {len(correlations['deployment_failure_clusters'])} deployment-failure clusters")
+        return correlations
 
     def print_pattern_summary(self):
         """Print summary of pattern analysis to console."""
@@ -492,8 +590,11 @@ class FailurePatternAnalyzer:
         # Calculate time distributions
         self.calculate_time_distribution(self.raw_failures)
 
+        # Analyze temporal correlations
+        correlations = self.analyze_temporal_correlations()
+
         # Generate taxonomy report
-        taxonomy = self.generate_taxonomy_report()
+        taxonomy = self.generate_taxonomy_report(correlations)
 
         # Print console output
         self.print_pattern_summary()
