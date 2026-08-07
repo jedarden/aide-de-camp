@@ -19,7 +19,7 @@ Acceptance criteria from bead adc-1m13ea:
 import pytest
 from enum import Enum
 
-from src.intent.comparison import compare_intent_type, compare_confidence
+from src.intent.comparison import compare_intent_type, compare_confidence, compare_structured_fields
 from src.intent.router import IntentType
 
 
@@ -283,3 +283,356 @@ class TestRealWorldScenarios:
         # Invalid types
         assert compare_intent_type("", "status") is False
         assert compare_confidence("high", 0.9) is False
+
+
+class TestCompareStructuredFields:
+    """Test suite for compare_structured_fields function."""
+
+    def test_empty_dicts(self):
+        """Verify comparison of empty dictionaries."""
+        result = compare_structured_fields({}, {})
+        assert result == {}
+
+    def test_flat_primitive_fields_match(self):
+        """Verify flat primitive field comparison with exact matches."""
+        dispatch = {"project_slug": "aide-de-camp", "confidence": 0.9, "urgency": "high"}
+        test = {"project_slug": "aide-de-camp", "confidence": 0.9, "urgency": "high"}
+        result = compare_structured_fields(dispatch, test)
+        assert result == {
+            "project_slug": True,
+            "confidence": True,
+            "urgency": True,
+        }
+
+    def test_flat_primitive_fields_mismatch(self):
+        """Verify flat primitive field comparison with mismatches."""
+        dispatch = {"project_slug": "aide-de-camp", "confidence": 0.9}
+        test = {"project_slug": "different-project", "confidence": 0.8}
+        result = compare_structured_fields(dispatch, test)
+        assert result == {
+            "project_slug": False,
+            "confidence": False,
+        }
+
+    def test_nested_dict_comparison_match(self):
+        """Verify nested dictionary comparison with matches."""
+        dispatch = {
+            "parameters": {
+                "project": "adc",
+                "urgency": "high",
+                "nested": {"key": "value"}
+            }
+        }
+        test = {
+            "parameters": {
+                "project": "adc",
+                "urgency": "high",
+                "nested": {"key": "value"}
+            }
+        }
+        result = compare_structured_fields(dispatch, test)
+        # All fields should match including nested ones
+        assert result["parameters.project"] is True
+        assert result["parameters.urgency"] is True
+        assert result["parameters.nested.key"] is True
+        assert result["parameters"] is True  # Parent matches if all children match
+
+    def test_nested_dict_comparison_mismatch(self):
+        """Verify nested dictionary comparison with mismatches."""
+        dispatch = {
+            "parameters": {
+                "project": "adc",
+                "urgency": "high",
+            }
+        }
+        test = {
+            "parameters": {
+                "project": "different",
+                "urgency": "low",
+            }
+        }
+        result = compare_structured_fields(dispatch, test)
+        assert result["parameters.project"] is False
+        assert result["parameters.urgency"] is False
+        assert result["parameters"] is False  # Parent fails if any child fails
+
+    def test_list_comparison_order_insensitive_match(self):
+        """Verify list comparison is order-insensitive by default."""
+        dispatch = {"entities": ["project", "status", "urgency"]}
+        test = {"entities": ["status", "project", "urgency"]}  # Different order
+        result = compare_structured_fields(dispatch, test)
+        assert result["entities"] is True
+
+    def test_list_comparison_order_insensitive_mismatch(self):
+        """Verify list comparison detects actual differences."""
+        dispatch = {"entities": ["project", "status"]}
+        test = {"entities": ["project", "different"]}  # Different element
+        result = compare_structured_fields(dispatch, test)
+        assert result["entities"] is False
+
+    def test_list_comparison_order_sensitive(self):
+        """Verify order-sensitive list comparison when configured."""
+        dispatch = {"steps": ["step1", "step2", "step3"]}
+        test = {"steps": ["step3", "step1", "step2"]}  # Different order
+        result = compare_structured_fields(
+            dispatch, test, order_sensitive_fields=["steps"]
+        )
+        assert result["steps"] is False
+
+    def test_list_comparison_order_sensitive_match(self):
+        """Verify order-sensitive list comparison with same order."""
+        dispatch = {"steps": ["step1", "step2", "step3"]}
+        test = {"steps": ["step1", "step2", "step3"]}  # Same order
+        result = compare_structured_fields(
+            dispatch, test, order_sensitive_fields=["steps"]
+        )
+        assert result["steps"] is True
+
+    def test_missing_key_in_dispatch(self):
+        """Verify missing key in dispatch is treated as mismatch."""
+        test = {"project_slug": "aide-de-camp", "confidence": 0.9}
+        dispatch = {"project_slug": "aide-de-camp"}  # Missing confidence
+        result = compare_structured_fields(dispatch, test)
+        assert result["project_slug"] is True
+        assert result["confidence"] is False
+
+    def test_missing_key_in_test(self):
+        """Verify missing key in test is treated as mismatch."""
+        dispatch = {"project_slug": "aide-de-camp", "confidence": 0.9}
+        test = {"project_slug": "aide-de-camp"}  # Missing confidence
+        result = compare_structured_fields(dispatch, test)
+        assert result["project_slug"] is True
+        assert result["confidence"] is False
+
+    def test_nested_none_values_match(self):
+        """Verify nested None values match when both are None."""
+        dispatch = {"parameters": {"project": None, "urgency": None}}
+        test = {"parameters": {"project": None, "urgency": None}}
+        result = compare_structured_fields(dispatch, test)
+        assert result["parameters.project"] is True
+        assert result["parameters.urgency"] is True
+        assert result["parameters"] is True
+
+    def test_nested_none_values_mismatch(self):
+        """Verify nested None values mismatch when one is not None."""
+        dispatch = {"parameters": {"project": None}}
+        test = {"parameters": {"project": "adc"}}
+        result = compare_structured_fields(dispatch, test)
+        assert result["parameters.project"] is False
+        assert result["parameters"] is False
+
+    def test_empty_dict_vs_none_in_dispatch(self):
+        """Verify empty dict vs None in dispatch is treated as mismatch."""
+        dispatch = {"parameters": {}}
+        test = {"parameters": None}
+        result = compare_structured_fields(dispatch, test)
+        assert result["parameters"] is False
+
+    def test_empty_dict_vs_none_in_test(self):
+        """Verify empty dict vs None in test is treated as mismatch."""
+        dispatch = {"parameters": None}
+        test = {"parameters": {}}
+        result = compare_structured_fields(dispatch, test)
+        assert result["parameters"] is False
+
+    def test_empty_list_vs_missing(self):
+        """Verify empty list vs missing key is treated as mismatch."""
+        dispatch = {"entities": []}
+        test = {}
+        result = compare_structured_fields(dispatch, test)
+        assert result["entities"] is False
+
+    def test_float_tolerance(self):
+        """Verify float comparison with tolerance."""
+        dispatch = {"confidence": 0.9}
+        test = {"confidence": 0.899}  # Within 0.01 tolerance
+        result = compare_structured_fields(dispatch, test)
+        assert result["confidence"] is True
+
+    def test_float_tolerance_exceeded(self):
+        """Verify float comparison fails when tolerance exceeded."""
+        dispatch = {"confidence": 0.9}
+        test = {"confidence": 0.85}  # Exceeds 0.01 tolerance
+        result = compare_structured_fields(dispatch, test)
+        assert result["confidence"] is False
+
+    def test_int_float_mix(self):
+        """Verify int and float comparison works."""
+        dispatch = {"count": 5}
+        test = {"count": 5.0}
+        result = compare_structured_fields(dispatch, test)
+        assert result["count"] is True
+
+    def test_complex_nested_structure(self):
+        """Verify complex nested structure comparison."""
+        dispatch = {
+            "parameters": {
+                "project": "adc",
+                "metadata": {
+                    "tags": ["urgent", "review"],
+                    "nested": {"key": "value"}
+                }
+            },
+            "entities": ["project", "status"]
+        }
+        test = {
+            "parameters": {
+                "project": "adc",
+                "metadata": {
+                    "tags": ["review", "urgent"],  # Different order
+                    "nested": {"key": "value"}
+                }
+            },
+            "entities": ["status", "project"]  # Different order
+        }
+        result = compare_structured_fields(dispatch, test)
+        # All should match despite different list orders
+        assert result["parameters.project"] is True
+        assert result["parameters.metadata.tags"] is True
+        assert result["parameters.metadata.nested.key"] is True
+        assert result["parameters.metadata"] is True
+        assert result["parameters"] is True
+        assert result["entities"] is True
+
+    def test_nested_order_sensitive_field(self):
+        """Verify order-sensitive comparison for nested field paths."""
+        dispatch = {
+            "metadata": {
+                "steps": ["step1", "step2"]
+            }
+        }
+        test = {
+            "metadata": {
+                "steps": ["step2", "step1"]
+            }
+        }
+        result = compare_structured_fields(
+            dispatch, test, order_sensitive_fields=["metadata.steps"]
+        )
+        assert result["metadata.steps"] is False
+
+    def test_none_vs_none_both_none(self):
+        """Verify both inputs being None returns empty dict."""
+        result = compare_structured_fields(None, None)
+        assert result == {}
+
+    def test_dispatch_none_test_not_none(self):
+        """Verify dispatch None and test non-None returns all False."""
+        result = compare_structured_fields(None, {"field": "value"})
+        assert result == {"field": False}
+
+    def test_dispatch_not_none_test_none(self):
+        """Verify dispatch non-None and test None returns all False."""
+        result = compare_structured_fields({"field": "value"}, None)
+        assert result == {"field": False}
+
+    def test_list_of_dicts_comparison(self):
+        """Verify comparison of lists containing dictionaries."""
+        dispatch = {
+            "items": [
+                {"id": 1, "name": "first"},
+                {"id": 2, "name": "second"}
+            ]
+        }
+        test = {
+            "items": [
+                {"id": 2, "name": "second"},  # Different order
+                {"id": 1, "name": "first"}
+            ]
+        }
+        result = compare_structured_fields(dispatch, test)
+        assert result["items"] is True  # Order-insensitive for dicts
+
+    def test_list_of_dicts_order_sensitive(self):
+        """Verify order-sensitive comparison of lists containing dictionaries."""
+        dispatch = {
+            "steps": [
+                {"action": "load"},
+                {"action": "process"}
+            ]
+        }
+        test = {
+            "steps": [
+                {"action": "process"},  # Different order
+                {"action": "load"}
+            ]
+        }
+        result = compare_structured_fields(
+            dispatch, test, order_sensitive_fields=["steps"]
+        )
+        assert result["steps"] is False
+
+    def test_mixed_types_comparison(self):
+        """Verify comparison handles mixed types correctly."""
+        dispatch = {
+            "string": "value",
+            "number": 42,
+            "float": 3.14,
+            "boolean": True,
+            "list": [1, 2, 3],
+            "nested": {"key": "value"}
+        }
+        test = {
+            "string": "value",
+            "number": 42,
+            "float": 3.14,
+            "boolean": True,
+            "list": [3, 2, 1],  # Different order
+            "nested": {"key": "value"}
+        }
+        result = compare_structured_fields(dispatch, test)
+        assert result["string"] is True
+        assert result["number"] is True
+        assert result["float"] is True
+        assert result["boolean"] is True
+        assert result["list"] is True  # Order-insensitive
+        assert result["nested.key"] is True
+
+    def test_deeply_nested_structure(self):
+        """Verify deeply nested dictionary comparison."""
+        dispatch = {
+            "level1": {
+                "level2": {
+                    "level3": {
+                        "level4": "deep_value"
+                    }
+                }
+            }
+        }
+        test = {
+            "level1": {
+                "level2": {
+                    "level3": {
+                        "level4": "deep_value"
+                    }
+                }
+            }
+        }
+        result = compare_structured_fields(dispatch, test)
+        assert result["level1.level2.level3.level4"] is True
+        assert result["level1.level2.level3"] is True
+        assert result["level1.level2"] is True
+        assert result["level1"] is True
+
+    def test_partial_nested_mismatch(self):
+        """Verify partial mismatch in nested structure."""
+        dispatch = {
+            "parameters": {
+                "project": "adc",
+                "urgency": "high",
+                "metadata": {"tags": ["urgent"]}
+            }
+        }
+        test = {
+            "parameters": {
+                "project": "adc",  # Match
+                "urgency": "low",  # Mismatch
+                "metadata": {"tags": ["review"]}  # Mismatch
+            }
+        }
+        result = compare_structured_fields(dispatch, test)
+        assert result["parameters.project"] is True
+        assert result["parameters.urgency"] is False
+        assert result["parameters.metadata.tags"] is False
+        assert result["parameters.metadata"] is False
+        assert result["parameters"] is False
