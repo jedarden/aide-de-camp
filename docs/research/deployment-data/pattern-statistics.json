@@ -1,0 +1,99 @@
+{
+  "generated_at": "2026-08-06T19:06:41.095495",
+  "analysis_period": {
+    "start": "2026-07-08T03:09:35+00:00",
+    "end": "2026-07-28T17:26:12+00:00",
+    "days": 20
+  },
+  "patterns": {
+    "ImagePullBackOff": {
+      "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
+      "severity": "high",
+      "occurrence_count": 0,
+      "frequency_per_day": 0,
+      "services_affected": [],
+      "images_affected": [],
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "dates_with_occurrences": [],
+        "consecutive_days": 0
+      },
+      "temporal_clusters": []
+    },
+    "CrashLoopBackOff": {
+      "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
+      "severity": "critical",
+      "occurrence_count": 0,
+      "frequency_per_day": 0,
+      "services_affected": [],
+      "images_affected": [],
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "dates_with_occurrences": [],
+        "consecutive_days": 0
+      },
+      "temporal_clusters": []
+    },
+    "OOMKilled": {
+      "description": "Container killed due to memory exhaustion (resource limits exceeded)",
+      "severity": "high",
+      "occurrence_count": 0,
+      "frequency_per_day": 0,
+      "services_affected": [],
+      "images_affected": [],
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "dates_with_occurrences": [],
+        "consecutive_days": 0
+      },
+      "temporal_clusters": []
+    },
+    "Probe_failure": {
+      "description": "Readiness or liveness probe failures (health check issues)",
+      "severity": "medium",
+      "occurrence_count": 0,
+      "frequency_per_day": 0,
+      "services_affected": [],
+      "images_affected": [],
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "dates_with_occurrences": [],
+        "consecutive_days": 0
+      },
+      "temporal_clusters": []
+    },
+    "Dependency_timeout": {
+      "description": "Deployment timeout due to dependency unavailability",
+      "severity": "medium",
+      "occurrence_count": 0,
+      "frequency_per_day": 0,
+      "services_affected": [],
+      "images_affected": [],
+      "time_distribution": {
+        "first_occurrence": null,
+        "last_occurrence": null,
+        "dates_with_occurrences": [],
+        "consecutive_days": 0
+      },
+      "temporal_clusters": []
+    },
+    "Other": {
+      "description": "Other failure patterns not matching standard categories",
+      "severity": "unknown",
+      "occurrence_count": 1,
+      "frequency_per_day": 0.05,
+      "services_affected": {
+        "pbx-web": 1
+      },
+      "images_affected": {
+        "ronaldraygun/pbx-web:1.0.8": 1
+      },
+      "time_distribution": {
+        "first_occurrence": "2026-07-13T18:07:55+00:00",
+        "last_occurrence": "2026-07-13T18:07:55+00:00",
+        "dates_with_occurrences": [
+          
