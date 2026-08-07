@@ -1,0 +1,161 @@
+{
+  "pbx-web": {
+    "service": "pbx-web",
+    "time_range": {
+      "start": "2026-07-07T00:00:00Z",
+      "end": "2026-08-06T23:59:59Z",
+      "description": "Absolute 30-day window using ISO 8601 timestamps"
+    },
+    "queries_executed": [
+      "workflow_latency_percentiles",
+      "deployment_latency_averages",
+      "pod_restart_latency",
+      "comprehensive_latency_summary"
+    ],
+    "query_results": {
+      "workflow_latency_percentiles": {
+        "query_description": "Calculate workflow latency percentiles from Argo workflow data",
+        "aggregation_functions": [
+          "QUANTILE(duration, 0.50) for p50 (median)",
+          "QUANTILE(duration, 0.75) for p75",
+          "QUANTILE(duration, 0.90) for p90",
+          "QUANTILE(duration, 0.95) for p95 (95th percentile)",
+          "QUANTILE(duration, 0.99) for p99 (99th percentile)",
+          "MIN(duration) for fastest workflow",
+          "MAX(duration) for slowest workflow"
+        ],
+        "latency_formula": "duration_seconds = finished_at - started_at",
+        "quantile_method": "statistics.quantiles(data, n=100, method='inclusive')",
+        "data_source": "/home/coding/aide-de-camp/research/pbx-web-workflows-raw.json",
+        "metrics": {
+          "total_workflows_analyzed": 14,
+          "valid_duration_count": 9,
+          "p50_seconds": 1457.0,
+          "p75_seconds": 3209.0,
+          "p90_seconds": 10773.2,
+          "p95_seconds": 15541.6,
+          "p99_seconds": 19356.32,
+          "min_seconds": 20.0,
+          "max_seconds": 20310.0,
+          "workflow_samples": [
+            {
+              "workflow": "needle-ci-x2wx2",
+              "duration_seconds": 3209.0,
+              "status": "Failed"
+            },
+            {
+              "workflow": "needle-ci-vnmhd",
+              "duration_seconds": 1533.0,
+              "status": "Failed"
+            },
+            {
+              "workflow": "needle-ci-f46kr",
+              "duration_seconds": 20310.0,
+              "status": "Failed"
+            },
+            {
+              "workflow": "needle-ci-verify-xjbbm",
+              "duration_seconds": 8389.0,
+              "status": "Failed"
+            },
+            {
+              "workflow": "needle-ci-zr2cx",
+              "duration_seconds": 1457.0,
+              "status": "Failed"
+            }
+          ]
+        }
+      },
+      "deployment_latency_averages": {
+        "query_description": "Calculate deployment latency averages from interval statistics",
+        "aggregation_functions": [
+          "AVG(duration) for mean latency",
+          "MEDIAN(duration) for median latency",
+          "STDEV(duration) for latency variability (standard deviation)",
+          "SUM(duration) for total time spent deploying",
+          "MIN(duration) for fastest deployment",
+          "MAX(duration) for slowest deployment"
+        ],
+        "latency_formula": "deployment_latency = interval_hours * 3600 (convert to seconds)",
+        "data_source": "/home/coding/aide-de-camp/research/deployment-interval-statistics.json",
+        "metrics": {
+          "total_deployments_analyzed": 7,
+          "mean_seconds": 241220.571,
+          "median_seconds": 84600.0,
+          "stddev_seconds": 399037.139,
+          "sum_seconds": 1688544.0,
+          "min_seconds": 396.0,
+          "max_seconds": 1089072.0,
+          "deployment_samples": [
+            {
+              "service": "pbx_web",
+              "interval_hours": 0.17,
+              "duration_seconds": 612.0
+            },
+            {
+              "service": "pbx_web",
+              "interval_hours": 33.11,
+              "duration_seconds": 119196.0
+            },
+            {
+              "service": "pbx_web",
+              "interval_hours": 302.52,
+              "duration_seconds": 1089072.0
+            },
+            {
+              "service": "pbx_web",
+              "interval_hours": 23.5,
+              "duration_seconds": 84600.0
+            },
+            {
+              "service": "whisper_stt",
+              "interval_hours": 0.11,
+              "duration_seconds": 396.0
+            }
+          ]
+        }
+      },
+      "pod_restart_latency": {
+        "query_description": "Calculate pod restart latency from pod lifecycle events",
+        "aggregation_functions": [
+          "COUNT(pod restarts) per pod",
+          "AVG(restart_latency) across all restarts",
+          "MAX(restarts) for worst-case pod",
+          "SUM(restarts) for total restart count"
+        ],
+        "latency_formula": "restart_latency = pod_start_time - pod_stop_time",
+        "data_source": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/*-analysis.json",
+        "metrics": {
+          "total_pods_analyzed": 8,
+          "pods_with_restarts": 0,
+          "pods_with_restarts_percentage": 0.0,
+          "total_restart_count": 0,
+          "restart_rate_per_pod": 0.0,
+          "restart_samples": []
+        }
+      },
+      "comprehensive_latency_summary": {
+        "query_description": "Combine all latency metrics into comprehensive summary",
+        "aggregation_functions": [
+          "Combine workflow percentiles with deployment averages",
+          "Calculate weighted latency scores",
+          "Provide latency upper bound estimates (p95 + 2*stddev)"
+        ],
+        "latency_formula": "weighted_latency = (workflow_p95 + deployment_mean) / 2",
+        "data_sources": "Combines all previous query results",
+        "metrics": {
+          "workflow_p95_latency": 15541.6,
+          "workflow_p99_latency": 19356.32,
+          "deployment_mean_latency": 241220.571,
+          "deployment_stddev": 399037.139,
+          "weighted_latency_score": 128381.086,
+          "latency_upper_bound_estimate": 813615.878,
+          "data_sources_combined": [
+            "workflow_latency_percentiles",
+            "deployment_latency_averages"
+          ]
+        }
+      }
+    }
+  }
+}
