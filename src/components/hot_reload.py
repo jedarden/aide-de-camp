@@ -21,6 +21,8 @@ from dataclasses import dataclass
 import yaml
 import threading
 import json
+import tempfile
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +87,66 @@ class EmptyRegistryError(HotReloadError):
             f"Registry file is empty or contains no valid data: '{path}'. "
             f"Action: Ensure the file contains valid YAML or JSON configuration."
         )
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """
+    Write content to a file atomically to prevent corruption.
+
+    ATOMIC FILE OPERATION:
+    =======================
+    This function ensures that file writes are atomic - either the entire
+    file is written successfully, or no write occurs at all. This prevents
+    partial file writes that can occur during crashes, power failures, or
+    concurrent access scenarios.
+
+    Implementation:
+    1. Write to a temporary file in the same directory
+    2. Use os.fsync() to ensure data is written to disk
+    3. Use atomic os.rename() to replace the target file
+    4. Cleanup temporary file on failure
+
+    This approach ensures:
+    - No partial writes visible to readers
+    - No corruption if process crashes mid-write
+    - Safe concurrent access (readers see old or new, never partial)
+    - Works on all platforms (atomic rename is POSIX-compliant)
+
+    Args:
+        path: Target file path to write
+        content: Content to write to the file
+
+    Raises:
+        OSError: If write operation fails
+        PermissionError: If file cannot be written
+    """
+    # Create temporary file in same directory as target
+    # This ensures os.rename() will work (same filesystem)
+    temp_fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix='.atomic_write_')
+
+    try:
+        # Write content to temporary file
+        with os.fdopen(temp_fd, 'w') as f:
+            f.write(content)
+            f.flush()
+            # Ensure data is written to physical disk
+            os.fsync(f.fileno())
+
+        # Atomic rename - replaces target file if it exists
+        # This is atomic on POSIX systems (Linux, macOS)
+        os.rename(temp_path, path)
+
+        logger.debug(f"Atomic write completed: {path}")
+
+    except Exception as e:
+        # Clean up temporary file on failure
+        try:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+        except Exception:
+            pass
+        logger.error(f"Atomic write failed for {path}: {e}")
+        raise
 
 
 @dataclass

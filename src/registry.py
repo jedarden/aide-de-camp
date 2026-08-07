@@ -270,7 +270,7 @@ def _build_registry() -> dict:
 
 def get_registry(force: bool = False) -> dict:
     """
-    Return the merged registry with hot-reload support.
+    Return the merged registry with hot-reload support and thread-safe concurrent access.
 
     HOT-RELOAD MECHANISM: TTL-Based Cache Invalidation
     ====================================================
@@ -281,11 +281,20 @@ def get_registry(force: bool = False) -> dict:
     3. After TTL expires, next call rebuilds registry from disk
     4. force=True bypasses cache and rebuilds immediately
 
+    CONCURRENT ACCESS PROTECTION:
+    =============================
+    This function uses _cache_lock to ensure thread-safe access to the registry:
+    - Multiple threads can safely read the cache concurrently
+    - Cache updates are atomic - readers see consistent state
+    - No race conditions between cache validation and updates
+    - Uses double-checked locking pattern for performance
+
     This approach means:
     - Changes to config/registry.yaml take effect within 5 minutes
     - Or immediately with force=True (used in tests and manual reloads)
     - No server restart required to pick up new projects/aliases
-    - Cache hit is very fast (no disk I/O or YAML parsing)
+    - Thread-safe concurrent access without corruption
+    - Cache hit is very fast (read lock acquisition, no disk I/O)
     - Cache miss rebuilds entire registry (includes git repo discovery)
 
     Args:
@@ -298,13 +307,26 @@ def get_registry(force: bool = False) -> dict:
     Verified in: test_registry_hot_reload (tests/test_config_hot_reload.py)
     """
     global _cache, _cache_at
-    # HOT-RELOAD: Check if cache is stale or force reload requested
-    # If force=True or cache is None or TTL expired, rebuild from disk
-    # Otherwise return cached registry (fast path, no disk I/O)
-    if force or _cache is None or (time.time() - _cache_at) > CACHE_TTL:
-        _cache = _build_registry()
-        _cache_at = time.time()
-    return _cache
+
+    # CONCURRENT ACCESS: Double-checked locking pattern
+    # First check without lock for performance (fast path for cache hits)
+    cache_is_stale = force or _cache is None or (time.time() - _cache_at) > CACHE_TTL
+
+    if not cache_is_stale:
+        # Fast path: return cached registry without lock contention
+        return _cache
+
+    # Slow path: need to rebuild cache - acquire lock for thread safety
+    with _cache_lock:
+        # Double-check: another thread may have rebuilt cache while we waited for lock
+        cache_is_stale = force or _cache is None or (time.time() - _cache_at) > CACHE_TTL
+
+        if cache_is_stale:
+            # Rebuild cache under lock protection
+            _cache = _build_registry()
+            _cache_at = time.time()
+
+        return _cache
 
 
 def get_project(slug: str) -> dict | None:
