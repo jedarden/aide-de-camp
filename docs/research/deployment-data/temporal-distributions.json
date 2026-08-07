@@ -1,0 +1,463 @@
+{
+  "metadata": {
+    "analysis_type": "temporal_distributions_and_deployment_correlations",
+    "generated_at": "2026-08-06T20:33:49.713453",
+    "time_window": {
+      "start_date": "2026-07-07",
+      "end_date": "2026-08-06",
+      "total_days": 31
+    },
+    "total_failures_analyzed": 1,
+    "total_deployments_analyzed": 9
+  },
+  "daily_bins": {
+    "2026-07-07": {
+      "date": "2026-07-07",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-08": {
+      "date": "2026-07-08",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-09": {
+      "date": "2026-07-09",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-10": {
+      "date": "2026-07-10",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-11": {
+      "date": "2026-07-11",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-12": {
+      "date": "2026-07-12",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-13": {
+      "date": "2026-07-13",
+      "total_failures": 1,
+      "by_pattern": {
+        "Other": 1
+      },
+      "by_service": {
+        "pbx-web": 1
+      },
+      "by_severity": {
+        "unknown": 1
+      },
+      "failure_timestamps": [
+        "2026-07-13T18:07:55Z"
+      ]
+    },
+    "2026-07-14": {
+      "date": "2026-07-14",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-15": {
+      "date": "2026-07-15",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-16": {
+      "date": "2026-07-16",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-17": {
+      "date": "2026-07-17",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-18": {
+      "date": "2026-07-18",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-19": {
+      "date": "2026-07-19",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-20": {
+      "date": "2026-07-20",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-21": {
+      "date": "2026-07-21",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-22": {
+      "date": "2026-07-22",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-23": {
+      "date": "2026-07-23",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-24": {
+      "date": "2026-07-24",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-25": {
+      "date": "2026-07-25",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-26": {
+      "date": "2026-07-26",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-27": {
+      "date": "2026-07-27",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-28": {
+      "date": "2026-07-28",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-29": {
+      "date": "2026-07-29",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-30": {
+      "date": "2026-07-30",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-07-31": {
+      "date": "2026-07-31",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-08-01": {
+      "date": "2026-08-01",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-08-02": {
+      "date": "2026-08-02",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-08-03": {
+      "date": "2026-08-03",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-08-04": {
+      "date": "2026-08-04",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-08-05": {
+      "date": "2026-08-05",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    },
+    "2026-08-06": {
+      "date": "2026-08-06",
+      "total_failures": 0,
+      "by_pattern": {},
+      "by_service": {},
+      "by_severity": {},
+      "failure_timestamps": []
+    }
+  },
+  "daily_failure_rates": {
+    "2026-07-07": {
+      "date": "2026-07-07",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-08": {
+      "date": "2026-07-08",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-09": {
+      "date": "2026-07-09",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-10": {
+      "date": "2026-07-10",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-11": {
+      "date": "2026-07-11",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-12": {
+      "date": "2026-07-12",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-13": {
+      "date": "2026-07-13",
+      "total_failures": 1,
+      "pattern_rates": {
+        "Other": {
+          "count": 1,
+          "rate_percentage": 100.0
+        }
+      }
+    },
+    "2026-07-14": {
+      "date": "2026-07-14",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-15": {
+      "date": "2026-07-15",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-16": {
+      "date": "2026-07-16",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-17": {
+      "date": "2026-07-17",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-18": {
+      "date": "2026-07-18",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-19": {
+      "date": "2026-07-19",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-20": {
+      "date": "2026-07-20",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-21": {
+      "date": "2026-07-21",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-22": {
+      "date": "2026-07-22",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-23": {
+      "date": "2026-07-23",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-24": {
+      "date": "2026-07-24",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-25": {
+      "date": "2026-07-25",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-26": {
+      "date": "2026-07-26",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-27": {
+      "date": "2026-07-27",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-28": {
+      "date": "2026-07-28",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-29": {
+      "date": "2026-07-29",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-30": {
+      "date": "2026-07-30",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-07-31": {
+      "date": "2026-07-31",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-08-01": {
+      "date": "2026-08-01",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-08-02": {
+      "date": "2026-08-02",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-08-03": {
+      "date": "2026-08-03",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-08-04": {
+      "date": "2026-08-04",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-08-05": {
+      "date": "2026-08-05",
+      "total_failures": 0,
+      "pattern_rates": {}
+    },
+    "2026-08-06": {
+      "date": "2026-08-06",
+      "total_failures": 0,
+      "pattern_rates": {}
+    }
+  },
+  "temporal_clusters": [],
+  "deployment_correlations": [
+    {
+      "failure_date": "2026-07-13",
+      "failure_timestamp": "2026-07-13T18:07:55Z",
+      "related_deployments": [
+        {
+          "deployment_id": "pbx-web-revision-11-rollback",
+          "timestamp": "2026-07-13T18:07:55Z",
+          "event_type": "deployment_rollback",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "service": "pbx-web",
+          "hours_before_failure": 0.0
+        }
+      ],
+      "deployment_count": 1,
+      "pattern": {
+        "Other": 1
+      },
+      "service": {
+        "pbx-web": 1
+      }
+    }
+  ],
+  "summary": {
+    "total_days_with_failures": 1,
+    "peak_failure_day": "2026-07-13",
+    "total_clusters": 0,
+    "total_correlations": 1
+  }
+}
