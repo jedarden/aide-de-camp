@@ -26,7 +26,7 @@ Usage:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, Dict, List
+from typing import Any, Optional, Dict, List, Union
 
 
 @dataclass(frozen=True)
@@ -144,6 +144,7 @@ class ComparisonReport:
         matching_count: Number of comparisons where all fields matched
         partial_match_count: Number of comparisons with some matches but not all
         mismatch_count: Number of comparisons with no matches
+        overall_match: True if ALL components match (no mismatches, no partials)
         results: List of individual ComparisonResult objects
         summary: Optional human-readable summary of the comparison results
 
@@ -158,11 +159,13 @@ class ComparisonReport:
         ...     matching_count=7,
         ...     partial_match_count=2,
         ...     mismatch_count=1,
+        ...     overall_match=False,
         ...     results=[result1, result2, ...],
         ...     summary="7/10 classifications fully matched expected values"
         ... )
         >>> assert report.total_comparisons == 10
         >>> assert report.matching_count == 7
+        >>> assert report.overall_match is False
     """
 
     total_comparisons: int
@@ -171,9 +174,10 @@ class ComparisonReport:
     mismatch_count: int
     results: List[ComparisonResult] = field(default_factory=list)
     summary: Optional[str] = None
+    overall_match: bool = False
 
     def __post_init__(self) -> None:
-        """Validate that counts match the results list."""
+        """Validate that counts match the results list and calculate overall_match."""
         if self.total_comparisons != len(self.results):
             raise ValueError(
                 f"total_comparisons ({self.total_comparisons}) must equal "
@@ -188,6 +192,13 @@ class ComparisonReport:
                 f"mismatch_count ({self.mismatch_count}) must equal "
                 f"total_comparisons ({self.total_comparisons})"
             )
+
+        # Calculate overall_match if not explicitly set
+        # overall_match is True only if ALL comparisons are full matches
+        if self.total_comparisons > 0:
+            object.__setattr__(self, 'overall_match', self.mismatch_count == 0 and self.partial_match_count == 0)
+        else:
+            object.__setattr__(self, 'overall_match', True)  # Empty results match
 
     def get_accuracy_rate(self) -> float:
         """
