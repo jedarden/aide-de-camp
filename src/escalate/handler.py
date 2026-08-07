@@ -366,13 +366,14 @@ class EscalateHandler:
 
     async def _execute_delete_pod(self, request: EscalateRequest) -> dict:
         """
-        Execute kubectl delete pod command.
+        Execute kubectl delete pod command with Deployment recreation warning.
 
         Args:
             request: The escalate request
 
         Returns:
-            Execution result dict
+            Execution result dict. Returns confirmation_required status
+            if pod is managed by Deployment/ReplicaSet.
         """
         executor = get_kubectl_executor()
 
@@ -382,12 +383,27 @@ class EscalateHandler:
             project_slug=request.project_slug,
         )
 
-        # Execute the delete command
+        # Check if user has confirmed deletion despite warning
+        # (e.g., via metadata flag)
+        skip_warning = request.metadata.get("skip_deployment_warning", False)
+
+        # Execute the delete command (will return confirmation_required if managed)
         result = await executor.execute_delete_pod(
             pod_name=params["pod_name"],
             namespace=params["namespace"],
             project_slug=request.project_slug,
+            skip_warning=skip_warning,
         )
+
+        # Handle confirmation_required status
+        if result.get("status") == "confirmation_required":
+            logger.info(
+                f"Confirmation required for pod deletion: {params['pod_name']} "
+                f"(managed by {result.get('data', {}).get('owner_kind')})"
+            )
+            # Return the confirmation_required result as-is
+            # The surface layer will display this to the user for confirmation
+            return result
 
         return result
 
