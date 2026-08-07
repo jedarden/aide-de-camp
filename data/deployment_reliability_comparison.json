@@ -1,0 +1,141 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-07T09:11:23.813538",
+    "analysis_type": "deployment_reliability_comparison",
+    "services_compared": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "reliability_profiles": {
+    "pbx_web": {
+      "service_name": "pbx-web",
+      "total_deployments": 5,
+      "total_successes": 4,
+      "total_failures": 1,
+      "success_rate_percent": 80.0,
+      "weekly_failure_rate": 0.5,
+      "top_error_types": {
+        "Scaled_Down_Or_Failed": 1,
+        "Rolled_Over": 4
+      },
+      "top_error_patterns": [
+        {
+          "pattern": "[pbx-web] ReplicaSet [REPLICASET] with image [IMAGE] was rolled over to new version",
+          "frequency": 4,
+          "percentage": 80.0
+        },
+        {
+          "pattern": "[pbx-web] ReplicaSet [REPLICASET] with image [IMAGE] was scaled down or failed",
+          "frequency": 1,
+          "percentage": 20.0
+        }
+      ],
+      "failure_modes": [
+        "Scaled_Down_Or_Failed",
+        "Rolled_Over"
+      ],
+      "most_common_failure": "Rolled_Over"
+    },
+    "whisper_stt": {
+      "service_name": "whisper-stt",
+      "total_deployments": 4,
+      "total_successes": 1,
+      "total_failures": 3,
+      "success_rate_percent": 25.0,
+      "weekly_failure_rate": 3.0,
+      "top_error_types": {
+        "Rolled_Over": 5
+      },
+      "top_error_patterns": [
+        {
+          "pattern": "[whisper-stt] ReplicaSet [REPLICASET] with image [IMAGE] was rolled over to new version",
+          "frequency": 5,
+          "percentage": 100.0
+        }
+      ],
+      "failure_modes": [
+        "Rolled_Over"
+      ],
+      "most_common_failure": "Rolled_Over"
+    }
+  },
+  "comparative_metrics": {
+    "success_rate_delta_percentage_points": 55.0,
+    "success_rate_improvement_factor": 2.2,
+    "failure_rate_ratio": 0.16666666666666666,
+    "shared_failure_patterns_count": 1,
+    "pbx_web_unique_patterns_count": 1,
+    "whisper_stt_unique_patterns_count": 0,
+    "has_temporal_correlation": false,
+    "pbx_web_stability": "STABLE",
+    "whisper_stt_stability": "NEEDS_ATTENTION",
+    "more_reliable_service": "pbx-web"
+  },
+  "shared_patterns": {
+    "shared_error_types": [
+      "Rolled_Over"
+    ],
+    "shared_phases": [
+      "Runtime"
+    ],
+    "explanation": "These error types and phases occur in both services"
+  },
+  "service_specific_patterns": {
+    "pbx_web_specific": {
+      "unique_error_types": [
+        "Scaled_Down_Or_Failed"
+      ],
+      "error_frequency": {
+        "Scaled_Down_Or_Failed": 1,
+        "Rolled_Over": 4
+      }
+    },
+    "whisper_stt_specific": {
+      "unique_error_types": [],
+      "error_frequency": {
+        "Rolled_Over": 5
+      }
+    }
+  },
+  "temporal_analysis": {
+    "weekly_correlation": [
+      {
+        "week": "2026-W29",
+        "pbx_web_failures": 1,
+        "whisper_stt_failures": 0,
+        "both_failed": false
+      },
+      {
+        "week": "2026-W28",
+        "pbx_web_failures": 0,
+        "whisper_stt_failures": 3,
+        "both_failed": false
+      }
+    ],
+    "has_correlated_failures": false,
+    "finding": "Services do NOT show correlated failure patterns"
+  },
+  "key_findings": [
+    "pbx-web has a 55.0 percentage point higher success rate than whisper-stt",
+    "pbx-web success rate: 80.0%, whisper-stt: 25.0%",
+    "whisper-stt has 0.2x more weekly failures than pbx-web",
+    "Both services share 1 error type(s): Rolled_Over",
+    "pbx-web has 1 unique error type(s): Scaled_Down_Or_Failed",
+    "whisper-stt has 0 unique error type(s): ",
+    "Temporal correlation: NO - failures do not cluster together",
+    "Most reliable service: PBX-WEB"
+  ],
+  "stability_triggers": {
+    "pbx_web": {
+      "stability_level": "STABLE",
+      "primary_concern": "Scaled_Down_Or_Failed errors (20% of errors)",
+      "recommendation": "Monitor for scale-down events and rollout stability"
+    },
+    "whisper_stt": {
+      "stability_level": "NEEDS_ATTENTION",
+      "primary_concern": "Very low success rate (25%) - all failures are Rolled_Over",
+      "recommendation": "Investigate rollout process and health check configuration"
+    }
+  }
+}
