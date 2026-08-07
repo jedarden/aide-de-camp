@@ -281,6 +281,38 @@ class TestUtteranceTableInfrastructure:
         assert sample_utterance_texts[1] == "Hi"  # Very short
         assert len(sample_utterance_texts[4]) == 10000  # Very long
 
+    @pytest.mark.asyncio
+    async def test_utterance_table_empty_before_test_execution(self, test_db_store: SessionStore) -> None:
+        """Verify utterance table is empty before test execution (bead adc-22bw9t).
+
+        This test verifies pre-execution state reset:
+        1. Query utterances table and verify row count is 0
+        2. Add assertion with helpful message if table is not empty
+        3. Use database query helpers from infrastructure bead
+
+        This is ONLY for pre-execution state verification. Post-execution checks
+        come in subsequent tests.
+        """
+        # Query utterances table using database helper from infrastructure
+        utterance_count = await get_utterance_count(test_db_store.db_path)
+
+        # Verify row count is 0 with helpful assertion message
+        assert utterance_count == 0, (
+            f"utterances table should be empty before test execution, "
+            f"but found {utterance_count} records. "
+            f"This indicates test isolation failure or incomplete cleanup."
+        )
+
+        # Additional verification: ensure no orphaned records exist
+        async with aiosqlite.connect(test_db_store.db_path) as db:
+            async with db.execute("SELECT id FROM utterances LIMIT 1") as cur:
+                orphaned_record = await cur.fetchone()
+
+        assert orphaned_record is None, (
+            "utterances table should contain no records before test execution. "
+            "Found orphaned record indicating test isolation failure."
+        )
+
 
 # =============================================================================
 # Utterance table cleanup verification tests (bead adc-290sq4)
