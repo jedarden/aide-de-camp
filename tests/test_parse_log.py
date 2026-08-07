@@ -136,8 +136,10 @@ class TestLoadJsonl:
         ]
         file_path = temp_jsonl_file(entries)
 
-        result = list(load_jsonl(file_path))
+        result, errors_count, skipped_count = load_jsonl(file_path)
         assert len(result) == 3
+        assert errors_count == 0
+        assert skipped_count == 0
         assert result[0] == {'test': 'entry1'}
         assert result[1] == {'test': 'entry2'}
         assert result[2] == {'test': 'entry3'}
@@ -155,18 +157,20 @@ class TestLoadJsonl:
         with open(file_path, 'w') as f:
             f.write('{"test":"entry1"}\n\n   \n{"test":"entry2"}\n')
 
-        result = list(load_jsonl(file_path))
+        result, errors_count, skipped_count = load_jsonl(file_path)
         assert len(result) == 2
+        assert errors_count == 0
+        assert skipped_count == 2  # Two empty lines skipped
 
     def test_missing_file_raises_error(self):
         """Missing file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError, match="JSONL file not found"):
-            list(load_jsonl('/nonexistent/path/file.log'))
+            load_jsonl('/nonexistent/path/file.log')
 
     def test_path_not_file_raises_error(self, tmp_path):
         """Path that is not a file raises ValueError."""
         with pytest.raises(ValueError, match="Path is not a file"):
-            list(load_jsonl(str(tmp_path)))
+            load_jsonl(str(tmp_path))
 
     def test_malformed_json_skipped_with_warning(self, temp_jsonl_file, caplog):
         """Malformed JSON lines are skipped with warning logged."""

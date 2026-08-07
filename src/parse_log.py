@@ -59,18 +59,21 @@ def detect_format(raw_entry: Dict[str, Any]) -> str:
     return FORMAT_UNKNOWN
 
 
-def load_jsonl(file_path: str) -> Iterator[Dict]:
+def load_jsonl(file_path: str) -> tuple[list[Dict], int, int]:
     """
     Load a JSONL file and parse each line as a JSON object.
 
     Reads the file line by line, parsing each line as a separate JSON object.
-    Empty lines are skipped. Yields individual parsed dict objects.
+    Empty lines are skipped. Returns successfully parsed entries with error statistics.
 
     Args:
         file_path: Path to the JSONL file (str).
 
-    Yields:
-        Dict objects parsed from each line in the file.
+    Returns:
+        Tuple of (entries, errors_count, skipped_count):
+        - entries: List of successfully parsed Dict objects
+        - errors_count: Number of lines with JSON decode errors
+        - skipped_count: Number of empty lines skipped
 
     Raises:
         FileNotFoundError: If the specified file does not exist.
@@ -78,10 +81,16 @@ def load_jsonl(file_path: str) -> Iterator[Dict]:
     path = Path(file_path)
 
     if not path.exists():
+        logger.error(f"JSONL file not found: {path}")
         raise FileNotFoundError(f"JSONL file not found: {path}")
 
     if not path.is_file():
+        logger.error(f"Path is not a file: {path}")
         raise ValueError(f"Path is not a file: {path}")
+
+    entries = []
+    errors_count = 0
+    skipped_count = 0
 
     with path.open('r', encoding='utf-8') as f:
         for line_num, line in enumerate(f, 1):
@@ -89,14 +98,21 @@ def load_jsonl(file_path: str) -> Iterator[Dict]:
 
             # Skip empty lines
             if not line:
+                skipped_count += 1
+                logger.debug(f"Skipping empty line {line_num} in {path}")
                 continue
 
             try:
                 obj = json.loads(line)
-                yield obj
+                entries.append(obj)
+                logger.debug(f"Successfully parsed line {line_num} in {path}")
             except json.JSONDecodeError as e:
+                errors_count += 1
                 logger.warning(f"Failed to parse line {line_num} in {path}: {e}")
                 continue
+
+    logger.info(f"Loaded {len(entries)} entries from {path} ({errors_count} errors, {skipped_count} empty lines skipped)")
+    return entries, errors_count, skipped_count
 
 
 def normalize_timestamp(ts_input: Optional[Any]) -> Optional[str]:
@@ -107,6 +123,11 @@ def normalize_timestamp(ts_input: Optional[Any]) -> Optional[str]:
     - Unix epoch timestamps (int/float, seconds or milliseconds)
     - ISO 8601 strings (with or without timezone)
     - datetime objects
+
+    Includes validation and error handling:
+    - Type checking before processing
+    - Invalid format logging at DEBUG level
+    - Graceful fallback to None for unparseable formats
 
     Args:
         ts_input: Timestamp in various formats
@@ -120,6 +141,11 @@ def normalize_timestamp(ts_input: Optional[Any]) -> Optional[str]:
     try:
         # Handle Unix epoch timestamps (numbers)
         if isinstance(ts_input, (int, float)):
+            # Validate timestamp is reasonable (between 1970 and 2100)
+            if ts_input < 0 or ts_input > 4_102_444_800:  # Jan 1, 2100
+                logger.warning(f"Timestamp out of valid range: {ts_input}")
+                return None
+
             # Detect if timestamp is in milliseconds (typically > 10^11)
             if ts_input > 100_000_000_000:  # Milliseconds since epoch
                 ts_input = ts_input / 1000
@@ -129,6 +155,11 @@ def normalize_timestamp(ts_input: Optional[Any]) -> Optional[str]:
         # Handle string timestamps
         if isinstance(ts_input, str):
             ts_input = ts_input.strip()
+
+            # Validate string is not empty after stripping
+            if not ts_input:
+                logger.debug("Empty timestamp string after stripping")
+                return None
 
             # Already ISO 8601 format
             if 'T' in ts_input:
@@ -152,17 +183,23 @@ def normalize_timestamp(ts_input: Optional[Any]) -> Optional[str]:
                 epoch = float(ts_input)
                 return normalize_timestamp(epoch)
             except ValueError:
+                logger.debug(f"Failed to parse timestamp string as epoch: '{ts_input}'")
                 pass
 
         # Handle datetime objects
         if isinstance(ts_input, datetime):
             return ts_input.strftime('%Y-%m-%dT%H:%M:%SZ')
 
+        # Unhandled type - log for debugging
+        logger.debug(f"Unhandled timestamp type: {type(ts_input).__name__}, value: {ts_input}")
+        return None
+
     except (ValueError, OSError, OverflowError) as e:
         logger.debug(f"Failed to normalize timestamp '{ts_input}': {e}")
         return None
-
-    return None
+    except Exception as e:
+        logger.warning(f"Unexpected error normalizing timestamp '{ts_input}': {e}")
+        return None
 
 
 def detect_entry_type(raw_entry: Dict[str, Any]) -> str:
@@ -637,6 +674,12 @@ def extract_fields(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
     service log formats. It now uses the multi-format parser which automatically
     detects the format and normalizes all formats to the same output schema.
 
+    Includes robust error handling for malformed/missing fields:
+    - Missing required fields get default values
+    - Invalid data types are handled gracefully
+    - Timestamp format is validated before normalization
+    - Completely invalid entries are logged and skipped
+
     Args:
         raw_entry: Raw log entry dictionary from JSONL file
 
@@ -667,5 +710,84 @@ def extract_fields(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
             'metadata': {...}
         }
     """
-    # Use the new multi-format parser
-    return parse_entry(raw_entry)
+    # Validate input type
+    if not isinstance(raw_entry, dict):
+        logger.error(f"Invalid entry type: expected dict, got {type(raw_entry).__name__}")
+        return _get_minimal_entry()
+
+    # Check for completely empty or invalid entries
+    if not raw_entry:
+        logger.warning("Empty entry provided, returning minimal entry")
+        return _get_minimal_entry()
+
+    try:
+        # Use the new multi-format parser
+        result = parse_entry(raw_entry)
+
+        # Validate the result has the expected structure
+        if not isinstance(result, dict):
+            logger.error(f"Parser returned non-dict result: {type(result).__name__}")
+            return _get_minimal_entry()
+
+        # Ensure all required fields are present (with defaults if missing)
+        _ensure_required_fields(result)
+
+        return result
+
+    except Exception as e:
+        logger.warning(f"Failed to extract fields from entry: {e}, using minimal entry")
+        return _get_minimal_entry()
+
+
+def _get_minimal_entry() -> Dict[str, Any]:
+    """
+    Get a minimal valid entry with default values.
+
+    Returns:
+        Dictionary with all required fields set to safe defaults
+    """
+    return {
+        'timestamp': None,
+        'service': 'unknown',
+        'event_type': 'unknown',
+        'status': 'unknown',
+        'error_code': None,
+        'duration_ms': None,
+        'cluster': 'unknown',
+        'namespace': 'unknown',
+        'metadata': {
+            'source_fields': {},
+            'raw_format': FORMAT_UNKNOWN
+        }
+    }
+
+
+def _ensure_required_fields(entry: Dict[str, Any]) -> None:
+    """
+    Ensure all required fields exist in the entry, adding defaults if missing.
+
+    Args:
+        entry: Entry dictionary to validate and populate
+    """
+    required_fields = {
+        'timestamp': None,
+        'service': 'unknown',
+        'event_type': 'unknown',
+        'status': 'unknown',
+        'error_code': None,
+        'duration_ms': None,
+        'cluster': 'unknown',
+        'namespace': 'unknown',
+        'metadata': {
+            'source_fields': {},
+            'raw_format': FORMAT_UNKNOWN
+        }
+    }
+
+    for field, default_value in required_fields.items():
+        if field not in entry:
+            logger.debug(f"Adding missing field '{field}' with default value: {default_value}")
+            entry[field] = default_value
+        elif field == 'metadata' and not isinstance(entry.get('metadata'), dict):
+            logger.warning(f"Invalid metadata field type, using default: {entry.get('metadata')}")
+            entry[field] = default_value
