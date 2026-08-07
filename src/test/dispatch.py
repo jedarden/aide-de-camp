@@ -425,6 +425,12 @@ TEST_UTTERANCES = [
         description="Weather query for current conditions",
     ),
     TestUtterance(
+        name="research_query",
+        utterance="tell me about Kubernetes architecture patterns",
+        expected_intent_type="research",
+        description="Research query for information gathering",
+    ),
+    TestUtterance(
         name="brainstorm",
         utterance="let's brainstorm ways to optimize the pipeline performance",
         expected_intent_type="brainstorm",
