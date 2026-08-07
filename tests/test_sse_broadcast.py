@@ -1162,6 +1162,287 @@ class TestBroadcastHelperFunctions:
 # --- Edge case tests ----------------------------------------------------------
 
 
+class TestTopicUpdatedEvent:
+    """Test topic_updated event broadcasts (bead adc-5lysxq)."""
+
+    async def test_topic_updated_event_broadcasts_with_correct_payload(self, broadcaster):
+        """topic_updated event broadcasts with correct payload including topic_id."""
+        conn = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        event = SSEEvent(
+            event_type=EventType.TOPIC_UPDATED,
+            data={
+                "topic_id": "topic-123",
+                "label": "Updated Topic",
+                "summary": "Topic has been updated"
+            }
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        assert sent_count == 1
+
+        # Verify the event is queued with correct payload
+        queued_event = await asyncio.wait_for(conn.queue.get(), timeout=1.0)
+        assert queued_event.event_type == EventType.TOPIC_UPDATED
+        assert queued_event.data["topic_id"] == "topic-123"
+        assert queued_event.data["label"] == "Updated Topic"
+        assert queued_event.data["summary"] == "Topic has been updated"
+
+        broadcaster.unregister(conn.connection_id)
+
+    async def test_topic_updated_with_session_filtering(self, broadcaster):
+        """topic_updated event respects target_session_id filtering."""
+        # Create connections for different sessions
+        conn1 = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn2 = broadcaster.register(
+            surface_id="surface-2",
+            session_id="session-2",
+            surface_type="canvas"
+        )
+        conn3 = broadcaster.register(
+            surface_id="surface-3",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        event = SSEEvent(
+            event_type=EventType.TOPIC_UPDATED,
+            data={
+                "topic_id": "topic-456",
+                "label": "Session 1 Update"
+            },
+            target_session_id="session-1"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        assert sent_count == 2  # Only session-1 connections
+
+        # conn1 and conn3 should receive the event
+        event1 = await asyncio.wait_for(conn1.queue.get(), timeout=1.0)
+        assert event1.event_type == EventType.TOPIC_UPDATED
+        assert event1.data["topic_id"] == "topic-456"
+
+        event3 = await asyncio.wait_for(conn3.queue.get(), timeout=1.0)
+        assert event3.event_type == EventType.TOPIC_UPDATED
+
+        # conn2 should not receive
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn2.queue.get(), timeout=0.1)
+
+        broadcaster.unregister(conn1.connection_id)
+        broadcaster.unregister(conn2.connection_id)
+        broadcaster.unregister(conn3.connection_id)
+
+    async def test_topic_updated_with_surface_targeting(self, broadcaster):
+        """topic_updated event respects target_surface_id filtering."""
+        conn1 = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn2 = broadcaster.register(
+            surface_id="surface-2",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn3 = broadcaster.register(
+            surface_id="surface-3",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        event = SSEEvent(
+            event_type=EventType.TOPIC_UPDATED,
+            data={
+                "topic_id": "topic-789",
+                "label": "Targeted Update"
+            },
+            target_surface_id="surface-2"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        assert sent_count == 1  # Only surface-2
+
+        # Only conn2 should receive
+        event2 = await asyncio.wait_for(conn2.queue.get(), timeout=1.0)
+        assert event2.event_type == EventType.TOPIC_UPDATED
+        assert event2.data["label"] == "Targeted Update"
+
+        # conn1 and conn3 should not receive
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn1.queue.get(), timeout=0.1)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn3.queue.get(), timeout=0.1)
+
+        broadcaster.unregister(conn1.connection_id)
+        broadcaster.unregister(conn2.connection_id)
+        broadcaster.unregister(conn3.connection_id)
+
+    async def test_topic_updated_with_surface_exclusion(self, broadcaster):
+        """topic_updated event respects exclude_surface_id filtering."""
+        conn1 = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn2 = broadcaster.register(
+            surface_id="surface-2",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn3 = broadcaster.register(
+            surface_id="surface-3",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        event = SSEEvent(
+            event_type=EventType.TOPIC_UPDATED,
+            data={
+                "topic_id": "topic-999",
+                "label": "Broadcast Except One"
+            },
+            exclude_surface_id="surface-2"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        assert sent_count == 2  # surface-1 and surface-3
+
+        # conn1 and conn3 should receive
+        await asyncio.wait_for(conn1.queue.get(), timeout=1.0)
+        await asyncio.wait_for(conn3.queue.get(), timeout=1.0)
+
+        # conn2 should not receive
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn2.queue.get(), timeout=0.1)
+
+        broadcaster.unregister(conn1.connection_id)
+        broadcaster.unregister(conn2.connection_id)
+        broadcaster.unregister(conn3.connection_id)
+
+    async def test_topic_updated_with_combined_filters(self, broadcaster):
+        """topic_updated event with both session and surface filters."""
+        conn1 = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn2 = broadcaster.register(
+            surface_id="surface-2",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn3 = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-2",
+            surface_type="canvas"
+        )
+
+        event = SSEEvent(
+            event_type=EventType.TOPIC_UPDATED,
+            data={
+                "topic_id": "topic-abc",
+                "label": "Combined Filter Test"
+            },
+            target_session_id="session-1",
+            target_surface_id="surface-2"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        assert sent_count == 1  # Only conn2 matches both filters
+
+        # Only conn2 should receive
+        event2 = await asyncio.wait_for(conn2.queue.get(), timeout=1.0)
+        assert event2.event_type == EventType.TOPIC_UPDATED
+        assert event2.data["topic_id"] == "topic-abc"
+
+        # conn1 and conn3 should not receive
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn1.queue.get(), timeout=0.1)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(conn3.queue.get(), timeout=0.1)
+
+        broadcaster.unregister(conn1.connection_id)
+        broadcaster.unregister(conn2.connection_id)
+        broadcaster.unregister(conn3.connection_id)
+
+    async def test_topic_updated_with_rendered_html(self, broadcaster):
+        """topic_updated event can include rendered_html field."""
+        conn = broadcaster.register(
+            surface_id="surface-1",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        event = SSEEvent(
+            event_type=EventType.TOPIC_UPDATED,
+            data={
+                "topic_id": "topic-html",
+                "label": "Topic with HTML"
+            },
+            rendered_html="<div class=\"topic-card\">Updated content</div>"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        assert sent_count == 1
+
+        queued_event = await asyncio.wait_for(conn.queue.get(), timeout=1.0)
+        assert queued_event.event_type == EventType.TOPIC_UPDATED
+        assert queued_event.rendered_html == "<div class=\"topic-card\">Updated content</div>"
+        assert queued_event.data["topic_id"] == "topic-html"
+
+        broadcaster.unregister(conn.connection_id)
+
+    async def test_topic_updated_to_multiple_surfaces_same_session(self, broadcaster):
+        """topic_updated event reaches all surfaces in the target session."""
+        # Multiple surfaces in same session
+        conn1 = broadcaster.register(
+            surface_id="canvas-a",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+        conn2 = broadcaster.register(
+            surface_id="terminal-b",
+            session_id="session-1",
+            surface_type="terminal"
+        )
+        conn3 = broadcaster.register(
+            surface_id="canvas-c",
+            session_id="session-1",
+            surface_type="canvas"
+        )
+
+        event = SSEEvent(
+            event_type=EventType.TOPIC_UPDATED,
+            data={
+                "topic_id": "topic-multi",
+                "label": "Multi-Surface Update"
+            },
+            target_session_id="session-1"
+        )
+
+        sent_count = await broadcaster.broadcast(event)
+        assert sent_count == 3  # All surfaces in session-1
+
+        # All three connections should receive
+        for conn in [conn1, conn2, conn3]:
+            queued = await asyncio.wait_for(conn.queue.get(), timeout=1.0)
+            assert queued.event_type == EventType.TOPIC_UPDATED
+            assert queued.data["topic_id"] == "topic-multi"
+
+        broadcaster.unregister(conn1.connection_id)
+        broadcaster.unregister(conn2.connection_id)
+        broadcaster.unregister(conn3.connection_id)
+
+
 class TestEdgeCases:
     """Test edge cases and error handling."""
 
