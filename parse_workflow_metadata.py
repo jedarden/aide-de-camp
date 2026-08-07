@@ -12,9 +12,106 @@ Extracts relevant fields from Argo Workflow records:
 
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any
+
+
+def calculate_duration(started_at: str, finished_at: str) -> Dict[str, Any]:
+    """
+    Calculate duration between two ISO 8601 timestamps.
+
+    Args:
+        started_at: Start timestamp string
+        finished_at: End timestamp string
+
+    Returns:
+        Dictionary with duration information including total seconds,
+        human-readable format, and calculation status
+    """
+    duration_info = {
+        'total_seconds': 0,
+        'human_readable': '',
+        'calculation_status': 'unknown'
+    }
+
+    if not started_at:
+        duration_info['calculation_status'] = 'missing_start_time'
+        return duration_info
+
+    try:
+        from datetime import datetime
+        start_time = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+
+        if finished_at:
+            end_time = datetime.fromisoformat(finished_at.replace('Z', '+00:00'))
+            duration_seconds = (end_time - start_time).total_seconds()
+            duration_info['calculation_status'] = 'complete'
+        else:
+            # Workflow still running or incomplete - use current time
+            now = datetime.now(timezone.utc)
+            duration_seconds = (now - start_time).total_seconds()
+            duration_info['calculation_status'] = 'incomplete'
+
+        duration_info['total_seconds'] = duration_seconds
+
+        # Calculate human-readable format
+        if duration_seconds >= 3600:
+            hours = int(duration_seconds // 3600)
+            minutes = int((duration_seconds % 3600) // 60)
+            duration_info['human_readable'] = f"{hours}h {minutes}m"
+        elif duration_seconds >= 60:
+            minutes = int(duration_seconds // 60)
+            seconds = int(duration_seconds % 60)
+            duration_info['human_readable'] = f"{minutes}m {seconds}s"
+        else:
+            duration_info['human_readable'] = f"{int(duration_seconds)}s"
+
+    except (ValueError, AttributeError) as e:
+        duration_info['calculation_status'] = f'invalid_timestamp: {str(e)}'
+
+    return duration_info
+
+
+def extract_failure_conditions(item: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract failure conditions and error details from workflow status.
+
+    Args:
+        item: Workflow item dictionary
+
+    Returns:
+        Dictionary with failure condition details
+    """
+    failure_info = {
+        'failed': False,
+        'failure_type': '',
+        'error_message': '',
+        'failed_nodes': []
+    }
+
+    status = item.get('status', {})
+    phase = status.get('phase', '')
+
+    # Determine if workflow failed
+    if phase == 'Failed':
+        failure_info['failed'] = True
+        failure_info['failure_type'] = 'workflow_failed'
+        failure_info['error_message'] = status.get('message', 'No error message provided')
+
+    # Extract failed nodes if available
+    nodes = status.get('nodes', {})
+    for node_id, node in nodes.items():
+        node_phase = node.get('phase', '')
+        if node_phase in ('Failed', 'Error'):
+            failure_info['failed_nodes'].append({
+                'node_id': node_id,
+                'name': node.get('name', ''),
+                'phase': node_phase,
+                'message': node.get('message', '')
+            })
+
+    return failure_info
 
 
 def parse_json_workflows(input_file: Path) -> List[Dict[str, Any]]:
@@ -43,6 +140,15 @@ def parse_json_workflows(input_file: Path) -> List[Dict[str, Any]]:
         # Detect format type
         if 'metadata' in item and 'status' in item:
             # Full kubectl format
+            started_at = item.get('status', {}).get('startedAt', '')
+            finished_at = item.get('status', {}).get('finishedAt', '')
+
+            # Calculate duration
+            duration_info = calculate_duration(started_at, finished_at)
+
+            # Extract failure conditions
+            failure_info = extract_failure_conditions(item)
+
             workflow = {
                 'metadata': {
                     'name': item.get('metadata', {}).get('name', ''),
@@ -53,10 +159,12 @@ def parse_json_workflows(input_file: Path) -> List[Dict[str, Any]]:
                 },
                 'status': {
                     'phase': item.get('status', {}).get('phase', 'Unknown'),
-                    'startedAt': item.get('status', {}).get('startedAt', ''),
-                    'finishedAt': item.get('status', {}).get('finishedAt', ''),
+                    'startedAt': started_at,
+                    'finishedAt': finished_at,
                     'message': item.get('status', {}).get('message', ''),
                     'resourcesDuration': item.get('status', {}).get('resourcesDuration', {}),
+                    'duration': duration_info,  # Added duration calculation
+                    'failures': failure_info    # Added failure conditions
                 },
                 'spec': {
                     'workflowTemplateRef': item.get('spec', {}).get('workflowTemplateRef', {}),
@@ -65,6 +173,20 @@ def parse_json_workflows(input_file: Path) -> List[Dict[str, Any]]:
             }
         elif 'name' in item and 'phase' in item:
             # Simplified format (name, created, phase)
+            started_at = item.get('created', '')
+            finished_at = item.get('finished', '')  # Might not exist in simplified format
+
+            # Calculate duration
+            duration_info = calculate_duration(started_at, finished_at)
+
+            # Basic failure info for simplified format
+            failure_info = {
+                'failed': item.get('phase', '') == 'Failed',
+                'failure_type': 'workflow_failed' if item.get('phase', '') == 'Failed' else '',
+                'error_message': item.get('error', ''),
+                'failed_nodes': []
+            }
+
             workflow = {
                 'metadata': {
                     'name': item.get('name', ''),
@@ -75,10 +197,12 @@ def parse_json_workflows(input_file: Path) -> List[Dict[str, Any]]:
                 },
                 'status': {
                     'phase': item.get('phase', 'Unknown'),
-                    'startedAt': item.get('created', ''),  # Use 'created' as startedAt
-                    'finishedAt': '',
-                    'message': '',
+                    'startedAt': started_at,
+                    'finishedAt': finished_at,
+                    'message': item.get('error', ''),
                     'resourcesDuration': {},
+                    'duration': duration_info,  # Added duration calculation
+                    'failures': failure_info    # Added failure conditions
                 },
                 'spec': {
                     'workflowTemplateRef': {},
@@ -86,7 +210,7 @@ def parse_json_workflows(input_file: Path) -> List[Dict[str, Any]]:
                 }
             }
         else:
-            # Unknown format, create minimal structure
+            # Unknown format, create minimal structure with duration and failure info
             workflow = {
                 'metadata': {
                     'name': str(item.get('name', item.get('metadata', {}).get('name', ''))),
@@ -101,6 +225,8 @@ def parse_json_workflows(input_file: Path) -> List[Dict[str, Any]]:
                     'finishedAt': '',
                     'message': '',
                     'resourcesDuration': {},
+                    'duration': calculate_duration('', ''),  # Empty duration for unknown format
+                    'failures': extract_failure_conditions(item)  # Try to extract failure info anyway
                 },
                 'spec': {
                     'workflowTemplateRef': {},
@@ -147,6 +273,8 @@ def parse_text_workflows(input_file: Path) -> List[Dict[str, Any]]:
         # Parse workflow line (basic parsing of table format)
         parts = line.split()
         if len(parts) >= 2:
+            phase = parts[1] if len(parts) > 1 else 'Unknown'
+
             workflows.append({
                 'metadata': {
                     'name': parts[0],
@@ -156,11 +284,18 @@ def parse_text_workflows(input_file: Path) -> List[Dict[str, Any]]:
                     'annotations': {},
                 },
                 'status': {
-                    'phase': parts[1] if len(parts) > 1 else 'Unknown',
+                    'phase': phase,
                     'startedAt': '',
                     'finishedAt': '',
                     'message': '',
                     'resourcesDuration': {},
+                    'duration': calculate_duration('', ''),  # No timestamps available in text format
+                    'failures': {  # Basic failure info for text format
+                        'failed': phase == 'Failed',
+                        'failure_type': 'workflow_failed' if phase == 'Failed' else '',
+                        'error_message': '',
+                        'failed_nodes': []
+                    }
                 },
                 'spec': {
                     'workflowTemplateRef': {},
