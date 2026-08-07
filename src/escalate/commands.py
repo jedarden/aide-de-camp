@@ -129,6 +129,80 @@ class KubernetesCommandExecutor:
             "namespace": namespace,
         }
 
+    async def check_pod_ownership(
+        self,
+        pod_name: str,
+        namespace: str,
+        cluster_proxy: str,
+        project_slug: Optional[str] = None,
+    ) -> dict:
+        """
+        Check if a pod is owned by a Deployment or ReplicaSet.
+
+        Args:
+            pod_name: Name of the pod to check
+            namespace: Kubernetes namespace
+            cluster_proxy: Proxy URL for kubectl access
+            project_slug: Project context (for logging)
+
+        Returns:
+            Dict with ownership information:
+                - is_managed: bool - Whether pod is managed by a controller
+                - owner_kind: str or None - 'Deployment', 'ReplicaSet', or None
+                - owner_name: str or None - Name of the owner resource
+                - warning_message: str - User-friendly warning about recreation
+        """
+        import httpx
+
+        ownership_info = {
+            "is_managed": False,
+            "owner_kind": None,
+            "owner_name": None,
+            "warning_message": None,
+        }
+
+        try:
+            # Get pod details to check owner references
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{cluster_proxy}/api/v1/namespaces/{namespace}/pods/{pod_name}",
+                    headers={"Accept": "application/json"}
+                )
+                response.raise_for_status()
+
+                pod_data = response.json()
+
+                # Check owner references
+                owner_references = pod_data.get("metadata", {}).get("ownerReferences", [])
+
+                for owner_ref in owner_references:
+                    kind = owner_ref.get("kind")
+                    name = owner_ref.get("name")
+
+                    if kind in ("Deployment", "ReplicaSet"):
+                        ownership_info["is_managed"] = True
+                        ownership_info["owner_kind"] = kind
+                        ownership_info["owner_name"] = name
+                        ownership_info["warning_message"] = (
+                            f"This pod is managed by a {kind} and will be automatically recreated "
+                            f"after deletion. This is normal Kubernetes behavior."
+                        )
+
+                        logger.info(
+                            f"Pod {pod_name} is managed by {kind} {name}"
+                        )
+                        break
+
+        except httpx.HTTPError as e:
+            logger.warning(f"Failed to check pod ownership: {e}")
+            # Continue with deletion even if ownership check fails
+            # The kubectl delete will fail if the pod doesn't exist
+        except Exception as e:
+            logger.error(f"Error checking pod ownership: {e}")
+            # Continue with deletion even if ownership check fails
+
+        return ownership_info
+
     async def execute_delete_pod(
         self,
         pod_name: str,
