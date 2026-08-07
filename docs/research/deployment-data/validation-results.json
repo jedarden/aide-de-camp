@@ -1,0 +1,108 @@
+{
+  "total_files": 25,
+  "valid_files": [
+    "classified-failures.json",
+    "correlation-analysis-results.json",
+    "coverage-report.json",
+    "deployment-events-30days-comprehensive.json",
+    "deployment-metrics-intermediate.json",
+    "failure-pattern-analysis.json",
+    "failure-taxonomy.json",
+    "frequency-by-pattern.json",
+    "frequency-metrics.json",
+    "parsed-data.json",
+    "pattern-statistics.json",
+    "pbx-web-deployment-data-30days.json",
+    "pbx-web-deployment-history-30days.json",
+    "pbx-web-deployments-30days.json",
+    "pbx-web-deployments-structured.json",
+    "pbx-web-deployments.json",
+    "pbx-web-metrics.json",
+    "pbx-web-raw-workflows.json",
+    "temporal-distributions.json",
+    "whisper-stt-deployment-data-30days.json",
+    "whisper-stt-deployment-history-30days.json",
+    "whisper-stt-deployments-structured.json",
+    "whisper-stt-deployments.json",
+    "whisper-stt-metrics.json",
+    "whisper-stt-raw-workflows.json"
+  ],
+  "invalid_files": [],
+  "service_summary": {
+    "classified-failures.json": {
+      "total_records": 4
+    },
+    "correlation-analysis-results.json": {
+      "total_records": 3
+    },
+    "coverage-report.json": {
+      "total_records": 3
+    },
+    "deployment-events-30days-comprehensive.json": {
+      "total_records": 4
+    },
+    "deployment-metrics-intermediate.json": {
+      "total_records": 6
+    },
+    "failure-pattern-analysis.json": {
+      "total_records": 5
+    },
+    "failure-taxonomy.json": {
+      "total_records": 3
+    },
+    "frequency-by-pattern.json": {
+      "total_records": 3
+    },
+    "frequency-metrics.json": {
+      "total_records": 4
+    },
+    "parsed-data.json": {
+      "total_records": 6
+    },
+    "pattern-statistics.json": {
+      "total_records": 5
+    },
+    "pbx-web-deployment-data-30days.json": {
+      "total_records": 9
+    },
+    "pbx-web-deployment-history-30days.json": {
+      "total_records": 7
+    },
+    "pbx-web-deployments-30days.json": {
+      "total_records": 7
+    },
+    "pbx-web-deployments-structured.json": {
+      "total_records": 17
+    },
+    "pbx-web-deployments.json": {
+      "total_records": 5
+    },
+    "pbx-web-metrics.json": {
+      "total_records": 6
+    },
+    "pbx-web-raw-workflows.json": {
+      "total_records": 0
+    },
+    "temporal-distributions.json": {
+      "total_records": 6
+    },
+    "whisper-stt-deployment-data-30days.json": {
+      "total_records": 12
+    },
+    "whisper-stt-deployment-history-30days.json": {
+      "total_records": 7
+    },
+    "whisper-stt-deployments-structured.json": {
+      "total_records": 22
+    },
+    "whisper-stt-deployments.json": {
+      "total_records": 5
+    },
+    "whisper-stt-metrics.json": {
+      "total_records": 6
+    },
+    "whisper-stt-raw-workflows.json": {
+      "total_records": 0
+    }
+  }
+}

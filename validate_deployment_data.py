@@ -1,279 +1,198 @@
 #!/usr/bin/env python3
 """
-Load and validate deployment data from child bead 1.
-
-This script loads the intermediate deployment metrics file and validates:
-- Data structure completeness
-- Required fields presence
-- Timestamp parseability
-- Status field validity
-- Data consistency
+Parse and validate all JSON files from docs/research/deployment-data/
+Loads them into memory for analysis and reports any errors.
 """
 
 import json
-from datetime import datetime
+import os
+import sys
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List, Tuple
+from collections import defaultdict
+from datetime import datetime
 
-# Required fields for validation
-REQUIRED_TOP_LEVEL_FIELDS = [
-    "generated_at", "analysis_period", "cluster", "services", "service_metrics"
-]
-
-REQUIRED_SERVICE_FIELDS = [
-    "service_name", "analysis_period_days", "deployment_metrics",
-    "timing_metrics", "pod_health_metrics"
-]
-
-REQUIRED_DEPLOYMENT_METRICS = [
-    "total_deployments", "successful_rollouts", "failed_rollouts",
-    "success_rate_percent", "failure_rate_percent"
-]
-
-REQUIRED_TIMING_METRICS = [
-    "mean_time_between_deployments_hours", "median_time_between_deployments_hours",
-    "deployment_timestamps", "sample_size"
-]
-
-REQUIRED_POD_HEALTH_METRICS = [
-    "total_pods", "running_pods", "total_restarts", "crashloops", "oomkills"
-]
-
-def parse_timestamp(timestamp_str: str) -> datetime:
-    """Parse ISO 8601 timestamp string."""
+def parse_json_file(filepath: Path) -> Tuple[bool, Any, str]:
+    """
+    Parse a JSON file and return (success, data, error_message).
+    """
     try:
-        # Handle various ISO formats
-        if timestamp_str.endswith('Z'):
-            timestamp_str = timestamp_str[:-1] + '+00:00'
-        return datetime.fromisoformat(timestamp_str.replace('+00:00', ''))
-    except Exception as e:
-        raise ValueError(f"Failed to parse timestamp: {timestamp_str}") from e
-
-def validate_deployment_data(data_path: Path) -> Dict[str, Any]:
-    """Load and validate deployment metrics data."""
-
-    print(f"Loading deployment data from: {data_path}")
-    validation_results = {
-        "loaded": False,
-        "errors": [],
-        "warnings": [],
-        "summary": {}
-    }
-
-    try:
-        # Load the data
-        with open(data_path, 'r') as f:
+        with open(filepath, 'r') as f:
             data = json.load(f)
-        validation_results["loaded"] = True
-        print("✓ Data loaded successfully")
-
-        # Validate top-level structure
-        print("\nValidating top-level structure...")
-        for field in REQUIRED_TOP_LEVEL_FIELDS:
-            if field not in data:
-                error = f"Missing required top-level field: {field}"
-                validation_results["errors"].append(error)
-                print(f"✗ {error}")
-            else:
-                print(f"✓ Found required field: {field}")
-
-        # Validate generated_at timestamp
-        if "generated_at" in data:
-            try:
-                generated_at = parse_timestamp(data["generated_at"])
-                print(f"✓ Generated timestamp valid: {generated_at}")
-                validation_results["summary"]["generated_at"] = generated_at.isoformat()
-            except Exception as e:
-                error = f"Invalid generated_at timestamp: {e}"
-                validation_results["errors"].append(error)
-                print(f"✗ {error}")
-
-        # Validate services list
-        if "services" in data:
-            services = data["services"]
-            print(f"\n✓ Services defined: {services}")
-            validation_results["summary"]["services"] = services
-
-            if not isinstance(services, list) or len(services) == 0:
-                error = "Services must be a non-empty list"
-                validation_results["errors"].append(error)
-                print(f"✗ {error}")
-
-        # Validate each service's metrics
-        if "service_metrics" in data:
-            print("\nValidating service metrics...")
-            for service_key, service_data in data["service_metrics"].items():
-                print(f"\nValidating service: {service_key}")
-
-                # Check required service fields
-                for field in REQUIRED_SERVICE_FIELDS:
-                    if field not in service_data:
-                        error = f"Service {service_key}: Missing required field: {field}"
-                        validation_results["errors"].append(error)
-                        print(f"✗ {error}")
-                    else:
-                        print(f"✓ {service_key}: Found {field}")
-
-                # Validate deployment_metrics
-                if "deployment_metrics" in service_data:
-                    deployment_metrics = service_data["deployment_metrics"]
-                    for field in REQUIRED_DEPLOYMENT_METRICS:
-                        if field not in deployment_metrics:
-                            error = f"Service {service_key}: Missing deployment_metric: {field}"
-                            validation_results["errors"].append(error)
-                            print(f"✗ {error}")
-                        else:
-                            print(f"✓ {service_key}: Found {field} = {deployment_metrics[field]}")
-
-                    # Validate numeric fields
-                    numeric_fields = ["total_deployments", "successful_rollouts",
-                                    "failed_rollouts", "success_rate_percent",
-                                    "failure_rate_percent"]
-                    for field in numeric_fields:
-                        if field in deployment_metrics:
-                            if not isinstance(deployment_metrics[field], (int, float)):
-                                error = f"Service {service_key}: {field} should be numeric"
-                                validation_results["errors"].append(error)
-                                print(f"✗ {error}")
-
-                # Validate timing_metrics
-                if "timing_metrics" in service_data:
-                    timing_metrics = service_data["timing_metrics"]
-
-                    # Check required timing fields
-                    for field in REQUIRED_TIMING_METRICS:
-                        if field not in timing_metrics:
-                            error = f"Service {service_key}: Missing timing_metric: {field}"
-                            validation_results["errors"].append(error)
-                            print(f"✗ {error}")
-
-                    # Validate timestamps array
-                    if "deployment_timestamps" in timing_metrics:
-                        timestamps = timing_metrics["deployment_timestamps"]
-                        if not isinstance(timestamps, list):
-                            error = f"Service {service_key}: deployment_timestamps must be a list"
-                            validation_results["errors"].append(error)
-                            print(f"✗ {error}")
-                        else:
-                            print(f"✓ {service_key}: Found {len(timestamps)} deployment timestamps")
-                            valid_timestamps = []
-                            for i, ts in enumerate(timestamps):
-                                try:
-                                    parsed = parse_timestamp(ts)
-                                    valid_timestamps.append(parsed.isoformat())
-                                except Exception as e:
-                                    error = f"Service {service_key}: Invalid timestamp at index {i}: {ts}"
-                                    validation_results["errors"].append(error)
-                                    print(f"✗ {error}")
-
-                            validation_results["summary"][f"{service_key}_valid_timestamps"] = len(valid_timestamps)
-                            validation_results["summary"][f"{service_key}_total_timestamps"] = len(timestamps)
-
-                # Validate pod_health_metrics
-                if "pod_health_metrics" in service_data:
-                    pod_metrics = service_data["pod_health_metrics"]
-
-                    for field in REQUIRED_POD_HEALTH_METRICS:
-                        if field not in pod_metrics:
-                            error = f"Service {service_key}: Missing pod_health_metric: {field}"
-                            validation_results["errors"].append(error)
-                            print(f"✗ {error}")
-                        else:
-                            value = pod_metrics[field]
-                            if not isinstance(value, (int, float)):
-                                error = f"Service {service_key}: {field} should be numeric"
-                                validation_results["errors"].append(error)
-                                print(f"✗ {error}")
-                            else:
-                                print(f"✓ {service_key}: {field} = {value}")
-
-                    # Validate consistency: running_pods <= total_pods
-                    if "running_pods" in pod_metrics and "total_pods" in pod_metrics:
-                        if pod_metrics["running_pods"] > pod_metrics["total_pods"]:
-                            warning = f"Service {service_key}: running_pods ({pod_metrics['running_pods']}) > total_pods ({pod_metrics['total_pods']})"
-                            validation_results["warnings"].append(warning)
-                            print(f"⚠ {warning}")
-
-        # Validate comparison data if present
-        if "comparison" in data:
-            print("\nValidating comparison metrics...")
-            comparison = data["comparison"]
-
-            comparison_fields = [
-                "total_deployments_both_services", "pbx_web_deployment_percentage",
-                "whisper_stt_deployment_percentage", "combined_success_rate_percent",
-                "joint_deployment_stability"
-            ]
-
-            for field in comparison_fields:
-                if field not in comparison:
-                    warning = f"Missing comparison field: {field}"
-                    validation_results["warnings"].append(warning)
-                    print(f"⚠ {warning}")
-                else:
-                    print(f"✓ Found comparison field: {field}")
-
-    except FileNotFoundError:
-        error = f"Data file not found: {data_path}"
-        validation_results["errors"].append(error)
-        print(f"✗ {error}")
+        return True, data, ""
     except json.JSONDecodeError as e:
-        error = f"Invalid JSON in data file: {e}"
-        validation_results["errors"].append(error)
-        print(f"✗ {error}")
+        return False, None, f"JSON decode error: {e.msg} at line {e.lineno}, column {e.colno}"
     except Exception as e:
-        error = f"Unexpected error during validation: {e}"
-        validation_results["errors"].append(error)
-        print(f"✗ {error}")
+        return False, None, f"Error reading file: {str(e)}"
 
-    return validation_results
+
+def validate_structure(data: Any, filepath: Path) -> List[str]:
+    """
+    Validate the structure of parsed JSON data.
+    Returns a list of validation warnings/errors.
+    """
+    issues = []
+
+    if data is None:
+        issues.append("Data is None")
+        return issues
+
+    if not isinstance(data, (dict, list)):
+        issues.append(f"Root is not a dict or list, got type: {type(data).__name__}")
+
+    return issues
+
+
+def analyze_service_data(data: Dict[str, Any]) -> Dict[str, int]:
+    """
+    Analyze the loaded data to extract record counts by service.
+    Returns a dictionary with service names and their record counts.
+    """
+    service_counts = defaultdict(int)
+
+    # Check for common deployment data structures
+    if isinstance(data, list):
+        # Array of deployment records
+        service_counts["total_records"] = len(data)
+
+        # Try to extract service names from records
+        for record in data:
+            if isinstance(record, dict):
+                # Common service identifier fields
+                for key in ['service', 'serviceName', 'service_name', 'app', 'application']:
+                    if key in record:
+                        service = record[key]
+                        if isinstance(service, str):
+                            service_counts[service] += 1
+                            break
+    elif isinstance(data, dict):
+        # Object with potentially nested data
+        if 'deployments' in data and isinstance(data['deployments'], list):
+            service_counts["total_records"] = len(data['deployments'])
+        elif 'items' in data and isinstance(data['items'], list):
+            service_counts["total_records"] = len(data['items'])
+        elif 'workflows' in data and isinstance(data['workflows'], list):
+            service_counts["total_records"] = len(data['workflows'])
+        elif 'data' in data and isinstance(data['data'], list):
+            service_counts["total_records"] = len(data['data'])
+        else:
+            # Count top-level keys
+            service_counts["total_records"] = len(data)
+
+    return dict(service_counts)
+
 
 def main():
-    """Main validation function."""
+    """Main validation routine."""
+    data_dir = Path("docs/research/deployment-data/")
 
-    # Path to intermediate data file
-    data_path = Path("/home/coding/aide-de-camp/docs/research/deployment-metrics-intermediate.json")
+    if not data_dir.exists():
+        print(f"ERROR: Directory {data_dir} does not exist")
+        sys.exit(1)
 
-    print("=" * 70)
-    print("DEPLOYMENT DATA VALIDATION")
-    print("=" * 70)
+    # Find all JSON files
+    json_files = sorted(data_dir.glob("*.json"))
 
-    # Run validation
-    results = validate_deployment_data(data_path)
+    if not json_files:
+        print(f"ERROR: No JSON files found in {data_dir}")
+        sys.exit(1)
 
-    # Print summary
-    print("\n" + "=" * 70)
+    print(f"Found {len(json_files)} JSON files to validate\n")
+    print("=" * 80)
+
+    # Results tracking
+    valid_files = []
+    invalid_files = []
+    all_data = {}  # Consolidated in-memory structure
+    service_summary = defaultdict(lambda: defaultdict(int))
+
+    # Process each file
+    for filepath in json_files:
+        filename = filepath.name
+        print(f"\nProcessing: {filename}")
+        print("-" * 80)
+
+        # Parse the file
+        success, data, error = parse_json_file(filepath)
+
+        if not success:
+            print(f"  ❌ FAILED TO PARSE: {error}")
+            invalid_files.append((filename, error))
+            continue
+
+        # Validate structure
+        issues = validate_structure(data, filepath)
+
+        if issues:
+            print(f"  ⚠️  STRUCTURE ISSUES:")
+            for issue in issues:
+                print(f"     - {issue}")
+
+        # Load into memory
+        all_data[filename] = data
+        valid_files.append(filename)
+
+        # Analyze service data
+        service_counts = analyze_service_data(data) if isinstance(data, (dict, list)) else {}
+
+        if service_counts:
+            print(f"  ✓ Parsed successfully")
+            for service, count in service_counts.items():
+                print(f"     - {service}: {count} records")
+                service_summary[filename][service] = count
+        else:
+            print(f"  ✓ Parsed successfully (unknown structure)")
+
+        # Basic stats
+        if isinstance(data, list):
+            print(f"     Structure: Array with {len(data)} items")
+        elif isinstance(data, dict):
+            print(f"     Structure: Object with {len(data)} top-level keys")
+
+    # Summary
+    print("\n" + "=" * 80)
     print("VALIDATION SUMMARY")
-    print("=" * 70)
+    print("=" * 80)
 
-    print(f"\nData Loaded: {'✓ YES' if results['loaded'] else '✗ NO'}")
-    print(f"Errors: {len(results['errors'])}")
-    print(f"Warnings: {len(results['warnings'])}")
+    print(f"\nTotal files processed: {len(json_files)}")
+    print(f"✓ Valid files: {len(valid_files)}")
+    print(f"❌ Invalid files: {len(invalid_files)}")
 
-    if results["errors"]:
-        print("\n❌ ERRORS:")
-        for error in results["errors"]:
-            print(f"  • {error}")
+    if invalid_files:
+        print(f"\nInvalid files:")
+        for filename, error in invalid_files:
+            print(f"  - {filename}: {error}")
 
-    if results["warnings"]:
-        print("\n⚠️  WARNINGS:")
-        for warning in results["warnings"]:
-            print(f"  • {warning}")
+    print(f"\nValid files loaded into memory:")
+    for filename in valid_files:
+        print(f"  - {filename}")
 
-    print("\n📊 SUMMARY:")
-    for key, value in results["summary"].items():
-        print(f"  • {key}: {value}")
+    print(f"\nRecord counts by file:")
+    for filename, services in sorted(service_summary.items()):
+        if services:
+            print(f"\n  {filename}:")
+            for service, count in services.items():
+                print(f"    - {service}: {count}")
 
-    # Overall validation result
-    print("\n" + "=" * 70)
-    if results["loaded"] and len(results["errors"]) == 0:
-        print("✓ VALIDATION PASSED - Data is ready for processing")
-    else:
-        print("✗ VALIDATION FAILED - Data has errors that need attention")
-    print("=" * 70)
+    # Print consolidated data structure info
+    print(f"\nConsolidated data structure loaded: {len(all_data)} files")
 
-    # Return validation results
-    return results
+    # Save validation results to a file
+    results = {
+        "total_files": len(json_files),
+        "valid_files": valid_files,
+        "invalid_files": [{"file": f, "error": e} for f, e in invalid_files],
+        "service_summary": {k: dict(v) for k, v in service_summary.items()}
+    }
+
+    output_file = data_dir / "validation-results.json"
+    with open(output_file, 'w') as f:
+        json.dump(results, f, indent=2)
+
+    print(f"\nValidation results saved to: {output_file}")
+
+    return 0 if len(invalid_files) == 0 else 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
