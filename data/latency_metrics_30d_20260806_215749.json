@@ -1,0 +1,325 @@
+{
+  "query_metadata": {
+    "start_date": "2026-07-07T00:00:00Z",
+    "end_date": "2026-08-06T23:59:59Z",
+    "period_days": 30,
+    "query_timestamp": "2026-08-06T21:57:49.308046",
+    "services": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "services": {
+    "pbx-web": {
+      "service": "pbx-web",
+      "data_sources": [
+        "workflow_executions",
+        "deployment_intervals"
+      ],
+      "latency_metrics": {
+        "workflow_percentiles": {
+          "count": 9,
+          "p50_seconds": 1457.0,
+          "p75_seconds": 3209.0,
+          "p90_seconds": 10773.2,
+          "p95_seconds": 15541.6,
+          "p99_seconds": 19356.32,
+          "min_seconds": 20.0,
+          "max_seconds": 20310.0,
+          "mean_seconds": 3886.556,
+          "median_seconds": 1457.0,
+          "stddev_seconds": 6723.986
+        },
+        "deployment_intervals": {
+          "count": 4,
+          "mean_seconds": 323370.0,
+          "median_seconds": 101898.0,
+          "stddev_seconds": 512890.636,
+          "min_seconds": 612.0,
+          "max_seconds": 1089072.0
+        }
+      },
+      "coverage_analysis": {
+        "workflow_data": {
+          "expected_days": 31,
+          "days_with_data": 1,
+          "coverage_percentage": 3.2,
+          "gaps": [
+            {
+              "date": "2026-07-07",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-08",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-09",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-10",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-11",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-12",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-13",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-14",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-15",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-16",
+              "type": "missing_data"
+            }
+          ],
+          "daily_distribution": {
+            "2026-08-06": 9
+          }
+        }
+      },
+      "raw_data": {
+        "workflow_durations": [
+          3209.0,
+          1533.0,
+          20310.0,
+          8389.0,
+          1457.0,
+          21.0,
+          20.0,
+          20.0,
+          20.0
+        ],
+        "workflow_samples": [
+          {
+            "workflow": "needle-ci-x2wx2",
+            "started_at": "2026-08-06T00:52:29Z",
+            "finished_at": "2026-08-06T01:45:58Z",
+            "duration_seconds": 3209.0,
+            "status": "Failed"
+          },
+          {
+            "workflow": "needle-ci-vnmhd",
+            "started_at": "2026-08-06T02:35:28Z",
+            "finished_at": "2026-08-06T03:01:01Z",
+            "duration_seconds": 1533.0,
+            "status": "Failed"
+          },
+          {
+            "workflow": "needle-ci-f46kr",
+            "started_at": "2026-08-06T11:24:57Z",
+            "finished_at": "2026-08-06T17:03:27Z",
+            "duration_seconds": 20310.0,
+            "status": "Failed"
+          },
+          {
+            "workflow": "needle-ci-verify-xjbbm",
+            "started_at": "2026-08-06T13:14:23Z",
+            "finished_at": "2026-08-06T15:34:12Z",
+            "duration_seconds": 8389.0,
+            "status": "Failed"
+          },
+          {
+            "workflow": "needle-ci-zr2cx",
+            "started_at": "2026-08-06T17:14:32Z",
+            "finished_at": "2026-08-06T17:38:49Z",
+            "duration_seconds": 1457.0,
+            "status": "Failed"
+          },
+          {
+            "workflow": "seam-ci-lnzps",
+            "started_at": "2026-08-06T19:36:49Z",
+            "finished_at": "2026-08-06T19:37:10Z",
+            "duration_seconds": 21.0,
+            "status": "Failed"
+          },
+          {
+            "workflow": "seam-ci-gn5rh",
+            "started_at": "2026-08-06T19:45:42Z",
+            "finished_at": "2026-08-06T19:46:02Z",
+            "duration_seconds": 20.0,
+            "status": "Failed"
+          },
+          {
+            "workflow": "seam-ci-bsd9q",
+            "started_at": "2026-08-06T20:09:46Z",
+            "finished_at": "2026-08-06T20:10:06Z",
+            "duration_seconds": 20.0,
+            "status": "Failed"
+          },
+          {
+            "workflow": "seam-ci-9sh2z",
+            "started_at": "2026-08-06T20:33:52Z",
+            "finished_at": "2026-08-06T20:34:12Z",
+            "duration_seconds": 20.0,
+            "status": "Failed"
+          }
+        ],
+        "deployment_intervals_seconds": [
+          612.0,
+          119196.0,
+          1089072.0,
+          84600.0
+        ]
+      }
+    },
+    "whisper-stt": {
+      "service": "whisper-stt",
+      "data_sources": [
+        "deployment_events"
+      ],
+      "latency_metrics": {
+        "deployment_frequency": {
+          "total_deployments": 4,
+          "deployment_count_30days": 4,
+          "intervals_hours": {
+            "count": 3,
+            "mean_hours": 36.58,
+            "median_hours": 0.18,
+            "min_hours": 0.11,
+            "max_hours": 109.45
+          }
+        },
+        "pod_health": {
+          "pods_analyzed": 10,
+          "restart_count": 0,
+          "startup_events": 0,
+          "error_count": 2
+        }
+      },
+      "coverage_analysis": {
+        "deployment_data": {
+          "expected_days": 31,
+          "days_with_deployments": 2,
+          "coverage_percentage": 6.5,
+          "gaps": [
+            {
+              "date": "2026-07-07",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-09",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-10",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-11",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-13",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-14",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-15",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-16",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-17",
+              "type": "missing_data"
+            },
+            {
+              "date": "2026-07-18",
+              "type": "missing_data"
+            }
+          ],
+          "deployment_distribution": {
+            "2026-07-12": 1,
+            "2026-07-08": 3
+          }
+        }
+      },
+      "raw_data": {
+        "deployment_intervals_hours": [
+          0.11,
+          0.18,
+          109.45
+        ],
+        "deployment_samples": [
+          {
+            "revision": 32,
+            "replicaset": "whisper-stt-847fd8d7b9",
+            "timestamp": "2026-07-12T16:53:42Z",
+            "status": "active"
+          },
+          {
+            "revision": 31,
+            "replicaset": "whisper-stt-6c497489fb",
+            "timestamp": "2026-07-08T03:26:44Z",
+            "status": "scaled_down"
+          },
+          {
+            "revision": 30,
+            "replicaset": "whisper-stt-5b8558f478",
+            "timestamp": "2026-07-08T03:16:13Z",
+            "status": "scaled_down"
+          },
+          {
+            "revision": 29,
+            "replicaset": "whisper-stt-5dbff75cbd",
+            "timestamp": "2026-07-08T03:09:35Z",
+            "status": "scaled_down"
+          }
+        ]
+      }
+    }
+  },
+  "summary": {
+    "data_quality": {
+      "pbx-web": {
+        "has_latency_data": true,
+        "has_coverage_data": true,
+        "data_sources": [
+          "workflow_executions",
+          "deployment_intervals"
+        ],
+        "overall_quality": "good"
+      },
+      "whisper-stt": {
+        "has_latency_data": true,
+        "has_coverage_data": true,
+        "data_sources": [
+          "deployment_events"
+        ],
+        "overall_quality": "good"
+      }
+    },
+    "latency_comparison": {},
+    "coverage_summary": {
+      "pbx-web_workflow_data": {
+        "coverage_percentage": 3.2,
+        "gap_count": 10,
+        "days_with_data": 1
+      },
+      "whisper-stt_deployment_data": {
+        "coverage_percentage": 6.5,
+        "gap_count": 10,
+        "days_with_data": 0
+      }
+    }
+  }
+}
