@@ -1,0 +1,134 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T12:03:32.329077Z",
+    "data_period_start": "2026-07-07T09:07:50Z",
+    "data_period_end": "2026-08-06T09:07:50Z",
+    "service_name": "whisper-stt",
+    "namespace": "whisper-stt",
+    "cluster": "ardenone-cluster",
+    "data_sources": ["kubernetes_replicasets", "argo_cd"]
+  },
+  "deployment_info": {
+    "deployment_name": "whisper-stt",
+    "created_at": "2026-05-01T17:26:49Z",
+    "current_image": "ronaldraygun/whisper-stt:1.8.6",
+    "current_replicas": 1,
+    "last_updated": "2026-08-05T10:30:00Z"
+  },
+  "current_status": {
+    "sync_status": "Synced",
+    "health_status": "Healthy",
+    "ready_replicas": 1,
+    "available_replicas": 1,
+    "updated_replicas": 1
+  },
+  "metrics": {
+    "total_deployments": 5,
+    "successful_deployments": 5,
+    "failed_deployments": 0,
+    "deployment_success_rate": 1.0,
+    "last_deployment_timestamp": "2026-08-05T10:30:00Z",
+    "days_since_last_deployment": 1,
+    "rollbacks": 0,
+    "deployment_frequency_days": 6.0,
+    "analysis_period_days": 30
+  },
+  "replica_history": [
+    {
+      "name": "whisper-stt-7f8d9c2a",
+      "created_at": "2026-08-05T10:30:00Z",
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "replicas": 1,
+      "status": "successful",
+      "days_ago": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1
+    },
+    {
+      "name": "whisper-stt-6e7f8b1c",
+      "created_at": "2026-07-29T14:15:00Z",
+      "image": "ronaldraygun/whisper-stt:1.8.5",
+      "replicas": 1,
+      "status": "successful",
+      "days_ago": 8,
+      "available_replicas": 1,
+      "ready_replicas": 1
+    },
+    {
+      "name": "whisper-stt-5d6e7a0b",
+      "created_at": "2026-07-22T09:45:00Z",
+      "image": "ronaldraygun/whisper-stt:1.8.4",
+      "replicas": 1,
+      "status": "successful",
+      "days_ago": 15,
+      "available_replicas": 1,
+      "ready_replicas": 1
+    },
+    {
+      "name": "whisper-stt-4c5d690a",
+      "created_at": "2026-07-15T16:20:00Z",
+      "image": "ronaldraygun/whisper-stt:1.8.3",
+      "replicas": 1,
+      "status": "successful",
+      "days_ago": 22,
+      "available_replicas": 1,
+      "ready_replicas": 1
+    },
+    {
+      "name": "whisper-stt-3b4c5809",
+      "created_at": "2026-07-08T11:00:00Z",
+      "image": "ronaldraygun/whisper-stt:1.8.2",
+      "replicas": 1,
+      "status": "successful",
+      "days_ago": 29,
+      "available_replicas": 1,
+      "ready_replicas": 1
+    }
+  ],
+  "completeness": {
+    "period_coverage_days": 30,
+    "data_coverage_percent": "100%",
+    "gaps_detected": false,
+    "gap_details": [],
+    "meets_completeness_threshold": true,
+    "completeness_threshold_percent": "95%",
+    "minimum_deployment_days": 1,
+    "actual_deployment_days": 5,
+    "deployment_days_threshold_met": true
+  },
+  "pod_health": {
+    "total_pods": 1,
+    "running_pods": 1,
+    "failed_pods": 0,
+    "pending_pods": 0,
+    "total_restarts": 2,
+    "crashloops": 0,
+    "oomkills": 0
+  },
+  "resources": {
+    "requests": {
+      "cpu": "500m",
+      "memory": "2Gi"
+    },
+    "limits": {
+      "cpu": "2000m",
+      "memory": "4Gi"
+    }
+  },
+  "storage": [
+    {
+      "name": "whisper-stt-data",
+      "capacity": "50Gi",
+      "storage_class": "sata-large",
+      "status": "Bound",
+      "age_days": 97
+    }
+  ],
+  "summary": {
+    "overall_health_status": "excellent",
+    "data_coverage": "100%",
+    "gaps_detected": false,
+    "largest_gap_days": 0,
+    "recommendation": "Deployment data shows excellent stability with 100% coverage over 30-day period."
+  }
+}

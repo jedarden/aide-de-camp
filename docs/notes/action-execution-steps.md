@@ -868,6 +868,121 @@ All errors are converted to StepResult with `status=StepStatus.FAILED` and `erro
 
 ---
 
+## Usage Examples
+
+### Example 1: Simple Health Check Workflow
+
+A read-only workflow to check application health without mutations:
+
+```yaml
+# config/registry.yaml
+projects:
+  pbx-web:
+    cluster: ardenone-cluster
+    namespace: pbx-web
+    argocd_app: pbx-web
+    workflows:
+      status:
+        description: "Check PBX web service health"
+        steps:
+          - pod_status           # Get pod status
+          - deployment_info      # Get deployment details
+          - argocd_apps          # Verify ArgoCD sync status
+```
+
+**Usage**: "Check the status of pbx-web"
+**Result**: Shows pod counts, deployment replica states, and ArgoCD sync status
+
+### Example 2: Deployment Workflow with CI Gate
+
+A complete deployment workflow that gates on CI and verifies deployment:
+
+```yaml
+projects:
+  whisper-stt:
+    cluster: ardenone-cluster
+    namespace: whisper-stt
+    argocd_app: whisper-stt
+    repo_path: /home/coding/declarative-config
+    workflows:
+      deploy:
+        description: "Deploy Whisper STT service"
+        steps:
+          - ci_status             # Gate on green CI
+          - image_tag             # Resolve image tag
+          - gitops_commit         # Update manifest
+          - argocd_sync_status    # Wait for sync
+          - pod_status            # Verify pods running
+```
+
+**Usage**: "Deploy whisper-stt to production"
+**Result**: Full CI-to-production pipeline with verification at each step
+
+### Example 3: Audit Workflow
+
+Read-only workflow for deployment state audit:
+
+```yaml
+projects:
+  declarative-config:
+    repo_path: /home/coding/declarative-config
+    workflows:
+      audit:
+        description: "Audit GitOps repository state"
+        steps:
+          - git_log              # Get recent commits
+          - argocd_apps          # Check all application statuses
+          - open_beads           # List open tracking beads
+```
+
+**Usage**: "Audit the declarative-config repository"
+**Result**: Shows recent git activity, application sync states, and open work items
+
+### Example 4: Multi-Cluster Status Check
+
+Check the same application across multiple clusters:
+
+```yaml
+projects:
+  options-pipeline:
+    cluster: rs-manager
+    namespace: production
+    argocd_app: options-pipeline
+    workflows:
+      status:
+        description: "Check options pipeline health"
+        steps:
+          - pod_status           # Check pod status
+          - deployment_info      # Check deployment state
+          - argocd_apps          # Verify ArgoCD sync
+```
+
+**Usage**: "Check the status of options-pipeline"
+**Result**: Shows health metrics for the production deployment
+
+### Example 5: Diagnostics Workflow
+
+Workflow for troubleshooting deployment issues:
+
+```yaml
+projects:
+  myapp:
+    cluster: iad-ci
+    namespace: staging
+    argocd_app: myapp-staging
+    workflows:
+      diagnose:
+        description: "Diagnose deployment issues"
+        steps:
+          - pod_status           # Check pod phases
+          - deployment_info      # Check rollout status
+          - argocd_apps          # Check sync state
+          - git_log              # Check recent changes
+```
+
+**Usage**: "Diagnose myapp-staging deployment issues"
+**Result**: Provides comprehensive diagnostic data for troubleshooting
+
 ## Best Practices
 
 ### Workflow Design
@@ -876,6 +991,7 @@ All errors are converted to StepResult with `status=StepStatus.FAILED` and `erro
 2. **End with verification**: Use `pod_status` or `deployment_info` as final steps to verify deployment health
 3. **Group related steps**: Place mutating steps (`gitops_commit`) immediately before their verification steps (`argocd_sync_status`)
 4. **Use read-only steps for monitoring**: Create workflows that only use read-only steps for health checks without side effects
+5. **Consider step timeout**: Plan for long-running steps like `argocd_sync_status` (5-minute timeout)
 
 ### Error Handling
 
@@ -883,6 +999,7 @@ All errors are converted to StepResult with `status=StepStatus.FAILED` and `erro
 2. **Provide meaningful error messages**: Include context (cluster, namespace, step name) in error messages
 3. **Use timeouts appropriately**: Set reasonable timeouts for external API calls (10-30 seconds for most operations)
 4. **Handle missing infrastructure gracefully**: Return informative errors when clusters/namespaces don't exist
+5. **Log step lifecycle**: Use structured logging at step start, completion, and failure
 
 ### Configuration Management
 
@@ -890,6 +1007,7 @@ All errors are converted to StepResult with `status=StepStatus.FAILED` and `erro
 2. **Use convenience properties**: Access `ctx.cluster`, `ctx.namespace` instead of `ctx.project_cfg["cluster"]`
 3. **Validate project configuration**: Ensure all required fields are present before step execution
 4. **Document required fields**: Clearly document which `project_cfg` fields each step requires
+5. **Use consistent naming**: Follow cluster and naming conventions across all projects
 
 ### Dry Run Mode
 
@@ -904,6 +1022,7 @@ All errors are converted to StepResult with `status=StepStatus.FAILED` and `erro
 2. **Set appropriate timeouts**: Balance between waiting for completion and detecting failures
 3. **Cache external queries**: Consider caching API responses when appropriate
 4. **Minimize external calls**: Batch queries when possible to reduce latency
+5. **Monitor step duration**: Track execution time to identify bottlenecks
 
 ### Testing
 
@@ -911,6 +1030,7 @@ All errors are converted to StepResult with `status=StepStatus.FAILED` and `erro
 2. **Mock external APIs**: Use mock responses for kubectl, ArgoCD, git operations
 3. **Test error cases**: Verify error handling for timeouts, missing config, API failures
 4. **Test dry_run mode**: Ensure mutating steps skip operations correctly
+5. **Test workflow composition**: Verify multi-step workflows execute correctly
 
 ### GitOps Conventions
 
@@ -925,6 +1045,471 @@ All errors are converted to StepResult with `status=StepStatus.FAILED` and `erro
 2. **Include timing information**: Always include `started_at`, `completed_at`, `duration_ms` in results
 3. **Target by session_id**: Use SSE targeting to send updates to the correct user session
 4. **Use structured data**: Convert results to dictionaries for consistent serialization
+
+### Project Registry Design
+
+1. **Use descriptive workflow names**: Names should indicate purpose (deploy, status, audit)
+2. **Provide workflow descriptions**: Help users understand what each workflow does
+3. **Define clear intent support**: Specify which intent types each project supports
+4. **Use aliases for common names**: Make projects discoverable by multiple names
+5. **Organize workflows logically**: Group related workflows under each project
+
+## Implementation Status
+
+### Fully Implemented Steps (Production Ready)
+
+These steps are fully implemented and tested:
+
+| Step | Status | Notes |
+|------|--------|-------|
+| `pod_status` | ✅ Complete | Queries kubectl proxy for pod information |
+| `deployment_info` | ✅ Complete | Gets Deployment and StatefulSet details |
+| `git_log` | ✅ Complete | Retrieves recent git history |
+| `argocd_apps` | ✅ Complete | Queries ArgoCD application status |
+| `open_beads` | ✅ Complete | Lists open beads via bf CLI |
+| `argocd_sync_status` | ✅ Complete | Polls ArgoCD until Synced/Healthy |
+
+### Partially Implemented Steps (Development)
+
+These steps have basic implementation but need enhancement:
+
+| Step | Status | Limitations |
+|------|--------|-------------|
+| `ci_status` | ⚠️ Basic | Queries workflows but needs project-specific adaptation |
+| `image_tag` | ❌ Stub | Returns `{"status": "not_implemented"}` |
+| `gitops_commit` | ❌ Stub | Returns `{"status": "not_implemented"}` |
+
+### Not Yet Implemented
+
+These step types are referenced in some workflow definitions but not yet implemented:
+
+| Step | Status | Alternative |
+|------|--------|-------------|
+| `pod_logs` | ❌ Not implemented | Use `kubectl logs` directly |
+| `argocd_events` | ❌ Not implemented | Check ArgoCD UI manually |
+| `argocd_sync` | ❌ Deprecated alias | Use `argocd_sync_status` instead |
+
+### Configuration Examples
+
+**Working workflow (all implemented steps):**
+```yaml
+projects:
+  pbx-web:
+    cluster: ardenone-cluster
+    namespace: pbx-web
+    workflows:
+      status:
+        steps:
+          - pod_status          # ✅ Works
+          - deployment_info     # ✅ Works
+          - argocd_apps         # ✅ Works
+```
+
+**Workflow with stub implementations:**
+```yaml
+projects:
+  myapp:
+    workflows:
+      deploy:
+        steps:
+          - ci_status           # ⚠️ Basic implementation
+          - image_tag           # ❌ Returns not_implemented
+          - gitops_commit       # ❌ Returns not_implemented
+          - argocd_sync_status  # ✅ Works
+          - pod_status          # ✅ Works
+```
+
+**Note**: Workflows that include stub steps will execute but return `{"status": "not_implemented"}` for those steps. This is non-blocking - the workflow continues to subsequent steps.
+
+## Quick Reference
+
+### Step Categories
+
+**Mutating Steps** (respect dry_run flag):
+- `gitops_commit`: Edit declarative-config and commit
+- `image_tag`: Resolve image tags from CI
+
+**Gating Steps** (control workflow flow):
+- `ci_status`: Block workflow until CI is green
+
+**Verification Steps** (confirm deployment state):
+- `argocd_sync_status`: Poll ArgoCD until sync complete
+- `pod_status`: Verify pods are running
+- `deployment_info`: Check rollout status
+
+**Information Steps** (read-only queries):
+- `git_log`: Show recent commits
+- `argocd_apps`: List application status
+- `open_beads`: Show open tracking beads
+
+### Required Configuration Fields
+
+**For `pod_status`, `deployment_info`:**
+- `cluster`: Cluster name (must exist in `config/clusters.yaml`)
+- `namespace`: Kubernetes namespace
+
+**For `argocd_sync_status`, `argocd_apps`:**
+- `argocd_app`: ArgoCD application name
+- ArgoCD base URL in `config/registry.yaml`
+
+**For `git_log`:**
+- `repo_path`: Repository filesystem path
+
+**For `open_beads`:**
+- `repo_path`: Repository path (defaults to `/home/coding/aide-de-camp`)
+
+**For `ci_status`:**
+- `project_slug`: Used to filter workflows by label
+- Kubeconfig at `/home/coding/.kube/iad-ci.kubeconfig`
+
+### Common Workflow Patterns
+
+**Health check:**
+```yaml
+steps: [pod_status, deployment_info, argocd_apps]
+```
+
+**Deployment with CI gate:**
+```yaml
+steps: [ci_status, image_tag, gitops_commit, argocd_sync_status, pod_status]
+```
+
+**Audit trail:**
+```yaml
+steps: [git_log, argocd_apps, open_beads]
+```
+
+**Quick status:**
+```yaml
+steps: [pod_status, argocd_apps]
+```
+
+
+
+### Workflow Execution Failures
+
+#### Issue: Workflow fails at first step with "project not found"
+
+**Symptoms:**
+```
+ValueError: Project 'myapp' not found in registry
+```
+
+**Causes:**
+- Project slug not defined in `config/registry.yaml`
+- Typo in project name
+- Registry not loaded correctly
+
+**Solutions:**
+1. Check `config/registry.yaml` for project entry
+2. Verify project slug matches exactly (case-sensitive)
+3. Use aliases to find alternative names
+4. Reload registry: `from src.action.registry import reload_registry(); reload_registry()`
+
+#### Issue: Step fails with "no namespace configured"
+
+**Symptoms:**
+```
+ValueError: Project 'myapp' has no namespace configured
+```
+
+**Causes:**
+- Missing `namespace` field in project configuration
+- Step requires namespace but project doesn't define it
+
+**Solutions:**
+1. Add `namespace` to project config in `config/registry.yaml`
+2. Use workflows that don't require namespace (e.g., `git_log`, `open_beads`)
+3. Verify required fields for each step type
+
+#### Issue: CI status check times out
+
+**Symptoms:**
+```
+RuntimeError: CI status check timed out
+```
+
+**Causes:**
+- kubectl command hangs (>15 seconds)
+- Cluster not accessible
+- Network connectivity issues
+
+**Solutions:**
+1. Verify kubectl config exists: `/home/coding/.kube/iad-ci.kubeconfig`
+2. Test kubectl manually: `kubectl --kubeconfig /home/coding/.kube/iad-ci.kubeconfig get workflows -n argo-workflows`
+3. Check cluster connectivity via Tailscale
+4. Increase timeout in `execute_ci_status_step()` if needed
+
+#### Issue: ArgoCD API calls fail
+
+**Symptoms:**
+```
+RuntimeError: Failed to get ArgoCD applications
+httpx.HTTPError: Connection error
+```
+
+**Causes:**
+- ArgoCD base URL not configured
+- ArgoCD proxy not accessible
+- SSL certificate verification failure
+
+**Solutions:**
+1. Check `config/registry.yaml` for `argocd.base_url`
+2. Verify ArgoCD proxy accessible: `curl -k https://argocd-ro-ardenone-manager-ts.ardenone.com:8444/api/v1/applications`
+3. Check Tailscale connectivity
+4. Verify `verify=False` in httpx client (self-signed cert)
+
+#### Issue: Pod status returns "unknown" state
+
+**Symptoms:**
+```python
+{"status": "unknown", "sync_status": "Unknown", "health_status": "Unknown"}
+```
+
+**Causes:**
+- Application not found in ArgoCD
+- Application deleted or not yet created
+- Wrong argocd_app name
+
+**Solutions:**
+1. Verify app exists: `curl -k https://argocd-ro-ardenone-manager-ts.ardenone.com:8444/api/v1/applications/{app-name}`
+2. Check `argocd_app` field in project config
+3. Verify application deployed in cluster
+4. Check for typos in application name
+
+### Configuration Issues
+
+#### Issue: Cluster proxy not found
+
+**Symptoms:**
+```
+ValueError: Cluster 'rs-manager' has no proxy configured
+```
+
+**Causes:**
+- Cluster not defined in `config/clusters.yaml`
+- Proxy URL missing for cluster
+
+**Solutions:**
+1. Check `config/clusters.yaml` for cluster entry
+2. Add proxy URL: `proxy: http://traefik-rs-manager:8001`
+3. Verify cluster name matches exactly
+4. Test proxy manually: `curl http://traefik-rs-manager:8001/api/v1/namespaces`
+
+#### Issue: Git operations fail
+
+**Symptoms:**
+```
+RuntimeError: git log failed: fatal: not a git repository
+RuntimeError: Repository path '/path/to/repo' does not exist
+```
+
+**Causes:**
+- `repo_path` not configured or incorrect
+- Repository not checked out on local machine
+- Path typo or wrong filesystem location
+
+**Solutions:**
+1. Verify `repo_path` in project config
+2. Check path exists: `ls -la /home/coding/declarative-config`
+3. Verify it's a git repository: `git -C /home/coding/declarative-config status`
+4. Update repo_path to correct location
+
+### Step-Specific Issues
+
+#### Issue: `ci_status` step returns "skipped"
+
+**Symptoms:**
+```python
+{"status": "skipped", "reason": "CI cluster not accessible"}
+```
+
+**Causes:**
+- Kubeconfig file doesn't exist
+- CI cluster not accessible from current machine
+
+**Solutions:**
+1. Verify kubeconfig exists: `ls -la /home/coding/.kube/iad-ci.kubeconfig`
+2. Check kubectl access manually
+3. This is non-blocking - workflow continues, just skips CI gate
+
+#### Issue: `argocd_sync_status` times out
+
+**Symptoms:**
+```python
+{"status": "timeout", "reason": "Sync did not complete within timeout"}
+```
+
+**Causes:**
+- ArgoCD sync takes longer than 5 minutes
+- Application stuck in OutOfSync state
+- Sync loop blocked by conflicts
+
+**Solutions:**
+1. Check ArgoCD UI for sync status: https://argocd-ro-ardenone-manager-ts.ardenone.com:8444
+2. Look for sync errors in application status
+3. Check for auto-sync disabled
+4. Increase timeout in `execute_argocd_sync_status_step()` if needed
+5. Manually sync in ArgoCD UI to unblock
+
+#### Issue: `pod_status` returns no pods
+
+**Symptoms:**
+```python
+{"total_pods": 0, "running": 0, "pending": 0, "failed": 0}
+```
+
+**Causes:**
+- Namespace has no pods (scaled down)
+- Wrong namespace configured
+- Pods in different namespace
+
+**Solutions:**
+1. Verify namespace in project config
+2. Check pods manually: `kubectl get pods -n {namespace}`
+3. Verify application deployed
+4. Check if deployment scaled to 0 replicas
+
+#### Issue: `bf list` command fails
+
+**Symptoms:**
+```
+RuntimeError: bf list failed: bf: command not found
+```
+
+**Causes:**
+- `bf` CLI not installed or not in PATH
+- Repository path doesn't contain beads
+
+**Solutions:**
+1. Verify `bf` installed: `which bf`
+2. Check repo path is valid
+3. Test manually: `bf list --status open --format json`
+4. Ensure bead-forge is installed on system
+
+### SSE Broadcasting Issues
+
+#### Issue: Canvas not updating with step progress
+
+**Symptoms:**
+- Steps execute but UI doesn't update
+- No step lifecycle events visible
+
+**Causes:**
+- SSE connection not established
+- Session ID mismatch
+- Broadcaster not initialized
+
+**Solutions:**
+1. Verify SSE connection in browser DevTools (Network tab)
+2. Check session ID matches between frontend and backend
+3. Verify broadcaster running: `from src.sse import get_broadcaster; get_broadcaster()`
+4. Check for errors in server logs
+
+#### Issue: Workflow completes but UI shows error
+
+**Symptoms:**
+- Workflow succeeds but UI shows failed state
+- Error message doesn't match actual execution
+
+**Causes:**
+- SSE event type mismatch
+- Failed to serialize result
+- Exception during broadcast
+
+**Solutions:**
+1. Check server logs for broadcast errors
+2. Verify `ActionResult.to_dict()` works correctly
+3. Test SSE serialization manually
+4. Check for exception handling in broadcast methods
+
+### Performance Issues
+
+#### Issue: Workflows execute slowly
+
+**Symptoms:**
+- Each step takes >10 seconds
+- Total workflow time exceeds expectations
+
+**Causes:**
+- Network latency to clusters
+- Sequential step execution
+- External API timeouts
+
+**Solutions:**
+1. Check cluster connectivity via Tailscale
+2. Optimize timeout values in step implementations
+3. Consider parallel execution for independent steps (future)
+4. Cache API responses where appropriate
+5. Profile step execution times to identify bottlenecks
+
+#### Issue: Memory usage grows over time
+
+**Symptoms:**
+- Server memory increases with each workflow execution
+- Slow degradation over multiple runs
+
+**Causes:**
+- Result objects not garbage collected
+- SSE connections not cleaned up
+- Large result objects retained
+
+**Solutions:**
+1. Verify result objects go out of scope after workflow
+2. Check SSE connection cleanup logic
+3. Limit result size in step outputs
+4. Monitor memory usage with workflow executions
+5. Restart service if memory leak detected (systemd auto-restart handles this)
+
+### Debugging Tips
+
+#### Enable verbose logging
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
+
+#### Test step execution directly
+
+```python
+from src.action.steps import execute_pod_status_step
+
+result = await execute_pod_status_step(
+    intent_id="test-123",
+    session_id="test-session",
+    project_slug="myapp",
+    project_cfg={"namespace": "default", "cluster": "rs-manager"}
+)
+print(result)
+```
+
+#### Validate workflow definitions
+
+```python
+from src.action.registry import validate_all_workflows
+
+errors = validate_all_workflows()
+for error in errors:
+    print(f"{error['project_slug']}/{error['workflow_name']}: {error['errors']}")
+```
+
+#### Manually test kubectl proxy access
+
+```bash
+# Test cluster proxy
+curl http://traefik-rs-manager:8001/api/v1/namespaces/default/pods
+
+# Test ArgoCD API
+curl -k https://argocd-ro-ardenone-manager-ts.ardenone.com:8444/api/v1/applications
+```
+
+#### Check SSE events in browser
+
+1. Open browser DevTools → Network tab
+2. Filter by "EventStream"
+3. Look for events with type: `ACTION_STEP_STARTED`, `ACTION_STEP_COMPLETED`
+4. Verify event data structure matches expected format
 
 ---
 

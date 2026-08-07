@@ -1,0 +1,653 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aide-de-camp.ardenone.com/schemas/core-deployment-30day-completeness.json",
+  "title": "Core Deployment Data Schema with 30-Day Completeness Validation",
+  "description": "Extended JSON schema for deployment data validation with strict 30-day completeness requirements. Validates structure and enforces completeness constraints for deployment data covering a continuous 30-day period.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "deployment_info",
+    "current_status",
+    "metrics",
+    "completeness"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Metadata about the deployment data generation and coverage period",
+      "required": [
+        "generated_at",
+        "data_period_start",
+        "data_period_end",
+        "service_name",
+        "namespace",
+        "cluster"
+      ],
+      "properties": {
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when deployment data was generated (ISO 8601 format)",
+          "examples": ["2026-08-06T12:03:32.329077Z"]
+        },
+        "data_period_start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start of the 30-day analysis period (ISO 8601 format). For completeness validation, the period from data_period_start to data_period_end must be at least 30 days.",
+          "examples": ["2026-07-07T09:07:50Z"]
+        },
+        "data_period_end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "End of the 30-day analysis period (ISO 8601 format). Must be at least 30 days after data_period_start for completeness validation.",
+          "examples": ["2026-08-06T09:07:50Z"]
+        },
+        "service_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the service",
+          "examples": ["whisper-stt", "pbx-web"]
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Kubernetes namespace",
+          "examples": ["whisper-stt", "pbx-web"]
+        },
+        "cluster": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Kubernetes cluster identifier",
+          "examples": ["ardenone-cluster", "apexalgo-iad"]
+        },
+        "data_sources": {
+          "type": "array",
+          "description": "Data sources used to compile deployment information",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "examples": [["kubernetes_replicasets", "argo_cd", "argo_workflows"]]
+        }
+      }
+    },
+    "deployment_info": {
+      "type": "object",
+      "description": "Core deployment information",
+      "required": [
+        "deployment_name",
+        "created_at",
+        "current_image",
+        "current_replicas"
+      ],
+      "properties": {
+        "deployment_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Kubernetes deployment name",
+          "examples": ["whisper-stt", "pbx-web"]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Initial deployment creation timestamp (ISO 8601 format)",
+          "examples": ["2026-05-01T17:26:49Z"]
+        },
+        "current_image": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+          "description": "Current container image in use (format: registry/image:tag)",
+          "examples": ["ronaldraygun/whisper-stt:1.8.6", "ronaldraygun/pbx-web:2.1.0"]
+        },
+        "current_replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current number of desired replicas"
+        },
+        "last_updated": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Most recent deployment update timestamp (ISO 8601 format)"
+        }
+      }
+    },
+    "current_status": {
+      "type": "object",
+      "description": "Current deployment and replica status",
+      "required": [
+        "sync_status",
+        "health_status",
+        "ready_replicas",
+        "available_replicas",
+        "updated_replicas"
+      ],
+      "properties": {
+        "sync_status": {
+          "type": "string",
+          "enum": ["Synced", "OutOfSync", "Unknown"],
+          "description": "ArgoCD sync status",
+          "examples": ["Synced"]
+        },
+        "health_status": {
+          "type": "string",
+          "enum": ["Healthy", "Progressing", "Degraded", "Missing", "Unknown"],
+          "description": "Overall deployment health status",
+          "examples": ["Healthy"]
+        },
+        "ready_replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of ready replicas"
+        },
+        "available_replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of available replicas"
+        },
+        "updated_replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of updated replicas"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Deployment metrics for the 30-day analysis period",
+      "required": [
+        "total_deployments",
+        "successful_deployments",
+        "failed_deployments",
+        "deployment_success_rate",
+        "last_deployment_timestamp",
+        "days_since_last_deployment",
+        "analysis_period_days"
+      ],
+      "properties": {
+        "total_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of deployments in the 30-day analysis period"
+        },
+        "successful_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of successful deployments in the 30-day period"
+        },
+        "failed_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failed or scaled-down deployments in the 30-day period"
+        },
+        "deployment_success_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Deployment success rate as decimal (0.0 to 1.0) for the 30-day period",
+          "examples": [0.857, 1.0, 0.5]
+        },
+        "last_deployment_timestamp": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Last deployment timestamp within the 30-day period (ISO 8601 format)"
+        },
+        "days_since_last_deployment": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days since the last deployment (capped at 30+ for periods beyond 30 days)"
+        },
+        "rollbacks": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of rollback operations in the 30-day period"
+        },
+        "deployment_frequency_days": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average days between deployments calculated over the 30-day period"
+        },
+        "analysis_period_days": {
+          "type": "integer",
+          "minimum": 30,
+          "description": "Length of the analysis period in days. Must be at least 30 for completeness validation.",
+          "examples": [30, 31, 35]
+        }
+      }
+    },
+    "replica_history": {
+      "type": "array",
+      "description": "Historical ReplicaSet data covering the 30-day analysis period. For completeness validation, this array should include all deployments within the period with no significant gaps (>7 days).",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "created_at",
+          "image",
+          "replicas",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "ReplicaSet name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ReplicaSet creation timestamp (ISO 8601 format)"
+          },
+          "image": {
+            "type": "string",
+            "description": "Container image used in this ReplicaSet"
+          },
+          "replicas": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of replicas in this ReplicaSet"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["successful", "rolled_over", "scaled_down_or_failed", "failed"],
+            "description": "ReplicaSet deployment status"
+          },
+          "days_ago": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30,
+            "description": "Days since this ReplicaSet was created (0-30 days)"
+          },
+          "available_replicas": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "Number of available replicas"
+          },
+          "ready_replicas": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "Number of ready replicas"
+          }
+        }
+      }
+    },
+    "completeness": {
+      "type": "object",
+      "description": "30-day completeness validation metrics. This section is required for 30-day completeness validation and must pass all checks for the data to be considered complete.",
+      "required": [
+        "period_coverage_days",
+        "data_coverage_percent",
+        "gaps_detected",
+        "gap_details",
+        "meets_completeness_threshold",
+        "minimum_deployment_days",
+        "actual_deployment_days",
+        "deployment_days_threshold_met"
+      ],
+      "properties": {
+        "period_coverage_days": {
+          "type": "integer",
+          "minimum": 30,
+          "description": "Number of days covered by the deployment data. Must be at least 30 for completeness validation.",
+          "examples": [30, 31, 35]
+        },
+        "data_coverage_percent": {
+          "type": "string",
+          "pattern": "^(100|[1-9]?[0-9])%$",
+          "description": "Percentage of the 30-day period with deployment data coverage. For completeness validation, this should be 100% or meet the minimum threshold (default 95%).",
+          "examples": ["100%", "95%", "87%"]
+        },
+        "gaps_detected": {
+          "type": "boolean",
+          "description": "Whether data gaps were detected in the 30-day period. For completeness validation, this should be false."
+        },
+        "gap_details": {
+          "type": "array",
+          "description": "List of gaps detected in the deployment data. For completeness validation, this array should be empty or only contain gaps <3 days. Each gap includes start, end, duration, severity, and affected data types.",
+          "items": {
+            "type": "object",
+            "required": ["gap_start_days_ago", "gap_end_days_ago", "gap_duration_days"],
+            "properties": {
+              "gap_start_days_ago": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Days ago when the gap started (relative to data_period_end)"
+              },
+              "gap_end_days_ago": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Days ago when the gap ended (relative to data_period_end)"
+              },
+              "gap_duration_days": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Duration of the gap in days"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["critical", "warning", "info"],
+                "description": "Gap severity level based on duration. Critical: >7 days, Warning: 3-7 days, Info: <3 days"
+              },
+              "missing_data_types": {
+                "type": "array",
+                "description": "Types of data missing during this gap",
+                "items": {
+                  "type": "string",
+                  "enum": ["replicasets", "argo_cd_status", "pod_health", "metrics"]
+                }
+              }
+            }
+          }
+        },
+        "meets_completeness_threshold": {
+          "type": "boolean",
+          "description": "Whether the deployment data meets the minimum completeness threshold (default: 95% coverage for 30-day period). For completeness validation, this should be true."
+        },
+        "completeness_threshold_percent": {
+          "type": "string",
+          "pattern": "^(100|[1-9]?[0-9])%$",
+          "default": "95%",
+          "description": "Minimum completeness threshold required for 30-day validation. Default is 95%, but can be set to 100% for strict validation.",
+          "examples": ["95%", "100%"]
+        },
+        "minimum_deployment_days": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1,
+          "description": "Minimum number of deployment days required in the 30-day period. Default is 1, but can be increased for stricter validation.",
+          "examples": [1, 5, 10]
+        },
+        "actual_deployment_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Actual number of distinct days with deployments in the 30-day period"
+        },
+        "deployment_days_threshold_met": {
+          "type": "boolean",
+          "description": "Whether the minimum deployment days threshold is met. For completeness validation, this should be true."
+        }
+      }
+    },
+    "pod_health": {
+      "type": "object",
+      "description": "Current pod health and runtime statistics",
+      "required": [
+        "total_pods",
+        "running_pods",
+        "failed_pods",
+        "pending_pods",
+        "total_restarts"
+      ],
+      "properties": {
+        "total_pods": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of pods"
+        },
+        "running_pods": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of running pods"
+        },
+        "failed_pods": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failed pods"
+        },
+        "pending_pods": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of pending pods"
+        },
+        "total_restarts": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total container restarts across all pods"
+        },
+        "crashloops": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of pods in CrashLoopBackOff"
+        },
+        "oomkills": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of OOMKilled containers"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Resource allocation and limits",
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "description": "Resource requests",
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "pattern": "^[\\d]+m?$|^\\d+$",
+              "description": "CPU request (e.g., '1', '100m')",
+              "examples": ["1", "500m"]
+            },
+            "memory": {
+              "type": "string",
+              "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+              "description": "Memory request (e.g., '4Gi', '512Mi')",
+              "examples": ["4Gi", "512Mi"]
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "description": "Resource limits",
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "pattern": "^[\\d]+m?$|^\\d+$",
+              "description": "CPU limit (e.g., '8', '8000m')",
+              "examples": ["8", "8000m"]
+            },
+            "memory": {
+              "type": "string",
+              "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+              "description": "Memory limit (e.g., '8Gi', '16384Mi')",
+              "examples": ["8Gi", "16384Mi"]
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "array",
+      "description": "Storage information for PVCs and volumes",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "capacity",
+          "storage_class",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "PVC or volume name"
+          },
+          "capacity": {
+            "type": "string",
+            "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+            "description": "Storage capacity (e.g., '10Gi')",
+            "examples": ["10Gi", "100Gi"]
+          },
+          "storage_class": {
+            "type": "string",
+            "description": "Kubernetes storage class name",
+            "examples": ["sata", "sata-large", "ssd", "ssd-large"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["Bound", "Pending", "Lost", "Available"],
+            "description": "PVC binding status"
+          },
+          "age_days": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Storage age in days"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Summary statistics for the 30-day analysis period",
+      "required": [
+        "overall_health_status",
+        "data_coverage",
+        "gaps_detected"
+      ],
+      "properties": {
+        "overall_health_status": {
+          "type": "string",
+          "enum": ["excellent", "good", "degraded", "poor", "critical"],
+          "description": "Overall service health status based on 30-day deployment data"
+        },
+        "data_coverage": {
+          "type": "string",
+          "pattern": "^\\d+%$",
+          "description": "Percentage of data coverage over the 30-day period (e.g., '100%')",
+          "examples": ["100%", "95%"]
+        },
+        "gaps_detected": {
+          "type": "boolean",
+          "description": "Whether data gaps were detected in the 30-day period"
+        },
+        "largest_gap_days": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Size of the largest gap in days within the 30-day period"
+        },
+        "recommendation": {
+          "type": "string",
+          "description": "Operational recommendation based on 30-day deployment data analysis"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "timestampFormats": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp format",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "imagePattern": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+      "description": "Container image format: registry/image:tag"
+    },
+    "resourcePattern": {
+      "type": "string",
+      "description": "Kubernetes resource pattern",
+      "anyOf": [
+        {
+          "pattern": "^[\\d]+m?$",
+          "description": "CPU in cores or millicores"
+        },
+        {
+          "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+          "description": "Memory with unit suffix"
+        }
+      ]
+    },
+    "completenessThresholds": {
+      "type": "object",
+      "description": "30-day completeness validation thresholds and requirements",
+      "properties": {
+        "minimum_period_days": {
+          "type": "integer",
+          "const": 30,
+          "description": "Minimum required analysis period in days for completeness validation"
+        },
+        "default_coverage_threshold": {
+          "type": "integer",
+          "const": 95,
+          "description": "Default minimum coverage percentage threshold"
+        },
+        "strict_coverage_threshold": {
+          "type": "integer",
+          "const": 100,
+          "description": "Strict coverage percentage threshold (no gaps allowed)"
+        },
+        "gap_severity_thresholds": {
+          "type": "object",
+          "description": "Gap severity classification thresholds",
+          "properties": {
+            "critical_gap_days": {
+              "type": "integer",
+              "const": 7,
+              "description": "Gap duration in days that triggers critical severity"
+            },
+            "warning_gap_days": {
+              "type": "integer",
+              "const": 3,
+              "description": "Gap duration in days that triggers warning severity"
+            }
+          }
+        },
+        "deployment_requirements": {
+          "type": "object",
+          "description": "Deployment activity requirements for completeness",
+          "properties": {
+            "minimum_deployment_events": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 1,
+              "description": "Minimum number of deployment events required"
+            },
+            "minimum_deployment_days": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 1,
+              "description": "Minimum number of distinct days with deployments"
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "completeness": {
+            "properties": {
+              "meets_completeness_threshold": {
+                "const": false
+              }
+            },
+            "required": ["meets_completeness_threshold"]
+          }
+        },
+        "required": ["completeness"]
+      },
+      "then": {
+        "properties": {
+          "completeness": {
+            "properties": {
+              "gap_details": {
+                "minItems": 1,
+                "description": "When completeness threshold is not met, gap_details must contain at least one entry explaining the failure"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -247,12 +247,12 @@ class ActionExecutor:
 
     def __init__(self):
         self._step_executors = {
+            # Mutating steps (respect dry_run)
             "ci_status": self._execute_ci_status,
             "image_tag": self._execute_image_tag,
             "gitops_commit": self._execute_gitops_commit,
+            # Read-only steps
             "argocd_sync_status": self._execute_argocd_sync_status,
-            "pod_status": self._execute_pod_status,
-            # Read-only steps (no mutation)
             "pod_status": self._execute_pod_status,
             "deployment_info": self._execute_deployment_info,
             "git_log": self._execute_git_log,
