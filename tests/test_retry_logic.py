@@ -113,6 +113,7 @@ class TestRetryDecorator:
             max_retries=3,
             base_delay=0.1,
             max_delay=1.0,
+            jitter_factor=0.0,  # Disable jitter for predictable timing
             exceptions=(ValueError,)
         )
         async def timed_failing_operation():
