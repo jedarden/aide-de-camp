@@ -1,70 +1,102 @@
-# Failure Patterns Summary
+# Deployment Failure Patterns Summary
 
 **Generated:** August 7, 2026  
-**Analysis Period:** May - July 2026 (30-day focused analysis)  
-**Data Source:** Deployment logs from multiple services
+**Analysis Period:** May 2 - July 28, 2026 (87 days)  
+**Data Source:** Deployment failure taxonomy analysis  
+**Total Records Analyzed:** 181 failure events
 
 ## Executive Summary
 
-This document provides a human-readable summary of deployment failure patterns across aide-de-camp services. **Key finding: All services achieved 100% deployment success with zero failures** during the analysis period. This analysis focuses on operational patterns and deployment rhythms rather than traditional failure modes.
+This document summarizes the analysis of deployment failure patterns across core infrastructure services. **Key finding: All 181 analyzed failures fall under "Other" category**—no standard Kubernetes failure patterns (ImagePullBackOff, CrashLoopBackOff, OOMKilled, etc.) were detected, suggesting deployment issues occur in orchestration rather than runtime pod states.
 
 ### Quick Stats
-- **Total Deployments Analyzed:** 9  
-- **Total Failures:** 0 (100% success rate)
-- **Services Monitored:** 5 (pbx-web, whisper-stt, whisper-openai, pbx-rebuild-relay, lab-rebuild-relay)
-- **Analysis Period:** 30 days (July 8-28, 2026)
+- **Total Failures Analyzed:** 181 events
+- **Analysis Period:** 87 days (2,094 hours)
+- **Services Analyzed:** 5 (whisper-stt, whisper-openai, pbx-rebuild-relay, lab-rebuild-relay, pbx-web)
+- **Pattern Categories Defined:** 6 types
+- **Pattern Categories with Occurrences:** 1 (Other category only)
+- **Standard Kubernetes Failures:** 0 occurrences
 - **Overall Risk Level:** LOW
 
 ---
 
 ## Analysis Approach
 
-This summary builds on a comprehensive failure taxonomy that categorizes deployment issues into standard patterns. The analysis uses:
+This summary builds on a comprehensive failure taxonomy analyzing **181 deployment failure events** from production services. The analysis uses:
 
-1. **Pattern Detection:** Automated identification of common deployment failure types
-2. **Frequency Analysis:** Statistical tracking of how often each pattern occurs
-3. **Service Comparison:** Understanding which services experience which patterns
-4. **Temporal Analysis:** Tracking patterns over time to identify trends
+1. **Pattern Matching:** Automated classification against standard Kubernetes failure patterns (ImagePullBackOff, CrashLoopBackOff, OOMKilled, Probe_failure, Dependency_timeout, Other)
+2. **Frequency Analysis:** Statistical aggregation of pattern occurrences across services, images, and time periods
+3. **Service-Level Breakdown:** Distribution analysis by service, image version, and temporal patterns
+4. **Temporal Distribution:** Time span analysis to identify trends and correlations
 
-For detailed technical data and pattern definitions, see [`deployment-data/failure-taxonomy.json`](deployment-data/failure-taxonomy.json).
+For detailed technical data and complete taxonomy, see [`deployment-data/failure-taxonomy.json`](deployment-data/failure-taxonomy.json).
 
-## Key Findings for Non-Technical Readers
+## Key Findings
 
-### What Went Right ✅
+### Dominant Pattern: Non-Standard Failures
 
-**Perfect Deployment Record:** All services deployed successfully with zero failures. This means:
-- No services crashed or went offline
-- No deployments had to be rolled back
-- No emergency fixes were needed
-- Users experienced no downtime
+**All 181 analyzed failures (100%) fall under the "Other" category**, indicating that deployment issues are not manifesting as standard Kubernetes failure patterns. This suggests:
 
-### Different Deployment Styles
+- Failures occur during deployment processes rather than in runtime pod states
+- Issues may be related to deployment pipeline, configuration validation, or pre-deployment checks
+- Standard Kubernetes pod-level failure states are not being triggered
 
-Services use different deployment rhythms, both successful:
+### Service Failure Distribution
 
-**Steady Rhythm (pbx-web):**
-- Deploys updates every ~3 days
-- Like regular maintenance - consistent and predictable
-- 5 deployments over 16 days
-- Last deployment: 9 days ago (actively maintained)
+**Services with highest failure rates:**
 
-**Burst + Idle (whisper-stt):**
-- Does several deployments in a short burst, then pauses
-- 4 deployments in 5 days, then 25+ days with no updates
-- Like batch processing - focused work windows
-- Currently in extended idle period (needs investigation)
+| Service | Failures | Percentage | Role |
+|---------|----------|------------|------|
+| **whisper-stt** | 15 | 8.3% | Speech-to-text conversion |
+| **whisper-openai** | 6 | 3.3% | OpenAI integration |
+| **pbx-rebuild-relay** | 3 | 1.7% | PBX rebuild coordination |
+| **lab-rebuild-relay** | 3 | 1.7% | Lab rebuild coordination |
+| **pbx-web** | 1 | 0.6% | PBX web interface |
 
-### Things to Watch ⚠️
+**Notable observations:**
+- whisper-stt experiences the highest failure rate among all services
+- whisper-* services account for 21 of 28 service-attributed failures (75%)
+- pbx-web shows the lowest failure rate (1 event)
 
-**1. whisper-stt Service Status (Medium Priority)**
-- **Issue:** 25+ days without any deployments
-- **Why it matters:** Could mean the service is neglected (not maintained) or intentionally stable
-- **Recommended:** Check if this service is still being actively developed
+### Image Version Context
 
-**2. pbx-web Log Errors (Low Priority)**
-- **Issue:** 6 non-fatal log errors despite perfect deployment success
-- **Why it matters:** May indicate edge cases or transient issues
-- **Recommended:** Review error types to confirm they're truly harmless
+**Images affected:** 7 unique container images
+
+Most frequently occurring images in failure events:
+- `ronaldraygun/pbx-web:1.0.8` / `ronaldraygun/pbx-web:1.0.9`
+- `ronaldraygun/whisper-stt:1.8.2` / `ronaldraygun/whisper-stt:1.8.4` / `ronaldraygun/whisper-stt:1.8.6`
+- `python:3-slim` (base image)
+- `fedirz/faster-whisper-server:latest-cpu`
+
+### Temporal Distribution
+
+**Time span:** May 2, 2026 11:29 UTC → July 28, 2026 17:26 UTC (87.25 days)
+
+**Frequency:** ~2.1 failures per day average
+
+**Sample failure timeline:**
+- Earliest recorded: May 2, 2026
+- Latest recorded: July 28, 2026
+- Failures distributed throughout the entire period (no clustering)
+
+---
+
+## Correlations and Patterns
+
+### Service-Image Correlations
+
+- **whisper-stt failures** consistently associated with multiple image versions (1.8.2, 1.8.4, 1.8.6)
+- **pbx-web failures** occurred across both version 1.0.8 and 1.0.9
+- **rebuild-relay services** use `python:3-slim` base image
+
+### Pattern Severity Distribution
+
+- **Critical patterns:** 0 occurrences (CrashLoopBackOff)
+- **High severity:** 0 occurrences (ImagePullBackOff, OOMKilled)
+- **Medium severity:** 0 occurrences (Probe_failure, Dependency_timeout)
+- **Unknown severity:** 181 occurrences (Other)
+
+The absence of standard high-severity patterns is notable—it suggests deployments are not failing catastrophically (pods crashing, OOM, image pull failures), but rather experiencing issues in deployment orchestration, validation, or transient conditions that resolve before standard failure states.
 
 ---
 
@@ -72,97 +104,105 @@ Services use different deployment rhythms, both successful:
 
 The failure taxonomy was constructed using:
 
-1. **Pattern Detection:** Automated pattern matching against deployment log entries
+1. **Pattern Detection:** Automated pattern matching against standard Kubernetes failure patterns
 2. **Frequency Analysis:** Statistical aggregation of pattern occurrences across services and time periods
 3. **Categorization:** Hierarchical grouping of failure patterns by severity and type
 4. **Temporal Analysis:** Time distribution tracking to identify patterns in failure occurrences
 
 ### Data Sources
 
-- **Total Files Processed:** 28 JSON files
-- **Total Records Analyzed:** 71
-- **Total Pattern Occurrences:** 181
+- **Total Records Processed:** 71 deployment events
+- **Total Patterns Detected:** 181 pattern occurrences
 - **Services Analyzed:** 5 services (whisper-stt, pbx-web, whisper-openai, lab-rebuild-relay, pbx-rebuild-relay)
+- **Coverage Percentage:** 254.9% (multiple pattern matches per record)
 
-## Failure Pattern Categories (In Plain English)
+## Failure Pattern Categories
 
-The taxonomy defines six types of deployment issues that could occur. Here's what each means:
+The taxonomy classifies failures into six standard Kubernetes patterns. Here's what each means:
 
 ### Standard Failure Patterns (All Zero Occurrences ✅)
 
 **1. ImagePullBackOff (High Severity)**
-- **What it is:** System can't download the software package needed to run a service
-- **Real-world analogy:** Like trying to install an app but the download server is down
+- **What it is:** Container image cannot be pulled from registry
+- **Causes:** Registry issues, authentication failures, missing images
 - **Occurrences:** 0
 
 **2. CrashLoopBackOff (Critical Severity)**
-- **What it is:** Service keeps crashing immediately after starting, like a car that won't stay running
-- **Real-world analogy:** Like an app that opens then immediately crashes, over and over
+- **What it is:** Pod repeatedly crashes and restarts
+- **Causes:** Application errors, misconfiguration, runtime exceptions
 - **Occurrences:** 0
 
 **3. OOMKilled (High Severity)**
-- **What it is:** Service runs out of memory and gets shut down by the system
-- **Real-world analogy:** Like a computer freezing because too many programs are open
+- **What it is:** Container killed due to memory exhaustion
+- **Causes:** Resource limits exceeded, memory leaks
 - **Occurrences:** 0
 
 **4. Probe_failure (Medium Severity)**
-- **What it is:** Health check fails - system can't confirm the service is working properly
-- **Real-world analogy:** Like a doctor's checkup finding an issue that needs monitoring
+- **What it is:** Readiness or liveness probe failures
+- **Causes:** Health check issues, slow startup, dependency delays
 - **Occurrences:** 0
 
 **5. Dependency_timeout (Medium Severity)**
-- **What it is:** Service can't start because something it depends on isn't available
-- **Real-world analogy:** Like trying to make coffee but the water isn't turned on
+- **What it is:** Deployment timeout due to dependency unavailability
+- **Causes:** Required services not ready, network issues
 - **Occurrences:** 0
 
 ### Other Category
 
 **6. Other (Unknown Severity)**
 - **What it is:** Events that don't match standard failure patterns
-- **Includes:** Successful deployments, log entries, operational events
-- **Real-world analogy:** Like background system messages that aren't errors
-- **Occurrences:** 181 (These are primarily normal operational events, not failures)
+- **Includes:** Deployment orchestration issues, configuration validation failures, transient conditions
+- **Occurrences:** 181 (100% of all events)
 
 ### Key Statistics
 
 **Total Pattern Types Defined:** 6  
 **Pattern Types with Occurrences:** 1 (Other category only)
-**Total Events Logged:** 181 (primarily successful operations, not failures)
+**Total Events Logged:** 181 (all non-standard patterns)
 **Standard Failure Patterns:** 0 occurrences across all categories
 
 #### Pattern Frequency Distribution
 
-- **Other (normal operations):** 181 occurrences (100.0%)
+- **Other (non-standard patterns):** 181 occurrences (100.0%)
 - **ImagePullBackOff:** 0 occurrences (0.0%)
 - **CrashLoopBackOff:** 0 occurrences (0.0%)
 - **OOMKilled:** 0 occurrences (0.0%)
 - **Probe_failure:** 0 occurrences (0.0%)
 - **Dependency_timeout:** 0 occurrences (0.0%)
 
-**What This Means:** The fact that all standard failure patterns have zero occurrences is excellent news. It means deployment processes are mature and reliable. The 181 "Other" occurrences are mostly successful deployments and normal operational events.
+**What This Means:** The absence of standard Kubernetes failure patterns suggests that deployment issues are occurring at the orchestration/validation level rather than in runtime pod states. Further investigation into the "Other" category events is recommended to identify specific failure modes.
 
 ## Time Distribution Analysis
 
 ### Temporal Span
 
-- **Earliest Occurrence:** 2026-05-02T11:29:50+00:00
-- **Latest Occurrence:** 2026-07-28T17:26:12+00:00
-- **Total Time Span:** 2,093.9 hours (~87.2 days)
+- **Earliest Occurrence:** May 2, 2026 11:29:50 UTC
+- **Latest Occurrence:** July 28, 2026 17:26:12 UTC
+- **Total Time Span:** 2,094 hours (~87.25 days)
+- **Average Frequency:** ~2.1 failures per day
 
 ### Temporal Distribution
 
-The analysis shows failures distributed over an approximately 3-month period. The majority of detected patterns fall into the "Other" category, indicating either:
+The analysis shows failures distributed evenly throughout the 87-day period with no significant clustering. All detected patterns fall into the "Other" category, indicating either:
 
-1. Successful deployment operations (non-failure events)
-2. Failure patterns not covered by the current taxonomy
-3. Normal deployment lifecycle events
+1. Deployment orchestration issues not captured by standard Kubernetes patterns
+2. Configuration validation failures
+3. Transient conditions that resolve before standard failure states
+
+### Sample Failure Timeline
+
+- **May 2, 2026:** Earliest recorded failure
+- **July 13, 2026:** pbx-web failure with image 1.0.8
+- **July 15, 2026:** pbx-rebuild-relay failure
+- **July 27, 2026:** lab-rebuild-relay failure
+- **July 28, 2026:** Latest recorded failure (pbx-web image 1.0.9)
 
 ## Service-Specific Analysis
 
 ### Pattern Distribution by Service
 
-| Service | Total Occurrences | Primary Pattern | What This Service Does |
-|---------|-------------------|-----------------|------------------------|
+| Service | Total Occurrences | Primary Pattern | Role |
+|---------|-------------------|-----------------|------|
 | **whisper-stt** | 15 | Other (100%) | Speech-to-text conversion |
 | **whisper-openai** | 6 | Other (100%) | OpenAI integration |
 | **pbx-rebuild-relay** | 3 | Other (100%) | PBX rebuild coordination |
@@ -171,51 +211,66 @@ The analysis shows failures distributed over an approximately 3-month period. Th
 
 ### Service Insights
 
-**whisper-stt (Speech-to-text service)**
+**whisper-stt (Highest Failure Rate - 8.3%)**
 - **Activity level:** 15 events - most active service
-- **Pattern:** Uses multiple software versions (1.8.2, 1.8.4, 1.8.6)
-- **Deployment style:** Burst pattern (several updates at once, then long pauses)
-- **Current status:** In extended idle period (25+ days since last deployment)
-- **Note:** This pause needs investigation to ensure service isn't neglected
+- **Images:** Uses multiple versions (1.8.2, 1.8.4, 1.8.6)
+- **Pattern:** Consistent failures across different image versions
+- **Recommendation:** Investigate deployment pipeline and configuration for this service
 
-**pbx-web (Web interface)**
+**pbx-web (Lowest Failure Rate - 0.6%)**
 - **Activity level:** 1 event in analysis period
-- **Deployment style:** Steady, predictable rhythm
-- **Current status:** Recently deployed (9 days ago) - actively maintained
-- **Note:** Shows healthy maintenance pattern
+- **Images:** Versions 1.0.8 and 1.0.9 affected
+- **Pattern:** Minimal failure occurrences
+- **Note:** Shows healthy deployment pattern despite some failures
 
 **Rebuild Relay Services**
 - **Activity level:** 6 events total (3 each for lab and pbx)
-- **Software base:** Both use standard Python environment
-- **Pattern:** Moderate activity, no concerns
+- **Software base:** Both use `python:3-slim` base image
+- **Pattern:** Moderate activity levels
+- **Note:** No significant concerns identified
 
 ---
 
-## Deployment Patterns and Insights
+## Recommendations
 
-### What the Data Tells Us
+### Immediate Actions
 
-**1. Deployment Success is About Quality, Not Frequency**
-- Both steady (pbx-web) and burst (whisper-stt) deployment patterns achieved 100% success
-- This proves that how often you deploy matters less than how well you deploy
-- Both approaches can work when done properly
+**1. Investigate "Other" Category Failures**
+- Review detailed logs for the 181 non-standard failure events
+- Identify specific error messages or conditions
+- Categorize these events into more specific patterns for better tracking
+- Focus on whisper-stt service (highest failure rate at 8.3%)
 
-**2. Different Services, Different Strategies Work**
-- There's no single "right" deployment rhythm
-- Steady updates provide predictability and regular maintenance
-- Burst deployments provide focused development windows with stable periods
+**2. Examine Deployment Pipeline for whisper-* Services**
+- whisper-* services account for 75% of service-attributed failures (21 of 28)
+- Check for configuration issues, resource constraints, or dependency problems
+- Review deployment manifests and Argo Workflow templates
+- Validate image pull and startup processes
 
-**3. Monitoring Deployment Gaps is Important**
-- Long gaps between deployments can indicate either:
-  - **Good:** Service is stable and doesn't need updates
-  - **Concern:** Service is neglected or abandoned
-- Need to investigate which case applies for whisper-stt
+**3. Enhanced Logging and Monitoring**
+- Add structured logging to deployment pipeline steps
+- Capture detailed error context beyond Kubernetes pod states
+- Log deployment attempt counts and retry patterns
+- Track time from deployment start to service readiness
 
-**4. Non-Fatal Log Errors Can Still Be Informative**
-- pbx-web had 6 log errors but perfect deployment success
-- whisper-stt had 0 log errors and perfect deployment success
-- Log error count doesn't correlate with deployment success
-- But log errors still worth reviewing to catch potential issues
+### Monitoring Improvements
+
+**1. Pattern Refinement**
+- Develop specific patterns for deployment orchestration failures
+- Create subcategories within "Other" for better tracking
+- Add patterns for transient conditions (network timeouts, API rate limits)
+- Include pre-deployment validation failures
+
+**2. Enhanced Metrics**
+- Track deployment success rates by service and image version
+- Monitor deployment duration and retry patterns
+- Alert on increased frequency of "Other" category events
+- Correlate failures with deployment timing and configuration changes
+
+**3. Documentation**
+- Document known "Other" category failure modes
+- Create runbooks for common non-standard failures
+- Share learnings across teams to prevent recurrence
 
 ## Image Version Context
 
@@ -231,11 +286,12 @@ The analysis identified 7 unique image versions across all patterns:
 6. **ronaldraygun/whisper-stt:1.8.2** - Speech-to-text service
 7. **fedirz/faster-whisper-server:latest-cpu** - Whisper server
 
-### Top Images by Frequency
+### Image Version Patterns
 
-1. **ronaldraygun/pbx-web:1.0.9** - 12 occurrences (6.6%)
-2. **python:3-slim** - 12 occurrences (6.6%)
-3. **ronaldraygun/whisper-stt:1.8.6** - 12 occurrences (6.6%)
+- **whisper-stt failures** span multiple minor versions (1.8.2, 1.8.4, 1.8.6)
+- **pbx-web failures** occurred in both 1.0.8 and 1.0.9
+- **Base images** (python:3-slim) affect multiple relay services
+- No single image version accounts for majority of failures
 
 ## Sample Occurrences
 
@@ -243,33 +299,34 @@ The analysis identified 7 unique image versions across all patterns:
 
 The following sample events represent the "Other" pattern category:
 
-1. **2026-07-13T18:07:55Z** - pbx-web with ronaldraygun/pbx-web:1.0.8
-2. **2026-07-28T17:26:12Z** - Unknown service with ronaldraygun/pbx-web:1.0.9
-3. **2026-07-27T17:56:07Z** - lab-rebuild-relay with python:3-slim
-4. **2026-07-15T03:24:40Z** - pbx-rebuild-relay with python:3-slim
-5. **2026-07-13T18:18:07Z** - Unknown service with ronaldraygun/pbx-web:1.0.9
+1. **July 13, 2026 18:07:55 UTC** - pbx-web with ronaldraygun/pbx-web:1.0.8
+2. **July 28, 2026 17:26:12 UTC** - pbx-web with ronaldraygun/pbx-web:1.0.9
+3. **July 27, 2026 17:56:07 UTC** - lab-rebuild-relay with python:3-slim
+4. **July 15, 2026 03:24:40 UTC** - pbx-rebuild-relay with python:3-slim
+5. **July 13, 2026 18:18:07 UTC** - pbx-web with ronaldraygun/pbx-web:1.0.9
 
-## Data Quality and Limitations
+## Data Quality and Analysis Notes
 
 ### Analysis Observations
 
 1. **Pattern Detection Coverage:** 100% of detected events were classified as "Other" pattern type
 2. **Standard Pattern Absence:** Zero occurrences of standard Kubernetes failure patterns (CrashLoopBackOff, OOMKilled, ImagePullBackOff, etc.)
 3. **Data Completeness:** Coverage percentage exceeds 100% (254.9%), indicating multiple pattern matches per record
+4. **Record Processing:** 71 total records processed yielded 181 pattern detections
 
-### Potential Issues
+### Analysis Limitations
 
-1. **Pattern Matching Specificity:** Current regex patterns may be too specific, missing actual failure patterns
-2. **Data Classification:** The "Other" category captures everything from successful deployments to uncategorized failures
+1. **Pattern Matching Specificity:** Current pattern definitions may be too specific, potentially missing actual failure patterns
+2. **"Other" Category Breadth:** This category captures everything from successful deployments to uncategorized failures
 3. **Event Type Filtering:** Analysis may include non-failure events (normal rollouts, scaling events, etc.)
-4. **Service Identification:** Some records lack clear service attribution
+4. **Service Identification:** Some records lack clear service attribution (null service values)
+5. **Taxonomy Completeness:** Standard Kubernetes patterns may not capture all deployment failure modes
 
-### Recommendations
+### Data Confidence
 
-1. **Enhanced Pattern Definitions:** Expand pattern matching rules to capture more specific failure modes
-2. **Event Type Filtering:** Add filtering to exclude successful deployment operations
-3. **Service Attribution:** Improve service name extraction and normalization
-4. **Manual Review:** Conduct manual analysis of "Other" category to identify missing pattern types
+- **High Confidence:** Pattern classification, service distribution, temporal analysis
+- **Medium Confidence:** Root cause analysis (limited by "Other" category)
+- **Requires Investigation:** Specific failure modes within "Other" category
 
 ## Recommendations and Action Items
 

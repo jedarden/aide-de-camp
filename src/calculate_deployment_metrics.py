@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any
 
+from src.utils.atomic_write import atomic_write
+
 
 def load_deployment_data(service: str) -> Dict[str, Any]:
     """Load deployment data for a given service."""
@@ -173,8 +175,7 @@ def main():
     }
 
     output_path = output_dir / "deployment-metrics-intermediate.json"
-    with open(output_path, "w") as f:
-        json.dump(results, f, indent=2)
+    atomic_write(output_path, json.dumps(results, indent=2))
 
     print(f"Deployment metrics calculated and saved to {output_path}")
     print(f"\nSummary:")

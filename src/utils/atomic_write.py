@@ -9,6 +9,8 @@ handling, rollback support, and logging.
 import logging
 import os
 import tempfile
+import time
+import random
 from pathlib import Path
 from typing import Union, Optional, Callable
 from contextlib import contextmanager
@@ -34,7 +36,9 @@ def atomic_write(
     *,
     create_backup: bool = False,
     validate_fn: Optional[Callable[[Union[str, bytes]], bool]] = None,
-    cleanup_verify: bool = True
+    cleanup_verify: bool = True,
+    max_retries: int = 0,
+    initial_delay: float = 0.1
 ) -> Optional[Path]:
     """
     Write content to a file atomically with comprehensive error handling.
@@ -53,6 +57,8 @@ def atomic_write(
                      Should return True if content is valid, False otherwise.
                      If validation fails, no write occurs and original file is preserved.
         cleanup_verify: If True, verifies no temp files remain after operation
+        max_retries: Maximum number of retry attempts for transient failures (default: 0, no retries)
+        initial_delay: Initial delay in seconds between retries (default: 0.1)
 
     Returns:
         Path to backup file if create_backup=True and original file existed,
@@ -92,6 +98,60 @@ def atomic_write(
         extra={"filepath": str(filepath), "operation_id": operation_id}
     )
 
+    # Retry logic for transient failures
+    delay = initial_delay
+    last_exception = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            # Core atomic write operation (wrapped in retry loop)
+            return _atomic_write_impl(
+                filepath, content, mode, operation_id,
+                create_backup, validate_fn, cleanup_verify, backup_path
+            )
+
+        except (OSError, PermissionError) as e:
+            last_exception = e
+            if attempt < max_retries:
+                # Log retry attempt with attempt number and error type
+                logger.info(
+                    f"[{operation_id}] Retry attempt {attempt + 1}/{max_retries} for atomic write: "
+                    f"{type(e).__name__}: {e}"
+                )
+                # Add jitter to prevent thundering herd problem
+                jittered_delay = delay * (0.5 + random.random() * 0.5)
+                time.sleep(jittered_delay)
+                delay *= 2.0  # Exponential backoff: 100ms, 200ms, 400ms
+            else:
+                # All retries exhausted - log final failure
+                logger.error(
+                    f"[{operation_id}] All {max_retries} retry attempts exhausted for atomic write: "
+                    f"{type(e).__name__}: {e}"
+                )
+                raise
+
+    # Should never reach here, but handle gracefully
+    if last_exception:
+        raise last_exception
+    raise RuntimeError(f"Unexpected error in atomic write for {filepath}")
+
+
+def _atomic_write_impl(
+    filepath: Path,
+    content: Union[str, bytes],
+    mode: str,
+    operation_id: str,
+    create_backup: bool,
+    validate_fn: Optional[Callable[[Union[str, bytes]], bool]],
+    cleanup_verify: bool,
+    backup_path: Optional[Path]
+) -> Optional[Path]:
+    """
+    Core implementation of atomic write operation.
+
+    This function performs the actual atomic write without retry logic.
+    Retry logic is handled by the atomic_write wrapper function.
+    """
     try:
         # Validate content type matches mode
         if mode == 'wb':
@@ -413,3 +473,153 @@ def cleanup_orphaned_temp_files(directory: Union[str, Path], pattern: str = '*.t
 
     logger.info(f"Cleanup complete: {count} files removed from {directory}")
     return count
+
+
+def atomic_append(
+    filepath: Union[str, Path],
+    content: Union[str, bytes],
+    mode: str = 'a',
+    *,
+    validate_fn: Optional[Callable[[Union[str, bytes]], bool]] = None,
+    max_retries: int = 0,
+    initial_delay: float = 0.1
+) -> None:
+    """
+    Append content to a file atomically with error handling.
+
+    This function implements atomic append for log files by writing to a
+    temporary file and using atomic rename to append the content. This ensures
+    that the append operation is atomic and won't result in partial writes.
+
+    For small content (under PIPE_BUF size, typically 4KB), a single write()
+    call is guaranteed to be atomic on POSIX systems. For larger content or
+    when stronger guarantees are needed, this function uses temp file + rename.
+
+    Args:
+        filepath: Target file path (str or Path object)
+        content: Content to append (str for text mode, bytes for binary mode)
+        mode: Append mode - 'a' for text, 'ab' for binary (default: 'a')
+        validate_fn: Optional validation function called with content before append.
+                     Should return True if content is valid.
+        max_retries: Maximum number of retry attempts for transient failures (default: 0)
+        initial_delay: Initial delay in seconds between retries (default: 0.1)
+
+    Raises:
+        PermissionError: If lacking write permissions
+        OSError: If filesystem error occurs
+        ValueError: If validation function returns False
+
+    Example:
+        >>> atomic_append('/var/log/deletions.jsonl', '{"pod": "x", "status": "deleted"}\\n')
+    """
+    filepath = Path(filepath)
+    operation_id = str(uuid.uuid4())[:8]
+
+    logger.debug(
+        f"[{operation_id}] Starting atomic append to {filepath}",
+        extra={"filepath": str(filepath), "operation_id": operation_id}
+    )
+
+    # Validate content if validation function provided
+    if validate_fn is not None:
+        if not validate_fn(content):
+            error_msg = f"Content validation failed for {filepath}"
+            logger.error(f"[{operation_id}] {error_msg}")
+            raise ValueError(error_msg)
+
+    # Ensure parent directory exists
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    # Retry logic for transient failures
+    delay = initial_delay
+    last_exception = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            # For text mode, ensure content is string
+            if mode == 'a' and isinstance(content, bytes):
+                content = content.decode('utf-8')
+            # For binary mode, ensure content is bytes
+            elif mode == 'ab' and isinstance(content, str):
+                content = content.encode('utf-8')
+
+            # Use temp file + rename pattern for atomic append
+            # Write content to temp file, then rename to append to target
+            temp_fd, temp_path = tempfile.mkstemp(
+                suffix=f'.tmp_{operation_id}_',
+                dir=filepath.parent,
+                prefix='.tmp_append_'
+            )
+
+            try:
+                # Write content to temp file
+                if mode == 'a':
+                    os.write(temp_fd, content.encode('utf-8'))
+                else:  # 'ab'
+                    os.write(temp_fd, content)
+
+                # Sync to disk
+                os.fsync(temp_fd)
+
+                # Close temp file
+                os.close(temp_fd)
+
+                # Atomic rename: temp -> target (appends if target exists)
+                # Note: os.replace() overwrites, so we need a different approach
+                # For true atomic append, we read entire file, append, then write atomically
+                if filepath.exists():
+                    # Read existing content
+                    existing_content = filepath.read_bytes() if mode == 'ab' else filepath.read_text()
+
+                    # Append new content
+                    if mode == 'ab':
+                        combined = existing_content + content
+                    else:
+                        combined = existing_content + content
+
+                    # Write combined content atomically
+                    _atomic_write_impl(
+                        filepath, combined, 'wb' if mode == 'ab' else 'w',
+                        operation_id, False, None, True, None
+                    )
+                else:
+                    # File doesn't exist, just rename temp file
+                    os.rename(temp_path, filepath)
+
+                logger.info(f"[{operation_id}] Atomic append successful to {filepath}")
+
+            except OSError as e:
+                # Cleanup temp file on error
+                try:
+                    os.close(temp_fd)
+                except:
+                    pass
+                try:
+                    Path(temp_path).unlink(missing_ok=True)
+                except:
+                    pass
+                raise
+
+            return  # Success
+
+        except (OSError, PermissionError) as e:
+            last_exception = e
+            if attempt < max_retries:
+                logger.info(
+                    f"[{operation_id}] Retry attempt {attempt + 1}/{max_retries} for atomic append: "
+                    f"{type(e).__name__}: {e}"
+                )
+                jittered_delay = delay * (0.5 + random.random() * 0.5)
+                time.sleep(jittered_delay)
+                delay *= 2.0
+            else:
+                logger.error(
+                    f"[{operation_id}] All {max_retries} retry attempts exhausted for atomic append: "
+                    f"{type(e).__name__}: {e}"
+                )
+                raise
+
+    # Should never reach here
+    if last_exception:
+        raise last_exception
+    raise RuntimeError(f"Unexpected error in atomic append for {filepath}")

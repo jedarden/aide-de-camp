@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-08-07T05:46:43.580586",
+  "query_log": [
+    {
+      "timestamp": "2026-08-07T05:46:43.580300",
+      "query": "PROCESS_FILE: /home/coding/aide-de-camp/logs/whisper-stt-30day-victorialogs.jsonl",
+      "result_count": 0,
+      "execution_time_ms": 721.04,
+      "status": "success"
+    }
+  ]
+}

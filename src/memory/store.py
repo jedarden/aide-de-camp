@@ -21,6 +21,8 @@ from logging import Logger
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
+from src.utils.atomic_write import atomic_write
+
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL", "https://openai-proxy.ardenone.com:8444")
 
 
@@ -189,7 +191,7 @@ class MemoryStore:
         """
         Persist memory to disk using atomic file operations.
 
-        Uses temp file + atomic rename pattern to prevent partial state issues.
+        Uses the atomic_write utility to prevent partial state issues.
         If the process crashes during write, either the old file remains intact
         or the new file is completely written - never a partial/corrupted state.
         """
@@ -197,27 +199,8 @@ class MemoryStore:
         self._data["facts"] = [f.to_dict() for f in self._facts]
         self._data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-        # Atomic write: temp file + rename pattern with unique naming (UUID4)
-        temp_path = self.file_path.parent / f".{self.file_path.name}.{uuid.uuid4()}.tmp"
-
-        try:
-            # Write to temp file first
-            with open(temp_path, "w") as f:
-                json.dump(self._data, f, indent=2)
-                f.flush()
-                os.fsync(f.fileno())  # Ensure data is written to disk
-
-            # Atomic rename to target path
-            temp_path.replace(self.file_path)
-
-        except Exception as e:
-            # Clean up temp file if it exists
-            if temp_path.exists():
-                try:
-                    temp_path.unlink()
-                except Exception:
-                    pass
-            raise  # Re-raise to trigger retry logic
+        # Use atomic_write utility for atomic persistence
+        atomic_write(self.file_path, json.dumps(self._data, indent=2))
 
     def _normalize_text(self, text: str) -> str:
         """Normalize text for comparison."""

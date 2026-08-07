@@ -43,7 +43,7 @@ import tracemalloc
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from components.hot_reload import get_reload_manager, HotReloadManager, Artifact
+from src.components.hot_reload import get_reload_manager, HotReloadManager, Artifact
 
 
 class HotReloadErrorTracker:

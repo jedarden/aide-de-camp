@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "generated_at": "2026-08-07T06:40:41.710914",
-    "analysis_type": "failure_pattern_analysis",
+    "generated_at": "2026-08-07T07:12:48.574022",
+    "analysis_type": "failure_pattern_analysis_with_correlations",
     "time_period": "deployment_data_analysis",
     "services_analyzed": [
       "pbx-web"
@@ -114,9 +114,9 @@
       "category": "Deployment Process Issues",
       "severity": "medium",
       "description": "Deployment rolled back due to failures",
-      "total_occurrences": 1,
+      "total_occurrences": 2,
       "distribution_by_service": {
-        "pbx-web": 1
+        "pbx-web": 2
       },
       "image_version_context": {
         "images_affected": [
@@ -125,12 +125,19 @@
         "total_unique_images": 1
       },
       "time_distribution": {
-        "frequency": 1,
+        "frequency": 2,
         "time_span_hours": 0.0,
         "earliest_timestamp": "2026-07-13T18:07:55",
         "latest_timestamp": "2026-07-13T18:07:55"
       },
       "sample_occurrences": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "service": "pbx-web",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "event_type": "deployment_rollback",
+          "outcome": "rolled_back"
+        },
         {
           "timestamp": "2026-07-13T18:07:55Z",
           "service": "pbx-web",
@@ -152,28 +159,45 @@
       "Volume_mount_failure": 0,
       "Resource_exhaustion": 0,
       "Network_policy_blocked": 0,
-      "Deployment_rollback": 1
+      "Deployment_rollback": 2
     },
     "by_severity": {
       "critical": 0,
       "high": 0,
-      "medium": 1
+      "medium": 2
     },
     "temporal_distribution": {}
   },
+  "temporal_correlations": {
+    "deployment_failure_clusters": [
+      {
+        "service": "pbx-web",
+        "failure_count": 2,
+        "time_span_hours": 0.0,
+        "start_time": "2026-07-13T18:07:55",
+        "end_time": "2026-07-13T18:07:55",
+        "patterns": [
+          "Other"
+        ]
+      }
+    ],
+    "high_frequency_periods": [],
+    "service_specific_patterns": {}
+  },
   "verification": {
-    "total_records_processed": 1,
-    "total_patterns_detected": 1,
+    "total_records_processed": 2,
+    "total_patterns_detected": 2,
     "coverage_percentage": 100.0
   },
   "summary": {
     "total_pattern_types_defined": 10,
     "total_pattern_types_with_occurrences": 1,
-    "total_failures_across_all_patterns": 1,
+    "total_failures_across_all_patterns": 2,
     "most_common_pattern": [
       "Deployment_rollback",
-      1
+      2
     ],
+    "deployment_failure_clusters_found": 1,
     "overall_assessment": "ANALYSIS_COMPLETE"
   }
 }

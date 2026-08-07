@@ -1,0 +1,79 @@
+{
+  "merge_date": "2026-08-07T10:02:11.362005Z",
+  "total_records": 48,
+  "namespaces": {
+    "pbx-web": 20,
+    "whisper-stt": 28
+  },
+  "field_completeness": {
+    "creation_timestamp": {
+      "present": 48,
+      "total": 48,
+      "percentage": 100.0
+    },
+    "deletion_timestamp": {
+      "present": 6,
+      "total": 48,
+      "percentage": 12.5
+    },
+    "log_size_bytes": {
+      "present": 48,
+      "total": 48,
+      "percentage": 100.0
+    },
+    "log_line_count": {
+      "present": 48,
+      "total": 48,
+      "percentage": 100.0
+    },
+    "analysis_file_path": {
+      "present": 18,
+      "total": 48,
+      "percentage": 37.5
+    }
+  },
+  "sample_records": [
+    {
+      "pod_name": "lab-rebuild-relay",
+      "namespace": "pbx-web",
+      "log_file_path": "logs/pbx-web-30day/lab-rebuild-relay-current.log",
+      "analysis_file_path": null,
+      "creation_timestamp": "2026-08-06T05:36:19",
+      "deletion_timestamp": "2026-08-06T13:36:39",
+      "file_creation_timestamp": "2026-08-06T13:36:43.650548",
+      "file_modification_timestamp": "2026-08-06T13:36:43.650548",
+      "log_size_bytes": 332275,
+      "has_analysis": false,
+      "collection_source": "pbx-web-30day",
+      "log_line_count": 3904
+    },
+    {
+      "pod_name": "pbx-rebuild-relay",
+      "namespace": "pbx-web",
+      "log_file_path": "logs/pbx-web-30day/pbx-rebuild-relay-current.log",
+      "analysis_file_path": null,
+      "creation_timestamp": "2026-08-03T08:43:53",
+      "deletion_timestamp": "2026-08-06T13:36:41",
+      "file_creation_timestamp": "2026-08-06T13:36:42.494552",
+      "file_modification_timestamp": "2026-08-06T13:36:42.494552",
+      "log_size_bytes": 3137027,
+      "has_analysis": false,
+      "collection_source": "pbx-web-30day",
+      "log_line_count": 36906
+    },
+    {
+      "pod_name": "pbx-web-main",
+      "namespace": "pbx-web",
+      "log_file_path": "logs/pbx-web-30day/pbx-web-main-current.log",
+      "analysis_file_path": null,
+      "creation_timestamp": "2026-07-28T13:26:14",
+      "deletion_timestamp": "2026-08-06T13:36:34",
+      "file_creation_timestamp": "2026-08-06T13:36:40.874558",
+      "file_modification_timestamp": "2026-08-06T13:36:40.874558",
+      "log_size_bytes": 4543274,
+      "has_analysis": false,
+      "collection_source": "pbx-web-30day",
+      "log_line_count": 35810
+    }
+  ]
+}

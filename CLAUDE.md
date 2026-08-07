@@ -256,3 +256,114 @@ body: JSON.stringify({ utterance, session_id: sessionId, surface_id: surfaceId }
 ```
 
 The canvas fetches topics from `/api/v1/sessions/{session_id}/topics` on SSE `result_created`.
+
+## Retry Configuration
+
+Retry behavior is configurable via environment variables and per-decorator overrides. The retry decorator (`src/utilities/retry.py`) provides exponential backoff with jitter for transient failures.
+
+### Environment Variables
+
+Set retry defaults via environment variables:
+
+- `ADC_MAX_RETRIES`: Maximum number of retry attempts (default: `3`)
+- `ADC_RETRY_BASE_DELAY`: Initial delay between retries in seconds (default: `1.0`)
+- `ADC_RETRY_MAX_DELAY`: Maximum delay between retries in seconds (default: `60.0`)
+- `ADC_RETRY_JITTER_FACTOR`: Jitter as a fraction of delay, 0 to 1 (default: `0.25`)
+
+### Configuration Examples
+
+```bash
+# Conservative defaults (production)
+export ADC_MAX_RETRIES=3
+export ADC_RETRY_BASE_DELAY=1.0
+export ADC_RETRY_MAX_DELAY=60.0
+export ADC_RETRY_JITTER_FACTOR=0.25
+
+# Aggressive retries (CI environment)
+export ADC_MAX_RETRIES=5
+export ADC_RETRY_BASE_DELAY=2.0
+export ADC_RETRY_MAX_DELAY=120.0
+export ADC_RETRY_JITTER_FACTOR=0.3
+
+# Minimal retries (local development)
+export ADC_MAX_RETRIES=2
+export ADC_RETRY_BASE_DELAY=0.5
+export ADC_RETRY_MAX_DELAY=10.0
+export ADC_RETRY_JITTER_FACTOR=0.1
+```
+
+### Usage Patterns
+
+**Use configured defaults:**
+```python
+from src.utilities.retry import retry_with_exponential_backoff
+
+@retry_with_exponential_backoff()
+async def fetch_data():
+    # Uses environment-configured defaults
+    pass
+```
+
+**Override specific parameters:**
+```python
+@retry_with_exponential_backoff(max_retries=5, base_delay=2.0)
+async def critical_operation():
+    # 5 retries, 2s base delay, other params from config
+    pass
+```
+
+**Override with exception types:**
+```python
+@retry_with_exponential_backoff(
+    exceptions=(sqlite3.OperationalError, asyncio.TimeoutError)
+)
+async def database_operation():
+    # Retry only on specific exceptions
+    pass
+```
+
+**Direct function call:**
+```python
+from src.utilities.retry import retry_async
+
+result = await retry_async(
+    fetch_from_database,
+    query,
+    max_retries=3,
+    exceptions=(sqlite3.OperationalError,)
+)
+```
+
+### Configuration Validation
+
+Retry configuration is validated on application startup. Invalid values prevent the server from starting with a clear error message:
+
+- `max_retries` must be >= 0
+- `base_delay` must be > 0
+- `max_delay` must be > 0 and >= `base_delay`
+- `jitter_factor` must be between 0 and 1
+
+### Jitter Behavior
+
+Jitter prevents the "thundering herd" problem when multiple processes retry simultaneously. The jitter factor controls the randomness:
+
+- `jitter_factor=0`: No jitter (deterministic delays)
+- `jitter_factor=0.25`: ±25% random variation (default)
+- `jitter_factor=1.0`: Full jitter (random between 0 and delay)
+
+### Testing Configuration
+
+Test different retry configurations without environment variables:
+
+```python
+from src.config.retry import RetryConfig, set_retry_config
+
+# Set custom config for testing
+test_config = RetryConfig(
+    max_retries=1,
+    base_delay=0.1,
+    max_delay=0.5,
+    jitter_factor=0.0
+)
+set_retry_config(test_config)
+```

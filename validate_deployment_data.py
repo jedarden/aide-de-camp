@@ -1,198 +1,356 @@
 #!/usr/bin/env python3
 """
-Parse and validate all JSON files from docs/research/deployment-data/
-Loads them into memory for analysis and reports any errors.
+Deployment data validation script.
+
+Validates both deployment JSON files and their structure:
+- pbx-web-deployments.json: ArgoCD deployment records
+- whisper-stt-deployments-30d.json: Comprehensive deployment event data
+
+Checks for required fields:
+- timestamp
+- success/failure status (outcome)
+- error_type (if failed)
+- phase (if failed)
+- error_message (if failed)
 """
 
 import json
-import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
-from collections import defaultdict
 from datetime import datetime
+from typing import Any, Dict, List, Tuple
 
-def parse_json_file(filepath: Path) -> Tuple[bool, Any, str]:
+def load_json_file(file_path: Path) -> Tuple[bool, Any, List[str]]:
+    """Load and parse a JSON file.
+
+    Returns:
+        (success, data, errors)
     """
-    Parse a JSON file and return (success, data, error_message).
-    """
+    errors = []
+
+    if not file_path.exists():
+        return False, None, [f"File not found: {file_path}"]
+
     try:
-        with open(filepath, 'r') as f:
+        with open(file_path, 'r') as f:
             data = json.load(f)
-        return True, data, ""
+        return True, data, errors
     except json.JSONDecodeError as e:
-        return False, None, f"JSON decode error: {e.msg} at line {e.lineno}, column {e.colno}"
+        return False, None, [f"Malformed JSON: {e}"]
     except Exception as e:
-        return False, None, f"Error reading file: {str(e)}"
+        return False, None, [f"Error reading file: {e}"]
 
 
-def validate_structure(data: Any, filepath: Path) -> List[str]:
+def validate_pbx_web_structure(data: Any) -> Tuple[bool, List[str], List[str], Dict]:
+    """Validate pbx-web-deployments.json structure.
+
+    Expected structure:
+    {
+      "query_date": "...",
+      "deployments": [
+        {
+          "commit_hash": "...",
+          "timestamp": "...",
+          "author": "...",
+          "message": "...",
+          "image_tag": "...",
+          "deployment_type": "..."
+        }
+      ]
+    }
     """
-    Validate the structure of parsed JSON data.
-    Returns a list of validation warnings/errors.
-    """
-    issues = []
+    errors = []
+    warnings = []
+    stats = {
+        "total_records": 0,
+        "has_timestamp": 0,
+        "has_commit_hash": 0,
+        "deployment_types": set(),
+    }
 
-    if data is None:
-        issues.append("Data is None")
-        return issues
+    if not isinstance(data, dict):
+        return False, ["Root element is not a dictionary"], [], stats
 
-    if not isinstance(data, (dict, list)):
-        issues.append(f"Root is not a dict or list, got type: {type(data).__name__}")
+    # Check for deployments array
+    if "deployments" not in data:
+        return False, ["Missing 'deployments' array"], [], stats
 
-    return issues
+    if not isinstance(data["deployments"], list):
+        return False, ["'deployments' is not a list"], [], stats
 
+    deployments = data["deployments"]
+    stats["total_records"] = len(deployments)
 
-def analyze_service_data(data: Dict[str, Any]) -> Dict[str, int]:
-    """
-    Analyze the loaded data to extract record counts by service.
-    Returns a dictionary with service names and their record counts.
-    """
-    service_counts = defaultdict(int)
+    if len(deployments) == 0:
+        warnings.append("No deployment records found")
 
-    # Check for common deployment data structures
-    if isinstance(data, list):
-        # Array of deployment records
-        service_counts["total_records"] = len(data)
+    # Validate each deployment record
+    for i, deployment in enumerate(deployments):
+        if not isinstance(deployment, dict):
+            errors.append(f"Record {i}: Not a dictionary")
+            continue
 
-        # Try to extract service names from records
-        for record in data:
-            if isinstance(record, dict):
-                # Common service identifier fields
-                for key in ['service', 'serviceName', 'service_name', 'app', 'application']:
-                    if key in record:
-                        service = record[key]
-                        if isinstance(service, str):
-                            service_counts[service] += 1
-                            break
-    elif isinstance(data, dict):
-        # Object with potentially nested data
-        if 'deployments' in data and isinstance(data['deployments'], list):
-            service_counts["total_records"] = len(data['deployments'])
-        elif 'items' in data and isinstance(data['items'], list):
-            service_counts["total_records"] = len(data['items'])
-        elif 'workflows' in data and isinstance(data['workflows'], list):
-            service_counts["total_records"] = len(data['workflows'])
-        elif 'data' in data and isinstance(data['data'], list):
-            service_counts["total_records"] = len(data['data'])
+        # Check timestamp
+        if "timestamp" in deployment:
+            stats["has_timestamp"] += 1
         else:
-            # Count top-level keys
-            service_counts["total_records"] = len(data)
+            errors.append(f"Record {i}: Missing required field 'timestamp'")
 
-    return dict(service_counts)
+        # Check commit_hash
+        if "commit_hash" in deployment:
+            stats["has_commit_hash"] += 1
+        else:
+            errors.append(f"Record {i}: Missing required field 'commit_hash'")
+
+        # Track deployment types
+        if "deployment_type" in deployment:
+            stats["deployment_types"].add(deployment["deployment_type"])
+
+    # Convert set to list for JSON serialization
+    stats["deployment_types"] = list(stats["deployment_types"])
+
+    return len(errors) == 0, errors, warnings, stats
+
+
+def validate_whisper_stt_structure(data: Any) -> Tuple[bool, List[str], List[str], Dict]:
+    """Validate whisper-stt-deployments-30d.json structure.
+
+    Expected structure:
+    {
+      "metadata": { ... },
+      "current_status": { ... },
+      "deployment_events_last_30_days": [
+        {
+          "date": "...",
+          "timestamp": "...",
+          "event_type": "...",
+          "outcome": "...",  // success/failure
+          "revision": ...,
+          // error details if outcome == failure
+        }
+      ],
+      "deployment_metrics": { ... }
+    }
+    """
+    errors = []
+    warnings = []
+    stats = {
+        "total_records": 0,
+        "has_timestamp": 0,
+        "has_event_type": 0,
+        "has_outcome": 0,
+        "successful_deployments": 0,
+        "failed_deployments": 0,
+        "outcome_types": set(),
+    }
+
+    if not isinstance(data, dict):
+        return False, ["Root element is not a dictionary"], [], stats
+
+    # Check for deployment_events_last_30_days array
+    if "deployment_events_last_30_days" not in data:
+        return False, ["Missing 'deployment_events_last_30_days' array"], [], stats
+
+    if not isinstance(data["deployment_events_last_30_days"], list):
+        return False, ["'deployment_events_last_30_days' is not a list"], [], stats
+
+    events = data["deployment_events_last_30_days"]
+    stats["total_records"] = len(events)
+
+    if len(events) == 0:
+        warnings.append("No deployment events found")
+
+    # Validate each event record
+    for i, event in enumerate(events):
+        if not isinstance(event, dict):
+            errors.append(f"Record {i}: Not a dictionary")
+            continue
+
+        # Check timestamp
+        if "timestamp" in event:
+            stats["has_timestamp"] += 1
+        else:
+            errors.append(f"Record {i}: Missing required field 'timestamp'")
+
+        # Check event_type
+        if "event_type" in event:
+            stats["has_event_type"] += 1
+        else:
+            errors.append(f"Record {i}: Missing required field 'event_type'")
+
+        # Check outcome (success/failure)
+        if "outcome" in event:
+            stats["has_outcome"] += 1
+            outcome = event["outcome"]
+            stats["outcome_types"].add(outcome)
+
+            if outcome == "success":
+                stats["successful_deployments"] += 1
+            elif outcome == "failure":
+                stats["failed_deployments"] += 1
+
+                # For failures, check error detail fields
+                if "error_type" not in event:
+                    warnings.append(f"Record {i}: Failed deployment missing 'error_type'")
+                if "phase" not in event:
+                    warnings.append(f"Record {i}: Failed deployment missing 'phase'")
+                if "error_message" not in event:
+                    warnings.append(f"Record {i}: Failed deployment missing 'error_message'")
+            else:
+                warnings.append(f"Record {i}: Unknown outcome type '{outcome}'")
+        else:
+            errors.append(f"Record {i}: Missing required field 'outcome'")
+
+    # Convert set to list for JSON serialization
+    stats["outcome_types"] = list(stats["outcome_types"])
+
+    return len(errors) == 0, errors, warnings, stats
+
+
+def validate_file(file_path: Path, file_type: str) -> Dict:
+    """Validate a single deployment data file."""
+
+    # Load the file
+    success, data, errors = load_json_file(file_path)
+
+    if not success:
+        return {
+            "file": str(file_path),
+            "exists": file_path.exists(),
+            "valid_json": False,
+            "structure_valid": False,
+            "record_count": 0,
+            "errors": errors,
+            "warnings": [],
+            "stats": {}
+        }
+
+    # Validate structure based on file type
+    if file_type == "pbx-web":
+        valid, structure_errors, warnings, stats = validate_pbx_web_structure(data)
+    elif file_type == "whisper-stt":
+        valid, structure_errors, warnings, stats = validate_whisper_stt_structure(data)
+    else:
+        return {
+            "file": str(file_path),
+            "exists": True,
+            "valid_json": True,
+            "structure_valid": False,
+            "record_count": 0,
+            "errors": ["Unknown file type"],
+            "warnings": [],
+            "stats": {}
+        }
+
+    return {
+        "file": str(file_path),
+        "exists": True,
+        "valid_json": True,
+        "structure_valid": valid,
+        "record_count": stats.get("total_records", 0),
+        "errors": structure_errors,
+        "warnings": warnings,
+        "stats": stats
+    }
 
 
 def main():
-    """Main validation routine."""
-    data_dir = Path("docs/research/deployment-data/")
+    """Main validation function."""
 
-    if not data_dir.exists():
-        print(f"ERROR: Directory {data_dir} does not exist")
-        sys.exit(1)
+    print("=" * 70)
+    print("Deployment Data Validation")
+    print("=" * 70)
+    print()
 
-    # Find all JSON files
-    json_files = sorted(data_dir.glob("*.json"))
+    # Define files to validate
+    workspace = Path("/home/coding/aide-de-camp")
+    files_to_validate = [
+        (workspace / "pbx-web-deployments.json", "pbx-web"),
+        (workspace / "whisper-stt-deployments-30d.json", "whisper-stt"),
+    ]
 
-    if not json_files:
-        print(f"ERROR: No JSON files found in {data_dir}")
-        sys.exit(1)
+    results = []
+    total_errors = 0
+    total_warnings = 0
 
-    print(f"Found {len(json_files)} JSON files to validate\n")
-    print("=" * 80)
+    for file_path, file_type in files_to_validate:
+        print(f"Validating: {file_path.name}")
+        print("-" * 70)
 
-    # Results tracking
-    valid_files = []
-    invalid_files = []
-    all_data = {}  # Consolidated in-memory structure
-    service_summary = defaultdict(lambda: defaultdict(int))
+        result = validate_file(file_path, file_type)
+        results.append(result)
 
-    # Process each file
-    for filepath in json_files:
-        filename = filepath.name
-        print(f"\nProcessing: {filename}")
-        print("-" * 80)
+        total_errors += len(result["errors"])
+        total_warnings += len(result["warnings"])
 
-        # Parse the file
-        success, data, error = parse_json_file(filepath)
-
-        if not success:
-            print(f"  ❌ FAILED TO PARSE: {error}")
-            invalid_files.append((filename, error))
-            continue
-
-        # Validate structure
-        issues = validate_structure(data, filepath)
-
-        if issues:
-            print(f"  ⚠️  STRUCTURE ISSUES:")
-            for issue in issues:
-                print(f"     - {issue}")
-
-        # Load into memory
-        all_data[filename] = data
-        valid_files.append(filename)
-
-        # Analyze service data
-        service_counts = analyze_service_data(data) if isinstance(data, (dict, list)) else {}
-
-        if service_counts:
-            print(f"  ✓ Parsed successfully")
-            for service, count in service_counts.items():
-                print(f"     - {service}: {count} records")
-                service_summary[filename][service] = count
+        # Print results
+        if not result["exists"]:
+            print(f"  ❌ File not found")
+        elif not result["valid_json"]:
+            print(f"  ❌ Invalid JSON: {result['errors'][0]}")
+        elif not result["structure_valid"]:
+            print(f"  ❌ Structure invalid: {len(result['errors'])} errors, {len(result['warnings'])} warnings")
         else:
-            print(f"  ✓ Parsed successfully (unknown structure)")
+            print(f"  ✅ Valid: {result['record_count']} records")
 
-        # Basic stats
-        if isinstance(data, list):
-            print(f"     Structure: Array with {len(data)} items")
-        elif isinstance(data, dict):
-            print(f"     Structure: Object with {len(data)} top-level keys")
+        print(f"  Errors: {len(result['errors'])}")
+        print(f"  Warnings: {len(result['warnings'])}")
+
+        if result.get("stats"):
+            stats = result["stats"]
+            print(f"  Statistics:")
+            print(f"    - Total records: {stats.get('total_records', 0)}")
+            print(f"    - Records with timestamp: {stats.get('has_timestamp', 0)}")
+
+            if file_type == "pbx-web":
+                print(f"    - Records with commit_hash: {stats.get('has_commit_hash', 0)}")
+                print(f"    - Deployment types: {', '.join(stats.get('deployment_types', []))}")
+            elif file_type == "whisper-stt":
+                print(f"    - Successful deployments: {stats.get('successful_deployments', 0)}")
+                print(f"    - Failed deployments: {stats.get('failed_deployments', 0)}")
+                print(f"    - Outcome types: {', '.join(stats.get('outcome_types', []))}")
+
+        print()
 
     # Summary
-    print("\n" + "=" * 80)
-    print("VALIDATION SUMMARY")
-    print("=" * 80)
+    print("=" * 70)
+    print("Summary")
+    print("=" * 70)
+    print(f"Total files validated: {len(results)}")
+    print(f"Valid files: {sum(1 for r in results if r['valid_json'] and r['structure_valid'])}")
+    print(f"Total errors: {total_errors}")
+    print(f"Total warnings: {total_warnings}")
+    print()
 
-    print(f"\nTotal files processed: {len(json_files)}")
-    print(f"✓ Valid files: {len(valid_files)}")
-    print(f"❌ Invalid files: {len(invalid_files)}")
-
-    if invalid_files:
-        print(f"\nInvalid files:")
-        for filename, error in invalid_files:
-            print(f"  - {filename}: {error}")
-
-    print(f"\nValid files loaded into memory:")
-    for filename in valid_files:
-        print(f"  - {filename}")
-
-    print(f"\nRecord counts by file:")
-    for filename, services in sorted(service_summary.items()):
-        if services:
-            print(f"\n  {filename}:")
-            for service, count in services.items():
-                print(f"    - {service}: {count}")
-
-    # Print consolidated data structure info
-    print(f"\nConsolidated data structure loaded: {len(all_data)} files")
-
-    # Save validation results to a file
-    results = {
-        "total_files": len(json_files),
-        "valid_files": valid_files,
-        "invalid_files": [{"file": f, "error": e} for f, e in invalid_files],
-        "service_summary": {k: dict(v) for k, v in service_summary.items()}
+    # Save results to file
+    output_file = workspace / "data" / "deployment_validation_results.json"
+    validation_report = {
+        "validation_date": datetime.now().isoformat(),
+        "results": results,
+        "summary": {
+            "total_files": len(results),
+            "valid_files": sum(1 for r in results if r['valid_json'] and r['structure_valid']),
+            "total_errors": total_errors,
+            "total_warnings": total_warnings
+        }
     }
 
-    output_file = data_dir / "validation-results.json"
     with open(output_file, 'w') as f:
-        json.dump(results, f, indent=2)
+        json.dump(validation_report, f, indent=2)
 
-    print(f"\nValidation results saved to: {output_file}")
+    print(f"Validation results saved to: {output_file}")
 
-    return 0 if len(invalid_files) == 0 else 1
+    # Exit with error code if validation failed
+    if total_errors > 0:
+        print("\n❌ Validation failed with errors")
+        sys.exit(1)
+    elif total_warnings > 0:
+        print("\n⚠️  Validation completed with warnings")
+        sys.exit(0)
+    else:
+        print("\n✅ All files validated successfully")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

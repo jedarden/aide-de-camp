@@ -1,912 +1,223 @@
 {
   "metadata": {
-    "generated_at": "2026-08-07T10:51:52.000000+00:00",
+    "generated_at": "2026-08-07T11:08:45.876325+00:00",
     "analysis_type": "failure_taxonomy_with_frequency_analysis",
-    "time_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "time_period": "deployment_data_analysis",
     "services_analyzed": [
-      "whisper-openai",
       "pbx-rebuild-relay",
       "pbx-web",
-      "lab-rebuild-relay",
-      "whisper-stt"
+      "whisper-openai",
+      "whisper-stt",
+      "lab-rebuild-relay"
     ],
-    "total_samples": 9,
-    "date_range": {
-      "start": "2026-07-07",
-      "end": "2026-08-06"
-    },
-    "total_pattern_categories": 14,
-    "pattern_matching_rules_version": "1.0.0",
-    "data_quality": "complete",
-    "overall_health_status": "HEALTHY",
-    "last_validated": "2026-08-07T10:51:52.000000+00:00",
-    "validation_status": "validated_and_complete"
-  },
-  "pattern_hierarchy": {
-    "level_1_critical_infrastructure": {
-      "description": "Failures that prevent pod startup entirely",
-      "severity_level": "critical",
-      "patterns": [
-        "ImagePullBackOff",
-        "VolumeMountFailure",
-        "ConfigMapMissing",
-        "SecretMissing"
-      ]
-    },
-    "level_2_runtime_failures": {
-      "description": "Failures during pod execution",
-      "severity_level": "critical",
-      "patterns": [
-        "CrashLoopBackOff",
-        "OOMKilled"
-      ]
-    },
-    "level_3_health_check_failures": {
-      "description": "Failures detected by probes",
-      "severity_level": "medium_to_high",
-      "patterns": [
-        "StartupProbeFailure",
-        "ReadinessProbeFailure",
-        "LivenessProbeFailure"
-      ]
-    },
-    "level_4_dependency_issues": {
-      "description": "Failures related to external services",
-      "severity_level": "medium_to_high",
-      "patterns": [
-        "DependencyTimeout",
-        "DatabaseConnectionFailure",
-        "NetworkPolicyBlocked"
-      ]
-    },
-    "level_5_deployment_process": {
-      "description": "Issues with deployment orchestration",
-      "severity_level": "medium",
-      "patterns": [
-        "DeploymentRollback",
-        "ProgressDeadlineExceeded"
-      ]
-    }
+    "total_pattern_categories": 6,
+    "pattern_matching_rules_version": "1.0.0"
   },
   "pattern_categories": {
     "ImagePullBackOff": {
       "pattern_id": "ImagePullBackOff",
-      "category": "Critical Infrastructure",
-      "severity": "critical",
-      "level": 1,
-      "description": "Container image cannot be pulled from registry",
-      "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
-        "images_affected": [],
-        "total_unique_images": 0
-      },
-      "indicators": [
-        "Failed to pull image",
-        "ImagePullBackOff",
-        "ErrImagePull",
-        "registry unavailable"
-      ],
-      "common_causes": [
-        "Image does not exist in registry",
-        "Registry authentication failure",
-        "Network connectivity to registry",
-        "Image tag or name typo"
-      ],
-      "resolution_hints": [
-        "Verify image exists in registry",
-        "Check image pull secrets",
-        "Test network connectivity to registry"
-      ]
-    },
-    "VolumeMountFailure": {
-      "pattern_id": "VolumeMountFailure",
-      "category": "Critical Infrastructure",
-      "severity": "critical",
-      "level": 1,
-      "description": "Cannot mount required volume",
-      "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
-        "images_affected": [],
-        "total_unique_images": 0
-      },
-      "indicators": [
-        "Volume mount failed",
-        "persistentvolumeclaim not found",
-        "cannot mount volume"
-      ],
-      "common_causes": [
-        "PVC not created",
-        "PV not available",
-        "Storage class issues",
-        "Wrong volume name in spec"
-      ],
-      "resolution_hints": [
-        "Create missing PVC",
-        "Verify storage class exists",
-        "Check volume availability"
-      ]
-    },
-    "ConfigMapMissing": {
-      "pattern_id": "ConfigMapMissing",
-      "category": "Critical Infrastructure",
+      "category": "ImagePullBackOff",
       "severity": "high",
-      "level": 1,
-      "description": "Required ConfigMap does not exist",
+      "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
       "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
+      "distribution_by_service": {},
+      "image_version_context": {
         "images_affected": [],
         "total_unique_images": 0
       },
-      "indicators": [
-        "ConfigMap not found",
-        "Required ConfigMap missing",
-        "Cannot mount ConfigMap"
-      ],
-      "common_causes": [
-        "ConfigMap not created",
-        "Wrong ConfigMap name",
-        "ConfigMap in different namespace"
-      ],
-      "resolution_hints": [
-        "Create required ConfigMap",
-        "Verify ConfigMap name in pod spec",
-        "Check ConfigMap namespace"
-      ]
-    },
-    "SecretMissing": {
-      "pattern_id": "SecretMissing",
-      "category": "Critical Infrastructure",
-      "severity": "high",
-      "level": 1,
-      "description": "Required Secret does not exist",
-      "total_occurrences": 0,
-      "frequency": 0,
       "time_distribution": {
         "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
+        "time_span_hours": 0,
         "earliest_timestamp": null,
         "latest_timestamp": null
       },
-      "context": {
-        "affected_services": [],
-        "images_affected": [],
-        "total_unique_images": 0
-      },
-      "indicators": [
-        "Secret not found",
-        "Required Secret missing",
-        "Cannot mount Secret"
-      ],
-      "common_causes": [
-        "Secret not created",
-        "Wrong Secret name",
-        "Secret in different namespace"
-      ],
-      "resolution_hints": [
-        "Create required Secret",
-        "Verify Secret name in pod spec",
-        "Check Secret namespace"
-      ]
+      "sample_occurrences": []
     },
     "CrashLoopBackOff": {
       "pattern_id": "CrashLoopBackOff",
-      "category": "Runtime Failures",
+      "category": "CrashLoopBackOff",
       "severity": "critical",
-      "level": 2,
-      "description": "Pod repeatedly crashes and restarts",
+      "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
       "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
+      "distribution_by_service": {},
+      "image_version_context": {
         "images_affected": [],
         "total_unique_images": 0
       },
-      "indicators": [
-        "back-off restarting failed container",
-        "CrashLoopBackOff",
-        "Container crashed",
-        "Pod was terminated"
-      ],
-      "common_causes": [
-        "Application code errors",
-        "Missing environment variables",
-        "Incorrect command or arguments",
-        "Missing dependencies"
-      ],
-      "resolution_hints": [
-        "Check container logs for application errors",
-        "Verify environment variables are set",
-        "Validate command and arguments"
-      ]
+      "time_distribution": {
+        "frequency": 0,
+        "time_span_hours": 0,
+        "earliest_timestamp": null,
+        "latest_timestamp": null
+      },
+      "sample_occurrences": []
     },
     "OOMKilled": {
       "pattern_id": "OOMKilled",
-      "category": "Runtime Failures",
-      "severity": "critical",
-      "level": 2,
-      "description": "Container killed due to exceeding memory limits",
-      "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
-        "images_affected": [],
-        "total_unique_images": 0
-      },
-      "indicators": [
-        "OOMKilled",
-        "exceeded memory limits",
-        "out of memory",
-        "Container was killed (exit code 137)"
-      ],
-      "common_causes": [
-        "Memory leaks in application",
-        "Memory limits set too low",
-        "Sudden increase in memory usage",
-        "Large file processing"
-      ],
-      "resolution_hints": [
-        "Increase memory limits in container spec",
-        "Investigate memory leaks in application",
-        "Add memory monitoring and profiling"
-      ]
-    },
-    "StartupProbeFailure": {
-      "pattern_id": "StartupProbeFailure",
-      "category": "Health Check Failures",
+      "category": "OOMKilled",
       "severity": "high",
-      "level": 3,
-      "description": "Startup probe fails during container initialization",
+      "description": "Container killed due to memory exhaustion (resource limits exceeded)",
       "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
+      "distribution_by_service": {},
+      "image_version_context": {
         "images_affected": [],
         "total_unique_images": 0
       },
-      "indicators": [
-        "Startup probe failed",
-        "container did not start within timeout",
-        "Failed startup probe"
-      ],
-      "common_causes": [
-        "Application startup time too long",
-        "Missing dependencies blocking startup",
-        "Configuration errors preventing startup"
-      ],
-      "resolution_hints": [
-        "Increase startup probe timeout and period",
-        "Check application startup logs",
-        "Verify startup dependencies"
-      ]
+      "time_distribution": {
+        "frequency": 0,
+        "time_span_hours": 0,
+        "earliest_timestamp": null,
+        "latest_timestamp": null
+      },
+      "sample_occurrences": []
     },
-    "ReadinessProbeFailure": {
-      "pattern_id": "ReadinessProbeFailure",
-      "category": "Health Check Failures",
+    "Probe_failure": {
+      "pattern_id": "Probe_failure",
+      "category": "Probe_failure",
       "severity": "medium",
-      "level": 3,
-      "description": "Readiness probe repeatedly fails, preventing pod from receiving traffic",
+      "description": "Readiness or liveness probe failures (health check issues)",
       "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
+      "distribution_by_service": {},
+      "image_version_context": {
         "images_affected": [],
         "total_unique_images": 0
       },
-      "indicators": [
-        "Readiness probe failed",
-        "connection refused",
-        "Container not ready"
-      ],
-      "common_causes": [
-        "Application not fully started",
-        "Health endpoint returning wrong status",
-        "Dependencies not ready",
-        "Port not listening"
-      ],
-      "resolution_hints": [
-        "Increase initialDelaySeconds",
-        "Increase probe timeout",
-        "Check application startup time"
-      ]
-    },
-    "LivenessProbeFailure": {
-      "pattern_id": "LivenessProbeFailure",
-      "category": "Health Check Failures",
-      "severity": "high",
-      "level": 3,
-      "description": "Liveness probe fails, causing pod restart",
-      "total_occurrences": 0,
-      "frequency": 0,
       "time_distribution": {
         "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
+        "time_span_hours": 0,
         "earliest_timestamp": null,
         "latest_timestamp": null
       },
-      "context": {
-        "affected_services": [],
-        "images_affected": [],
-        "total_unique_images": 0
-      },
-      "indicators": [
-        "Liveness probe failed",
-        "killing container",
-        "Application hung",
-        "liveness probe timeout"
-      ],
-      "common_causes": [
-        "Application deadlock",
-        "Application hung state",
-        "Liveness endpoint too strict",
-        "Long-running operations blocking probe"
-      ],
-      "resolution_hints": [
-        "Check for deadlocks in application",
-        "Increase liveness probe period",
-        "Review liveness endpoint logic"
-      ]
+      "sample_occurrences": []
     },
-    "DependencyTimeout": {
-      "pattern_id": "DependencyTimeout",
-      "category": "Dependency Issues",
-      "severity": "high",
-      "level": 4,
-      "description": "Application cannot connect to required external services",
-      "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
-        "images_affected": [],
-        "total_unique_images": 0
-      },
-      "indicators": [
-        "timeout connecting to",
-        "connection refused",
-        "service unavailable",
-        "Failed to resolve DNS"
-      ],
-      "common_causes": [
-        "Dependency service not ready",
-        "Network policies blocking connections",
-        "DNS resolution failures",
-        "Service discovery issues"
-      ],
-      "resolution_hints": [
-        "Check dependency service is running",
-        "Verify network policies allow traffic",
-        "Test DNS resolution"
-      ]
-    },
-    "DatabaseConnectionFailure": {
-      "pattern_id": "DatabaseConnectionFailure",
-      "category": "Dependency Issues",
-      "severity": "high",
-      "level": 4,
-      "description": "Cannot establish connection to database",
-      "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
-        "images_affected": [],
-        "total_unique_images": 0
-      },
-      "indicators": [
-        "database connection failed",
-        "connection refused",
-        "authentication failed",
-        "SQL connection error"
-      ],
-      "common_causes": [
-        "Database not available",
-        "Wrong connection string",
-        "Authentication failures",
-        "Network issues to database"
-      ],
-      "resolution_hints": [
-        "Verify database is accessible",
-        "Check connection string",
-        "Validate database credentials"
-      ]
-    },
-    "NetworkPolicyBlocked": {
-      "pattern_id": "NetworkPolicyBlocked",
-      "category": "Dependency Issues",
+    "Dependency_timeout": {
+      "pattern_id": "Dependency_timeout",
+      "category": "Dependency_timeout",
       "severity": "medium",
-      "level": 4,
-      "description": "Network traffic blocked by network policy",
+      "description": "Deployment timeout due to dependency unavailability",
       "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
+      "distribution_by_service": {},
+      "image_version_context": {
         "images_affected": [],
         "total_unique_images": 0
       },
-      "indicators": [
-        "Connection blocked by network policy",
-        "Traffic denied by NetworkPolicy",
-        "network policy rules prevent connection"
-      ],
-      "common_causes": [
-        "NetworkPolicy too restrictive",
-        "Missing NetworkPolicy allow rules",
-        "Wrong namespace selectors",
-        "Missing pod labels for policy"
-      ],
-      "resolution_hints": [
-        "Review NetworkPolicy rules",
-        "Add allow rules for required traffic",
-        "Check pod labels match policy selectors"
-      ]
-    },
-    "DeploymentRollback": {
-      "pattern_id": "DeploymentRollback",
-      "category": "Deployment Process Issues",
-      "severity": "medium",
-      "level": 5,
-      "description": "Deployment was rolled back to previous version",
-      "total_occurrences": 1,
-      "frequency": 1,
       "time_distribution": {
-        "frequency": 1,
-        "time_span_days": 1,
-        "average_frequency_per_day": 1.0,
-        "earliest_timestamp": "2026-07-13T18:07:55+00:00",
-        "latest_timestamp": "2026-07-13T18:07:55+00:00",
-        "peak_day": "2026-07-13",
-        "peak_hour": "18:00"
+        "frequency": 0,
+        "time_span_hours": 0,
+        "earliest_timestamp": null,
+        "latest_timestamp": null
       },
-      "context": {
-        "affected_services": [
-          "pbx-web"
-        ],
+      "sample_occurrences": []
+    },
+    "Other": {
+      "pattern_id": "Other",
+      "category": "Other",
+      "severity": "unknown",
+      "description": "Other failure patterns not matching standard categories",
+      "total_occurrences": 181,
+      "distribution_by_service": {
+        "pbx-web": 1,
+        "lab-rebuild-relay": 3,
+        "pbx-rebuild-relay": 3,
+        "whisper-openai": 6,
+        "whisper-stt": 15
+      },
+      "image_version_context": {
         "images_affected": [
-          "ronaldraygun/pbx-web:1.0.8"
+          "ronaldraygun/pbx-web:1.0.8",
+          "ronaldraygun/pbx-web:1.0.9",
+          "python:3-slim",
+          "ronaldraygun/whisper-stt:1.8.6",
+          "ronaldraygun/whisper-stt:1.8.4",
+          "ronaldraygun/whisper-stt:1.8.2",
+          "fedirz/faster-whisper-server:latest-cpu"
         ],
-        "total_unique_images": 1,
-        "rollback_details": {
-          "from": "revision 11",
-          "to": "revision 14",
-          "reason": "deployment_rollback",
-          "notes": "Rolled back to 1.0.8 on same day"
-        }
+        "total_unique_images": 7
+      },
+      "time_distribution": {
+        "frequency": 181,
+        "time_span_hours": 2093.9394444444442,
+        "earliest_timestamp": "2026-05-02T11:29:50+00:00",
+        "latest_timestamp": "2026-07-28T17:26:12+00:00"
       },
       "sample_occurrences": [
         {
           "timestamp": "2026-07-13T18:07:55+00:00",
           "service": "pbx-web",
           "image": "ronaldraygun/pbx-web:1.0.8",
-          "event_type": "deployment_rollback",
-          "revision": 11
-        }
-      ],
-      "indicators": [
-        "Deployment rolled back",
-        "rolled back to previous version",
-        "revert",
-        "previous version"
-      ],
-      "common_causes": [
-        "Health check failures",
-        "Configuration errors",
-        "Performance degradation",
-        "Critical bugs detected"
-      ],
-      "resolution_hints": [
-        "Review deployment logs for root cause",
-        "Fix issues in failed version",
-        "Test before redeploying"
-      ]
-    },
-    "ProgressDeadlineExceeded": {
-      "pattern_id": "ProgressDeadlineExceeded",
-      "category": "Deployment Process Issues",
-      "severity": "high",
-      "level": 5,
-      "description": "Deployment took longer than progress deadline",
-      "total_occurrences": 0,
-      "frequency": 0,
-      "time_distribution": {
-        "frequency": 0,
-        "time_span_days": 0,
-        "average_frequency_per_day": 0.0,
-        "earliest_timestamp": null,
-        "latest_timestamp": null
-      },
-      "context": {
-        "affected_services": [],
-        "images_affected": [],
-        "total_unique_images": 0
-      },
-      "indicators": [
-        "Deployment exceeded progress deadline",
-        "ReplicaSet progress timeout",
-        "deployment did not complete within timeout"
-      ],
-      "common_causes": [
-        "Readiness probes taking too long",
-        "Slow image pull",
-        "Resource constraints",
-        "Pod stuck in pending state"
-      ],
-      "resolution_hints": [
-        "Increase progressDeadlineSeconds",
-        "Check readiness probe timeouts",
-        "Verify resource availability"
-      ]
-    }
-  },
-  "deployment_pattern_categories": {
-    "rollback_pattern": {
-      "pattern_type": "rollback",
-      "occurrence_count": 1,
-      "frequency": "1 events in 30 days",
-      "severity": "LOW",
-      "affected_services": [
-        "pbx-web"
-      ],
-      "time_distribution": {
-        "timestamps": [
-          "2026-07-13T18:07:55Z"
-        ],
-        "temporal_analysis": {
-          "daily_distribution": {
-            "2026-07-13": 1
-          },
-          "hourly_distribution": {
-            "18:00": 1
-          },
-          "day_of_week_distribution": {
-            "Monday": 1
-          },
-          "total_active_days": 1,
-          "peak_day": [
-            "2026-07-13",
-            1
-          ],
-          "peak_hour": [
-            "18:00",
-            1
-          ]
-        }
-      },
-      "context": {
-        "images_involved": [
-          "ronaldraygun/pbx-web:1.0.8"
-        ],
-        "impact": "Service continuity maintained via automatic rollback"
-      }
-    },
-    "rapid_deployment_pattern": {
-      "pattern_type": "rapid_deployment",
-      "occurrence_count": 3,
-      "frequency": "3 rapid sequences involving 6 deployments",
-      "severity": "MEDIUM",
-      "affected_services": [
-        "whisper_stt",
-        "pbx_web"
-      ],
-      "time_distribution": {
-        "sequences_detected": 3,
-        "temporal_analysis": {
-          "daily_distribution": {
-            "2026-07-08": 4,
-            "2026-07-13": 2
-          },
-          "hourly_distribution": {
-            "03:00": 4,
-            "18:00": 2
-          },
-          "day_of_week_distribution": {
-            "Monday": 2,
-            "Wednesday": 4
-          },
-          "total_active_days": 2,
-          "peak_day": [
-            "2026-07-08",
-            4
-          ],
-          "peak_hour": [
-            "03:00",
-            4
-          ]
+          "pattern_type": "Other"
         },
-        "total_deployments_in_rapid_sequences": 6
-      },
-      "context": {
-        "rapid_image_progressions": [
-          {
-            "service": "pbx_web",
-            "sequence": [
-              "ronaldraygun/pbx-web:1.0.8",
-              "ronaldraygun/pbx-web:1.0.9"
-            ],
-            "start_time": "2026-07-13T18:07:55+00:00",
-            "duration_seconds": 612.0
-          },
-          {
-            "service": "whisper_stt",
-            "sequence": [
-              "ronaldraygun/whisper-stt:1.8.2",
-              "ronaldraygun/whisper-stt:1.8.4"
-            ],
-            "start_time": "2026-07-08T03:09:35+00:00",
-            "duration_seconds": 398.0
-          },
-          {
-            "service": "whisper_stt",
-            "sequence": [
-              "ronaldraygun/whisper-stt:1.8.4",
-              "ronaldraygun/whisper-stt:1.8.6"
-            ],
-            "start_time": "2026-07-08T03:16:13+00:00",
-            "duration_seconds": 631.0
-          }
-        ],
-        "average_duration_seconds": 547.0,
-        "impact": "Rapid iterations may increase risk if not properly tested"
-      }
-    },
-    "version_revert_pattern": {
-      "pattern_type": "version_revert",
-      "occurrence_count": 1,
-      "frequency": "1 version reverts in 30 days",
-      "severity": "LOW",
-      "affected_services": [
-        "pbx_web"
-      ],
-      "time_distribution": {
-        "timestamps": [
-          "2026-07-28T17:26:12Z"
-        ],
-        "temporal_analysis": {
-          "daily_distribution": {
-            "2026-07-28": 1
-          },
-          "hourly_distribution": {
-            "17:00": 1
-          },
-          "day_of_week_distribution": {
-            "Tuesday": 1
-          },
-          "total_active_days": 1,
-          "peak_day": [
-            "2026-07-28",
-            1
-          ],
-          "peak_hour": [
-            "17:00",
-            1
-          ]
-        }
-      },
-      "context": {
-        "revert_details": {
-          "from": "python:3-slim",
-          "to": "ronaldraygun/pbx-web:1.0.9",
-          "timestamp": "2026-07-28T17:26:12Z",
-          "service": "pbx_web"
+        {
+          "timestamp": "2026-07-28T17:26:12+00:00",
+          "service": null,
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "pattern_type": "Other"
         },
-        "impact": "Reverting to previous version indicates instability or issues with newer version"
-      }
-    },
-    "infrastructure_deployment_pattern": {
-      "pattern_type": "infrastructure_deployment",
-      "occurrence_count": 2,
-      "frequency": "2 infrastructure deployments in 30 days",
-      "severity": "INFO",
-      "affected_services": [
-        "lab-rebuild-relay",
-        "pbx-rebuild-relay"
-      ],
-      "time_distribution": {
-        "temporal_analysis": {
-          "daily_distribution": {
-            "2026-07-15": 1,
-            "2026-07-27": 1
-          },
-          "hourly_distribution": {
-            "03:00": 1,
-            "17:00": 1
-          },
-          "day_of_week_distribution": {
-            "Wednesday": 1,
-            "Monday": 1
-          },
-          "total_active_days": 2,
-          "peak_day": [
-            "2026-07-15",
-            1
-          ],
-          "peak_hour": [
-            "03:00",
-            1
-          ]
+        {
+          "timestamp": "2026-07-27T17:56:07+00:00",
+          "service": "lab-rebuild-relay",
+          "image": "python:3-slim",
+          "pattern_type": "Other"
+        },
+        {
+          "timestamp": "2026-07-15T03:24:40+00:00",
+          "service": "pbx-rebuild-relay",
+          "image": "python:3-slim",
+          "pattern_type": "Other"
+        },
+        {
+          "timestamp": "2026-07-13T18:18:07+00:00",
+          "service": null,
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "pattern_type": "Other"
         }
-      },
-      "context": {
-        "images_used": [
-          "python:3-slim"
-        ],
-        "deployment_types": [
-          "PBX rebuild relay deployment - supporting infrastructure",
-          "Lab rebuild relay deployment - supporting infrastructure"
-        ],
-        "impact": "Infrastructure deployments support main service operations"
-      }
+      ]
     }
   },
   "frequency_statistics": {
     "by_pattern": {
       "ImagePullBackOff": 0,
-      "VolumeMountFailure": 0,
-      "ConfigMapMissing": 0,
-      "SecretMissing": 0,
       "CrashLoopBackOff": 0,
       "OOMKilled": 0,
-      "StartupProbeFailure": 0,
-      "ReadinessProbeFailure": 0,
-      "LivenessProbeFailure": 0,
-      "DependencyTimeout": 0,
-      "DatabaseConnectionFailure": 0,
-      "NetworkPolicyBlocked": 0,
-      "DeploymentRollback": 1,
-      "ProgressDeadlineExceeded": 0
+      "Probe_failure": 0,
+      "Dependency_timeout": 0,
+      "Other": 181
     },
-    "by_service": {
-      "pbx-web": 1,
-      "whisper-stt": 0,
-      "whisper-openai": 0,
-      "pbx-rebuild-relay": 0,
-      "lab-rebuild-relay": 0
-    },
-    "by_severity": {
-      "critical": 0,
-      "high": 0,
-      "medium": 1,
-      "low": 0
-    },
-    "by_deployment_pattern": {
-      "rollback": 1,
-      "rapid_deployment": 3,
-      "version_revert": 1,
-      "infrastructure_deployment": 2
-    },
-    "temporal_distribution": {
-      "dates_with_failures": [
-        "2026-07-13"
-      ],
-      "dates_with_patterns": [
-        "2026-07-08",
-        "2026-07-13",
-        "2026-07-15",
-        "2026-07-27",
-        "2026-07-28"
-      ],
-      "failure_frequency_per_day": 0.033,
-      "pattern_frequency_per_day": 0.167
-    },
+    "by_service": {},
+    "by_severity": {},
+    "temporal_distribution": {},
+    "time_span_analysis": {},
     "service_pattern_breakdown": {
       "pbx-web": {
-        "DeploymentRollback": 1
+        "Other": 1
       },
-      "whisper-stt": {},
-      "whisper-openai": {},
-      "pbx-rebuild-relay": {},
-      "lab-rebuild-relay": {}
+      "lab-rebuild-relay": {
+        "Other": 3
+      },
+      "pbx-rebuild-relay": {
+        "Other": 3
+      },
+      "whisper-openai": {
+        "Other": 6
+      },
+      "whisper-stt": {
+        "Other": 15
+      }
     }
   },
   "verification": {
-    "total_records_processed": 9,
-    "total_patterns_detected": 7,
-    "coverage_percentage": 77.8,
-    "schema_validation": "passed",
-    "json_well_formed": true,
-    "all_patterns_accounted_for": true
+    "total_records_processed": 71,
+    "total_patterns_detected": 181,
+    "coverage_percentage": 254.92957746478874
   },
   "summary": {
-    "total_pattern_types_defined": 14,
-    "total_deployment_pattern_types": 4,
+    "total_pattern_types_defined": 6,
     "total_pattern_types_with_occurrences": 1,
-    "total_deployment_patterns_detected": 4,
-    "total_failures_across_all_patterns": 1,
+    "total_failures_across_all_patterns": 181,
     "most_common_pattern": [
-      "DeploymentRollback",
-      1
+      "Other",
+      181
     ],
-    "most_common_deployment_pattern": [
-      "rapid_deployment",
-      3
-    ],
-    "most_affected_service": [
-      "pbx-web",
-      1
-    ],
-    "deployment_success_rate": "100%",
-    "overall_assessment": "HEALTHY",
-    "key_insights": [
-      "100% deployment success rate across all services",
-      "Only 1 rollback event indicates stable deployment process",
-      "Rapid deployment patterns suggest active development",
-      "No critical infrastructure or runtime failures detected",
-      "Health check and dependency issues absent from dataset"
-    ]
+    "overall_assessment": "ANALYSIS_COMPLETE"
   }
 }

@@ -1,0 +1,364 @@
+{
+  "report_metadata": {
+    "report_id": "adc-39kyy-validation-report",
+    "timestamp": "2026-08-07T07:30:00Z",
+    "validation_window": {
+      "start": "2026-07-08T00:00:00Z",
+      "end": "2026-08-06T23:59:59Z",
+      "expected_days": 30
+    },
+    "services_validated": ["pbx-web", "whisper-stt"],
+    "validation_criteria": [
+      "Verify temporal coverage spans full 30 days for all four datasets",
+      "Identify and document any gaps or missing periods",
+      "Validate data consistency across error rate and latency datasets",
+      "Document anomalies detected (spikes, drops, zero periods)",
+      "Store consolidated metrics in final intermediate format"
+    ]
+  },
+  "executive_summary": {
+    "overall_status": "CRITICAL_DATA_FAILURE",
+    "key_findings": [
+      "Latency data collection: 0% success rate for both services (108,252 log entries processed, 0 with latency data)",
+      "Error rate data: Partial collection success - pbx-web has HTTP + app errors, whisper-stt has app errors only",
+      "Temporal coverage: Latency 0% coverage, Error rate ~60% coverage (limited to single-day snapshots)",
+      "Data consistency: Cannot validate - insufficient baseline data",
+      "Anomalies: Complete infrastructure failure in latency pipeline"
+    ],
+    "acceptance_criteria_status": {
+      "verify_temporal_coverage": "FAILED - 0% latency coverage, partial error rate coverage",
+      "identify_gaps": "COMPLETED - 31 missing days for latency, partial for error rates",
+      "validate_consistency": "BLOCKED - Insufficient data for cross-validation",
+      "document_anomalies": "COMPLETED - Critical infrastructure failures documented",
+      "consolidated_metrics": "COMPLETED - Final intermediate format created"
+    }
+  },
+  "dataset_validation": {
+    "pbx-web": {
+      "latency_metrics": {
+        "status": "FAILED",
+        "data_source": "logs/pbx-web-victorialogs-raw.jsonl",
+        "entries_processed": 10000,
+        "entries_with_latency": 0,
+        "temporal_coverage_days": 0,
+        "temporal_coverage_percentage": 0.0,
+        "missing_days": 31,
+        "missing_day_list": [
+          "2026-07-08", "2026-07-09", "2026-07-10", "2026-07-11", "2026-07-12",
+          "2026-07-13", "2026-07-14", "2026-07-15", "2026-07-16", "2026-07-17",
+          "2026-07-18", "2026-07-19", "2026-07-20", "2026-07-21", "2026-07-22",
+          "2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26", "2026-07-27",
+          "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31", "2026-08-01",
+          "2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06"
+        ],
+        "percentile_metrics": {
+          "p50": "UNDEFINED",
+          "p75": "UNDEFINED",
+          "p90": "UNDEFINED",
+          "p95": "UNDEFINED",
+          "p99": "UNDEFINED",
+          "mean": "UNDEFINED",
+          "median": "UNDEFINED",
+          "stddev": "UNDEFINED"
+        }
+      },
+      "error_rate_metrics": {
+        "status": "PARTIAL_SUCCESS",
+        "http_errors": {
+          "http_5xx_errors": 0,
+          "http_4xx_errors": 2,
+          "http_total_requests": 33129,
+          "http_5xx_error_rate": 0.0,
+          "http_4xx_error_rate": 6.037006852002777e-05
+        },
+        "application_errors": {
+          "total_pods_analyzed": 8,
+          "pods_with_errors": 1,
+          "total_error_count": 5,
+          "error_rate_per_pod": 0.625,
+          "error_rate_per_day": 0.16666666666666666
+        },
+        "oom_kills": {
+          "total_oom_kill_count": 0,
+          "oom_kill_rate_per_pod": 0.0,
+          "oom_kill_rate_per_day": 0.0
+        },
+        "deployment_errors": {
+          "total_deployments": 0,
+          "deployment_error_rate": 0.0,
+          "deployment_success_rate": 0.0
+        },
+        "overall_error_rate": 0.23333333333333334,
+        "temporal_coverage_note": "Single-day snapshot only - not 30-day continuous coverage"
+      }
+    },
+    "whisper-stt": {
+      "latency_metrics": {
+        "status": "FAILED",
+        "data_source": "logs/whisper-stt-30day-victorialogs.jsonl",
+        "entries_processed": 98252,
+        "entries_with_latency": 0,
+        "temporal_coverage_days": 0,
+        "temporal_coverage_percentage": 0.0,
+        "missing_days": 31,
+        "missing_day_list": [
+          "2026-07-08", "2026-07-09", "2026-07-10", "2026-07-11", "2026-07-12",
+          "2026-07-13", "2026-07-14", "2026-07-15", "2026-07-16", "2026-07-17",
+          "2026-07-18", "2026-07-19", "2026-07-20", "2026-07-21", "2026-07-22",
+          "2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26", "2026-07-27",
+          "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31", "2026-08-01",
+          "2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06"
+        ],
+        "percentile_metrics": {
+          "p50": "UNDEFINED",
+          "p75": "UNDEFINED",
+          "p90": "UNDEFINED",
+          "p95": "UNDEFINED",
+          "p99": "UNDEFINED",
+          "mean": "UNDEFINED",
+          "median": "UNDEFINED",
+          "stddev": "UNDEFINED"
+        }
+      },
+      "error_rate_metrics": {
+        "status": "PARTIAL_SUCCESS",
+        "http_errors": {
+          "http_5xx_errors": 0,
+          "http_4xx_errors": 0,
+          "http_total_requests": 0,
+          "note": "No HTTP access logs found for whisper-stt"
+        },
+        "application_errors": {
+          "total_pods_analyzed": 10,
+          "pods_with_errors": 2,
+          "total_error_count": 2,
+          "error_rate_per_pod": 0.2,
+          "error_rate_per_day": 0.06666666666666667
+        },
+        "oom_kills": {
+          "total_oom_kill_count": 0,
+          "oom_kill_rate_per_pod": 0.0,
+          "oom_kill_rate_per_day": 0.0
+        },
+        "deployment_errors": {
+          "status": "QUERY_FAILED",
+          "error": "'str' object has no attribute 'get'"
+        },
+        "overall_error_rate": 0.06666666666666667,
+        "temporal_coverage_note": "Single-day snapshot only - not 30-day continuous coverage"
+      }
+    }
+  },
+  "gap_analysis": {
+    "latency_gaps": {
+      "gap_type": "COMPLETE_DATA_LOSS",
+      "affected_services": ["pbx-web", "whisper-stt"],
+      "total_expected_days": 31,
+      "total_missing_days": 31,
+      "coverage_percentage": 0.0,
+      "root_cause": "Missing latency field mappings in Victorialogs schema, no Argo Workflow timing integration",
+      "impact": "No baseline performance data available for analysis",
+      "remediation_required": "Infrastructure changes to log schema and workflow integration"
+    },
+    "error_rate_gaps": {
+      "gap_type": "TEMPORAL_COVERAGE_LIMITED",
+      "affected_services": ["pbx-web", "whisper-stt"],
+      "total_expected_days": 30,
+      "actual_coverage_days": 1,
+      "coverage_percentage": 3.33,
+      "limitation": "Data collection limited to single-day snapshots, not continuous 30-day coverage",
+      "impact": "Cannot analyze temporal patterns, trends, or correlate events with errors",
+      "remediation_required": "Implement continuous error rate monitoring with proper timestamps"
+    }
+  },
+  "anomaly_detection": {
+    "critical_anomalies": [
+      {
+        "anomaly_id": "ADC-ANOMALY-001",
+        "type": "DATA_COLLECTION_FAILURE",
+        "severity": "CRITICAL",
+        "description": "Zero latency capture across 108,252 log entries (10,000 pbx-web + 98,252 whisper-stt)",
+        "timestamp": "2026-08-07T07:12:03Z",
+        "affected_services": ["pbx-web", "whisper-stt"],
+        "impact": "100% latency data loss rate",
+        "business_impact": "Complete blindness to service performance characteristics",
+        "immediate_action_required": true
+      },
+      {
+        "anomaly_id": "ADC-ANOMALY-002",
+        "type": "TEMPORAL_COVERAGE_FAILURE",
+        "severity": "CRITICAL",
+        "description": "Complete 30-day window missing for latency metrics on both services",
+        "timestamp": "2026-08-07T07:12:03Z",
+        "affected_services": ["pbx-web", "whisper-stt"],
+        "impact": "0% temporal coverage for latency analysis",
+        "immediate_action_required": true
+      },
+      {
+        "anomaly_id": "ADC-ANOMALY-003",
+        "type": "STATISTICAL_ANOMALY",
+        "severity": "CRITICAL",
+        "description": "Zero variance across entire dataset, all percentiles undefined",
+        "timestamp": "2026-08-07T07:12:03Z",
+        "affected_services": ["pbx-web", "whisper-stt"],
+        "impact": "No baseline for performance comparison",
+        "immediate_action_required": true
+      },
+      {
+        "anomaly_id": "ADC-ANOMALY-004",
+        "type": "QUERY_INFRASTRUCTURE_FAILURE",
+        "severity": "HIGH",
+        "description": "Deployment error rate queries failed with 'str' object has no attribute 'get'",
+        "timestamp": "2026-08-06T18:20:30Z",
+        "affected_services": ["whisper-stt"],
+        "impact": "Deployment error data unavailable for whisper-stt",
+        "immediate_action_required": false
+      }
+    ],
+    "minor_anomalies": [
+      {
+        "anomaly_id": "ADC-ANOMALY-005",
+        "type": "ZERO_HTTP_ERRORS",
+        "severity": "INFO",
+        "description": "whisper-stt shows zero HTTP errors - either no HTTP traffic or no access logs",
+        "timestamp": "2026-08-06T18:20:30Z",
+        "affected_services": ["whisper-stt"],
+        "impact": "Cannot validate HTTP error rates for whisper-stt",
+        "immediate_action_required": false
+      }
+    ]
+  },
+  "data_consistency_validation": {
+    "status": "BLOCKED",
+    "reason": "Insufficient data for cross-validation",
+    "validation_attempts": {
+      "error_vs_latency_correlation": "BLOCKED - No latency data available",
+      "cross_service_comparison": "BLOCKED - No baseline data for either service",
+      "temporal_consistency": "BLOCKED - Single-day snapshots prevent trend analysis",
+      "statistical_validation": "BLOCKED - Undefined percentiles across both services"
+    }
+  },
+  "final_intermediate_format": {
+    "format_type": "consolidated_metrics_validation",
+    "timestamp": "2026-08-07T07:30:00Z",
+    "validation_period": {
+      "start": "2026-07-08T00:00:00Z",
+      "end": "2026-08-06T23:59:59Z"
+    },
+    "consolidated_metrics": {
+      "pbx-web": {
+        "latency": {
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "mean": null,
+          "median": null,
+          "stddev": null,
+          "min": null,
+          "max": null,
+          "data_quality": "FAILED",
+          "coverage_percentage": 0.0,
+          "sample_count": 0
+        },
+        "error_rate": {
+          "http_5xx_rate": 0.0,
+          "http_4xx_rate": 6.037006852002777e-05,
+          "app_error_rate": 0.16666666666666666,
+          "oom_kill_rate": 0.0,
+          "deployment_error_rate": 0.0,
+          "overall_error_rate": 0.23333333333333334,
+          "data_quality": "PARTIAL",
+          "coverage_percentage": 3.33,
+          "sample_count": 7
+        }
+      },
+      "whisper-stt": {
+        "latency": {
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "mean": null,
+          "median": null,
+          "stddev": null,
+          "min": null,
+          "max": null,
+          "data_quality": "FAILED",
+          "coverage_percentage": 0.0,
+          "sample_count": 0
+        },
+        "error_rate": {
+          "http_5xx_rate": null,
+          "http_4xx_rate": null,
+          "app_error_rate": 0.06666666666666667,
+          "oom_kill_rate": 0.0,
+          "deployment_error_rate": null,
+          "overall_error_rate": 0.06666666666666667,
+          "data_quality": "PARTIAL",
+          "coverage_percentage": 3.33,
+          "sample_count": 2
+        }
+      }
+    },
+    "ready_for_analysis": false,
+    "blocking_issues": [
+      "No latency data available for either service",
+      "Error rate data limited to single-day snapshots",
+      "Cannot perform temporal trend analysis",
+      "Cannot perform cross-service comparisons",
+      "No baseline data for anomaly detection"
+    ]
+  },
+  "recommendations": {
+    "immediate_actions": [
+      {
+        "priority": 1,
+        "category": "Fix Latency Data Collection",
+        "actions": [
+          "Add latency field mappings to Victorialogs query infrastructure",
+          "Integrate Argo Workflow API to pull startedAt/finishedAt timestamps",
+          "Implement application-level timing in both services"
+        ]
+      },
+      {
+        "priority": 2,
+        "category": "Improve Error Rate Coverage",
+        "actions": [
+          "Implement continuous error rate monitoring with proper timestamps",
+          "Add HTTP access log collection for whisper-stt",
+          "Fix deployment error query infrastructure"
+        ]
+      },
+      {
+        "priority": 3,
+        "category": "Data Quality Monitoring",
+        "actions": [
+          "Create alerting for data quality failures",
+          "Implement temporal gap detection with automated alerts",
+          "Add validation checks at data ingestion time"
+        ]
+      }
+    ]
+  },
+  "acceptance_criteria_summary": {
+    "verify_temporal_coverage": {
+      "status": "FAILED",
+      "details": "Latency: 0% coverage (0/31 days), Error rate: 3.33% coverage (1/30 days)"
+    },
+    "identify_gaps": {
+      "status": "COMPLETED",
+      "details": "Documented 31 missing days for latency, partial coverage for error rates"
+    },
+    "validate_consistency": {
+      "status": "BLOCKED",
+      "details": "Cannot validate without sufficient baseline data"
+    },
+    "document_anomalies": {
+      "status": "COMPLETED",
+      "details": "5 anomalies documented (3 critical, 1 high, 1 info)"
+    },
+    "consolidated_metrics": {
+      "status": "COMPLETED",
+      "details": "Final intermediate format created but not ready for analysis"
+    }
+  }
+}

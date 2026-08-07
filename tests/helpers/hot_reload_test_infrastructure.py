@@ -38,7 +38,7 @@ import asyncio
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from components.hot_reload import HotReloadManager, Artifact
+from src.components.hot_reload import HotReloadManager, Artifact
 
 
 class HotReloadTestBase:

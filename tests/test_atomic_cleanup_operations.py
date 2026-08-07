@@ -341,13 +341,13 @@ class TestHotReloadAtomicOperations:
 
     def test_atomic_write_creates_temp_with_unique_name(self, tmp_path):
         """Test that atomic write creates temp file with unique name."""
-        from src.components.hot_reload import _atomic_write
+        from src.utils.atomic_write import atomic_write
 
         target_file = tmp_path / "test.yaml"
         content = "test: content"
 
-        # Perform atomic write
-        _atomic_write(target_file, content)
+        # Perform atomic write with retry logic
+        atomic_write(target_file, content, max_retries=3, initial_delay=0.1)
 
         # Verify file was written
         assert target_file.exists()
@@ -359,12 +359,12 @@ class TestHotReloadAtomicOperations:
 
     def test_atomic_write_handles_concurrent_access(self, tmp_path):
         """Test atomic write handles concurrent file access safely."""
-        from src.components.hot_reload import _atomic_write
+        from src.utils.atomic_write import atomic_write
 
         target_file = tmp_path / "concurrent.yaml"
 
         async def concurrent_write(content):
-            _atomic_write(target_file, content)
+            atomic_write(target_file, content, max_retries=3, initial_delay=0.1)
 
         # Run concurrent writes
         contents = [f"version-{i}\n" for i in range(5)]
@@ -378,7 +378,7 @@ class TestHotReloadAtomicOperations:
 
     def test_atomic_write_cleans_up_temp_on_failure(self, tmp_path):
         """Test atomic write cleans up temp files on failure."""
-        from src.components.hot_reload import _atomic_write
+        from src.utils.atomic_write import atomic_write
 
         # Create a scenario where write might fail
         target_file = tmp_path / "readonly" / "test.yaml"
@@ -389,7 +389,7 @@ class TestHotReloadAtomicOperations:
         try:
             # Attempt atomic write - should fail gracefully
             try:
-                _atomic_write(target_file, "test: content")
+                atomic_write(target_file, "test: content", max_retries=3, initial_delay=0.1)
             except (OSError, PermissionError):
                 pass  # Expected to fail
 

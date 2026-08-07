@@ -38,20 +38,18 @@ class DispatchRequest(BaseModel):
 
     utterance: str = Field(
         ...,
+        min_length=2,
         description="The utterance text to dispatch",
-        min_length=1,
         example="Check CI status for aide-de-camp",
     )
     session_id: str = Field(
         ...,
         description="Session ID for tracking and SSE targeting",
-        min_length=1,
         example="550e8400-e29b-41d4-a716-446655440000",
     )
     surface_id: str = Field(
         ...,
         description="Surface ID for SSE broadcast targeting",
-        min_length=1,
         example="surface-abc123",
     )
     utterance_id: Optional[str] = Field(
@@ -126,7 +124,7 @@ class DispatchRequest(BaseModel):
             raise ValueError('surface_id must be a non-empty string')
         return stripped
 
-    @field_validator('utterance_id')
+    @field_validator('utterance_id', mode='before')
     @classmethod
     def validate_optional_utterance_id(cls, v: Optional[str]) -> Optional[str]:
         """

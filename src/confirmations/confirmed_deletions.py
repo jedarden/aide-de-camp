@@ -24,11 +24,12 @@ Usage:
 """
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional, Any
 import logging
+
+from ..utils.atomic_write import atomic_append
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +94,14 @@ def document_confirmed_deletion(
     CONFIRMED_DELETIONS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Append to log file (one JSON record per line)
+    # Note: Append mode is appropriate for log files. Each line is a self-contained JSON record.
+    # The single write() call is atomic for reasonable content sizes. For concurrent access,
+    # application-level single-writer guarantees are assumed.
     try:
         with open(CONFIRMED_DELETIONS_LOG, "a") as f:
             f.write(json.dumps(deletion_record) + "\n")
+            f.flush()  # Ensure data is written to OS buffer
+            os.fsync(f.fileno())  # Ensure data is written to disk
         logger.info(f"Documented confirmed deletion: pod={pod_name}, response={user_response}, timestamp={timestamp}")
     except IOError as e:
         logger.error(f"Failed to write confirmed deletion to log: {e}")

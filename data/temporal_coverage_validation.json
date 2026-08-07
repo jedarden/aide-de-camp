@@ -1,0 +1,74 @@
+{
+  "validation_timestamp": "2026-08-07T07:23:05.423141",
+  "time_period": {
+    "expected_start": "2026-07-08T07:23:05.423110",
+    "expected_end": "2026-08-07T07:23:05.423110",
+    "expected_days": 30
+  },
+  "dataset_coverage": {
+    "pbx-web": {
+      "error_rates": 100.0,
+      "latency": 0.0,
+      "overall": 50.0
+    },
+    "whisper-stt": {
+      "error_rates": 100.0,
+      "latency": 0.0,
+      "overall": 50.0
+    }
+  },
+  "gaps_and_anomalies": {
+    "pbx-web": {
+      "anomalies": [],
+      "data_gaps": [
+        {
+          "metric_type": "latency",
+          "gap_description": "COMPLETE - No latency measurements available for entire 30-day period",
+          "severity": "critical",
+          "affected_days": "ALL_30_DAYS"
+        },
+        {
+          "metric_type": "error_rates",
+          "gap_description": "LOW_GRANULARITY - Only aggregate error rates available, no daily breakdown",
+          "severity": "moderate",
+          "affected_days": "ALL_30_DAYS"
+        }
+      ]
+    },
+    "whisper-stt": {
+      "anomalies": [],
+      "data_gaps": [
+        {
+          "metric_type": "latency",
+          "gap_description": "COMPLETE - No latency measurements available for entire 30-day period",
+          "severity": "critical",
+          "affected_days": "ALL_30_DAYS"
+        },
+        {
+          "metric_type": "error_rates",
+          "gap_description": "LOW_GRANULARITY - Only aggregate error rates available, no daily breakdown",
+          "severity": "moderate",
+          "affected_days": "ALL_30_DAYS"
+        }
+      ]
+    }
+  },
+  "consistency_checks": {
+    "pbx-web": {
+      "has_error_data": true,
+      "has_latency_data": false,
+      "consistent": false,
+      "issues": [
+        "Error rate data exists but latency data missing"
+      ]
+    },
+    "whisper-stt": {
+      "has_error_data": true,
+      "has_latency_data": false,
+      "consistent": false,
+      "issues": [
+        "Error rate data exists but latency data missing"
+      ]
+    }
+  }
+}
