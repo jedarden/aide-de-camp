@@ -267,9 +267,223 @@ class Step(BaseModel):
 - **Extensibility:** Intended to be subclassed for concrete step types
 - **Configuration:** `use_enum_values=True` ensures enum values serialize as strings
 
+## Practical Single-Step Usage Examples
+
+### Example 1: Direct Step Function Execution
+
+```python
+from src.action.steps import execute_ci_status_step, execute_pod_status_step
+
+# Execute CI status check directly
+ci_result = await execute_ci_status_step(
+    intent_id="intent-abc123",
+    session_id="session-def456",
+    project_slug="mta-my-way",
+    project_cfg={
+        "cluster": "iad-ci",
+        "namespace": "production",
+    },
+)
+
+# Handle the dict result directly
+if ci_result.get("status") == "success":
+    print(f"CI passed: {ci_result['workflow_name']}")
+elif ci_result.get("status") == "skipped":
+    print(f"CI check skipped: {ci_result['reason']}")
+else:
+    print(f"CI failed: {ci_result.get('phase', 'Unknown')}")
+
+# Execute pod status check
+pod_result = await execute_pod_status_step(
+    intent_id="intent-abc123",
+    session_id="session-def456", 
+    project_slug="mta-my-way",
+    project_cfg={
+        "cluster": "apexalgo-iad",
+        "namespace": "production",
+    },
+)
+
+# Check pod health
+running = pod_result.get("running", 0)
+total = pod_result.get("total_pods", 0)
+print(f"Pods: {running}/{total} running")
+```
+
+### Example 2: Step Class Usage
+
+```python
+from src.action.steps.read import CIStatusStep, PodStatusStep
+
+# Create and execute CI status step
+ci_step = CIStatusStep(
+    kubectl_config="/home/coding/.kube/iad-ci.kubeconfig",
+    timeout=15,
+)
+
+ci_result = await ci_step.execute(project_slug="mta-my-way")
+
+# Handle dataclass result
+if ci_result.success:
+    print(f"CI Status: {ci_result.data.get('status')}")
+    print(f"Workflow: {ci_result.data.get('workflow_name')}")
+else:
+    print(f"CI check failed: {ci_result.error}")
+
+# Create and execute pod status step
+pod_step = PodStatusStep(
+    proxy_url=None,  # Auto-detect from cluster config
+    timeout=10.0,
+)
+
+pod_result = await pod_step.execute(
+    namespace="production",
+    cluster="apexalgo-iad",
+)
+
+# Check pod phases
+if pod_result.success:
+    total_pods = pod_result.data.get("total_pods", 0)
+    phase_counts = pod_result.data.get("phase_counts", {})
+    print(f"Total pods: {total_pods}")
+    print(f"Phase distribution: {phase_counts}")
+else:
+    print(f"Pod status check failed: {pod_result.error}")
+```
+
+### Example 3: Sequential Step Execution
+
+```python
+from src.action.steps import (
+    execute_ci_status_step,
+    execute_pod_status_step,
+    execute_git_log_step,
+)
+
+async def diagnostic_check(project_slug: str, project_cfg: dict):
+    """Execute diagnostic checks sequentially."""
+    
+    results = {}
+    
+    # Step 1: Check CI status
+    try:
+        ci_result = await execute_ci_status_step(
+            intent_id="diagnostic-1",
+            session_id="session-123",
+            project_slug=project_slug,
+            project_cfg=project_cfg,
+        )
+        results["ci_status"] = ci_result
+        print(f"✓ CI status: {ci_result.get('status')}")
+    except Exception as e:
+        print(f"✗ CI check failed: {e}")
+        results["ci_status"] = {"error": str(e)}
+    
+    # Step 2: Check pod status
+    try:
+        pod_result = await execute_pod_status_step(
+            intent_id="diagnostic-1",
+            session_id="session-123",
+            project_slug=project_slug,
+            project_cfg=project_cfg,
+        )
+        results["pod_status"] = pod_result
+        print(f"✓ Pod status: {pod_result.get('running')}/{pod_result.get('total_pods')} running")
+    except Exception as e:
+        print(f"✗ Pod check failed: {e}")
+        results["pod_status"] = {"error": str(e)}
+    
+    # Step 3: Get git history
+    try:
+        git_result = await execute_git_log_step(
+            intent_id="diagnostic-1",
+            session_id="session-123",
+            project_slug=project_slug,
+            project_cfg=project_cfg,
+        )
+        results["git_log"] = git_result
+        print(f"✓ Recent commits: {git_result.get('count', 0)}")
+    except Exception as e:
+        print(f"✗ Git log failed: {e}")
+        results["git_log"] = {"error": str(e)}
+    
+    return results
+
+# Usage
+results = await diagnostic_check(
+    project_slug="mta-my-way",
+    project_cfg={
+        "cluster": "apexalgo-iad",
+        "namespace": "production",
+        "repo_path": "/home/coding/mta-my-way",
+    }
+)
+```
+
+### Example 4: Parallel Step Execution
+
+```python
+import asyncio
+from src.action.steps import (
+    execute_deployment_info_step,
+    execute_pod_status_step,
+    execute_argocd_apps_step,
+)
+
+async def parallel_cluster_check(project_slug: str, project_cfg: dict):
+    """Execute independent cluster checks in parallel."""
+    
+    # Create parallel tasks
+    tasks = [
+        execute_deployment_info_step(
+            intent_id="parallel-1",
+            session_id="session-123",
+            project_slug=project_slug,
+            project_cfg=project_cfg,
+        ),
+        execute_pod_status_step(
+            intent_id="parallel-1",
+            session_id="session-123",
+            project_slug=project_slug,
+            project_cfg=project_cfg,
+        ),
+        execute_argocd_apps_step(
+            intent_id="parallel-1",
+            session_id="session-123",
+            project_slug=project_slug,
+            project_cfg=project_cfg,
+        ),
+    ]
+    
+    # Execute all tasks in parallel
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Process results
+    deployment_info, pod_info, argocd_info = results
+    
+    print(f"Deployments: {len(deployment_info.get('deployments', []))}")
+    print(f"Pods: {pod_info.get('running', 0)}/{pod_info.get('total_pods', 0)} running")
+    print(f"ArgoCD Apps: {len(argocd_info.get('applications', []))}")
+    
+    return {
+        "deployment_info": deployment_info,
+        "pod_status": pod_info,
+        "argocd_apps": argocd_info,
+    }
+
+# Usage
+cluster_status = await parallel_cluster_check(
+    project_slug="mta-my-way",
+    project_cfg={
+        "cluster": "apexalgo-iad",
+        "namespace": "production",
+    }
+)
+```
+
 ## Comprehensive Usage Examples
 
-### Example 1: Complete Workflow Execution
+### Example 5: Complete Workflow Execution
 
 ```python
 import time
@@ -384,7 +598,7 @@ await broadcaster.broadcast(
 )
 ```
 
-### Example 2: Types Working Together - Error Handling
+### Example 6: Types Working Together - Error Handling
 
 ```python
 from src.action.models import ExecutionContext, StepResult, StepStatus
@@ -452,7 +666,7 @@ def finalize_workflow(workflow: ActionResult) -> ActionResult:
     return workflow
 ```
 
-### Example 3: Creating and Manipulating Instances
+### Example 7: Creating and Manipulating Instances
 
 ```python
 import time
@@ -541,7 +755,7 @@ step_definition = Step(
 )
 ```
 
-### Example 4: Serialization and SSE Broadcasting
+### Example 8: Serialization and SSE Broadcasting
 
 ```python
 import json
@@ -595,7 +809,7 @@ await broadcaster.broadcast(
 )
 ```
 
-### Example 5: Type Safety and Validation
+### Example 9: Type Safety and Validation
 
 ```python
 from src.action.models import ExecutionContext, StepResult, StepStatus
@@ -1186,6 +1400,89 @@ class EventType:
 ```
 
 **Status:** ✅ FIXED - All action workflow event types have been added to `src/sse/broadcaster.py` (2026-08-06). Workflows can now execute without `AttributeError`.
+
+### ⚠️ CRITICAL: Dual StepResult Type System
+
+**Problem:** There are TWO different `StepResult` types in the codebase that serve different purposes:
+
+```python
+# Type 1: Pydantic model in src/action/models.py (for workflow execution)
+from src.action.models import StepResult, StepStatus
+result1 = StepResult(
+    step_name="ci_status",
+    status=StepStatus.COMPLETED,  # Uses StepStatus enum
+    started_at=time.time(),
+    completed_at=time.time(),
+    duration_ms=1000.0,
+)
+
+# Type 2: Dataclass in src/action/steps/read.py (for individual steps)
+from src.action.steps.read import StepResult
+result2 = StepResult(
+    success=True,  # Uses boolean success field
+    data={"key": "value"},
+    error=None,
+)
+
+# Type 3: Dict return from step functions in src/action/steps.py
+result3 = await execute_ci_status_step(
+    intent_id="intent-123",
+    session_id="session-456",
+    project_slug="mta-my-way",
+    project_cfg={...},
+)
+# Returns: dict[str, Any] with direct data fields
+```
+
+**Impact:** Mixing these types causes type errors and field access confusion:
+
+```python
+# ❌ WRONG - Trying to use Pydantic methods on dict/StepResult dataclass
+result.status  # AttributeError: dict has no 'status'
+result.to_dict()  # AttributeError: dataclass has no 'to_dict'
+
+# ❌ WRONG - Wrong field names for type
+result.success  # Pydantic StepResult doesn't have 'success' field
+result.status  # Dataclass StepResult doesn't have 'status' field
+```
+
+**Solution:** Use the correct type for each context:
+
+```python
+# ✅ CORRECT - For workflow execution results (Pydantic model)
+from src.action.models import StepResult, StepStatus, ActionResult
+workflow_result = ActionResult(...)
+step_result = StepResult(
+    step_name="ci_status",
+    status=StepStatus.COMPLETED,
+    output={"data": "..."},
+    started_at=time.time(),
+)
+workflow_result.add_step(step_result)  # For workflow aggregation
+
+# ✅ CORRECT - For direct step execution (dict returns)
+from src.action.steps import execute_ci_status_step
+ci_data = await execute_ci_status_step(
+    intent_id="intent-123",
+    session_id="session-456",
+    project_slug="mta-my-way",
+    project_cfg={...},
+)
+# ci_data is dict[str, Any], access directly: ci_data["status"], ci_data["workflow_name"]
+
+# ✅ CORRECT - For step class instances (dataclass)
+from src.action.steps.read import CIStatusStep
+step = CIStatusStep()
+result = await step.execute(project_slug="mta-my-way")
+# result is StepResult dataclass, access: result.success, result.data
+```
+
+**Usage Guide:**
+- **Workflow Execution**: Use `src.action.models.StepResult` (Pydantic) - for `ActionExecutor` and workflow aggregation
+- **Step Functions**: Use `src.action.steps.execute_*_step()` functions - return `dict[str, Any]`
+- **Step Classes**: Use `src.action.steps.read.*Step` classes - return dataclass `StepResult`
+
+**Status:** ⚠️ BY DESIGN - The dual-type system is intentional: Pydantic models for workflow orchestration, dict returns for step functions, dataclass for step classes.
 
 ### Gotcha 1: Enum Serialization
 
