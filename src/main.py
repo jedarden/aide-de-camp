@@ -25,6 +25,7 @@ from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field, field_validator, ValidationError
 
 from .realtime.session import VoiceSession, load_voice_prompt, AVAILABLE_VOICES
@@ -219,13 +220,13 @@ app.include_router(test_router, prefix="/api/v1", tags=["test"])
 # Exception handlers for validation errors
 # =============================================================================
 
-@app.exception_handler(ValidationError)
-async def validation_exception_handler(request, exc: ValidationError):
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
     """
     Handle Pydantic validation errors with clear error messages.
 
     Returns 400 with detailed field-level error messages for validation failures.
-    Logs validation failures for monitoring.
+    Logs validation failures for monitoring with session_id context when available.
     """
     errors = []
     for error in exc.errors():
@@ -237,9 +238,26 @@ async def validation_exception_handler(request, exc: ValidationError):
             "type": error["type"]
         })
 
-    # Log validation failure
+    # Try to extract session_id from request body for logging context
+    # Use request.body() which returns the raw request body bytes
+    session_id = "unknown"
+    try:
+        # Get the request body
+        import json
+        body_bytes = await request.body()
+        if body_bytes:
+            body = json.loads(body_bytes.decode())
+            session_id = body.get("session_id", "unknown")
+            # Sanitize: limit length and show only prefix for security
+            if session_id != "unknown" and len(session_id) > 8:
+                session_id = session_id[:8] + "..."
+    except Exception:
+        # If we can't parse the body, use "unknown"
+        session_id = "unknown"
+
+    # Log validation failure with session_id context
     logger.warning(
-        f"Request validation failed: {len(errors)} error(s) - "
+        f"Request validation failed for session {session_id}: {len(errors)} error(s) - "
         + "; ".join(f"{e['field']}: {e['message']}" for e in errors)
     )
 
