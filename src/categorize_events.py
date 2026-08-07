@@ -91,6 +91,23 @@ def categorize_event(log_data: Dict[str, Any]) -> EventType:
     that match no known pattern are categorized as UNKNOWN, serving as a
     safe fallback to prevent data loss.
 
+    **Fallback Behavior:**
+    The UNKNOWN category is the FINAL fallback after ALL specific checks:
+    1. Input validation (None, not dict, empty) → UNKNOWN
+    2. OOM detection → if matched, return OOM; continue if not
+    3. Image pull errors → if matched, return IMAGE_PULL_ERROR; continue if not
+    4. Pod crashes → if matched, return POD_CRASH; continue if not
+    5. Readiness failures → if matched, return READINESS_FAIL; continue if not
+    6. Timeouts → if matched, return TIMEOUT; continue if not
+    7. Resource limits → if matched, return RESOURCE_LIMIT; continue if not
+    8. Network errors → if matched, return NETWORK_ERROR; continue if not
+    9. Probe failures → if matched, return PROBE_FAILURE; continue if not
+    10. Deployment start → if matched, return DEPLOYMENT_START; continue if not
+    11. Deployment complete → if matched, return DEPLOYMENT_COMPLETE; continue if not
+    12. **FINAL FALLBACK → UNKNOWN** (if nothing above matched)
+
+    This ensures ALL events are categorized, preventing data loss.
+
     Args:
         log_data: A normalized event dictionary from parse_log.parse_entry()
                  with fields: timestamp, service, event_type, status,
@@ -99,8 +116,8 @@ def categorize_event(log_data: Dict[str, Any]) -> EventType:
     Returns:
         EventType enum value indicating the category of the event.
         Returns EventType.UNKNOWN if:
-        - log_data is None, not a dict, or empty
-        - No specific event pattern matches (after all checks)
+        - log_data is None, not a dict, or empty (input validation failure)
+        - No specific event pattern matches after all checks (pattern mismatch)
         - Event lacks recognizable error indicators or deployment signatures
 
     Examples:
@@ -165,7 +182,16 @@ def categorize_event(log_data: Dict[str, Any]) -> EventType:
     if _is_deployment_complete(event_type, status, source_fields):
         return EventType.DEPLOYMENT_COMPLETE
 
-    # Fallback to unknown
+    # Final fallback: unknown events
+    # This is the last resort when no specific pattern matches.
+    # Events reach this point when they:
+    # - Pass all validation checks (not None, proper dict structure)
+    # - Have valid event_type, status, and metadata fields
+    # - Do NOT match any of the specific detection patterns above
+    #
+    # This fallback ensures ALL events are categorized, preventing data loss
+    # and allowing for later analysis of emerging event types that may not
+    # fit into known patterns.
     return EventType.UNKNOWN
 
 

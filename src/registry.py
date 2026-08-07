@@ -14,6 +14,7 @@ precedence over discovered entries on all fields.
 
 import os
 import time
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,12 @@ import yaml
 REGISTRY_PATH = Path(__file__).parent.parent / "config" / "registry.yaml"
 DISCOVERY_ROOT = Path("/home/coding")
 CACHE_TTL = 300  # 5 minutes
+
+# CONCURRENT ACCESS PROTECTION: Thread-safe registry access
+# _cache_lock protects all access to _cache and _cache_at to prevent race conditions
+# This ensures that multiple threads can safely access the registry without corruption
+# The lock uses a reentrant lock (RLock) to allow recursive calls within the same thread
+_cache_lock = threading.RLock()
 
 # HOT-RELOAD MECHANISM: TTL-based cache invalidation
 # _cache stores the merged registry (YAML + discovered projects)

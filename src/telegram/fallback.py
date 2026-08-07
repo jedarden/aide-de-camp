@@ -343,6 +343,7 @@ class TelegramFallback:
             "failures_since_last_log": self._failures_since_last_log,
             "seen_failure_types": sorted(self._seen_failure_types),
             "distinct_failure_types": len(self._seen_failure_types),
+            "bridge_failure_summary": self._state_tracker.get_failure_summary(),
         }
 
     async def _handle_send_failure(
@@ -557,6 +558,24 @@ class TelegramFallback:
             # Re-arm per-type dedup so the next failure (even of a previously
             # seen type) is treated as a fresh first occurrence.
             self._seen_failure_types.clear()
+
+    def reset_failure_count(self) -> None:
+        """Reset the bridge state tracker's failure counter.
+
+        This can be used for manual recovery or after a threshold is reached.
+        The reachability state and last failure timestamp are preserved.
+        """
+        self._state_tracker.reset_failure_count()
+
+    def log_bridge_state(self) -> None:
+        """Log the current bridge state for monitoring purposes.
+
+        This method logs a summary of the bridge state at INFO level,
+        useful for periodic monitoring or debugging. It includes
+        the human-readable failure summary from the state tracker.
+        """
+        summary = self._state_tracker.get_failure_summary()
+        logger.info(f"Telegram bridge state: {summary}")
 
     def _format_result_message(self, result: dict) -> str:
         """Format a result as a Telegram message."""

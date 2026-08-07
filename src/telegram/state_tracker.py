@@ -11,6 +11,9 @@ class BridgeState:
     to provide a clean interface for health monitoring and alerting.
     """
 
+    # Maximum failure count to prevent infinite growth
+    MAX_FAILURE_COUNT = 9999
+
     def __init__(self) -> None:
         """Initialize a new BridgeState tracker."""
         self._is_reachable: bool = True
@@ -37,7 +40,9 @@ class BridgeState:
         """
         self._is_reachable = False
         self._last_failure_time = timestamp
-        self._failure_count += 1
+        # Cap failure count at MAX_FAILURE_COUNT to prevent infinite growth
+        if self._failure_count < self.MAX_FAILURE_COUNT:
+            self._failure_count += 1
         # Reset logging flag when we transition from reachable to unreachable
         # or when we're in a new failure streak
         if self._failure_count == 1:
@@ -85,3 +90,48 @@ class BridgeState:
     def failure_count(self) -> int:
         """Number of consecutive failures recorded."""
         return self._failure_count
+
+    def reset_failure_count(self) -> None:
+        """Reset the failure counter to zero.
+
+        This can be used for manual recovery or after a threshold is reached.
+        The reachability state and last failure timestamp are preserved.
+        """
+        self._failure_count = 0
+
+    def get_failure_summary(self) -> str:
+        """Get a human-readable summary of the bridge failure state.
+
+        Returns:
+            A human-readable status string indicating whether the bridge is
+            reachable or, if unreachable, how long it has been unreachable
+            and how many consecutive failures have occurred.
+        """
+        if self._is_reachable:
+            return "Bridge reachable"
+
+        # Bridge is unreachable - calculate time since last failure
+        if self._last_failure_time is None:
+            return "Bridge unreachable (no failure timestamp)"
+
+        now = datetime.now()
+        time_since_failure = now - self._last_failure_time
+
+        # Format the time duration in a human-readable way
+        total_seconds = int(time_since_failure.total_seconds())
+        if total_seconds < 60:
+            duration_str = f"{total_seconds} second(s)"
+        elif total_seconds < 3600:
+            minutes = total_seconds // 60
+            duration_str = f"{minutes} minute(s)"
+        elif total_seconds < 86400:
+            hours = total_seconds // 3600
+            duration_str = f"{hours} hour(s)"
+        else:
+            days = total_seconds // 86400
+            duration_str = f"{days} day(s)"
+
+        return (
+            f"Bridge unreachable for {duration_str}, "
+            f"{self._failure_count} consecutive failure(s)"
+        )

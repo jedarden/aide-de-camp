@@ -1,0 +1,1083 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aide-de-camp.ardenone.com/schemas/whisper-stt-deployment-data.json",
+  "title": "Whisper-STT Deployment Data Validation Schema",
+  "description": "JSON Schema for validating whisper-stt deployment data files. This schema ensures deployment data meets structural, type, and 30-day completeness requirements for operational analysis and comparative studies with pbx-web service.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "current_status",
+    "deployment_events_last_30_days",
+    "deployment_metrics",
+    "pod_health",
+    "infrastructure_details",
+    "summary"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Top-level deployment metadata including service identification, collection timestamp, and analysis period",
+      "required": [
+        "service",
+        "namespace",
+        "cluster",
+        "data_collected_at",
+        "time_period",
+        "managed_by",
+        "strategy",
+        "data_source"
+      ],
+      "properties": {
+        "service": {
+          "type": "string",
+          "const": "whisper-stt",
+          "description": "Service name (must be 'whisper-stt')"
+        },
+        "namespace": {
+          "type": "string",
+          "const": "whisper-stt",
+          "description": "Kubernetes namespace for the deployment"
+        },
+        "cluster": {
+          "type": "string",
+          "description": "Kubernetes cluster identifier (e.g., 'ardenone-cluster')"
+        },
+        "data_collected_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when deployment data was collected (ISO 8601 format)"
+        },
+        "time_period": {
+          "type": "object",
+          "description": "Analysis time period boundaries",
+          "required": ["start", "end", "description"],
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Analysis window start timestamp (ISO 8601)"
+            },
+            "end": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Analysis window end timestamp (ISO 8601)"
+            },
+            "description": {
+              "type": "string",
+              "description": "Human-readable description of the analysis period (e.g., '30-day period: 2026-07-07 to 2026-08-06')"
+            }
+          }
+        },
+        "managed_by": {
+          "type": "string",
+          "description": "Deployment management system (e.g., 'ArgoCD')"
+        },
+        "strategy": {
+          "type": "string",
+          "description": "Deployment strategy (e.g., 'Recreate', 'RollingUpdate')"
+        },
+        "data_source": {
+          "type": "string",
+          "description": "Data collection method (e.g., 'kubectl read-only proxy')"
+        }
+      }
+    },
+    "current_status": {
+      "type": "object",
+      "description": "Current deployment status including revision, image, replica counts, and conditions",
+      "required": [
+        "deployment_name",
+        "current_revision",
+        "current_image",
+        "generation",
+        "replicas",
+        "readyReplicas",
+        "updatedReplicas",
+        "availableReplicas",
+        "current_pod",
+        "pod_created_at"
+      ],
+      "properties": {
+        "deployment_name": {
+          "type": "string",
+          "const": "whisper-stt",
+          "description": "Kubernetes deployment name"
+        },
+        "current_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current deployment revision number"
+        },
+        "current_image": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+          "description": "Current container image (format: registry/image:tag, e.g., ronaldraygun/whisper-stt:1.8.6)"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Kubernetes generation number"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Desired replica count"
+        },
+        "readyReplicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of ready replicas"
+        },
+        "updatedReplicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of updated replicas"
+        },
+        "availableReplicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of available replicas"
+        },
+        "current_pod": {
+          "type": "string",
+          "description": "Current primary pod name"
+        },
+        "pod_created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Current pod creation timestamp"
+        },
+        "conditions": {
+          "type": "array",
+          "description": "Deployment conditions indicating status and availability",
+          "items": {
+            "type": "object",
+            "required": ["type", "status", "reason", "message", "lastTransitionTime"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Condition type (e.g., 'Progressing', 'Available')"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["True", "False", "Unknown"],
+                "description": "Condition status"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Human-readable reason for condition"
+              },
+              "message": {
+                "type": "string",
+                "description": "Detailed condition message"
+              },
+              "lastTransitionTime": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Last state transition timestamp"
+              }
+            }
+          }
+        }
+      }
+    },
+    "deployment_events_last_30_days": {
+      "type": "array",
+      "description": "Deployment events recorded within the 30-day analysis period. Critical for 30-day completeness validation.",
+      "items": {
+        "type": "object",
+        "required": [
+          "date",
+          "timestamp",
+          "event_type",
+          "outcome",
+          "revision",
+          "replicaSet",
+          "image"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Event date in YYYY-MM-DD format for daily aggregation"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Event timestamp with full precision (ISO 8601)"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": ["deployment_rollout", "deployment_rollback", "scaling_change", "config_change", "infrastructure_event"],
+            "description": "Event category classification"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["success", "failed", "rolled_back", "partial"],
+            "description": "Event outcome status"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Deployment revision number"
+          },
+          "replicaSet": {
+            "type": "string",
+            "description": "Kubernetes ReplicaSet name"
+          },
+          "image": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+            "description": "Container image deployed"
+          },
+          "previous_image": {
+            "type": ["string", "null"],
+            "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+            "description": "Previous image if applicable (null for initial deployment)"
+          },
+          "pod_name": {
+            "type": ["string", "null"],
+            "description": "Pod name created by this deployment"
+          },
+          "pod_ready": {
+            "type": ["boolean", "null"],
+            "description": "Pod readiness status"
+          },
+          "restart_count": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Container restart count"
+          },
+          "rollback_from": {
+            "type": ["string", "null"],
+            "description": "Source revision if this was a rollback"
+          },
+          "notes": {
+            "type": ["string", "null"],
+            "description": "Additional context or notes"
+          }
+        }
+      }
+    },
+    "historical_deployments_beyond_30_days": {
+      "type": "array",
+      "description": "Historical deployment events outside the 30-day window. Optional field for extended historical context.",
+      "items": {
+        "type": "object",
+        "required": [
+          "date",
+          "timestamp",
+          "event_type",
+          "outcome",
+          "revision",
+          "replicaSet",
+          "image"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Event date in YYYY-MM-DD format"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Event timestamp (ISO 8601)"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": ["deployment_rollout", "deployment_rollback", "scaling_change", "config_change", "infrastructure_event"],
+            "description": "Event category"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["success", "failed", "rolled_back", "partial"],
+            "description": "Event outcome"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Deployment revision"
+          },
+          "replicaSet": {
+            "type": "string",
+            "description": "ReplicaSet name"
+          },
+          "image": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+            "description": "Container image"
+          }
+        }
+      }
+    },
+    "deployment_metrics": {
+      "type": "object",
+      "description": "Deployment performance metrics calculated over the analysis period",
+      "required": [
+        "total_deployments_last_30_days",
+        "successful_deployments",
+        "failed_deployments",
+        "deployment_frequency_days",
+        "unique_images_deployed",
+        "images_used_last_30_days",
+        "current_uptime_days",
+        "last_deployment",
+        "days_since_last_deployment",
+        "rollbacks_last_30_days",
+        "deployment_success_rate"
+      ],
+      "properties": {
+        "total_deployments_last_30_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total deployments in the 30-day window (key metric for 30-day completeness)"
+        },
+        "successful_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of successful deployments"
+        },
+        "failed_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failed deployments"
+        },
+        "deployment_frequency_days": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average days between deployments (lower = more frequent)"
+        },
+        "unique_images_deployed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of unique image versions deployed"
+        },
+        "images_used_last_30_days": {
+          "type": "array",
+          "description": "List of image versions deployed in 30-day period",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$"
+          }
+        },
+        "current_uptime_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days since current deployment started"
+        },
+        "last_deployment": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of last deployment"
+        },
+        "days_since_last_deployment": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days elapsed since last deployment"
+        },
+        "rollbacks_last_30_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of rollback operations in 30-day period"
+        },
+        "deployment_success_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Success rate as decimal (0.0 to 1.0, e.g., 0.857 = 85.7%)"
+        }
+      }
+    },
+    "pod_health": {
+      "type": "object",
+      "description": "Current pod health information including individual pod status and aggregate health metrics",
+      "required": ["current_pod", "health_indicators"],
+      "properties": {
+        "current_pod": {
+          "type": "object",
+          "description": "Current primary pod details",
+          "required": [
+            "name",
+            "namespace",
+            "created_at",
+            "node_name",
+            "pod_ip",
+            "phase",
+            "ready"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Pod name"
+            },
+            "namespace": {
+              "type": "string",
+              "const": "whisper-stt",
+              "description": "Pod namespace"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Pod creation timestamp"
+            },
+            "node_name": {
+              "type": "string",
+              "description": "Node hosting the pod"
+            },
+            "pod_ip": {
+              "type": "string",
+              "pattern": "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$",
+              "description": "Pod IP address (IPv4 format)"
+            },
+            "phase": {
+              "type": "string",
+              "enum": ["Running", "Pending", "Failed", "Succeeded", "Unknown"],
+              "description": "Pod phase status"
+            },
+            "ready": {
+              "type": "boolean",
+              "description": "Pod readiness status"
+            },
+            "restart_count": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Total container restarts"
+            },
+            "containers": {
+              "type": "array",
+              "description": "Container states within the pod",
+              "items": {
+                "type": "object",
+                "required": ["name", "ready", "restart_count", "image", "image_id", "state"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Container name"
+                  },
+                  "ready": {
+                    "type": "boolean",
+                    "description": "Container readiness"
+                  },
+                  "restart_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Container restart count"
+                  },
+                  "image": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+                    "description": "Container image"
+                  },
+                  "image_id": {
+                    "type": "string",
+                    "description": "Container image ID (digest)"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": ["running", "waiting", "terminated"],
+                    "description": "Container state"
+                  },
+                  "started_at": {
+                    "type": ["string", "null"],
+                    "format": "date-time",
+                    "description": "Container start timestamp"
+                  }
+                }
+              }
+            },
+            "conditions": {
+              "type": "array",
+              "description": "Pod conditions",
+              "items": {
+                "type": "object",
+                "required": ["type", "status", "lastTransitionTime"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "Condition type (e.g., 'Ready', 'PodScheduled')"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["True", "False", "Unknown"],
+                    "description": "Condition status"
+                  },
+                  "lastTransitionTime": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Last state transition"
+                  }
+                }
+              }
+            },
+            "volume_mounts": {
+              "type": "array",
+              "description": "Volume mounts in the pod",
+              "items": {
+                "type": "object",
+                "required": ["name", "path", "type"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Volume name"
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "Mount path"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Mount type"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "health_indicators": {
+          "type": "object",
+          "description": "Aggregate pod health metrics across the deployment",
+          "required": [
+            "total_pods",
+            "healthy_pods",
+            "unhealthy_pods",
+            "failed_pods",
+            "pending_pods",
+            "success_rate",
+            "total_restarts",
+            "avg_pod_age_days",
+            "oldest_pod_age_days",
+            "pvc_mount_issues"
+          ],
+          "properties": {
+            "total_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total pods in deployment"
+            },
+            "healthy_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Healthy pod count"
+            },
+            "unhealthy_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Unhealthy pod count"
+            },
+            "failed_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Failed pod count"
+            },
+            "pending_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Pending pod count"
+            },
+            "success_rate": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0,
+              "description": "Pod success rate (0.0 to 1.0)"
+            },
+            "total_restarts": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total container restarts across all pods"
+            },
+            "avg_pod_age_days": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Average pod age in days"
+            },
+            "oldest_pod_age_days": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Oldest pod age in days"
+            },
+            "pvc_mount_issues": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "PVC mounting problem count"
+            }
+          }
+        }
+      }
+    },
+    "operational_logs_sample": {
+      "type": "object",
+      "description": "Sample operational logs for troubleshooting and diagnostics",
+      "properties": {
+        "recent_errors": {
+          "type": "array",
+          "description": "Recent error log entries",
+          "items": {
+            "type": "object",
+            "required": ["timestamp", "pod", "container", "level", "message"],
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Log timestamp"
+              },
+              "pod": {
+                "type": "string",
+                "description": "Pod name"
+              },
+              "container": {
+                "type": "string",
+                "description": "Container name"
+              },
+              "level": {
+                "type": "string",
+                "enum": ["ERROR", "WARNING", "INFO", "DEBUG"],
+                "description": "Log level"
+              },
+              "message": {
+                "type": "string",
+                "description": "Log message"
+              }
+            }
+          }
+        },
+        "recent_warnings": {
+          "type": "array",
+          "description": "Recent warning log entries",
+          "items": {
+            "type": "object",
+            "required": ["timestamp", "pod", "container", "level", "message"],
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Log timestamp"
+              },
+              "pod": {
+                "type": "string",
+                "description": "Pod name"
+              },
+              "container": {
+                "type": "string",
+                "description": "Container name"
+              },
+              "level": {
+                "type": "string",
+                "enum": ["ERROR", "WARNING", "INFO", "DEBUG"],
+                "description": "Log level"
+              },
+              "message": {
+                "type": "string",
+                "description": "Log message"
+              }
+            }
+          }
+        },
+        "startup_events": {
+          "type": "array",
+          "description": "Pod startup events",
+          "items": {
+            "type": "object",
+            "required": ["timestamp", "pod", "event"],
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Event timestamp"
+              },
+              "pod": {
+                "type": "string",
+                "description": "Pod name"
+              },
+              "event": {
+                "type": "string",
+                "description": "Event description"
+              }
+            }
+          }
+        }
+      }
+    },
+    "infrastructure_details": {
+      "type": "object",
+      "description": "Infrastructure configuration including resources, volumes, secrets, and probes",
+      "required": ["resource_limits", "volumes", "environment_variables", "secrets_used"],
+      "properties": {
+        "resource_limits": {
+          "type": "object",
+          "description": "Resource requirements per container",
+          "patternProperties": {
+            "^[a-z0-9-]+$": {
+              "type": "object",
+              "description": "Container resource specifications",
+              "required": ["cpu", "memory"],
+              "properties": {
+                "cpu": {
+                  "type": "object",
+                  "description": "CPU resources",
+                  "required": ["request", "limit"],
+                  "properties": {
+                    "request": {
+                      "type": "string",
+                      "pattern": "^[\\d]+m?$|^\\d+$",
+                      "description": "CPU request (e.g., '1', '100m')"
+                    },
+                    "limit": {
+                      "type": "string",
+                      "pattern": "^[\\d]+m?$|^\\d+$",
+                      "description": "CPU limit (e.g., '8', '8000m')"
+                    }
+                  }
+                },
+                "memory": {
+                  "type": "object",
+                  "description": "Memory resources",
+                  "required": ["request", "limit"],
+                  "properties": {
+                    "request": {
+                      "type": "string",
+                      "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+                      "description": "Memory request (e.g., '4Gi', '512Mi')"
+                    },
+                    "limit": {
+                      "type": "string",
+                      "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+                      "description": "Memory limit (e.g., '8Gi', '16384Mi')"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "volumes": {
+          "type": "array",
+          "description": "Volume configurations",
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "mount_path"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Volume name"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["persistentVolumeClaim", "emptyDir", "configMap", "secret"],
+                "description": "Volume type"
+              },
+              "claim": {
+                "type": ["string", "null"],
+                "description": "PVC claim name if applicable"
+              },
+              "size": {
+                "type": ["string", "null"],
+                "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+                "description": "Volume size (e.g., '10Gi')"
+              },
+              "storage_class": {
+                "type": ["string", "null"],
+                "enum": ["sata", "sata-large", "ssd", "ssd-large"],
+                "description": "Storage class"
+              },
+              "mount_path": {
+                "type": "string",
+                "description": "Mount path"
+              },
+              "read_only": {
+                "type": "boolean",
+                "default": false,
+                "description": "Read-only mount"
+              },
+              "medium": {
+                "type": ["string", "null"],
+                "description": "EmptyDir medium (Memory, default)"
+              },
+              "size_limit": {
+                "type": ["string", "null"],
+                "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+                "description": "EmptyDir size limit"
+              }
+            }
+          }
+        },
+        "environment_variables": {
+          "type": "object",
+          "description": "Key environment variables (sanitized, no secrets)",
+          "patternProperties": {
+            "^[A-Z_]+$": {
+              "type": "string",
+              "description": "Environment variable value (non-secret)"
+            }
+          }
+        },
+        "secrets_used": {
+          "type": "array",
+          "description": "Secret references (no values stored)",
+          "items": {
+            "type": "object",
+            "required": ["name", "keys", "type"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Secret name"
+              },
+              "keys": {
+                "type": "array",
+                "description": "Secret keys referenced",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": ["Secret", "ExternalSecret", "SealedSecret"],
+                "description": "Secret management type"
+              }
+            }
+          }
+        },
+        "liveness_probes": {
+          "type": "object",
+          "description": "Liveness probe configurations per container",
+          "patternProperties": {
+            "^[a-z0-9-]+$": {
+              "type": "object",
+              "required": ["enabled", "path", "port"],
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Probe enabled"
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Health check path"
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "description": "Health check port"
+                },
+                "initial_delay_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Initial delay before probing"
+                },
+                "period_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Probe period"
+                },
+                "timeout_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Probe timeout"
+                },
+                "failure_threshold": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Failure threshold"
+                }
+              }
+            }
+          }
+        },
+        "readiness_probes": {
+          "type": "object",
+          "description": "Readiness probe configurations per container",
+          "patternProperties": {
+            "^[a-z0-9-]+$": {
+              "type": "object",
+              "required": ["enabled", "path", "port"],
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Probe enabled"
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Health check path"
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "description": "Health check port"
+                },
+                "initial_delay_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Initial delay before probing"
+                },
+                "period_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Probe period"
+                },
+                "timeout_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Probe timeout"
+                },
+                "failure_threshold": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Failure threshold"
+                }
+              }
+            }
+          }
+        },
+        "node_affinity": {
+          "type": ["object", "null"],
+          "description": "Node placement rules",
+          "properties": {
+            "preferred_during_scheduling": {
+              "type": "object",
+              "description": "Preferred scheduling terms"
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Executive summary providing overall health, stability, and operational recommendations",
+      "required": [
+        "overall_health",
+        "deployment_stability",
+        "uptime",
+        "deployment_success_rate",
+        "recommendation"
+      ],
+      "properties": {
+        "overall_health": {
+          "type": "string",
+          "enum": ["excellent", "good", "degraded", "poor", "critical"],
+          "description": "Overall service health classification"
+        },
+        "deployment_stability": {
+          "type": "string",
+          "description": "Deployment stability assessment (e.g., 'Stable', 'Frequent rollbacks')"
+        },
+        "uptime": {
+          "type": "string",
+          "description": "Human-readable uptime (e.g., '15 days')"
+        },
+        "issues_last_30_days": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Total issues or incidents"
+        },
+        "rollbacks_last_30_days": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Rollback operations"
+        },
+        "deployment_success_rate": {
+          "type": "string",
+          "pattern": "^[\\d]+(\\.\\d+)?%$",
+          "description": "Formatted success rate (e.g., '85.7%')"
+        },
+        "critical_issues": {
+          "type": "array",
+          "description": "Critical problems requiring immediate attention",
+          "items": {
+            "type": "object",
+            "required": ["issue", "duration", "impact"],
+            "properties": {
+              "issue": {
+                "type": "string",
+                "description": "Issue description"
+              },
+              "duration": {
+                "type": "string",
+                "description": "Issue duration"
+              },
+              "impact": {
+                "type": "string",
+                "description": "Business impact"
+              }
+            }
+          }
+        },
+        "recommendation": {
+          "type": "string",
+          "description": "Operational recommendation"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "thirtyDayCompleteness": {
+      "type": "object",
+      "description": "30-day data completeness validation requirements. This definition ensures deployment data covers a continuous 30-day period without significant gaps.",
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "time_period": {
+              "type": "object",
+              "required": ["start", "end"],
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "required": ["time_period"],
+          "additionalProperties": true
+        },
+        "deployment_events_last_30_days": {
+          "type": "array",
+          "description": "Must contain at least one deployment event to verify 30-day coverage",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["date", "timestamp"],
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "deployment_metrics": {
+          "type": "object",
+          "required": ["total_deployments_last_30_days"],
+          "properties": {
+            "total_deployments_last_30_days": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Must be non-negative; zero indicates no deployments in period"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "required": ["metadata", "deployment_events_last_30_days", "deployment_metrics"]
+    }
+  }
+}
