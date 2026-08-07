@@ -1153,6 +1153,40 @@ async def execute_resilient_workflow(ctx: ExecutionContext) -> ActionResult:
 
 ## Common Gotchas and Solutions
 
+### ⚠️ CRITICAL: Missing EventType Constants
+
+**Problem:** The executor code references `EventType.ACTION_*` constants that don't exist in the `EventType` class, causing runtime `AttributeError`.
+
+```python
+# ❌ BROKEN - These constants don't exist in EventType
+EventType.ACTION_WORKFLOW_STARTED    # AttributeError
+EventType.ACTION_STEP_STARTED        # AttributeError
+EventType.ACTION_STEP_COMPLETED      # AttributeError
+EventType.ACTION_WORKFLOW_COMPLETED  # AttributeError
+EventType.ACTION_WORKFLOW_FAILED     # AttributeError
+EventType.ACTION_WORKFLOW_CANCELLED  # AttributeError
+```
+
+**Impact:** Any attempt to execute workflows will fail with `AttributeError: type object 'EventType' has no attribute 'ACTION_WORKFLOW_STARTED'`.
+
+**Solution:** Add the missing event type constants to `src/sse/broadcaster.py`:
+
+```python
+# Add to EventType class in src/sse/broadcaster.py
+class EventType:
+    # ... existing event types ...
+    
+    # Action workflow events (MISSING - need to be added)
+    ACTION_WORKFLOW_STARTED = "action_workflow_started"
+    ACTION_STEP_STARTED = "action_step_started"
+    ACTION_STEP_COMPLETED = "action_step_completed"
+    ACTION_WORKFLOW_COMPLETED = "action_workflow_completed"
+    ACTION_WORKFLOW_FAILED = "action_workflow_failed"
+    ACTION_WORKFLOW_CANCELLED = "action_workflow_cancelled"
+```
+
+**Status:** This is a critical bug that must be fixed before workflows can execute. The documentation shows correct usage, but the implementation is missing these constants.
+
 ### Gotcha 1: Enum Serialization
 
 **Problem:** `StepStatus` enum values aren't JSON-serializable by default.
@@ -1319,6 +1353,56 @@ await broadcaster.broadcast(
 )
 ```
 
+### Gotcha 9: Sequential vs Parallel Execution Mismatch
+
+**Problem:** Documentation shows parallel execution examples, but the actual `ActionExecutor` only executes steps sequentially.
+
+```python
+# ❌ DOCUMENTATION MISMATCH - Pattern 5 shows parallel execution
+# The documentation shows this pattern:
+parallel_tasks = [
+    execute_pod_status_step(ctx),
+    execute_service_status_step(ctx),
+    execute_configmap_status_step(ctx),
+]
+results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
+
+# ✅ ACTUAL IMPLEMENTATION - Steps execute sequentially only
+# The ActionExecutor.execute_workflow() method runs steps one at a time:
+for i, step_name in enumerate(steps):
+    step_result = await self._execute_step(...)  # Sequential, not parallel
+    result.add_step(step_result)
+```
+
+**Impact:** If you design workflows assuming parallel execution, they will run sequentially, potentially taking longer than expected.
+
+**Solution:** 
+- For now, assume all steps in a workflow execute sequentially
+- If parallel execution is needed, it must be implemented within individual step executors
+- Future versions may add parallel step execution capabilities
+
+**Status:** Documentation needs clarification that `ActionExecutor` currently supports sequential execution only. Parallel execution patterns shown are aspirational/design patterns, not current implementation behavior.
+
+```python
+# ❌ WRONG (broadcasts to all clients)
+await broadcaster.broadcast(
+    SSEEvent(
+        event_type="step_completed",
+        data=result.to_dict(),
+        # Missing target_session_id
+    )
+)
+
+# ✅ CORRECT (targets specific session)
+await broadcaster.broadcast(
+    SSEEvent(
+        event_type="step_completed",
+        target_session_id=ctx.session_id,  # Always include
+        data=result.to_dict(),
+    )
+)
+```
+
 ## Type Reference Summary
 
 | Type | Purpose | Required Fields | Key Methods |
@@ -1328,6 +1412,66 @@ await broadcaster.broadcast(
 | `StepResult` | Single step execution result | `step_name`, `status`, `started_at` | `to_dict()` |
 | `ActionResult` | Complete workflow result | `intent_id`, `session_id`, `workflow_name`, `status`, `started_at` | `add_step()`, `to_dict()` |
 | `Step` | Base class for step definitions | `step_type` | N/A |
+
+## Implementation Verification Notes
+
+### ⚠️ Critical Issues Found
+
+During documentation verification against `src/action/` implementation (2026-08-06), the following critical issues were discovered:
+
+1. **Missing EventType Constants** (CRITICAL)
+   - `executor.py` references `EventType.ACTION_*` constants that don't exist
+   - Causes `AttributeError` when executing workflows
+   - Constants must be added to `src/sse/broadcaster.py` EventType class
+   - See Gotcha 9 above for fix
+
+2. **Sequential vs Parallel Execution Mismatch** (IMPORTANT)
+   - Documentation shows parallel execution patterns (Pattern 5)
+   - Actual `ActionExecutor` only executes steps sequentially
+   - See Gotcha 10 above for details
+   - Documentation shows aspirational patterns vs actual implementation
+
+### ✅ Verified Correct
+
+The following aspects of the documentation match the implementation accurately:
+
+- All type definitions exactly match `src/action/models.py`
+- Step vocabulary matches registered step types in `ActionExecutor.__init__`
+- Method signatures and return types are accurate
+- Best practices and gotchas are based on real implementation issues
+- SSE broadcasting patterns are correct (except for missing constants)
+- ExecutionContext convenience properties work as documented
+
+### Implementation Details Verified
+
+**Step Executor Registry** (from `executor.py` line 249-261):
+```python
+self._step_executors = {
+    "ci_status": self._execute_ci_status,
+    "image_tag": self._execute_image_tag, 
+    "gitops_commit": self._execute_gitops_commit,
+    "argocd_sync_status": self._execute_argocd_sync_status,
+    "pod_status": self._execute_pod_status,
+    "deployment_info": self._execute_deployment_info,
+    "git_log": self._execute_git_log,
+    "argocd_apps": self._execute_argocd_apps,
+    "open_beads": self._execute_open_beads,
+}
+```
+
+**Execution Flow** (from `executor.py` line 334-362):
+- Workflows execute steps sequentially (not in parallel)
+- Failed steps halt the workflow immediately (fail-fast pattern)
+- Each step result is added to `ActionResult.steps` list
+- Progress broadcasts after each step completion
+
+**SSE Event Flow** (from `executor.py` line 637-716):
+- `ACTION_WORKFLOW_STARTED`: Broadcast when workflow begins
+- `ACTION_STEP_STARTED`: Broadcast before each step executes
+- `ACTION_STEP_COMPLETED`: Broadcast after each step finishes
+- `ACTION_WORKFLOW_COMPLETED/FAILED/CANCELLED`: Final workflow status
+
+Note: These event constants are missing from EventType class and must be added.
 
 ## Quick Reference Card
 
