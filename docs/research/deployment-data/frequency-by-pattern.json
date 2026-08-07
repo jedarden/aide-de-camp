@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "analysis_type": "frequency_by_pattern",
+    "generated_at": "2026-08-06T23:00:00Z",
+    "source_data": "classified-failures.json"
+  },
+  "pattern_statistics": {
+    "Other": {
+      "total_count": 1,
+      "services": {
+        "pbx-web": 1
+      },
+      "severity_counts": {
+        "unknown": 1
+      },
+      "severity_level": "unknown",
+      "description": "Other failure patterns not matching standard categories"
+    }
+  },
+  "summary": {
+    "total_patterns": 1,
+    "total_failures": 1,
+    "pattern_rankings": [
+      [
+        "Other",
+        1
+      ]
+    ],
+    "services_affected": [
+      "pbx-web"
+    ],
+    "high_severity_patterns": [],
+    "critical_severity_patterns": []
+  }
+}
