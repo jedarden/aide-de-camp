@@ -139,3 +139,43 @@ The extraction function expects standard Kubernetes pod logs with the following 
 2. Verify deletion detection with logs that contain termination events
 3. Validate timestamp parsing with various ISO 8601 formats
 4. Test edge cases: empty files, missing files, malformed timestamps
+
+## Additional Findings: Actual Log Format Examples
+
+### Nginx Access Log Format
+**Sample file:** `/home/coding/aide-de-camp/data/pbx-web-nginx.log`
+
+**Format:**
+```
+10.42.6.1 - - [06/Aug/2026:01:32:12 +0000] "GET /HTTP/1.1" 200 80210 "-" "kube-probe/1.34" "-"
+```
+
+**Characteristics:**
+- Timestamp at position 4: `[06/Aug/2026:01:32:12 +0000]`
+- Uses `[` and `]` delimiters
+- Format: `DD/Mon/YYYY:HH:MM:SS +TZ` (NOT ISO 8601)
+- **Problem:** Current extraction function won't match this format (no 'T' separator, different structure)
+
+### Application Log Format
+**Sample file:** `/home/coding/aide-de-camp/data/pbx-web-site-generator.log`
+
+**Format:**
+```
+Running Pagefind v1.1.0
+Running from: "/app"
+Source:       "/var/www/calls"
+```
+
+**Characteristics:**
+- No structured timestamps at all
+- Text output only
+- **Problem:** Deletion detection must rely on shutdown messages in the text
+- No reliable creation timestamp extraction possible
+
+## Critical Format Mismatch
+
+The extraction function expects ISO 8601 format but actual logs use:
+1. **Nginx:** `DD/Mon/YYYY:HH:MM:SS +TZ` (common log format)
+2. **Application:** No timestamps (plain text output)
+
+**Impact:** The function will fail to extract timestamps from actual log files and will fall back to file mtime, which may not represent the actual log creation time.
