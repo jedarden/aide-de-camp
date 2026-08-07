@@ -1185,7 +1185,7 @@ class EventType:
     ACTION_WORKFLOW_CANCELLED = "action_workflow_cancelled"
 ```
 
-**Status:** This is a critical bug that must be fixed before workflows can execute. The documentation shows correct usage, but the implementation is missing these constants.
+**Status:** ✅ FIXED - All action workflow event types have been added to `src/sse/broadcaster.py` (2026-08-06). Workflows can now execute without `AttributeError`.
 
 ### Gotcha 1: Enum Serialization
 
@@ -1403,6 +1403,380 @@ await broadcaster.broadcast(
 )
 ```
 
+## Troubleshooting Guide
+
+This section provides practical solutions for common issues encountered when using the Action Execution Model.
+
+### Issue: AttributeError when executing workflows
+
+**Symptoms:**
+```
+AttributeError: type object 'EventType' has no attribute 'ACTION_WORKFLOW_STARTED'
+```
+
+**Root Cause:** Missing event type constants in `src/sse/broadcaster.py`.
+
+**Solution:** ✅ Already fixed in the current codebase. All action workflow event types are now defined in the `EventType` class.
+
+**Verification:**
+```python
+from src.sse.broadcaster import EventType
+
+# These should all work without AttributeError
+assert EventType.ACTION_WORKFLOW_STARTED == "action_workflow_started"
+assert EventType.ACTION_STEP_STARTED == "action_step_started"
+assert EventType.ACTION_STEP_COMPLETED == "action_step_completed"
+```
+
+---
+
+### Issue: Workflow status remains "running" after completion
+
+**Symptoms:**
+- Workflow executes successfully but status never changes from "running"
+- Canvas UI shows workflow as in-progress indefinitely
+- SSE events show workflow started but never completed
+
+**Root Cause:** Forgetting to finalize workflow status and timing fields.
+
+**Solution:** Always finalize workflow before returning:
+```python
+def finalize_workflow(workflow: ActionResult) -> ActionResult:
+    """Finalize workflow result with timing."""
+    workflow.completed_at = time.time()
+    workflow.duration_ms = (workflow.completed_at - workflow.started_at) * 1000
+    
+    # Update status based on step results
+    if workflow.status == "running":
+        failed_steps = [s for s in workflow.steps if s.status == StepStatus.FAILED]
+        if failed_steps:
+            workflow.status = "failed"
+            workflow.error = f"Failed steps: {[s.step_name for s in failed_steps]}"
+        else:
+            workflow.status = "completed"
+    
+    return workflow
+```
+
+---
+
+### Issue: Steps execute but no SSE events received
+
+**Symptoms:**
+- Workflow executes correctly
+- Canvas UI doesn't show progress updates
+- No step completion events visible
+
+**Root Cause:** Missing SSE event broadcasts or incorrect event targeting.
+
+**Solution:** Ensure proper SSE broadcasting with session targeting:
+```python
+# After each step completion
+await broadcaster.broadcast(
+    SSEEvent(
+        event_type=EventType.ACTION_STEP_COMPLETED,
+        data=step_result.to_dict(),
+        target_session_id=ctx.session_id,  # CRITICAL: must include session targeting
+    )
+)
+
+# For final workflow result
+await broadcaster.broadcast(
+    SSEEvent(
+        event_type=EventType.ACTION_WORKFLOW_COMPLETED,
+        data=workflow_result.to_dict(),
+        target_session_id=ctx.session_id,
+    )
+)
+```
+
+---
+
+### Issue: TypeError when serializing StepResult to JSON
+
+**Symptoms:**
+```
+TypeError: Object of type StepStatus is not JSON serializable
+```
+
+**Root Cause:** Attempting to serialize Pydantic models with enum values directly.
+
+**Solution:** Always use `to_dict()` method before JSON serialization:
+```python
+# ❌ WRONG
+json.dumps(step_result)  # TypeError
+
+# ✅ CORRECT
+json.dumps(step_result.to_dict())  # Converts enum to string
+
+# ❌ WRONG
+json.dumps(workflow_result)  # TypeError
+
+# ✅ CORRECT  
+json.dumps(workflow_result.to_dict())  # Recursively converts all enums
+```
+
+---
+
+### Issue: Dry-run mode commits actual changes
+
+**Symptoms:**
+- Workflow with `dry_run=True` still commits changes
+- Git history shows unexpected commits
+- Declarative-config modified despite dry-run flag
+
+**Root Cause:** Step executors not respecting `ctx.dry_run` flag.
+
+**Solution:** Check dry-run flag in all mutating steps:
+```python
+async def execute_gitops_commit_step(ctx: ExecutionContext) -> dict[str, Any]:
+    """Execute gitops_commit step with dry-run support."""
+    
+    if ctx.dry_run:
+        return {
+            "status": "skipped",
+            "reason": "dry_run enabled - no commits made",
+            "would_commit": True,
+        }
+    
+    # Only proceed with actual commit when dry_run is False
+    # ... actual commit logic ...
+```
+
+---
+
+### Issue: Project not found in registry errors
+
+**Symptoms:**
+```
+ValueError: Project 'my-project' not found in registry
+```
+
+**Root Cause:** Project slug not registered in `config/registry.yaml`.
+
+**Solution:** Register project in registry configuration:
+```yaml
+# config/registry.yaml
+projects:
+  my-project:
+    cluster: "iad-ci"
+    namespace: "production"
+    repo_path: "/path/to/project/repo"
+    argocd_app: "my-project-app"
+    
+    workflows:
+      deploy:
+        description: "Deploy my-project"
+        steps:
+          - ci_status
+          - gitops_commit
+          - argocd_sync_status
+```
+
+**Verification:**
+```python
+from src.action.registry import list_workflows
+
+# Should return dict of workflows
+workflows = list_workflows("my-project")
+print(f"Available workflows: {list(workflows.keys())}")
+```
+
+---
+
+### Issue: Step executor timing out
+
+**Symptoms:**
+- Step hangs indefinitely
+- No step completion event
+- Workflow appears stuck
+
+**Root Cause:** Long-running operations without timeout handling.
+
+**Solution:** Implement proper timeout handling:
+```python
+import asyncio
+
+async def execute_with_timeout(
+    coro,
+    timeout_seconds: float = 60.0,
+    step_name: str = "unknown",
+) -> Any:
+    """Execute coroutine with timeout."""
+    try:
+        return await asyncio.wait_for(coro, timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        raise RuntimeError(f"Step '{step_name}' timed out after {timeout_seconds}s")
+
+# Usage in step executor
+async def execute_slow_step(ctx: ExecutionContext) -> dict[str, Any]:
+    result = await execute_with_timeout(
+        slow_operation(),
+        timeout_seconds=30.0,
+        step_name="slow_step",
+    )
+    return result
+```
+
+---
+
+### Issue: Kubectl proxy connection refused
+
+**Symptoms:**
+```
+RuntimeError: Failed to get pod status: Connection refused
+httpx.ConnectError: [Errno 111] Connection refused
+```
+
+**Root Cause:** Kubectl proxy not running or incorrect proxy URL in cluster config.
+
+**Solution:** 
+1. Check proxy is running:
+```bash
+# Check if proxy endpoint is accessible
+curl -s http://kubectl-proxy-<cluster>:8001/api/v1/namespaces/default/pods
+```
+
+2. Verify cluster configuration:
+```yaml
+# config/clusters.yaml
+clusters:
+  my-cluster:
+    proxy: "http://kubectl-proxy-my-cluster:8001"
+```
+
+3. Check proxy availability:
+```python
+from src.action.steps import _get_cluster_proxy
+
+proxy_url = _get_cluster_proxy("my-cluster")
+print(f"Proxy URL: {proxy_url}")  # Should not be None
+```
+
+---
+
+### Issue: ArgoCD sync status polling times out
+
+**Symptoms:**
+```
+RuntimeError: Failed to poll ArgoCD sync status: timeout
+```
+
+**Root Cause:** ArgoCD sync takes longer than the 5-minute timeout.
+
+**Solution:** Adjust timeout or investigate sync issues:
+```python
+# In execute_argocd_sync_status_step
+timeout = 300  # 5 minutes - increase if needed
+poll_interval = 5  # 5 seconds between polls
+
+# Check ArgoCD app status directly
+kubectl get applications <app-name> -n argocd -o json
+```
+
+---
+
+### Issue: Git operations fail in step executors
+
+**Symptoms:**
+```
+RuntimeError: git log failed: fatal: not a git repository
+RuntimeError: Failed to get git log: [Errno 2] No such file or directory
+```
+
+**Root Cause:** Incorrect `repo_path` in project configuration or path doesn't exist.
+
+**Solution:** Verify repository path configuration:
+```python
+from pathlib import Path
+
+repo_path = project_cfg.get("repo_path")
+if not Path(repo_path).exists():
+    raise RuntimeError(f"Repository path '{repo_path}' does not exist")
+
+# Verify it's a git repository
+git_dir = Path(repo_path) / ".git"
+if not git_dir.exists():
+    raise RuntimeError(f"Path '{repo_path}' is not a git repository")
+```
+
+---
+
+### Issue: Bead workflow execution errors
+
+**Symptoms:**
+```
+RuntimeError: bf list failed: bf: command not found
+RuntimeError: bf list failed: [Errno 2] No such file or directory
+```
+
+**Root Cause:** `bf` CLI not installed or not in PATH.
+
+**Solution:** 
+1. Check `bf` installation:
+```bash
+which bf  # Should show path to bf executable
+bf --version  # Should show version
+```
+
+2. Verify repo path for bead operations:
+```python
+repo_path = project_cfg.get("repo_path")
+if not repo_path:
+    # Fall back to aide-de-camp workspace
+    repo_path = "/home/coding/aide-de-camp"
+```
+
+---
+
+## Quick Diagnostic Checklist
+
+When troubleshooting Action Execution Model issues, check these items in order:
+
+1. **Event Types Defined?**
+   ```python
+   from src.sse.broadcaster import EventType
+   assert hasattr(EventType, 'ACTION_WORKFLOW_STARTED')
+   ```
+
+2. **Project Registered?**
+   ```python
+   from src.action.registry import list_workflows
+   workflows = list_workflows("my-project")
+   ```
+
+3. **Context Valid?**
+   ```python
+   ctx = ExecutionContext(intent_id="test", session_id="test")
+   assert ctx.intent_id and ctx.session_id
+   ```
+
+4. **SSE Broadcaster Running?**
+   ```python
+   from src.sse import get_broadcaster
+   broadcaster = get_broadcaster()
+   assert broadcaster is not None
+   ```
+
+5. **Step Executors Registered?**
+   ```python
+   from src.action.executor import get_action_executor
+   executor = get_action_executor()
+   assert "ci_status" in executor._step_executors
+   ```
+
+6. **Cluster Config Valid?**
+   ```python
+   # Check config/clusters.yaml exists
+   # Check proxy URLs are accessible
+   ```
+
+7. **ArgoCD Accessible?**
+   ```python
+   # Check ArgoCD base URL in config/registry.yaml
+   # Verify API endpoint is reachable
+   ```
+
 ## Type Reference Summary
 
 | Type | Purpose | Required Fields | Key Methods |
@@ -1415,21 +1789,20 @@ await broadcaster.broadcast(
 
 ## Implementation Verification Notes
 
-### ⚠️ Critical Issues Found
+### ✅ Fixed Issues (2026-08-06)
 
-During documentation verification against `src/action/` implementation (2026-08-06), the following critical issues were discovered:
+1. **Missing EventType Constants** (FIXED)
+   - Previously: `executor.py` referenced `EventType.ACTION_*` constants that didn't exist
+   - Fixed: Added all action workflow event types to `src/sse/broadcaster.py` EventType class
+   - Events added: `ACTION_WORKFLOW_STARTED`, `ACTION_STEP_STARTED`, `ACTION_STEP_COMPLETED`, `ACTION_WORKFLOW_COMPLETED`, `ACTION_WORKFLOW_FAILED`, `ACTION_WORKFLOW_CANCELLED`
 
-1. **Missing EventType Constants** (CRITICAL)
-   - `executor.py` references `EventType.ACTION_*` constants that don't exist
-   - Causes `AttributeError` when executing workflows
-   - Constants must be added to `src/sse/broadcaster.py` EventType class
-   - See Gotcha 9 above for fix
+### ⚠️ Known Limitations
 
-2. **Sequential vs Parallel Execution Mismatch** (IMPORTANT)
-   - Documentation shows parallel execution patterns (Pattern 5)
-   - Actual `ActionExecutor` only executes steps sequentially
-   - See Gotcha 10 above for details
-   - Documentation shows aspirational patterns vs actual implementation
+1. **Sequential Execution Only** (By Design)
+   - Current `ActionExecutor` executes steps sequentially (not in parallel)
+   - Parallel execution patterns shown in Pattern 5 are aspirational/design patterns
+   - Parallel execution must be implemented within individual step executors if needed
+   - Future versions may add native parallel step execution support
 
 ### ✅ Verified Correct
 
@@ -1471,7 +1844,7 @@ self._step_executors = {
 - `ACTION_STEP_COMPLETED`: Broadcast after each step finishes
 - `ACTION_WORKFLOW_COMPLETED/FAILED/CANCELLED`: Final workflow status
 
-Note: These event constants are missing from EventType class and must be added.
+✅ All event types are now properly defined in `src/sse/broadcaster.py` EventType class.
 
 ## Quick Reference Card
 

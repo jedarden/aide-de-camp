@@ -16,7 +16,7 @@ from logging import getLogger
 from typing import Optional
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 logger = getLogger(__name__)
 
@@ -148,7 +148,7 @@ async def test_classify_intent(request: TestClassificationRequest) -> TestClassi
     try:
         # Get router and classify
         router = get_router()
-        classifications = await router.classify_utterance(
+        classifications, _ = await router.classify_utterance(
             utterance=request.utterance,
             session_id=request.session_id,
         )

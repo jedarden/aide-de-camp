@@ -1,0 +1,14 @@
+deployment.apps/whisper-stt 
+REVISION  CHANGE-CAUSE
+22        <none>
+23        <none>
+24        <none>
+25        <none>
+26        <none>
+27        <none>
+28        <none>
+29        <none>
+30        <none>
+31        <none>
+32        <none>
+

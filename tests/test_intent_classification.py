@@ -521,22 +521,29 @@ class TestMetaTypeHandling:
         }
 
 
-# --- 6. malformed-response fallback ----------------------------------------
+# --- 6. malformed-response handling ----------------------------------------
 
-class TestFallbackOnMalformedResponse:
-    """A non-JSON LLM response must degrade to a single STATUS intent, not raise."""
+class TestMalformedResponseHandling:
+    """
+    Malformed responses raise RouterMalformedError after one retry.
+    The router fails loudly rather than silently degrading - this is intentional
+    because routing errors cascade downstream.
+    """
 
     @pytest.mark.asyncio
-    async def test_unparseable_response_defaults_to_status(self, router):
+    async def test_malformed_json_raises_after_retry(self, router):
+        """
+        A completely unparseable response should raise RouterMalformedError
+        after one corrective retry attempt. This is the intentional behavior -
+        the router fails loudly rather than producing garbage classifications.
+        """
+        import pytest
+        from src.intent.router import RouterMalformedError
+
         r = _make_router_with_response(router, "this is not json at all")
 
-        classifications = await r.classify_utterance(
-            "something happened", "session-test"
-        )
-
-        assert len(classifications) == 1
-        assert classifications[0].intent_type == IntentType.STATUS
-        assert classifications[0].confidence < 0.6  # flagged as low-confidence
+        with pytest.raises(RouterMalformedError):
+            await r.classify_utterance("something happened", "session-test")
 
 
 # --- 7. edge cases: empty/ambiguous inputs (bead adc-5qdx) ------------------
@@ -910,8 +917,6 @@ class TestRouterCacheBehavior:
     @pytest.mark.asyncio
     async def test_cache_hit_statistics_tracking(self, router):
         """Cache statistics track hits and misses correctly."""
-        import src.intent.router as router_module
-
         r = _make_router_with_response(router, json.dumps([{
             "intent_type": "status",
             "utterance_fragment": "test",
@@ -919,13 +924,15 @@ class TestRouterCacheBehavior:
 
         # First call: miss (cache was cleared by fixture, so stats start at 0)
         await r.classify_utterance("test", "session-1")
-        assert router_module._cache_misses == 1
-        assert router_module._cache_hits == 0
+        stats = r._cache.get_stats()
+        assert stats["misses"] == 1
+        assert stats["hits"] == 0
 
         # Second call: hit
         await r.classify_utterance("test", "session-1")
-        assert router_module._cache_hits == 1
-        assert router_module._cache_misses == 1
+        stats = r._cache.get_stats()
+        assert stats["hits"] == 1
+        assert stats["misses"] == 1
 
     @pytest.mark.asyncio
     async def test_cache_ttl_is_five_minutes(self, router):
