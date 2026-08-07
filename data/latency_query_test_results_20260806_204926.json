@@ -1,0 +1,65 @@
+{
+  "test_metadata": {
+    "timestamp": "2026-08-06T20:49:26.560540",
+    "time_period_days": 30,
+    "start_date": "2026-07-07T00:00:00Z",
+    "end_date": "2026-08-06T23:59:59Z",
+    "test_types": [
+      "percentiles",
+      "averages",
+      "comprehensive"
+    ]
+  },
+  "tests": {
+    "pbx_web_percentiles": {
+      "count": 9,
+      "p50_seconds": 1457.0,
+      "p75_seconds": 3209.0,
+      "p90_seconds": 10773.2,
+      "p95_seconds": 15541.6,
+      "p99_seconds": 19356.32,
+      "min_seconds": 20.0,
+      "max_seconds": 20310.0
+    },
+    "deployment_intervals_average": {
+      "count": 7,
+      "mean_seconds": 241220.57142857142,
+      "median_seconds": 84600.0,
+      "sum_seconds": 1688544.0,
+      "stddev_seconds": 399037.13918667485,
+      "min_seconds": 396.0,
+      "max_seconds": 1089072.0
+    },
+    "pbx_web_comprehensive": {
+      "service": "pbx-web",
+      "time_range": {
+        "start": "2026-07-07T00:00:00Z",
+        "end": "2026-08-06T23:59:59Z",
+        "days": 30
+      },
+      "percentile_stats": {
+        "count": 9,
+        "p50_seconds": 1457.0,
+        "p75_seconds": 3209.0,
+        "p90_seconds": 10773.2,
+        "p95_seconds": 15541.6,
+        "p99_seconds": 19356.32,
+        "min_seconds": 20.0,
+        "max_seconds": 20310.0
+      },
+      "average_stats": {
+        "mean_seconds": 3886.5555555555557,
+        "median_seconds": 1457.0,
+        "sum_seconds": 34979.0,
+        "stddev_seconds": 6723.985557522992
+      },
+      "data_quality": {
+        "total_records": 14,
+        "valid_records": 9,
+        "invalid_records": 5,
+        "validation_warnings": []
+      },
+      "query_timestamp": "2026-08-06T20:49:26.560962"
+    }
+  }
+}
