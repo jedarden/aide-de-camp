@@ -1,0 +1,729 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aide-de-camp.ardenone.com/schemas/whisper-stt-deployment.json",
+  "title": "Whisper-STT Deployment Data Schema",
+  "description": "Schema for validating whisper-stt deployment data with 30-day completeness requirements. This schema ensures deployment data meets structural, type, and coverage requirements for operational analysis.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "argo_workflows",
+    "argo_cd",
+    "cluster_deployments",
+    "summary",
+    "pod_health"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Metadata about the deployment data generation and coverage period",
+      "required": [
+        "generated_at",
+        "data_period_start",
+        "data_period_end",
+        "services",
+        "clusters",
+        "data_sources"
+      ],
+      "properties": {
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the deployment data was generated (ISO 8601 format)"
+        },
+        "data_period_start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start of the 30-day analysis period (ISO 8601 format)"
+        },
+        "data_period_end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "End of the 30-day analysis period (ISO 8601 format)"
+        },
+        "services": {
+          "type": "array",
+          "description": "List of services covered in this deployment data",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "contains": {
+            "const": "whisper-stt",
+            "description": "Must contain whisper-stt service"
+          }
+        },
+        "clusters": {
+          "type": "array",
+          "description": "List of Kubernetes clusters queried for deployment data",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "data_sources": {
+          "type": "array",
+          "description": "Data sources used to compile deployment information",
+          "items": {
+            "type": "string",
+            "enum": [
+              "kubernetes_replicasets",
+              "argo_workflows",
+              "argo_cd",
+              "git_history",
+              "pod_monitoring"
+            ]
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "argo_workflows": {
+      "type": "object",
+      "description": "Argo Workflow execution data for CI/CD builds",
+      "properties": {
+        "whisper_stt_build": {
+          "type": "object",
+          "description": "whisper-stt build workflow template and execution data",
+          "required": [
+            "template_name",
+            "template_created",
+            "workflow_runs_last_30_days",
+            "workflow_runs"
+          ],
+          "properties": {
+            "template_name": {
+              "type": "string",
+              "description": "Name of the Argo WorkflowTemplate",
+              "example": "whisper-stt-build"
+            },
+            "template_created": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the workflow template was created"
+            },
+            "workflow_runs_last_30_days": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of workflow runs in the 30-day period"
+            },
+            "workflow_runs": {
+              "type": "array",
+              "description": "Detailed list of workflow runs with timestamps and status",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "workflow_name": {
+                    "type": "string",
+                    "description": "Name of the workflow run"
+                  },
+                  "started_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Workflow start timestamp"
+                  },
+                  "finished_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Workflow completion timestamp"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["Succeeded", "Failed", "Error", "Running"],
+                    "description": "Final workflow execution status"
+                  },
+                  "duration_seconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Workflow execution duration in seconds"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "argo_cd": {
+      "type": "object",
+      "description": "ArgoCD application deployment state",
+      "properties": {
+        "whisper-stt": {
+          "type": "object",
+          "description": "ArgoCD applications for whisper-stt service",
+          "required": ["application_found", "applications"],
+          "properties": {
+            "application_found": {
+              "type": "boolean",
+              "description": "Whether whisper-stt ArgoCD application was found"
+            },
+            "applications": {
+              "type": "array",
+              "description": "List of ArgoCD applications for whisper-stt",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "namespace",
+                  "project",
+                  "sync_status",
+                  "health_status"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "ArgoCD application name"
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Kubernetes namespace"
+                  },
+                  "project": {
+                    "type": "string",
+                    "description": "ArgoCD project name"
+                  },
+                  "sync_status": {
+                    "type": "string",
+                    "enum": ["Synced", "OutOfSync", "Unknown"],
+                    "description": "ArgoCD sync status"
+                  },
+                  "health_status": {
+                    "type": "string",
+                    "enum": ["Healthy", "Progressing", "Degraded", "Missing", "Unknown"],
+                    "description": "ArgoCD health status"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "cluster_deployments": {
+      "type": "object",
+      "description": "Kubernetes deployment data from ReplicaSet analysis",
+      "properties": {
+        "whisper-stt": {
+          "type": "object",
+          "description": "whisper-stt deployment information",
+          "required": [
+            "namespace",
+            "deployment_name",
+            "created_at",
+            "current_image",
+            "current_replicas",
+            "deployments_last_30_days",
+            "successful_deployments",
+            "failed_deployments",
+            "deployment_versions"
+          ],
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "description": "Kubernetes namespace for whisper-stt deployment"
+            },
+            "deployment_name": {
+              "type": "string",
+              "description": "Kubernetes deployment name"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Initial deployment creation timestamp"
+            },
+            "current_image": {
+              "type": "string",
+              "description": "Current container image in use",
+              "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+              "example": "ronaldraygun/whisper-stt:1.8.6"
+            },
+            "current_replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Current number of running replicas"
+            },
+            "last_updated": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Most recent deployment update timestamp"
+            },
+            "replica_history": {
+              "type": "array",
+              "description": "Historical ReplicaSet data for the 30-day period",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "created_at",
+                  "image",
+                  "replicas",
+                  "status",
+                  "days_ago"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "ReplicaSet name"
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "ReplicaSet creation timestamp"
+                  },
+                  "image": {
+                    "type": "string",
+                    "description": "Container image used in this ReplicaSet"
+                  },
+                  "replicas": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of replicas in this ReplicaSet"
+                  },
+                  "available_replicas": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of available replicas",
+                    "nullable": true
+                  },
+                  "ready_replicas": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of ready replicas",
+                    "nullable": true
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["successful", "rolled_over", "scaled_down_or_failed", "failed"],
+                    "description": "ReplicaSet deployment status"
+                  },
+                  "days_ago": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 30,
+                    "description": "Days since this ReplicaSet was created (0-30)"
+                  }
+                }
+              }
+            },
+            "deployments_last_30_days": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of deployments in the 30-day period"
+            },
+            "successful_deployments": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of successful deployments"
+            },
+            "failed_deployments": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of failed or scaled-down deployments"
+            },
+            "deployment_versions": {
+              "type": "array",
+              "description": "List of image versions deployed in the 30-day period",
+              "items": {
+                "type": "string",
+                "pattern": "^[\\d.]+$"
+              },
+              "minItems": 1
+            },
+            "all_versions_in_history": {
+              "type": "array",
+              "description": "Complete list of all versions in deployment history",
+              "items": {
+                "type": "string",
+                "pattern": "^[\\d.]+$"
+              },
+              "minItems": 1
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Summary statistics for the 30-day deployment period",
+      "required": [
+        "total_deployments_last_30_days",
+        "whisper_stt_deployments",
+        "successful_deployments",
+        "failed_or_scaled_down",
+        "data_coverage",
+        "gaps_detected",
+        "largest_gap_days"
+      ],
+      "properties": {
+        "total_deployments_last_30_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total deployments across all services in the period"
+        },
+        "whisper_stt_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of whisper-stt deployments in the period"
+        },
+        "successful_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of successful deployments"
+        },
+        "failed_or_scaled_down": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failed or scaled-down deployments"
+        },
+        "data_coverage": {
+          "type": "string",
+          "pattern": "^\\d+%$",
+          "description": "Percentage of data coverage (e.g., '100%')"
+        },
+        "gaps_detected": {
+          "type": "boolean",
+          "description": "Whether data gaps were detected in the period"
+        },
+        "largest_gap_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the largest gap in days"
+        }
+      }
+    },
+    "pod_health": {
+      "type": "object",
+      "description": "Current pod health and runtime statistics",
+      "required": ["current_pods", "pod_metrics"],
+      "properties": {
+        "current_pods": {
+          "type": "array",
+          "description": "List of currently running pods with detailed status",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "created",
+              "age_days",
+              "status",
+              "containers"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Pod name"
+              },
+              "created": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Pod creation timestamp"
+              },
+              "age_days": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Pod age in days"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["Running", "Pending", "Failed", "Succeeded", "Unknown"],
+                "description": "Current pod status"
+              },
+              "containers": {
+                "type": "array",
+                "description": "Container status within the pod",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "name",
+                    "image",
+                    "ready",
+                    "restartCount"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Container name"
+                    },
+                    "image": {
+                      "type": "string",
+                      "description": "Container image"
+                    },
+                    "ready": {
+                      "type": "boolean",
+                      "description": "Whether container is ready"
+                    },
+                    "restartCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Number of container restarts"
+                    },
+                    "started": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Container start timestamp"
+                    }
+                  }
+                }
+              },
+              "totalRestartCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total restarts across all containers in the pod"
+              },
+              "node": {
+                "type": "string",
+                "description": "Node where the pod is running"
+              }
+            }
+          }
+        },
+        "pod_metrics": {
+          "type": "object",
+          "description": "Aggregate pod health metrics",
+          "required": [
+            "total_pods",
+            "running_pods",
+            "total_containers",
+            "total_restarts",
+            "crashloops",
+            "oomkills",
+            "failed_pods",
+            "pending_pods"
+          ],
+          "properties": {
+            "total_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of pods"
+            },
+            "running_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of running pods"
+            },
+            "total_containers": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of containers across all pods"
+            },
+            "total_restarts": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total container restarts"
+            },
+            "crashloops": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of pods in CrashLoopBackOff"
+            },
+            "oomkills": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of OOMKilled containers"
+            },
+            "failed_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of failed pods"
+            },
+            "pending_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of pending pods"
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Resource allocation and limits for whisper-stt deployment",
+      "properties": {
+        "whisper-stt": {
+          "type": "object",
+          "description": "Resource specifications for whisper-stt",
+          "required": ["requests", "limits"],
+          "properties": {
+            "requests": {
+              "type": "object",
+              "description": "Resource requests",
+              "required": ["cpu", "memory"],
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[\\d]+m?$|^\\d+$",
+                  "description": "CPU request (e.g., '1', '100m')"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+                  "description": "Memory request (e.g., '4Gi', '512Mi')"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "description": "Resource limits",
+              "required": ["cpu", "memory"],
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[\\d]+m?$|^\\d+$",
+                  "description": "CPU limit (e.g., '8', '8000m')"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+                  "description": "Memory limit (e.g., '8Gi', '16384Mi')"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "description": "Storage information for whisper-stt PVCs and volumes",
+      "properties": {
+        "whisper-model-cache": {
+          "type": "object",
+          "description": "ML model cache storage details",
+          "required": [
+            "capacity",
+            "storage_class",
+            "status",
+            "age_days"
+          ],
+          "properties": {
+            "capacity": {
+              "type": "string",
+              "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+              "description": "Storage capacity (e.g., '10Gi')"
+            },
+            "storage_class": {
+              "type": "string",
+              "description": "Kubernetes storage class name"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["Bound", "Pending", "Lost", "Available"],
+              "description": "PVC binding status"
+            },
+            "age_days": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Storage age in days"
+            }
+          }
+        }
+      }
+    },
+    "error_incidents": {
+      "type": "object",
+      "description": "Error incidents and failures recorded during the period",
+      "required": [
+        "total_incidents",
+        "critical_incidents",
+        "warning_incidents",
+        "incident_details"
+      ],
+      "properties": {
+        "total_incidents": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of error incidents"
+        },
+        "critical_incidents": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of critical incidents"
+        },
+        "warning_incidents": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of warning incidents"
+        },
+        "incident_details": {
+          "type": "array",
+          "description": "Detailed incident reports",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Incident timestamp"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["critical", "warning", "info"],
+                "description": "Incident severity level"
+              },
+              "error_type": {
+                "type": "string",
+                "description": "Type of error or failure"
+              },
+              "description": {
+                "type": "string",
+                "description": "Detailed incident description"
+              },
+              "affected_components": {
+                "type": "array",
+                "description": "List of affected components",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "resolution": {
+                "type": "string",
+                "description": "Resolution details, if resolved"
+              }
+            }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "description": "Additional notes and observations about the deployment data",
+      "items": {
+        "type": "string",
+        "description": "Individual note string"
+      }
+    }
+  },
+  "definitions": {
+    "thirtyDayCoverage": {
+      "type": "object",
+      "description": "Validation for 30-day data completeness requirements",
+      "properties": {
+        "data_period_start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "data_period_end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "data_coverage": {
+              "type": "string",
+              "pattern": "^(100|[1-9]?[0-9])%$"
+            },
+            "gaps_detected": {
+              "type": "boolean"
+            },
+            "largest_gap_days": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["data_coverage", "gaps_detected", "largest_gap_days"]
+        }
+      },
+      "required": ["data_period_start", "data_period_end", "summary"]
+    }
+  }
+}
