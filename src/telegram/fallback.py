@@ -143,8 +143,9 @@ class TelegramFallback:
             async with httpx.AsyncClient() as client:
                 # Telegram Bot API sendMessage endpoint
                 # https://core.telegram.org/bots/api#sendmessage
+                url = f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/sendMessage"
                 response = await client.post(
-                    f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/sendMessage",
+                    url,
                     json={
                         "chat_id": int(chat_id) if isinstance(chat_id, str) else chat_id,
                         "text": message,
@@ -162,14 +163,14 @@ class TelegramFallback:
                     return True
                 else:
                     error_msg = f"status {response.status_code} - {response.text}"
-                    await self._handle_send_failure(error_context=error_msg)
+                    await self._handle_send_failure(error_context=error_msg, url=url)
                     return False
 
         except httpx.RequestError as e:
-            await self._handle_send_failure(error=e)
+            await self._handle_send_failure(error=e, url=f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/sendMessage")
             return False
         except Exception as e:
-            await self._handle_send_failure(error=e)
+            await self._handle_send_failure(error=e, url=f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/sendMessage")
             return False
 
     async def send_result(self, chat_id: int | str, result: dict) -> bool:
@@ -251,12 +252,14 @@ class TelegramFallback:
             self._set_reachable(False)
             return False
 
+        url = f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/getMe"
+
         try:
             async with httpx.AsyncClient() as client:
                 # Use getMe endpoint to verify bot token validity
                 # https://core.telegram.org/bots/api#getme
                 response = await client.get(
-                    f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/getMe",
+                    url,
                     timeout=2.5,
                 )
                 is_available = response.status_code == 200
@@ -266,9 +269,18 @@ class TelegramFallback:
                     self._state_tracker.mark_as_unreachable(datetime.now())
                 self._set_reachable(is_available)
                 return is_available
-        except Exception:
+        except Exception as e:
+            # STATE UPDATE FIRST - Mark as unreachable before logging
             self._state_tracker.mark_as_unreachable(datetime.now())
             self._set_reachable(False)
+
+            # LOGGING AFTER STATE UPDATE - Capture error context
+            error_type = type(e).__name__
+            error_message = str(e) or "unknown error"
+            logger.warning(
+                f"Telegram bridge health check failed. URL: {url}. "
+                f"Error type: {error_type}. Error: {error_message}."
+            )
             return False
 
     def _set_reachable(self, value: bool, *, now: Optional[datetime] = None) -> None:
@@ -337,6 +349,7 @@ class TelegramFallback:
         self,
         error: Exception | None = None,
         error_context: str = "",
+        url: str = "",
     ) -> None:
         """Reactive detection entry for a Telegram send failure.
 
@@ -351,9 +364,10 @@ class TelegramFallback:
                 responses (httpx does not raise for those).
             error_context: Free-form context (e.g. ``"status 500 - ..."``) used as
                 the message when no exception is available, or to enrich one.
+            url: The URL that was attempted when the failure occurred.
         """
         async with self._first_failure_lock:
-            self._record_failure_locked(error=error, error_context=error_context)
+            self._record_failure_locked(error=error, error_context=error_context, url=url)
 
     def _repeated_log_cooldown_elapsed(self, now: datetime) -> bool:
         """True if the rate-limit window has elapsed and a DEBUG summary may be logged.
@@ -371,6 +385,7 @@ class TelegramFallback:
         self,
         error: Exception | None = None,
         error_context: str = "",
+        url: str = "",
     ) -> bool:
         """Record a failure and emit the appropriate (rate-limited) log line.
 
@@ -394,6 +409,11 @@ class TelegramFallback:
         ``_failure_count`` and ``_last_failure_timestamp`` are updated on every
         call regardless of whether anything is logged.
 
+        Args:
+            error: The exception that caused the failure, if any.
+            error_context: Free-form context (e.g. ``"status 500 - ..."``).
+            url: The URL that was attempted when the failure occurred.
+
         Returns:
             True iff THIS call performed the first-failure claim (the
             ``_has_logged_first_failure`` False→True flip); False otherwise.
@@ -402,37 +422,33 @@ class TelegramFallback:
         now = datetime.now()
         self._set_reachable(False, now=now)
 
-        # Update state tracker for reachability and deduplication
+        # STATE UPDATE FIRST - Update state tracker for reachability and deduplication
+        # This MUST be called before any logging to ensure state is updated first
         self._state_tracker.mark_as_unreachable(now)
 
-        # Log WARNING on first failure after bridge was reachable
+        # Capture exception context for logging
+        if error is not None:
+            error_type = type(error).__name__
+            error_message = str(error) or error_context or "unknown error"
+        else:
+            error_type = "HTTPError"
+            error_message = error_context or "unknown error"
+
+        # Build URL context for logging
+        url_context = f" URL: {url}" if url else ""
+
+        # LOGGING AFTER STATE UPDATE - Log WARNING on first failure after bridge was reachable
         # This uses the state tracker to prevent duplicate warnings per failure streak
         if self._state_tracker.should_log_failure():
-            if error is not None:
-                error_type = type(error).__name__
-                message = str(error) or error_context or "unknown error"
-                logger.warning(
-                    f"Telegram bridge unreachable: send failed. "
-                    f"Error type: {error_type}. Error: {message}. "
-                    f"Bridge may be down or network issue."
-                )
-            else:
-                message = error_context or "unknown error"
-                logger.warning(
-                    f"Telegram bridge unreachable: send failed. "
-                    f"Error: {message}. Bridge may be down or network issue."
-                )
+            logger.warning(
+                f"Telegram bridge unreachable: send failed.{url_context} "
+                f"Error type: {error_type}. Error: {error_message}. "
+                f"Bridge may be down or network issue."
+            )
 
         self._failure_count += 1
         self._last_failure_timestamp = now
         self._failures_since_last_log += 1
-
-        if error is not None:
-            error_type = type(error).__name__
-            message = str(error) or error_context or "unknown error"
-        else:
-            error_type = "HTTPError"
-            message = error_context or "unknown error"
 
         is_new_failure_type = error_type not in self._seen_failure_types
 
@@ -450,8 +466,8 @@ class TelegramFallback:
                 self._last_repeated_log_timestamp = now
                 self._failures_since_last_log = 0
                 logger.warning(
-                    f"Telegram bridge unreachable: send failed. "
-                    f"Error type: {error_type}. Error: {message}. "
+                    f"Telegram bridge unreachable: send failed.{url_context} "
+                    f"Error type: {error_type}. Error: {error_message}. "
                     f"Subsequent failures of the same type are rate-limited (one "
                     f"DEBUG summary per {self._failure_log_interval_seconds:g}s); "
                     f"a different failure type is logged independently."
@@ -477,8 +493,8 @@ class TelegramFallback:
             # Reset the counter for the new failure type, starting from this one
             self._failures_since_last_log = 0
             logger.warning(
-                f"New Telegram send failure type during ongoing outage: "
-                f"{error_type}. Error: {message}. "
+                f"New Telegram send failure type during ongoing outage:{url_context} "
+                f"{error_type}. Error: {error_message}. "
                 f"Logged independently of the "
                 f"{self._failure_log_interval_seconds:g}s same-type cooldown. "
                 f"(Total failures: {self._failure_count}; distinct failure "
@@ -495,8 +511,8 @@ class TelegramFallback:
             if batch > 0:
                 logger.debug(
                     f"Repeated Telegram send failures: {batch} failure(s) since last "
-                    f"log (total {self._failure_count}). "
-                    f"Latest error type: {error_type}. Error: {message}."
+                    f"log (total {self._failure_count}).{url_context} "
+                    f"Latest error type: {error_type}. Error: {error_message}."
                 )
                 self._last_repeated_log_timestamp = now
                 self._failures_since_last_log = 0
