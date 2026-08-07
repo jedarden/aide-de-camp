@@ -1261,3 +1261,175 @@ class TestMalformedJSONBody:
 
         # Verify error status is included
         assert error_data.get("status") == 400
+
+    def test_malformed_json_random_text_special_chars(self, test_client):
+        """Test that random text with special characters returns HTTP 400 status code."""
+        malformed_json = "!@#$%^&*()_+{}[]|\\:;\"'<>?,./"
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") in ("Validation failed", "Invalid JSON")
+        assert "detail" in error_data
+
+    def test_malformed_json_random_text_single_char(self, test_client):
+        """Test that single character returns HTTP 400 status code."""
+        malformed_json = "x"
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") in ("Validation failed", "Invalid JSON")
+        assert "detail" in error_data
+
+    def test_malformed_json_random_text_newlines(self, test_client):
+        """Test that random text with newlines returns HTTP 400 status code."""
+        malformed_json = "random\ntext\nwith\nnewlines"
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") in ("Validation failed", "Invalid JSON")
+        assert "detail" in error_data
+
+    def test_malformed_json_random_text_unicode_garbage(self, test_client):
+        """Test that random Unicode garbage returns HTTP 400 status code."""
+        malformed_json = "עברית العربية 日本语 ລາວ"
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") in ("Validation failed", "Invalid JSON")
+        assert "detail" in error_data
+
+    def test_malformed_json_random_binary_like(self, test_client):
+        """Test that binary-like random text returns HTTP 400 status code."""
+        malformed_json = "\x00\x01\x02\x03\x04\x05"
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") in ("Validation failed", "Invalid JSON")
+        assert "detail" in error_data
+
+    def test_malformed_json_random_text_mixed_content(self, test_client):
+        """Test that mixed random text content returns HTTP 400 status code."""
+        malformed_json = "hello { world } [ test ] ( 123 ) !@#"
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") in ("Validation failed", "Invalid JSON")
+        assert "detail" in error_data
+
+    def test_malformed_json_completely_invalid_alphanumeric(self, test_client):
+        """Test that completely invalid alphanumeric text returns HTTP 400 status code."""
+        malformed_json = "abc123def456ghi789"
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") in ("Validation failed", "Invalid JSON")
+        assert "detail" in error_data
+
+        # If errors array is present, verify it mentions JSON decode
+        if "errors" in error_data:
+            errors = error_data.get("errors", [])
+            assert len(errors) > 0
+            json_error = errors[0]
+            error_msg = json_error.get("message", "")
+            # Should mention JSON decode or parsing error
+            assert len(error_msg) > 0
+            assert json_error.get("type") == "json_invalid"
+
+    def test_malformed_json_error_message_clarity_consistent(self, test_client):
+        """Test that all malformed JSON errors have consistent assertion patterns."""
+        test_cases = [
+            "not valid json at all",
+            "random text here",
+            "!@#$% garbage",
+            "x",
+            "abc123def456",
+        ]
+
+        for malformed_json in test_cases:
+            response = test_client.post(
+                "/dispatch",
+                content=malformed_json,
+                headers={"Content-Type": "application/json"}
+            )
+
+            # Consistent assertion pattern 1: status code
+            assert response.status_code == 400, f"Failed for input: {malformed_json}"
+
+            # Consistent assertion pattern 2: error response structure
+            error_data = response.json()
+            assert "error" in error_data, f"Missing 'error' field for input: {malformed_json}"
+            assert "detail" in error_data, f"Missing 'detail' field for input: {malformed_json}"
+            assert "status" in error_data, f"Missing 'status' field for input: {malformed_json}"
+
+            # Consistent assertion pattern 3: error type validation
+            assert error_data["status"] == 400, f"Wrong status code for input: {malformed_json}"
+            assert error_data["error"] in ("Validation failed", "Invalid JSON"), f"Wrong error type for input: {malformed_json}"
+
+            # Consistent assertion pattern 4: error message indicates JSON parsing failure
+            error_detail = error_data.get("detail", "")
+            assert len(error_detail) > 0, f"Empty error detail for input: {malformed_json}"
+
+            # If errors array is present, verify JSON decode indication
+            if "errors" in error_data:
+                errors = error_data.get("errors", [])
+                assert len(errors) > 0, f"Empty errors array for input: {malformed_json}"
+                json_error = errors[0]
+                error_msg = json_error.get("message", "")
+                assert len(error_msg) > 0, f"Empty error message for input: {malformed_json}"
+                assert json_error.get("type") == "json_invalid", f"Wrong error type for input: {malformed_json}"
