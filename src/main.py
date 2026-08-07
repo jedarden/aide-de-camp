@@ -364,13 +364,21 @@ async def get_test_endpoint():
 
 
 @app.post("/test")
-async def test_endpoint(request: dict):
+async def test_endpoint(
+    request: dict,
+    session_id: Optional[str] = Query(None, description="Optional session ID (overrides body)"),
+    surface_id: Optional[str] = Query(None, description="Optional surface ID (overrides body)"),
+):
     """
     Test endpoint that accepts utterance and session_id.
 
     Mirrors the /dispatch interface for basic testing and verification.
     Stores the utterance to the session database and returns a test response.
     Broadcasts SSE events to connected canvas surfaces when surface_id is provided.
+
+    Query parameters:
+        session_id: Optional session ID (overrides body if provided)
+        surface_id: Optional surface ID (overrides body if provided)
 
     Request body:
     {
@@ -393,15 +401,21 @@ async def test_endpoint(request: dict):
             "topic_id": "...",
             "result_id": "..."
         },
+        "verification": {
+            "storage_match": true,
+            "sse_broadcast": true,
+            "payload_match": true
+        },
         "message": "Test endpoint received and stored data successfully"
     }
     """
     from datetime import datetime
     import uuid
 
+    # Query params override body params
     utterance = request.get("utterance", "")
-    session_id = request.get("session_id", "")
-    surface_id = request.get("surface_id", "")
+    session_id = session_id or request.get("session_id", "")
+    surface_id = surface_id or request.get("surface_id", "")
 
     logger.info(f"[TEST] Received test request - utterance: {utterance[:100]}..., session_id: {session_id}, surface_id: {surface_id}")
 
