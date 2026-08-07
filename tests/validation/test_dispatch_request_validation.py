@@ -8,9 +8,11 @@ Comprehensive tests for Pydantic model validation including:
 - Validator error messages
 """
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from src.api.models import DispatchRequest
+from src.main import app
 
 
 class TestValidRequestCreation:
@@ -373,10 +375,11 @@ class TestValidatorErrorMessages:
         error_msg = utterance_errors[0].get('msg', '')
 
         # Check for clear, actionable error message
-        assert 'utterance must be a non-empty string' in error_msg
+        # With min_length=2, Pydantic's built-in validation runs first
         assert len(error_msg) > 0  # Not empty
-        assert 'string' in error_msg.lower()  # Mentions type
-        assert 'empty' in error_msg.lower()  # Mentions requirement
+        assert 'string' in error_msg.lower() or 'characters' in error_msg.lower()  # Mentions type
+        # Error message mentions the length constraint
+        assert '2' in error_msg or 'least' in error_msg.lower() or 'at least' in error_msg.lower()
 
     def test_session_id_error_message_is_clear(self):
         """Test that session_id validator provides clear error message."""
@@ -560,6 +563,90 @@ class TestEdgeCases:
         assert "\t" in request.utterance
 
 
+class TestMinLengthValidation:
+    """Test cases for minimum length constraint validation."""
+
+    def test_single_character_utterance(self):
+        """Test that single-character utterance raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(
+                utterance="A",
+                session_id="session-123",
+                surface_id="surface-456"
+            )
+
+        errors = exc_info.value.errors()
+        utterance_errors = [e for e in errors if 'utterance' in str(e.get('loc', ''))]
+
+        assert len(utterance_errors) > 0
+        # Check that error mentions minimum length
+        error_msg = str(utterance_errors[0].get('msg', ''))
+        assert 'at least 2 characters' in error_msg.lower() or 'min_length' in str(utterance_errors[0]).lower()
+
+    def test_utterance_exactly_min_length(self):
+        """Test that utterance exactly at minimum length is accepted."""
+        request = DispatchRequest(
+            utterance="AB",
+            session_id="session-123",
+            surface_id="surface-456"
+        )
+
+        assert request.utterance == "AB"
+
+    def test_utterance_above_min_length(self):
+        """Test that utterance above minimum length is accepted."""
+        request = DispatchRequest(
+            utterance="Check CI status",
+            session_id="session-123",
+            surface_id="surface-456"
+        )
+
+        assert request.utterance == "Check CI status"
+
+    def test_min_length_error_structure(self):
+        """Test that min_length validation error has proper structure."""
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(
+                utterance="A",
+                session_id="session-123",
+                surface_id="surface-456"
+            )
+
+        errors = exc_info.value.errors()
+        utterance_errors = [e for e in errors if 'utterance' in str(e.get('loc', ''))]
+
+        assert len(utterance_errors) > 0
+        error = utterance_errors[0]
+
+        # Verify error structure has required fields
+        assert 'loc' in error
+        assert 'msg' in error
+        assert 'type' in error
+
+        # Verify location points to utterance
+        assert 'utterance' in str(error['loc'])
+
+    def test_min_length_error_message_includes_limit(self):
+        """Test that error message includes the minimum length requirement."""
+        with pytest.raises(ValidationError) as exc_info:
+            DispatchRequest(
+                utterance="A",
+                session_id="session-123",
+                surface_id="surface-456"
+            )
+
+        errors = exc_info.value.errors()
+        utterance_errors = [e for e in errors if 'utterance' in str(e.get('loc', ''))]
+
+        assert len(utterance_errors) > 0
+        error_msg = utterance_errors[0].get('msg', '')
+
+        # Error message should mention the constraint
+        assert len(error_msg) > 0
+        # Pydantic typically includes "at least" and the number in min_length errors
+        assert '2' in error_msg or 'two' in error_msg.lower() or 'min_length' in str(utterance_errors[0]).lower()
+
+
 class TestDispatchEndpointValidation:
     """Integration tests for /dispatch endpoint request validation."""
 
@@ -671,8 +758,8 @@ class TestDispatchEndpointValidation:
         utterance_error = utterance_errors[0]
         error_msg = utterance_error.get("message", "")
         assert len(error_msg) > 0
-        assert "utterance" in error_msg.lower()
-        assert "empty" in error_msg.lower()
+        # With min_length=2, error mentions characters/length
+        assert "utterance" in error_msg.lower() or "characters" in error_msg.lower() or "length" in error_msg.lower()
 
     def test_whitespace_only_utterance_returns_400(self, test_client):
         """Test that whitespace-only utterance returns HTTP 400 status code."""
@@ -711,3 +798,335 @@ class TestDispatchEndpointValidation:
         missing_fields = [e.get("field", "") for e in missing_errors]
         assert any("session_id" in field for field in missing_fields)
         assert any("surface_id" in field for field in missing_fields)
+
+    def test_min_length_violation_returns_400(self, test_client):
+        """Test that utterance below minimum length returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "A",
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_min_length_error_structure(self, test_client):
+        """Test that min_length violation error includes proper structure."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "A",
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "detail" in error_data
+        assert "error" in error_data
+        assert "errors" in error_data
+
+        # Verify error detail contains field validation information
+        assert error_data["error"] == "Validation failed"
+        errors = error_data["errors"]
+        assert isinstance(errors, list)
+
+        # Find utterance-related error
+        utterance_errors = [e for e in errors if "utterance" in e.get("field", "")]
+        assert len(utterance_errors) > 0
+
+        # Verify error structure
+        utterance_error = utterance_errors[0]
+        assert "field" in utterance_error
+        assert "message" in utterance_error
+        assert "type" in utterance_error
+        assert "utterance" in utterance_error["field"]
+
+    def test_min_length_error_message_includes_details(self, test_client):
+        """Test that min_length violation error message includes constraint details."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "A",
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "errors" in error_data
+
+        # Find utterance error
+        errors = error_data["errors"]
+        utterance_errors = [e for e in errors if "utterance" in e.get("field", "")]
+        assert len(utterance_errors) > 0
+
+        # Verify error message includes min-length information
+        utterance_error = utterance_errors[0]
+        error_msg = utterance_error.get("message", "")
+        assert len(error_msg) > 0
+        # Error message should mention length constraint - Pydantic includes "at least X characters"
+        assert "characters" in error_msg.lower() or "length" in error_msg.lower()
+        # Should mention the minimum requirement (2 characters)
+        assert "2" in error_msg or "two" in error_msg.lower()
+
+    def test_empty_string_min_length_violation_returns_400(self, test_client):
+        """Test that empty string (below min_length) returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "",
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "errors" in error_data
+
+        # Verify the error structure includes field information
+        errors = error_data["errors"]
+        utterance_errors = [e for e in errors if "utterance" in e.get("field", "")]
+        assert len(utterance_errors) > 0
+
+        # Verify error includes message
+        utterance_error = utterance_errors[0]
+        error_msg = utterance_error.get("message", "")
+        assert len(error_msg) > 0
+
+
+class TestMalformedJSONBody:
+    """Test cases for malformed JSON request body validation."""
+
+    def test_malformed_json_missing_closing_brace(self, test_client):
+        """Test that JSON with missing closing brace returns HTTP 400 status code."""
+        malformed_json = '{"utterance": "Check CI status", "session_id": "session-123", "surface_id": "surface-456"'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        # App returns 400 with custom error structure for malformed JSON
+        assert response.status_code == 400
+
+        # Verify error response structure matches app's custom handler
+        error_data = response.json()
+        assert error_data.get("error") == "Invalid JSON"
+        assert "detail" in error_data
+        assert error_data.get("status") == 400
+
+    def test_malformed_json_missing_opening_brace(self, test_client):
+        """Test that JSON with missing opening brace returns HTTP 400 status code."""
+        malformed_json = '"utterance": "Check CI status", "session_id": "session-123", "surface_id": "surface-456"}'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") == "Invalid JSON"
+        assert "detail" in error_data
+        assert "JSON" in error_data.get("detail", "")
+
+    def test_malformed_json_unquoted_keys(self, test_client):
+        """Test that JSON with unquoted keys returns HTTP 400 status code."""
+        malformed_json = '{utterance: "Check CI status", session_id: "session-123", surface_id: "surface-456"}'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") == "Invalid JSON"
+        assert "detail" in error_data
+
+    def test_malformed_json_trailing_comma(self, test_client):
+        """Test that JSON with trailing comma returns HTTP 400 status code."""
+        malformed_json = '{"utterance": "Check CI status", "session_id": "session-123", "surface_id": "surface-456",}'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response structure
+        error_data = response.json()
+        assert error_data.get("error") == "Invalid JSON"
+        assert "detail" in error_data
+
+    def test_malformed_json_missing_quotes(self, test_client):
+        """Test that JSON with missing quotes returns HTTP 400 status code."""
+        malformed_json = '{"utterance": Check CI status, "session_id": "session-123", "surface_id": "surface-456"}'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") == "Invalid JSON"
+        assert "detail" in error_data
+
+    def test_malformed_json_invalid_escape_sequence(self, test_client):
+        """Test that JSON with invalid escape sequence returns HTTP 400 status code."""
+        malformed_json = '{"utterance": "Check CI status\\x", "session_id": "session-123", "surface_id": "surface-456"}'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") == "Invalid JSON"
+        assert "detail" in error_data
+
+    def test_malformed_json_error_message_indicates_parse_failure(self, test_client):
+        """Test that malformed JSON error message indicates JSON parsing failure."""
+        malformed_json = '{"utterance": "Check CI status", "session_id": "session-123"'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        error_detail = error_data.get("detail", "")
+
+        # Error message should reference JSON parsing or invalid format
+        assert len(error_detail) > 0
+        # App's custom handler includes "Malformed JSON:" prefix
+        error_lower = error_detail.lower()
+        assert "json" in error_lower or "malformed" in error_lower or "invalid" in error_lower
+        assert error_data.get("error") == "Invalid JSON"
+
+    def test_malformed_json_with_missing_colon(self, test_client):
+        """Test that JSON with missing colon returns HTTP 400 status code."""
+        malformed_json = '{"utterance" "Check CI status", "session_id": "session-123", "surface_id": "surface-456"}'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response structure
+        error_data = response.json()
+        assert error_data.get("error") == "Invalid JSON"
+        assert "detail" in error_data
+
+    def test_malformed_json_empty_body(self, test_client):
+        """Test that empty request body returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            content="",
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response structure
+        error_data = response.json()
+        assert error_data.get("error") == "Invalid JSON"
+        assert "detail" in error_data
+
+    def test_malformed_json_completely_invalid(self, test_client):
+        """Test that completely invalid JSON returns HTTP 400 status code."""
+        malformed_json = "not valid json at all"
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        # Verify error response indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") == "Invalid JSON"
+        assert "detail" in error_data
+        error_detail = error_data.get("detail", "")
+        assert len(error_detail) > 0
+
+    def test_malformed_json_includes_position_info(self, test_client):
+        """Test that malformed JSON error includes line and column information."""
+        malformed_json = '{"utterance": "Check CI status", "session_id": "session-123"'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        # App's custom handler includes line and column info
+        assert "line" in error_data
+        assert "column" in error_data
+        # Line and column should be positive integers
+        assert error_data.get("line", 0) > 0
+        assert error_data.get("column", 0) > 0
+
+    def test_malformed_json_error_structure(self, test_client):
+        """Test that malformed JSON error has consistent structure."""
+        malformed_json = '{"utterance": "Check CI status", "session_id": "session-123"'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        # Verify all expected fields are present
+        assert "error" in error_data
+        assert "detail" in error_data
+        assert "status" in error_data
+        assert "line" in error_data
+        assert "column" in error_data
+
+        # Verify field values
+        assert error_data["error"] == "Invalid JSON"
+        assert error_data["status"] == 400
+        assert len(error_data["detail"]) > 0
+        assert isinstance(error_data["line"], int)
+        assert isinstance(error_data["column"], int)
