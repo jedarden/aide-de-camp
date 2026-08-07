@@ -1,0 +1,93 @@
+{
+  "validation_timestamp": "2026-08-06T21:27:37.032799",
+  "gap_analysis": {
+    "pbx-web": {
+      "service": "pbx-web",
+      "data_sources": [
+        "workflow_executions",
+        "deployment_intervals"
+      ],
+      "coverage_summary": {
+        "workflow_data": {
+          "expected_days": 31,
+          "actual_days": 1,
+          "coverage_percentage": 3.2,
+          "gap_count": 10,
+          "data_quality": "poor"
+        }
+      },
+      "gap_details": {
+        "workflow_data": {
+          "total_gaps": 10,
+          "consecutive_gaps": [
+            {
+              "start_date": "2026-07-07",
+              "end_date": "2026-07-16",
+              "duration_days": 10
+            }
+          ],
+          "isolated_gaps": [],
+          "longest_gap": 10,
+          "gap_patterns": []
+        }
+      },
+      "issues_found": [
+        "CRITICAL: Very low coverage (3.2%) for workflow_data"
+      ]
+    },
+    "whisper-stt": {
+      "service": "whisper-stt",
+      "data_sources": [
+        "deployment_events"
+      ],
+      "coverage_summary": {
+        "deployment_data": {
+          "expected_days": 31,
+          "actual_days": 0,
+          "coverage_percentage": 6.5,
+          "gap_count": 10,
+          "data_quality": "poor"
+        }
+      },
+      "gap_details": {
+        "deployment_data": {
+          "total_gaps": 10,
+          "consecutive_gaps": [
+            {
+              "start_date": "2026-07-09",
+              "end_date": "2026-07-11",
+              "duration_days": 3
+            },
+            {
+              "start_date": "2026-07-13",
+              "end_date": "2026-07-18",
+              "duration_days": 6
+            }
+          ],
+          "isolated_gaps": [
+            "2026-07-07"
+          ],
+          "longest_gap": 6,
+          "gap_patterns": []
+        }
+      },
+      "issues_found": [
+        "CRITICAL: Very low coverage (6.5%) for deployment_data",
+        "CRITICAL: No data available for deployment_data"
+      ]
+    }
+  },
+  "data_quality_issues": [
+    "CRITICAL: Very low coverage (3.2%) for workflow_data",
+    "CRITICAL: Very low coverage (6.5%) for deployment_data",
+    "CRITICAL: No data available for deployment_data"
+  ],
+  "recommendations": [
+    "pbx-web workflow_data: CRITICAL - Less than 10% coverage. Consider extending data collection period or investigating missing data.",
+    "pbx-web workflow data: Only 1 day(s) with data. Check Argo Workflow retention policies and query filters.",
+    "whisper-stt deployment_data: CRITICAL - Less than 10% coverage. Consider extending data collection period or investigating missing data.",
+    "whisper-stt deployment data: Limited deployment history (0 days). This may be normal if deployments are infrequent, but verify against actual deployment activity.",
+    "GENERAL: Overall data coverage is below 20%. Consider extending the analysis window or investigating data collection issues.",
+    "NOTE: Neither service achieves 50% coverage. Results should be interpreted as preliminary and may not represent typical performance patterns."
+  ]
+}
