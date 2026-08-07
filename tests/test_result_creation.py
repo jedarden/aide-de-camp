@@ -480,9 +480,11 @@ class TestResultCreationIntegration:
     @pytest.mark.asyncio
     async def test_results_retrievable_by_topic(self, in_memory_db_store, test_topic_with_session):
         """Test that results can be retrieved for a specific topic."""
+        import asyncio
+        import time
         session_id, topic_id = test_topic_with_session
 
-        # Create multiple results for the topic
+        # Create first result
         await in_memory_db_store.create_result(
             intent_id=None,
             topic_id=topic_id,
@@ -491,6 +493,10 @@ class TestResultCreationIntegration:
             data={"index": 1}
         )
 
+        # Add delay to ensure distinct timestamps (timestamps are integer seconds)
+        time.sleep(1)
+
+        # Create second result with guaranteed later timestamp
         await in_memory_db_store.create_result(
             intent_id=None,
             topic_id=topic_id,

@@ -123,7 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_results_previous ON results(previous_result_id);
 CREATE TABLE IF NOT EXISTS topics (
     id           TEXT PRIMARY KEY,
     label        TEXT NOT NULL,
-    type         TEXT NOT NULL CHECK(type IN ('project', 'research', 'personal', 'exception', 'compound')) DEFAULT 'adhoc',
+    type         TEXT NOT NULL CHECK(type IN ('project', 'research', 'personal', 'exception', 'compound', 'adhoc')) DEFAULT 'adhoc',
     project_slugs TEXT,  -- JSON array
     scope        TEXT NOT NULL CHECK(scope IN ('session', 'cross-session', 'global')) DEFAULT 'session',
     session_id   TEXT,
@@ -1591,7 +1591,7 @@ class SessionStore:
             async with db.execute(
                 """SELECT * FROM results
                    WHERE topic_id = ?
-                   ORDER BY created_at DESC
+                   ORDER BY created_at DESC, id DESC
                    LIMIT 1""",
                 (topic_id,)
             ) as cursor:
@@ -2572,12 +2572,16 @@ class SessionStore:
 _store: SessionStore | None = None
 
 
-def get_store(db_path: Path | None = None) -> SessionStore:
+async def get_store(db_path: Path | None = None) -> SessionStore:
     """Get or create the global session store instance.
 
     When db_path is not given, resolves in this order:
       1. ADC_DB_PATH env var (used by tests to isolate from production data)
       2. DEFAULT_DB_PATH (data/session.db)
+
+    Automatically initializes the database with schema if creating a new store.
+    The initialize() method is idempotent, so calling it when the database
+    already exists is safe.
     """
     global _store
     if _store is None:
@@ -2585,4 +2589,6 @@ def get_store(db_path: Path | None = None) -> SessionStore:
             env_path = os.environ.get("ADC_DB_PATH")
             db_path = Path(env_path) if env_path else DEFAULT_DB_PATH
         _store = SessionStore(db_path)
+        # Initialize the database with schema
+        await _store.initialize()
     return _store
