@@ -144,7 +144,7 @@
     "total_deployment_events": 9,
     "whisper_stt_events": 4,
     "pbx_web_events": 5,
-    "combined_deployment_frequency": 3.3_days,
+    "combined_deployment_frequency": "3.3_days",
     "deployment_peaks": [
       {
         "date": "2026-07-08",
