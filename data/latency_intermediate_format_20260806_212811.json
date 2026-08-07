@@ -1,0 +1,287 @@
+{
+  "metadata": {
+    "extraction_timestamp": "2026-08-06T21:28:11.859665",
+    "original_query_timestamp": "2026-08-06T21:26:17.152749",
+    "analysis_period": {
+      "start_date": "2026-07-07T00:00:00Z",
+      "end_date": "2026-08-06T23:59:59Z",
+      "period_days": 30
+    },
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "data_quality_summary": {
+      "data_quality": {
+        "pbx-web": {
+          "has_latency_data": true,
+          "has_coverage_data": true,
+          "data_sources": [
+            "workflow_executions",
+            "deployment_intervals"
+          ],
+          "overall_quality": "good"
+        },
+        "whisper-stt": {
+          "has_latency_data": true,
+          "has_coverage_data": true,
+          "data_sources": [
+            "deployment_events"
+          ],
+          "overall_quality": "good"
+        }
+      },
+      "latency_comparison": {},
+      "coverage_summary": {
+        "pbx-web_workflow_data": {
+          "coverage_percentage": 3.2,
+          "gap_count": 10,
+          "days_with_data": 1
+        },
+        "whisper-stt_deployment_data": {
+          "coverage_percentage": 6.5,
+          "gap_count": 10,
+          "days_with_data": 0
+        }
+      }
+    },
+    "processing_notes": [
+      "Raw latency data extracted from 30-day query results",
+      "All duration values are in seconds unless otherwise specified",
+      "Percentile calculations use inclusive quantile method",
+      "Coverage gaps identified and documented"
+    ]
+  },
+  "time_series": {
+    "pbx-web": {
+      "daily_distribution": {
+        "workflow_data": {
+          "2026-08-06": 9
+        }
+      },
+      "deployment_timeline": [],
+      "workflow_executions": [
+        {
+          "workflow_name": "needle-ci-x2wx2",
+          "started_at": "2026-08-06T00:52:29Z",
+          "finished_at": "2026-08-06T01:45:58Z",
+          "duration_seconds": 3209.0,
+          "status": "Failed"
+        },
+        {
+          "workflow_name": "needle-ci-vnmhd",
+          "started_at": "2026-08-06T02:35:28Z",
+          "finished_at": "2026-08-06T03:01:01Z",
+          "duration_seconds": 1533.0,
+          "status": "Failed"
+        },
+        {
+          "workflow_name": "needle-ci-f46kr",
+          "started_at": "2026-08-06T11:24:57Z",
+          "finished_at": "2026-08-06T17:03:27Z",
+          "duration_seconds": 20310.0,
+          "status": "Failed"
+        },
+        {
+          "workflow_name": "needle-ci-verify-xjbbm",
+          "started_at": "2026-08-06T13:14:23Z",
+          "finished_at": "2026-08-06T15:34:12Z",
+          "duration_seconds": 8389.0,
+          "status": "Failed"
+        },
+        {
+          "workflow_name": "needle-ci-zr2cx",
+          "started_at": "2026-08-06T17:14:32Z",
+          "finished_at": "2026-08-06T17:38:49Z",
+          "duration_seconds": 1457.0,
+          "status": "Failed"
+        },
+        {
+          "workflow_name": "seam-ci-lnzps",
+          "started_at": "2026-08-06T19:36:49Z",
+          "finished_at": "2026-08-06T19:37:10Z",
+          "duration_seconds": 21.0,
+          "status": "Failed"
+        },
+        {
+          "workflow_name": "seam-ci-gn5rh",
+          "started_at": "2026-08-06T19:45:42Z",
+          "finished_at": "2026-08-06T19:46:02Z",
+          "duration_seconds": 20.0,
+          "status": "Failed"
+        },
+        {
+          "workflow_name": "seam-ci-bsd9q",
+          "started_at": "2026-08-06T20:09:46Z",
+          "finished_at": "2026-08-06T20:10:06Z",
+          "duration_seconds": 20.0,
+          "status": "Failed"
+        },
+        {
+          "workflow_name": "seam-ci-9sh2z",
+          "started_at": "2026-08-06T20:33:52Z",
+          "finished_at": "2026-08-06T20:34:12Z",
+          "duration_seconds": 20.0,
+          "status": "Failed"
+        }
+      ]
+    },
+    "whisper-stt": {
+      "daily_distribution": {},
+      "deployment_timeline": [
+        {
+          "timestamp": "2026-07-12T16:53:42Z",
+          "revision": 32,
+          "replicaset": "whisper-stt-847fd8d7b9",
+          "status": "active"
+        },
+        {
+          "timestamp": "2026-07-08T03:26:44Z",
+          "revision": 31,
+          "replicaset": "whisper-stt-6c497489fb",
+          "status": "scaled_down"
+        },
+        {
+          "timestamp": "2026-07-08T03:16:13Z",
+          "revision": 30,
+          "replicaset": "whisper-stt-5b8558f478",
+          "status": "scaled_down"
+        },
+        {
+          "timestamp": "2026-07-08T03:09:35Z",
+          "revision": 29,
+          "replicaset": "whisper-stt-5dbff75cbd",
+          "status": "scaled_down"
+        }
+      ],
+      "workflow_executions": []
+    }
+  },
+  "raw_metrics": {
+    "pbx-web": {
+      "workflow_latency": {
+        "percentiles": {
+          "p50_seconds": 1457.0,
+          "p75_seconds": 3209.0,
+          "p90_seconds": 10773.2,
+          "p95_seconds": 15541.6,
+          "p99_seconds": 19356.32
+        },
+        "statistics": {
+          "count": 9,
+          "mean_seconds": 3886.556,
+          "median_seconds": 1457.0,
+          "stddev_seconds": 6723.986,
+          "min_seconds": 20.0,
+          "max_seconds": 20310.0
+        },
+        "raw_durations": [
+          3209.0,
+          1533.0,
+          20310.0,
+          8389.0,
+          1457.0,
+          21.0,
+          20.0,
+          20.0,
+          20.0
+        ]
+      },
+      "deployment_intervals": {
+        "statistics": {
+          "count": 4,
+          "mean_seconds": 323370.0,
+          "median_seconds": 101898.0,
+          "stddev_seconds": 512890.636,
+          "min_seconds": 612.0,
+          "max_seconds": 1089072.0
+        },
+        "raw_intervals_seconds": [
+          612.0,
+          119196.0,
+          1089072.0,
+          84600.0
+        ]
+      },
+      "pod_health": {}
+    },
+    "whisper-stt": {
+      "workflow_latency": {},
+      "deployment_intervals": {
+        "frequency": {
+          "total_deployments": 4,
+          "deployment_count_30days": 4,
+          "intervals_hours": {
+            "count": 3,
+            "mean_hours": 36.58,
+            "median_hours": 0.18,
+            "min_hours": 0.11,
+            "max_hours": 109.45
+          }
+        },
+        "raw_intervals_hours": [
+          0.11,
+          0.18,
+          109.45
+        ]
+      },
+      "pod_health": {
+        "pods_analyzed": 10,
+        "restart_count": 0,
+        "startup_events": 0,
+        "error_count": 2
+      }
+    }
+  },
+  "data_dictionary": {
+    "field_descriptions": {
+      "workflow_latency.percentiles.p50_seconds": "50th percentile of workflow execution duration (median)",
+      "workflow_latency.percentiles.p95_seconds": "95th percentile of workflow execution duration",
+      "workflow_latency.percentiles.p99_seconds": "99th percentile of workflow execution duration",
+      "workflow_latency.statistics.mean_seconds": "Average workflow execution duration",
+      "workflow_latency.statistics.stddev_seconds": "Standard deviation of workflow durations",
+      "deployment_intervals.statistics.mean_seconds": "Average time between deployments in seconds",
+      "deployment_intervals.frequency.mean_hours": "Average time between deployments in hours",
+      "pod_health.restart_count": "Number of pod restart events detected",
+      "coverage_percentage": "Percentage of days with data during analysis period",
+      "gap_count": "Number of days without data in analysis period"
+    },
+    "units": {
+      "time": "seconds (unless otherwise specified)",
+      "count": "integer",
+      "percentage": "percent",
+      "duration": "seconds"
+    },
+    "data_sources": {
+      "pbx-web": [
+        "workflow_executions - Argo workflow history",
+        "deployment_intervals - Kubernetes deployment events"
+      ],
+      "whisper-stt": [
+        "deployment_events - Kubernetes deployment history",
+        "pod_health - Pod log analysis"
+      ]
+    },
+    "limitations": [
+      "Limited coverage: pbx-web workflow data only available for 1 out of 31 days",
+      "Limited coverage: whisper-stt deployment data only available for 2 out of 31 days",
+      "Results should be interpreted as preliminary due to sparse data coverage",
+      "Workflow data may be affected by Argo retention policies",
+      "Deployment intervals may not represent typical patterns due to low sample size"
+    ],
+    "quality_notes": {
+      "pbx-web": {
+        "workflow_data_quality": "poor",
+        "sample_size": "9 workflow executions",
+        "coverage_period": "single day (2026-08-06)",
+        "notes": "All workflows analyzed show 'Failed' status"
+      },
+      "whisper-stt": {
+        "deployment_data_quality": "poor",
+        "sample_size": "4 deployment events",
+        "coverage_period": "2 days (2026-07-08, 2026-07-12)",
+        "notes": "Multiple rapid deployments on 2026-07-08 indicate potential issues"
+      }
+    }
+  }
+}
