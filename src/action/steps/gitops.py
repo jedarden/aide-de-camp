@@ -17,38 +17,26 @@ import asyncio
 import logging
 import subprocess
 import time
+import tempfile
+import shutil
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+# Import validation utilities for pre-flight checks
+from .git_validation import (
+    GitError,
+    GitConflictError,
+    GitNetworkError,
+    GitAuthenticationError,
+    GitStateError,
+    PreflightGitValidation,
+)
+
 logger = logging.getLogger(__name__)
-
-
-class GitError(RuntimeError):
-    """Base exception for git operation failures."""
-    pass
-
-
-class GitConflictError(GitError):
-    """Raised when git operations encounter merge conflicts or rejection."""
-    pass
-
-
-class GitNetworkError(GitError):
-    """Raised when git operations fail due to network issues."""
-    pass
-
-
-class GitAuthenticationError(GitError):
-    """Raised when git operations fail due to authentication issues."""
-    pass
-
-
-class GitStateError(GitError):
-    """Raised when git repository is in an unexpected state."""
-    pass
 
 
 def retry_on_network_failure(max_retries: int = 3, backoff_factor: float = 1.5):
@@ -370,73 +358,27 @@ class GitOpsCommitStep:
         )
 
     def _validate_declarative_config_repo(self) -> None:
-        """Validate that we're in the declarative-config repository."""
-        if not self.declarative_config_path.exists():
-            raise GitStateError(f"declarative-config path does not exist: {self.declarative_config_path}")
+        """
+        Validate that we're in the declarative-config repository.
 
-        # Check for git repository
-        git_dir = self.declarative_config_path / ".git"
-        if not git_dir.exists():
-            raise GitStateError(f"Not a git repository: {self.declarative_config_path}")
+        Uses comprehensive pre-flight validation checks to ensure the repository
+        is in a clean state before performing any operations.
+        """
+        validator = PreflightGitValidation(
+            repo_path=self.declarative_config_path,
+            expected_branch="main",
+            expected_remote_pattern="declarative-config",
+            timeout=self.timeout,
+            min_free_mb=100,
+            strict=True,  # Raise immediately on first error
+        )
 
-        # Check for uncommitted changes
-        try:
-            result = subprocess.run(
-                ["git", "-C", str(self.declarative_config_path), "status", "--porcelain"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
+        # Run all validation checks
+        # Will raise GitStateError, GitAuthenticationError, or GitNetworkError
+        # if any check fails
+        validator.validate_all()
 
-            if result.stdout.strip():
-                raise GitStateError(
-                    f"Repository has uncommitted changes. Please commit or stash them first:\n{result.stdout.strip()}"
-                )
-        except subprocess.TimeoutExpired:
-            raise GitNetworkError("Git status check timed out")
-        except FileNotFoundError:
-            raise GitError("Git command not found - ensure git is installed")
-
-        # Verify we're on main branch
-        try:
-            result = subprocess.run(
-                ["git", "-C", str(self.declarative_config_path), "branch", "--show-current"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=True,
-            )
-
-            current_branch = result.stdout.strip()
-            if current_branch != "main":
-                raise GitStateError(f"Not on main branch: {current_branch}. Please switch to main branch first.")
-        except subprocess.TimeoutExpired:
-            raise GitNetworkError("Git branch check timed out")
-
-        # Verify remote is jedarden/declarative-config
-        try:
-            result = subprocess.run(
-                ["git", "-C", str(self.declarative_config_path), "remote", "-v"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
-
-            # Check for authentication failures
-            if result.returncode != 0:
-                error_output = result.stderr.lower()
-                if any(pattern in error_output for pattern in ["authentication", "permission denied", "credentials", "auth", "fatal"]):
-                    raise GitAuthenticationError(f"Git authentication failed: {result.stderr.strip()}")
-                raise GitError(f"Git remote check failed: {result.stderr.strip()}")
-
-            if "declarative-config" not in result.stdout:
-                raise GitStateError("Git remote is not jedarden/declarative-config")
-        except subprocess.TimeoutExpired:
-            raise GitNetworkError("Git remote check timed out")
-        except FileNotFoundError:
-            raise GitError("Git command not found - ensure git is installed")
+        logger.info(f"Pre-flight validation passed for {self.declarative_config_path}")
 
     def _parse_and_validate_fields(self, template_fields: list[dict[str, Any]]) -> list[TemplateField]:
         """Parse and validate template field specifications."""
