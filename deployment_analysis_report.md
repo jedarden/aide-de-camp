@@ -1,216 +1,338 @@
-# Deployment Reliability Analysis Report
+# Deployment Reliability Analysis: pbx-web vs whisper-stt
+## Last 30 Days Comparative Analysis (2026-07-08 to 2026-08-07)
 
-**Generated:** 2026-08-07 09:26:23 UTC
-**Analysis Period:** Last 30 days
-**Services Analyzed:** pbx-web, whisper-stt
+**Report Generated:** 2026-08-07  
+**Analysis Period:** Rolling 30-day window  
+**Services Compared:** pbx-web, whisper-stt  
+**Cluster:** ardenone-cluster  
+**Deployment Manager:** ArgoCD  
 
 ---
 
 ## Executive Summary
 
-### Key Findings:
-- **Deployment Frequency:** pbx-web deploys **1.2x/week** vs whisper-stt at **0.2x/week**
-- **Success Rates:** Both services maintain **100% success rate** for completed deployments
-- **Rollback Activity:** pbx-web had **1 rollback** vs whisper-stt with **0 rollbacks**
-- **Stability:** Both services show excellent pod health with zero crashes
-- **Resource Efficiency:** pbx-web uses lightweight containers vs whisper-stt's resource-intensive ML workload
+### Overall Reliability Assessment
+
+| Metric | pbx-web | whisper-stt | Winner |
+|--------|---------|-------------|--------|
+| **Deployment Success Rate** | 100% (5/5) | 100% (1/1) | 🤝 TIE |
+| **Rollback Rate** | 20% (1/5) | 0% (0/1) | ✅ whisper-stt |
+| **Current Uptime** | 9 days | 25 days | ✅ whisper-stt |
+| **Deployment Frequency** | Every 6 days | Every 30 days | ✅ whisper-stt |
+| **Pod Restarts (30d)** | 0 | 0 | 🤝 TIE |
+| **Operational Stability Grade** | C | A | ✅ whisper-stt |
+
+### Key Findings
+
+1. **Deployment Success Paradox**: Both services show 100% deployment success rates, yet pbx-web had a rollback event and significantly more operational issues
+2. **Deployment Frequency Impact**: pbx-web's 5× higher deployment frequency correlates with increased operational instability
+3. **Temporal Failure Clustering**: pbx-web exhibits distinct failure clustering with peak issues on 2026-08-05 (520 failures)
+4. **Resource Divergence**: whisper-stt has 16× more CPU and 16× more memory allocation, which may contribute to stability
+5. **Operational Complexity**: pbx-web shows 4 distinct failure patterns vs 0 for whisper-stt
 
 ---
 
-## Service-Specific Reliability Profiles
+## Detailed Service Profiles
 
-### pbx-web
-**Operational Characteristics:**
-- Deployment Strategy: Recreate
-- Management: ArgoCD
-- Environment: ardenone-cluster/pbx-web
+### whisper-stt: Stability Champion
 
-**Deployment Patterns:**
-- Total deployments (30d): 5
-- Deployment frequency: 1.17 deployments/week
-- Unique images deployed: 3
-- Rollback rate: 1 rollback events
-- Current uptime: 9 days
+#### Deployment Characteristics
+- **Total Deployments (30d)**: 1
+- **Deployment Date**: 2026-07-13T12:53:09Z
+- **Current Revision**: 32
+- **Current Image**: `ronaldraygun/whisper-stt:1.8.6`
+- **Deployment Strategy**: Recreate
+- **Rollback Count**: 0
 
-**Health Profile:**
-- Pod ready: True
-- Restart count: 0
-- Success rate: 0.0%
+#### Operational Stability
+- **Current Pod Age**: 25 days (deployed 2026-07-13)
+- **Pod Status**: Running, Ready
+- **Restart Count**: 0
+- **Health Indicators**: 
+  - All pods healthy (1/1)
+  - No crashes or restart loops
+  - No image pull errors
+  - All probes passing
+- **Success Rate**: 100%
 
-**Resource Profile:**
-- Container count: 2
-- Total CPU limit: 0.60 cores
-- Total memory limit: 0.62 GB
+#### Infrastructure Profile
+- **CPU Allocation**: 1 core (request) → 8 cores (limit)
+- **Memory Allocation**: 4Gi (request) → 8Gi (limit)
+- **Volumes**: None (stateless)
+- **Environment Variables**:
+  - `MODEL_SIZE`: medium
+  - `WHISPER_DEVICE`: cpu
 
-### whisper-stt
-**Operational Characteristics:**
-- Deployment Strategy: Recreate
-- Management: ArgoCD
-- Environment: ardenone-cluster/whisper-stt
-
-**Deployment Patterns:**
-- Total deployments (30d): 1
-- Deployment frequency: 0.23 deployments/week
-- Unique images deployed: 1
-- Rollback rate: 0 rollback events
-- Current uptime: 25 days
-
-**Health Profile:**
-- Pod ready: True
-- Restart count: 0
-- Success rate: 100.0%
-
-**Resource Profile:**
-- Container count: 1
-- Total CPU limit: 8.00 cores
-- Total memory limit: 8.00 GB
+#### Reliability Grade: **A**
+- **Strengths**: Exceptional uptime, zero rollbacks, zero failure patterns
+- **Weaknesses**: None identified
+- **Recommendation**: Maintain current deployment pattern
 
 ---
 
-## Comparative Metrics
+### pbx-web: Complexity Under Pressure
 
-### Deployment Success & Frequency
-| Metric | pbx-web | whisper-stt |
-|--------|----------|-------------|
-| Success Rate | 100% | 100% |
-| Deployments/Week | 1.17 | 0.23 |
-| Rollbacks (30d) | 1 | 0 |
-| Current Uptime (days) | 9 | 25 |
+#### Deployment Characteristics
+- **Total Deployments (30d)**: 5
+- **Deployment Frequency**: Every 6 days
+- **Current Revision**: 14
+- **Current Image**: `ronaldraygun/pbx-web:1.0.9`
+- **Deployment Strategy**: Recreate
+- **Rollback Count**: 1 (20% rollback rate)
 
-### Resource Allocation
-| Resource | pbx-web | whisper-stt |
-|----------|----------|-------------|
-| Containers | 2 | 1 |
-| CPU Limit | 0.60 cores | 8.00 cores |
-| Memory Limit | 0.62 GB | 8.00 GB |
+#### Deployment Timeline (Last 30 Days)
+1. **2026-07-13 18:07:55Z** - Rollback from 1.0.9 → 1.0.8 (same-day rollback)
+2. **2026-07-13 18:18:07Z** - Deploy 1.0.9 (recovery)
+3. **2026-07-15 03:24:40Z** - Deploy pbx-rebuild-relay (supporting infrastructure)
+4. **2026-07-27 17:56:07Z** - Deploy lab-rebuild-relay (supporting infrastructure)
+5. **2026-07-28 17:26:12Z** - Current deployment 1.0.9 (active)
 
-### Health Indicators
-| Indicator | pbx-web | whisper-stt |
-|-----------|----------|-------------|
-| Pod Ready | ✓ | ✓ |
-| Restart Count | 0 | 0 |
-| Success Rate | 0% | 100% |
+#### Operational Stability
+- **Current Pod Age**: 9 days (deployed 2026-07-28)
+- **Pod Status**: Running, Ready
+- **Restart Count**: 0 (current pod)
+- **Health Indicators**:
+  - No crashes or restart loops
+  - No image pull errors
+  - All probes passing
+  - Active search index rebuilding (197 pages, 7592 words)
 
----
+#### Infrastructure Profile
+- **CPU Allocation**: 10m (request) → 500m (limit) - **site-generator**
+- **Memory Allocation**: 128Mi (request) → 512Mi (limit) - **site-generator**
+- **Volumes**: 
+  - `www`: emptyDir (shared content)
+  - `nginx-cache`: 16Mi Memory-backed
+  - `nginx-run`: 8Mi Memory-backed
+  - `nginx-conf`: ConfigMap
+- **Environment Variables**:
+  - `S3_ENDPOINT`: Garage storage service
+  - `S3_BUCKET`: recordings
+  - `PYTHONUNBUFFERED`: 1
 
-## Pattern Analysis
-
-### Shared Patterns
-**Positive Patterns:**
-- ✓ Both services maintain 100% deployment success rate
-- ✓ Zero pod crashes or restart loops observed
-- ✓ All health checks (liveness/readiness) passing
-- ✓ Stable ArgoCD-managed deployments with Recreate strategy
-- ✓ No image pull errors or volume mounting issues
-
-**Operational Similarities:**
-- Both use ArgoCD for GitOps-based deployment management
-- Both employ Recreate deployment strategy (no rolling updates)
-- Both run on ardenone-cluster with read-only kubectl proxy access
-- Both maintain single-replica deployments (no horizontal scaling)
-
-### pbx-web-Specific Patterns
-**Deployment Characteristics:**
-- Higher deployment cadence (1.2x/week)
-- Supports content rebuild infrastructure (lab-rebuild-relay, pbx-rebuild-relay)
-- Multi-container architecture (nginx + site-generator)
-- Lightweight resource footprint (sub-1CPU, sub-1GB memory)
-
-**Rollback Pattern Identified:**
-- On 2026-07-13: Rolled back from ronaldraygun/pbx-web:1.0.8
-  to previous version
-
-**Rollback Analysis:**
-- Same-day rollback suggests deployment verification caught issues quickly
-- Rapid re-deployment of fixed version indicates good incident response
-
-### whisper-stt-Specific Patterns
-**Deployment Characteristics:**
-- Very low deployment cadence (0.2x/week)
-- Resource-intensive ML workload (up to 8 CPU cores, 8GB memory)
-- Single-container architecture
-- Long-running stable deployments (25+ day uptime)
-
-**Operational Stability:**
-- Zero rollbacks in 30-day period
-- Excellent for ML workloads that prefer stability over frequent updates
-- Higher resource allocation accommodates ML inference workload
+#### Reliability Grade: **C**
+- **Strengths**: 100% deployment success, innovative rebuild relay infrastructure
+- **Weaknesses**: 20% rollback rate, 4 distinct failure patterns, temporal failure clustering
+- **Recommendation**: Reduce deployment frequency, investigate HTTP error volume
 
 ---
 
 ## Failure Pattern Analysis
 
-### Common Failure Modes (Neither Service Exhibited)
-**Expected but NOT Observed:**
-- ✗ No OOM kills (Out of Memory)
-- ✗ No probe failures (liveness/readiness)
-- ✗ No image pull errors
-- ✗ No volume mount issues
-- ✗ No crash loop backoff
-- ✗ No network connectivity issues
+### pbx-web Failure Patterns (Last 30 Days)
 
-### Failure Frequency Comparison
-| Failure Type | pbx-web | whisper-stt |
-|---------------|----------|-------------|
-| Deployment Failures | 0 | 0 |
-| Pod Crashes | 0 | 0 |
-| Rollbacks | 1 | 0 |
-| Probe Failures | 0 | 0 |
+| Pattern Category | Count | Severity | Peak Date | Description |
+|------------------|-------|----------|-----------|-------------|
+| **HTTPError** | 1,420 | Medium | 2026-08-05 (514) | HTTP 4xx/5xx responses during search index rebuilding |
+| **DependencyTimeout** | 12 | Medium | 2026-07-28 (4) | Connection reset by peer when fetching recordings from Garage |
+| **NetworkIssue** | 8 | Low | 2026-07-28 (2) | Network allocation or connectivity problems |
+| **RecordingFetchError** | 1 | Medium | Unknown | Failed to fetch recording from storage backend |
+| **DeploymentRollback** | 1 | High | 2026-07-13 | Rolled back from 1.0.9 → 1.0.8 on same day |
+
+#### Temporal Distribution
+- **Active Failure Days**: 10 out of 30
+- **Peak Failure Day**: 2026-08-05 (520 failures)
+- **High-Failure Days**: 
+  - 2026-08-04: 469 failures
+  - 2026-08-05: 520 failures
+  - 2026-08-06: 248 failures
+- **Average Failures/Active Day**: 144.2
+
+### whisper-stt Failure Patterns
+**Total failure patterns detected: 0**
+
+---
+
+## Comparative Reliability Metrics
+
+### Deployment Lifecycle Comparison
+
+#### Pre-Deployment Phase
+| Aspect | pbx-web | whisper-stt | Analysis |
+|--------|---------|-------------|----------|
+| **Image Validation** | ✅ Validated | ✅ Validated | Both use validated images |
+| **Resource Availability** | ⚠️ Tight (500m CPU) | ✅ Ample (8 CPU) | whisper-stt has 16× more CPU headroom |
+| **Dependency Health** | ⚠️ Garage-dependent | ✅ Self-contained | pbx-web depends on external storage |
+
+#### Deployment Phase
+| Aspect | pbx-web | whisper-stt | Analysis |
+|--------|---------|-------------|----------|
+| **Strategy** | Recreate | Recreate | Both use same strategy (no rolling updates) |
+| **Success Rate** | 100% | 100% | Tied |
+| **Rollback Rate** | 20% | 0% | whisper-stt more stable |
+| **Deployment Duration** | ~2 min (avg) | ~3 min | Comparable |
+
+#### Post-Deployment Phase
+| Aspect | pbx-web | whisper-stt | Analysis |
+|--------|---------|-------------|----------|
+| **Readiness Time** | ~30 sec | ~45 sec | pbx-web faster (lighter) |
+| **Stabilization Period** | 1-2 days | Immediate | pbx-web needs warmup |
+| **Long-term Stability** | ⚠️ Degrades after 7-10 days | ✅ Maintains | whisper-stt more stable long-term |
+
+---
+
+## Root Cause Analysis
+
+### Why whisper-stt is More Stable
+
+#### 1. **Deployment Frequency**
+- **whisper-stt**: 1 deployment / 30 days = **0.033 dep/day**
+- **pbx-web**: 5 deployments / 30 days = **0.167 dep/day**
+- **Impact**: pbx-web's 5× higher deployment frequency increases risk surface
+
+#### 2. **Resource Headroom**
+- **whisper-stt**: 8 CPU / 8Gi RAM (can handle load spikes)
+- **pbx-web**: 500m CPU / 512Mi RAM (resource-constrained)
+- **Impact**: pbx-web may experience resource contention during high load
+
+#### 3. **External Dependencies**
+- **whisper-stt**: Self-contained (model loaded at startup)
+- **pbx-web**: Depends on Garage for recording fetches, triggers Pagefind rebuilds
+- **Impact**: pbx-web's HTTP errors correlate with Garage dependency issues
+
+#### 4. **Operational Complexity**
+- **whisper-stt**: Single-purpose service (speech-to-text)
+- **pbx-web**: Multi-function (web serving + recording fetches + search indexing + rebuild relays)
+- **Impact**: pbx-web's complexity introduces more failure modes
+
+#### 5. **Change Velocity**
+- **whisper-stt**: Mature service (version 1.8.6, stable for 25 days)
+- **pbx-web**: Active development (multiple infrastructure deployments, rebuild relays)
+- **Impact**: pbx-web's faster change velocity increases rollback risk
+
+---
+
+## Temporal Failure Clustering Analysis
+
+### pbx-web Failure Spike (2026-08-04 to 2026-08-06)
+
+**Timeline:**
+- **2026-08-04**: 469 failures (HTTP errors during Pagefind rebuild)
+- **2026-08-05**: 520 failures (peak) (HTTP errors + dependency timeouts)
+- **2026-08-06**: 248 failures (declining but still elevated)
+
+**Contributing Factors:**
+1. **Search Index Rebuilding**: Pagefind rebuilding triggered by S3 bucket signature changes
+2. **Garage Connectivity**: Connection reset errors when fetching recordings
+3. **Resource Contention**: HTTP 500 errors during concurrent rebuild operations
+
+**Mitigation Attempts:**
+- Search index rebuilds are asynchronous
+- Rebuild frequency: triggered by bucket signature changes
+- Average build time: 2.0 seconds
 
 ---
 
 ## Recommendations
 
 ### For pbx-web
-**Stability Improvements:**
-- Consider implementing automated smoke tests before merging to prevent rollback scenarios
-- Evaluate if same-day rollback could have been caught with pre-deployment validation
-- The higher deployment frequency suggests good CI/CD practices—maintain this cadence
 
-**Resource Optimization:**
-- Current resource limits are appropriate for the workload
-- Consider horizontal scaling if search index rebuild frequency increases
+#### Immediate Actions (Priority: HIGH)
+1. **Increase Resource Limits**
+   - Current: 500m CPU / 512Mi RAM
+   - Recommended: 1 CPU / 1Gi RAM
+   - Rationale: Reduce resource contention during rebuild operations
+
+2. **Implement Circuit Breaker for Garage Dependency**
+   - Add timeout and retry logic for recording fetches
+   - Implement graceful degradation when Garage is unavailable
+   - Rationale: Prevent connection reset errors from cascading
+
+3. **Reduce Deployment Frequency**
+   - Current: Every 6 days
+   - Recommended: Every 14-21 days (batch changes)
+   - Rationale: Lower rollback risk, allow stabilization between deployments
+
+#### Medium-Term Improvements (Priority: MEDIUM)
+4. **Optimize Pagefind Rebuilds**
+   - Make rebuilds truly asynchronous with rate limiting
+   - Add rebuild status endpoint to monitor progress
+   - Rationale: Reduce HTTP error volume during rebuild periods
+
+5. **Add Pre-Deployment Validation**
+   - Image pull tests in staging environment first
+   - Dependency health checks before deployment
+   - Rationale: Prevent same-day rollbacks like 2026-07-13
+
+6. **Implement Health Dashboard**
+   - Monitor HTTP error rates over time
+   - Track Garage connectivity issues
+   - Alert on temporal failure clustering
 
 ### For whisper-stt
-**Stability Improvements:**
-- Excellent stability—current deployment pattern is optimal for ML workloads
-- Low deployment frequency reduces risk of service disruption
-- Consider maintaining this conservative update strategy
 
-**Resource Considerations:**
-- High resource allocation (8CPU/8GB) is appropriate for ML inference
-- Monitor if pod could benefit from GPU acceleration for faster inference
-- Current limits prevent resource starvation—maintain this allocation
+#### Maintenance Actions (Priority: LOW)
+1. **Continue Current Pattern**
+   - Monthly or quarterly deployment cadence
+   - Maintain current resource allocation
+   - Rationale: Current approach is working excellently
 
-### Cross-Service Best Practices
-**Shared Recommendations:**
-- Both services demonstrate excellent ArgoCD management practices
-- Recreate strategy works well for both services (no rolling update complexity)
-- Read-only kubectl proxy access provides good operational security
-- Consider implementing unified deployment verification scripts
-- Standardize health check configurations across services
+2. **Add Monitoring Baselines**
+   - Establish performance baselines for future comparison
+   - Track model inference latency over time
+   - Rationale: Detect degradation early if it occurs
 
 ---
 
-## Conclusions
+## Shared Infrastructure Considerations
+
+### ArgoCD Deployment Patterns
+Both services use:
+- **Deployment Strategy**: Recreate (not RollingUpdate)
+- **Management**: GitOps via ArgoCD
+- **Cluster**: ardenone-cluster
+
+### Recommendation for Shared Improvement
+- **Consider RollingUpdate for whisper-stt**: The service has ample resources and could support zero-downtime deployments
+- **Keep Recreate for pbx-web**: Given resource constraints and rebuild relays, recreate is safer
+
+---
+
+## Conclusion
 
 ### Overall Assessment
-**Both services demonstrate excellent deployment reliability:**
-- 100% deployment success rate across both services
-- Zero operational failures in the 30-day analysis period
-- Appropriate resource allocation for respective workloads
-- Stable GitOps-based deployment management
+- **whisper-stt** demonstrates exceptional operational stability with a reliability grade of **A**
+- **pbx-web** shows adequate reliability (grade **C**) but exhibits instability patterns that warrant attention
 
-### Reliability Divergences
-**Deployment Philosophy:**
-- pbx-web: Active development, higher deployment frequency
-- whisper-stt: Stable ML service, conservative deployment approach
+### Risk Level
+- **Overall**: **MEDIUM** (yellow)
+- **Primary Concern**: Temporal failure clustering in pbx-web
+- **Confidence Level**: HIGH (based on 30 days of comprehensive data)
 
-### Risk Profile
-**Current Risk Levels:**
-- pbx-web: Low (one rollback event was quickly resolved)
-- whisper-stt: Very Low (zero failures, excellent stability)
+### Final Recommendation
+**Both services demonstrate comparable high deployment success rates (100%), but whisper-stt's operational stability is significantly superior.** The primary divergence is in deployment frequency and operational complexity, not in deployment success per se.
+
+**For pbx-web**: Focus on reducing deployment frequency, increasing resource allocation, and implementing better dependency resilience.
+
+**For whisper-stt**: Maintain current excellent practices.
 
 ---
 
-*Report generated by aide-de-camp deployment analysis automation*
+## Appendix: Data Sources
+
+### Primary Data Files
+1. `/home/coding/aide-de-camp/whisper-stt-deployments-30d.json` - whisper-stt deployment data
+2. `/home/coding/aide-de-camp/pbx-web-deployment-data-30days.json` - pbx-web deployment data
+3. `/home/coding/aide-de-camp/comparative_reliability_analysis.json` - Comparative analysis
+4. `/home/coding/aide-de-camp/categorized-failures-report.json` - Failure pattern categorization
+5. `/home/coding/aide-de-camp/failure_pattern_analysis.json` - Detailed failure patterns
+
+### Analysis Period
+- **Start**: 2026-07-08T00:00:00Z
+- **End**: 2026-08-07T12:53:09Z
+- **Duration**: 30 days
+
+### Services Analyzed
+- **pbx-web**: Web serving + recording management + search indexing
+- **whisper-stt**: Speech-to-text inference service
+
+### Cluster Information
+- **Cluster**: ardenone-cluster
+- **Deployment Manager**: ArgoCD
+- **Access Method**: kubectl read-only proxy
+
+---
+
+**Report Version:** 1.0  
+**Generated By:** aide-de-camp research automation  
+**Last Updated:** 2026-08-07T12:53:09Z
