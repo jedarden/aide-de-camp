@@ -1,0 +1,150 @@
+{
+  "analysis_timestamp": "2026-08-07T08:24:58.261965Z",
+  "services": {
+    "pbx-web": {
+      "total_events": 44,
+      "success_count": 6,
+      "failure_count": 0,
+      "warning_count": 2,
+      "success_rate": 13.64,
+      "failure_rate": 0.0,
+      "warning_rate": 4.55,
+      "top_error_codes": [
+        [
+          "ClusterIPNotAllocated",
+          1
+        ],
+        [
+          "deprecatedAnnotation",
+          1
+        ]
+      ],
+      "top_event_types": [
+        [
+          "unknown",
+          24
+        ],
+        [
+          "timeout",
+          20
+        ]
+      ],
+      "duration_stats": {
+        "mean": 4426988.682,
+        "median": 3850327.232,
+        "min": 831160.732,
+        "max": 8369342.732,
+        "count": 20
+      },
+      "time_to_failure_stats": {
+        "mean_seconds": 462803.94444444444,
+        "median_seconds": 139634.5,
+        "min_seconds": 1.0,
+        "max_seconds": 3023627.0,
+        "count": 18
+      },
+      "temporal_patterns": {
+        "hourly_distribution": {
+          "21": 1,
+          "17": 4,
+          "3": 2,
+          "20": 2,
+          "11": 3,
+          "18": 8,
+          "15": 1
+        },
+        "weekday_distribution": {
+          "monday": 6,
+          "tuesday": 4,
+          "wednesday": 2,
+          "thursday": 4,
+          "friday": 0,
+          "saturday": 4,
+          "sunday": 1
+        }
+      }
+    },
+    "whisper-stt": {
+      "total_events": 196528,
+      "success_count": 4,
+      "failure_count": 0,
+      "warning_count": 0,
+      "success_rate": 0.0,
+      "failure_rate": 0.0,
+      "warning_rate": 0.0,
+      "top_error_codes": [],
+      "top_event_types": [
+        [
+          "unknown",
+          196504
+        ],
+        [
+          "timeout",
+          24
+        ]
+      ],
+      "duration_stats": {
+        "mean": 3877730.0663333335,
+        "median": 4216990.233,
+        "min": 2215510.733,
+        "max": 4682068.733,
+        "count": 24
+      },
+      "time_to_failure_stats": {
+        "mean_seconds": 112116.27272727272,
+        "median_seconds": 514.5,
+        "min_seconds": 1.0,
+        "max_seconds": 921587.0,
+        "count": 22
+      },
+      "temporal_patterns": {
+        "hourly_distribution": {
+          "4": 8,
+          "16": 3,
+          "3": 7,
+          "14": 2,
+          "19": 1,
+          "2": 1,
+          "20": 1,
+          "12": 1
+        },
+        "weekday_distribution": {
+          "monday": 0,
+          "tuesday": 0,
+          "wednesday": 5,
+          "thursday": 3,
+          "friday": 2,
+          "saturday": 0,
+          "sunday": 14
+        }
+      }
+    }
+  },
+  "comparison": {
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "failure_rate_comparison": {
+      "pbx-web": 0.0,
+      "whisper-stt": 0.0
+    },
+    "success_rate_comparison": {
+      "pbx-web": 13.64,
+      "whisper-stt": 0.0
+    },
+    "shared_error_codes": {
+      "pbx-web": [],
+      "whisper-stt": [],
+      "all_shared": []
+    },
+    "unique_errors": {
+      "pbx-web": [
+        "deprecatedAnnotation",
+        "ClusterIPNotAllocated"
+      ],
+      "whisper-stt": []
+    },
+    "temporal_patterns": {}
+  }
+}
