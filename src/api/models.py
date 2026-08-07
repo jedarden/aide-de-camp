@@ -148,8 +148,9 @@ class DispatchRequest(BaseModel):
                 raise ValueError('utterance_id must be a non-empty string if provided')
         return v
 
-    model_config = {
-        "json_schema_extra": {
+    class Config:
+        """Pydantic model configuration for OpenAPI documentation."""
+        json_schema_extra = {
             "examples": [
                 {
                     "utterance": "Check CI status for aide-de-camp",
@@ -159,4 +160,3 @@ class DispatchRequest(BaseModel):
                 }
             ]
         }
-    }
