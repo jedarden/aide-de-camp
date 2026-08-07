@@ -465,7 +465,7 @@ async def test_global_store_singleton_reset():
 
     # Get a fresh store instance
     from src.session.store import get_store
-    store = get_store()
+    store = await get_store()
 
     # Verify it's a new instance with the test database
     assert store is not None, "Should get a valid store instance"
