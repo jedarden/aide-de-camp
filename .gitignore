@@ -26,3 +26,16 @@ nohup.out
 # - .browser_libpath_cache.json : host-specific /nix/store lib-path cache
 tests/e2e/screenshots/
 tests/e2e/.browser_libpath_cache.json
+
+# ── Generated analysis artifacts and raw log dumps ──────────────────────────
+# Added 2026-08-07. These are regenerated outputs, not source. Committing them
+# grew this repo to 1.7GB server-side (674MB at HEAD alone) and, combined with
+# ~933 commits/day from the NEEDLE fleet, drove Forgejo's git gc past its 2Gi
+# container limit — OOM-killing it every ~8 minutes so gc never completed and
+# nothing was ever repacked.
+categorized-failures-report.json
+validated-failures-dataset.json
+logs/
+research/**/pod-logs/
+docs/error-analysis/*-logs.txt
+*.jsonl.raw
