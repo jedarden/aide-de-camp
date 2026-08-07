@@ -45,6 +45,24 @@ def validate_all(data: Dict[str, Any]) -> Tuple[bool, List[str]]:
         >>> is_valid
         True
     """
+    # Import the JSON well-formedness validator
+    from src.validation.completeness import validate_json_wellformedness
+
+    # Step 1: JSON well-formedness validation (EARLY TERMINATION)
+    # This is called first to ensure data is well-formed JSON before proceeding.
+    # On failure, we immediately return to prevent further validation attempts
+    # on malformed data that could cause unexpected errors or false positives.
+    is_valid, error = validate_json_wellformedness(data)
+    if not is_valid:
+        # Early termination: return immediately with JSON validation error
+        # No further validation functions are called when JSON is invalid
+        return (False, [f"JSON validation: {error}"])
+
+    # TODO: Add remaining validation steps in future beads:
+    # - Step 2: Required fields validation (validate_required_fields)
+    # - Step 3: Data types validation (validate_data_types)
+    # - Step 4: Completeness validation (validate_completeness)
+
     return (True, [])
 
 
