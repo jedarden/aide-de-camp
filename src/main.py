@@ -278,37 +278,89 @@ async def health_check():
 @app.get("/test")
 async def get_test_endpoint():
     """
-    GET test endpoint that returns a simple test result structure.
+    GET test endpoint that stores a test result and returns verification.
 
-    Returns a result object with id, type, and content fields matching
-    the structure used by /dispatch for testing and verification.
+    Stores a test result to the session database using the same session store
+    logic as /dispatch. Returns storage confirmation with result_id.
 
     Returns:
         {
-            "id": "test-...",
-            "type": "test",
-            "content": {...}
+            "stored": true,
+            "result_id": "...",
+            "test_mode": true,
+            "timestamp": "...",
+            "summary": "..."
         }
     """
     import uuid
     from datetime import datetime
 
-    test_result = {
-        "id": f"test-{uuid.uuid4()}",
-        "type": "test",
-        "content": {
-            "test_mode": True,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "summary": "Test result from GET endpoint",
-            "urgency": "normal",
-            "data": {
-                "message": "This is a test result structure",
-                "fields_present": ["id", "type", "content"],
-            }
-        }
+    # Get the session store
+    store = await get_store()
+
+    # Generate IDs for test data
+    session_id = str(uuid.uuid4())
+    utterance_id = str(uuid.uuid4())
+
+    # Create session
+    await store.create_session(session_id)
+
+    # Create utterance record
+    test_utterance = "GET /test endpoint verification"
+    await store.create_utterance(session_id, test_utterance, utterance_id)
+
+    # Create intent record
+    intent_id = await store.create_intent(
+        utterance_id=utterance_id,
+        session_id=session_id,
+        project_slug="test",
+        intent_type="test",
+    )
+
+    # Create topic
+    topic_id = await store.create_topic(
+        label=f"Test: GET /test verification",
+        topic_type="personal",
+        project_slugs=[],
+        scope="session",
+        session_id=session_id,
+    )
+
+    # Create result record
+    result_data = {
+        "test_mode": True,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "endpoint": "GET /test",
+        "verification": "Storage verified",
     }
 
-    return test_result
+    result_id = await store.create_result(
+        intent_id=intent_id,
+        topic_id=topic_id,
+        session_id=session_id,
+        summary="Test result from GET /test endpoint with storage verification",
+        data=result_data,
+        urgency="normal",
+        result_type="test",
+    )
+
+    logger.info(f"[TEST] GET /test stored result - result_id: {result_id}, session_id: {session_id}")
+
+    # Return storage confirmation with result_id
+    return {
+        "status": "test",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "stored": {
+            "utterance_id": utterance_id,
+            "intent_id": intent_id,
+            "topic_id": topic_id,
+            "result_id": result_id,
+            "session_id": session_id,
+        },
+        "test_mode": True,
+        "summary": "Test result from GET /test endpoint with storage verification",
+        "message": "GET /test endpoint stored data successfully",
+    }
 
 
 @app.post("/test")
