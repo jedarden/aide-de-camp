@@ -36,7 +36,34 @@ class EventType(Enum):
         RESOURCE_LIMIT: Events indicating resource limits were exceeded
         PROBE_FAILURE: Events indicating a generic probe (liveness/startup) failure
         NETWORK_ERROR: Events indicating network connectivity issues
-        UNKNOWN: Events that could not be categorized
+        UNKNOWN: Events that could not be categorized into any known type
+
+    UNKNOWN Event Criteria:
+        An event is categorized as UNKNOWN when it matches NONE of the specific
+        detection patterns above. This includes events that are:
+
+        - Malformed or missing required fields (None, not a dict, empty dict)
+        - Using unrecognized event_type values not matching deployment/pod/event patterns
+        - Missing error indicators (no error_code, no reason, no message patterns)
+        - Having status values that don't correlate to known event states
+        - Containing only unknown or unrecognized metadata fields
+
+        The UNKNOWN category serves as a safe fallback to ensure all events are
+        categorized, even if they don't match known patterns. This prevents
+        data loss and allows for later analysis of emerging event types.
+
+        Events are checked in specificity order (most specific to least specific):
+        1. OOM (highest priority - distinct error pattern)
+        2. Image pull errors (very specific error pattern)
+        3. Pod crashes (more specific than readiness failures)
+        4. Readiness failures (less specific than crashes)
+        5. Timeouts (but not DNS timeouts - those are network errors)
+        6. Resource limits (resource exhaustion, not timeout-related)
+        7. Network errors (connectivity failures, not timeouts)
+        8. Probe failures (generic liveness/startup, not readiness)
+        9. Deployment start (deployment initialization)
+        10. Deployment complete (successful rollout)
+        11. UNKNOWN (fallback - matches no pattern above)
     """
     DEPLOYMENT_START = 'deployment_start'
     DEPLOYMENT_COMPLETE = 'deployment_complete'
@@ -59,19 +86,32 @@ def categorize_event(log_data: Dict[str, Any]) -> EventType:
     Returns a detailed event category that can be used for filtering,
     alerting, and analytics.
 
+    The categorization process checks event patterns in order of specificity,
+    from most specific (OOM) to most generic (deployment lifecycle). Events
+    that match no known pattern are categorized as UNKNOWN, serving as a
+    safe fallback to prevent data loss.
+
     Args:
         log_data: A normalized event dictionary from parse_log.parse_entry()
                  with fields: timestamp, service, event_type, status,
                  error_code, duration_ms, cluster, namespace, metadata
 
     Returns:
-        EventType enum value indicating the category of the event
+        EventType enum value indicating the category of the event.
+        Returns EventType.UNKNOWN if:
+        - log_data is None, not a dict, or empty
+        - No specific event pattern matches (after all checks)
+        - Event lacks recognizable error indicators or deployment signatures
 
     Examples:
         >>> event = {'event_type': 'pod_status', 'status': 'failure',
         ...          'error_code': 'OOMKilled', ...}
         >>> categorize_event(event)
         <EventType.OOM: 'oom'>
+
+        >>> event = {'event_type': 'unknown_type', 'status': 'unknown', ...}
+        >>> categorize_event(event)
+        <EventType.UNKNOWN: 'unknown'>
     """
     if not log_data or not isinstance(log_data, dict):
         return EventType.UNKNOWN
