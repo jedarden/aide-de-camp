@@ -143,3 +143,14 @@ class TestCompareStructuredFields:
 
         assert "confidence" in result
         assert result["confidence"] is False
+
+    def test_completely_different_dicts(self):
+        """Test comparison of completely different dictionaries with no overlapping keys."""
+        dispatch = {"project_slug": "adc", "confidence": 0.9}
+        test = {"intent_type": "status", "urgency": "high"}
+
+        result = compare_structured_fields(dispatch, test)
+
+        # All fields should be marked as mismatch
+        assert len(result) == 4  # All 4 fields from both dicts
+        assert all(value is False for value in result.values())
