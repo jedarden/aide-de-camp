@@ -1,61 +1,73 @@
-# Pod Logs File Mapping (adc-f22z0)
+# Pod-Logs File Mapping - Task Summary
 
-## Summary
+## Task: adc-f22z0
+**Enumerate pod-logs directory and create file mapping**
 
-Scanned the `logs/` directory and created a comprehensive file mapping for all pod log files.
+## Completed Actions
 
-## Results
+### 1. Directory Discovery
+Located two pod-logs directories in the research folder:
+- `research/pbx-web-30days/pod-logs/`
+- `research/whisper-stt-30days/pod-logs/`
 
-**Total log files found:** 10
-- **With analysis files:** 0
-- **Without analysis files:** 10
+### 2. File Enumeration
+Scanned both directories and found:
+- **Total log files: 24**
+- **pbx-web-30days: 12 log files**
+- **whisper-stt-30days: 12 log files**
 
-## File Structure
+### 3. Analysis File Check
+- **Files with .analysis.json: 0**
+- **Files without .analysis.json: 24**
 
-### Namespace: pbx-web-30day
-- `lab-rebuild-relay-current.log` → pod: `lab-rebuild-relay`
-- `pbx-rebuild-relay-current.log` → pod: `pbx-rebuild-relay`
-- `pbx-web-main-current.log` → pod: `pbx-web-main`
-- `pbx-web-pagefind.log` → pod: `pbx-web-pagefind`
-- `pbx-web-web-container.log` → pod: `pbx-web-web-container`
+### 4. Mapping Structure Created
+Created comprehensive mapping file: `tmp/pod_log_mapping.json`
 
-### Namespace: <root> (no namespace)
-- `pbx-web-nginx.log` → pod: `pbx-web-nginx`
-- `pbx-web-site-generator-recent.log` → pod: `pbx-web-site-generator`
-- `pbx-web-site-generator.log` → pod: `pbx-web-site-generator`
-- `whisper-openai-pod.log` → pod: `whisper-openai-pod`
-- `whisper-stt-pod.log` → pod: `whisper-stt-pod`
-
-## Output
-
-The mapping is written to `/tmp/pod_logs_mapping.json` with the following structure:
-
+#### Mapping Structure:
 ```json
 {
-  "total_count": 10,
-  "with_analysis": 0,
-  "without_analysis": 10,
-  "mappings": [
+  "scan_timestamp": "2026-08-06T20:47:00Z",
+  "total_log_files": 24,
+  "files_with_analysis": 0,
+  "files_without_analysis": 24,
+  "entries": [
     {
-      "log_file_path": "logs/pbx-web-30day/lab-rebuild-relay-current.log",
-      "analysis_file_path": null,
-      "pod_name": "lab-rebuild-relay",
-      "namespace": "pbx-web-30day"
-    },
-    ...
+      "log_file_path": "relative/path/to/log.log",
+      "analysis_file_path": null or "relative/path/to/analysis.json",
+      "pod_name": "extracted_pod_name",
+      "namespace": "extracted_namespace",
+      "has_analysis": boolean,
+      "log_file_size": size_in_bytes
+    }
   ]
 }
 ```
 
-## Script
+### 5. Sample Files Identified
 
-Created `scan_pod_logs.py` to:
-- Recursively scan `logs/` directory for `.log` files
-- Check for corresponding `.analysis.json` files
-- Extract pod names from filenames (stripping `-current`, `-recent` suffixes)
-- Extract namespaces from directory structure
-- Output mapping to temporary file
+**PBX-Web Logs (12 files):**
+- `pbx-web-current-nginx.log` (4.4 MB)
+- `pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log` (1.7 MB)
+- `pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06.log` (158 KB)
+- `pbx-web-current-site-generator.log` (162 KB)
+- Various other pod logs with smaller sizes
 
-## Next Steps
+**Whisper-STT Logs (12 files):**
+- `whisper-openai-68966786fb-jsb5d.log` (5.4 MB)
+- `pod-whisper-openai-68966786fb-jsb5d-2026-06-14.log` (5.3 MB)
+- `pod-whisper-openai-68966786fb-jsb5d-2026-08-06-stderr.log` (29 KB)
+- Various other whisper-stt pod logs
 
-The mapping file at `/tmp/pod_logs_mapping.json` is ready for the next step to consume.
+## Success Criteria Met
+✅ File mapping exists listing all log files with their paths and metadata extracts
+
+## Files Created
+- `tmp/pod_log_file_mapping.py` - Python script to create the mapping
+- `tmp/pod_log_mapping.json` - Comprehensive mapping output
+
+## Notes
+- No .analysis.json files currently exist alongside the .log files
+- All log files have been cataloged with relative paths from repo root
+- Pod names extracted from filenames
+- File sizes included for prioritization
+- Ready for next step: log analysis and .analysis.json file generation
