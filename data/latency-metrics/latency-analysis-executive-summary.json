@@ -1,0 +1,238 @@
+{
+  "analysis_metadata": {
+    "report_id": "adc-6azora-latency-analysis",
+    "timestamp": "2026-08-07T06:00:00Z",
+    "analysis_window": {
+      "start": "2026-07-08T00:00:00Z",
+      "end": "2026-08-07T23:59:59Z",
+      "days": 30
+    },
+    "services_analyzed": ["pbx-web", "whisper-stt"],
+    "severity": "CRITICAL"
+  },
+  "executive_summary": {
+    "overall_status": "INFRASTRUCTURE_FAILURE",
+    "key_findings": [
+      "Complete latency data collection failure across both services",
+      "108,252 log entries processed with 0% latency capture success rate",
+      "0% temporal coverage across entire 30-day analysis window",
+      "No workflow execution timing data available for analysis",
+      "Missing log field mappings and workflow integration issues"
+    ],
+    "business_impact": "HIGH - Complete blindness to service performance characteristics",
+    "immediate_action_required": true
+  },
+  "data_quality_assessment": {
+    "pbx_web": {
+      "total_entries_processed": 10000,
+      "entries_with_latency": 0,
+      "entries_without_latency": 10000,
+      "success_rate": 0.0,
+      "temporal_coverage_days": 0,
+      "temporal_coverage_percentage": 0.0,
+      "data_quality_score": "FAILED"
+    },
+    "whisper_stt": {
+      "total_entries_processed": 98252,
+      "entries_with_latency": 0,
+      "entries_without_latency": 98252,
+      "success_rate": 0.0,
+      "temporal_coverage_days": 0,
+      "temporal_coverage_percentage": 0.0,
+      "data_quality_score": "FAILED"
+    }
+  },
+  "temporal_gap_analysis": {
+    "expected_days": 31,
+    "pbx_web_missing_days": 31,
+    "whisper_stt_missing_days": 31,
+    "coverage_percentage": 0.0,
+    "missing_dates": [
+      "2026-07-08", "2026-07-09", "2026-07-10", "2026-07-11", "2026-07-12",
+      "2026-07-13", "2026-07-14", "2026-07-15", "2026-07-16", "2026-07-17",
+      "2026-07-18", "2026-07-19", "2026-07-20", "2026-07-21", "2026-07-22",
+      "2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26", "2026-07-27",
+      "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31", "2026-08-01",
+      "2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06",
+      "2026-08-07"
+    ]
+  },
+  "statistical_analysis": {
+    "status": "NO_DATA_AVAILABLE",
+    "percentile_metrics": {
+      "pbx_web": {
+        "p50": "UNDEFINED",
+        "p75": "UNDEFINED",
+        "p90": "UNDEFINED",
+        "p95": "UNDEFINED",
+        "p99": "UNDEFINED",
+        "min": "UNDEFINED",
+        "max": "UNDEFINED"
+      },
+      "whisper_stt": {
+        "p50": "UNDEFINED",
+        "p75": "UNDEFINED",
+        "p90": "UNDEFINED",
+        "p95": "UNDEFINED",
+        "p99": "UNDEFINED",
+        "min": "UNDEFINED",
+        "max": "UNDEFINED"
+      }
+    },
+    "additional_metrics": {
+      "pbx_web": {
+        "mean": "UNDEFINED",
+        "median": "UNDEFINED",
+        "stddev": "UNDEFINED"
+      },
+      "whisper_stt": {
+        "mean": "UNDEFINED",
+        "median": "UNDEFINED",
+        "stddev": "UNDEFINED"
+      }
+    }
+  },
+  "anomaly_detection": {
+    "severity_level": "CRITICAL",
+    "anomalies_detected": [
+      {
+        "type": "DATA_COLLECTION_FAILURE",
+        "severity": "CRITICAL",
+        "description": "Zero latency capture across 108,252 log entries",
+        "impact": "100% data loss rate",
+        "affected_services": ["pbx-web", "whisper-stt"]
+      },
+      {
+        "type": "TEMPORAL_COVERAGE_FAILURE",
+        "severity": "CRITICAL",
+        "description": "Complete 30-day window missing for both services",
+        "impact": "0% temporal coverage",
+        "affected_services": ["pbx-web", "whisper-stt"]
+      },
+      {
+        "type": "STATISTICAL_ANOMALY",
+        "severity": "CRITICAL",
+        "description": "Zero variance across entire dataset, all percentiles undefined",
+        "impact": "No baseline for performance comparison",
+        "affected_services": ["pbx-web", "whisper-stt"]
+      }
+    ]
+  },
+  "comparative_analysis": {
+    "status": "NOT_COMPARABLE",
+    "reason": "No baseline data available for either service",
+    "infrastructure_comparison": {
+      "log_capture": {
+        "pbx_web": "OPERATIONAL",
+        "whisper_stt": "OPERATIONAL",
+        "status": "Both working"
+      },
+      "log_volume": {
+        "pbx_web": 10000,
+        "whisper_stt": 98252,
+        "ratio": "whisper-stt 9.8x higher"
+      },
+      "latency_capture": {
+        "pbx_web": "FAILED",
+        "whisper_stt": "FAILED",
+        "status": "Both failed"
+      },
+      "temporal_coverage": {
+        "pbx_web": "0%",
+        "whisper_stt": "0%",
+        "status": "Both failed"
+      },
+      "data_quality": {
+        "pbx_web": "0%",
+        "whisper_stt": "0%",
+        "status": "Both failed"
+      }
+    }
+  },
+  "root_cause_analysis": {
+    "primary_causes": [
+      "Missing latency field mappings in Victorialogs schema",
+      "No Argo Workflow execution timing integration",
+      "Expected workflow templates (pbx-web-build, whisper-stt-build) not found in dataset",
+      "Log sources contain HTTP access data but no application-level timing"
+    ],
+    "infrastructure_gaps": [
+      "No end-to-end request-to-response duration tracking",
+      "Missing workflow step timing metrics",
+      "No integration between Argo Workflow API and latency analysis pipeline",
+      "Victorialogs queries capture wrong data type (access logs vs execution timing)"
+    ]
+  },
+  "recommendations": {
+    "immediate_actions": [
+      {
+        "priority": 1,
+        "category": "Fix Log Schema",
+        "actions": [
+          "Add latency field mappings to Victorialogs query infrastructure",
+          "Integrate Argo Workflow API to pull startedAt/finishedAt timestamps",
+          "Implement application-level timing in both services",
+          "Add workflow step timing for granular analysis"
+        ]
+      },
+      {
+        "priority": 2,
+        "category": "Validate Workflow Templates",
+        "actions": [
+          "Confirm pbx-web-build template exists and is being triggered",
+          "Confirm whisper-stt-build template exists and is being triggered",
+          "Verify workflow execution frequency and success rates",
+          "Check workflow template registration in ArgoCD"
+        ]
+      },
+      {
+        "priority": 3,
+        "category": "Data Pipeline Enhancement",
+        "actions": [
+          "Implement end-to-end latency tracking from request to response",
+          "Add percentile calculation at log ingestion time",
+          "Create alerting for data quality failures",
+          "Implement temporal gap detection with automated alerts"
+        ]
+      }
+    ],
+    "medium_term_improvements": [
+      "Deploy Prometheus latency exporters for both services",
+      "Implement distributed tracing (Jaeger/Tempo) integration",
+      "Add custom application-level timing middleware",
+      "Create workflow-level timing dashboards"
+    ],
+    "long_term_architecture": [
+      "Unified metrics platform as single source of truth",
+      "End-to-end tracing for request lifecycle visibility",
+      "Continuous performance profiling and monitoring",
+      "ML-based predictive performance forecasting"
+    ]
+  },
+  "success_criteria": {
+    "latency_field_coverage": ">95% of log entries",
+    "temporal_coverage": ">90% across 30-day window",
+    "percentile_availability": "Valid percentile calculations",
+    "comparative_capability": "Services comparable for performance analysis"
+  },
+  "next_steps": [
+    "Implement Priority 1 recommendations (log schema fixes)",
+    "Validate workflow template configuration (Priority 2)",
+    "Re-run analysis after 7 days of data collection",
+    "Establish ongoing data quality monitoring"
+  ],
+  "report_metadata": {
+    "analysis_type": "comprehensive_latency_analysis",
+    "generated_by": "adc-6azora",
+    "report_files": [
+      "latency-analysis-comprehensive-report-20260807.md",
+      "latency-analysis-executive-summary.json"
+    ],
+    "source_data": [
+      "logs/pbx-web-victorialogs-raw.jsonl",
+      "logs/whisper-stt-30day-victorialogs.jsonl",
+      "research/pbx-web-workflows-raw.json",
+      "research/whisper-stt-30days/argo-runs/all-recent-workflows.json"
+    ]
+  }
+}
