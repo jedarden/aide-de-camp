@@ -185,6 +185,116 @@ def _extract_classification_from_routed_intent(
         return routed_intent
 
 
+def compare_intent_type(dispatch_intent: Any, test_intent: Any) -> bool:
+    """
+    Compare intent type strings between two classification results.
+
+    This function performs a direct string comparison of intent types.
+    It handles None/null values gracefully and performs case-sensitive matching.
+
+    Args:
+        dispatch_intent: Intent type from dispatch endpoint (can be string, Enum, or None)
+        test_intent: Intent type from test endpoint (can be string, Enum, or None)
+
+    Returns:
+        True if both intent types are non-None and match exactly, False otherwise
+
+    Examples:
+        >>> compare_intent_type("status", "status")
+        True
+        >>> compare_intent_type("status", "action")
+        False
+        >>> compare_intent_type(None, "status")
+        False
+        >>> compare_intent_type("status", None)
+        False
+        >>> compare_intent_type(None, None)
+        False
+
+    Note:
+        None values never match — missing intent type is always a failure.
+        This ensures that absent intent fields are detected as differences.
+    """
+    # Handle None values - return False if either is None
+    if dispatch_intent is None or test_intent is None:
+        return False
+
+    # Handle Enum values (extract the string value)
+    if hasattr(dispatch_intent, 'value'):
+        dispatch_intent = dispatch_intent.value
+    if hasattr(test_intent, 'value'):
+        test_intent = test_intent.value
+
+    # Ensure both are strings
+    if not isinstance(dispatch_intent, str) or not isinstance(test_intent, str):
+        return False
+
+    # Case-sensitive string comparison
+    return dispatch_intent == test_intent
+
+
+def compare_confidence(
+    dispatch_confidence: Any,
+    test_confidence: Any,
+    tolerance: float = 0.01
+) -> bool:
+    """
+    Compare confidence scores with tolerance for floating-point arithmetic.
+
+    This function compares two confidence scores, allowing for a small tolerance
+    to handle floating-point precision issues. It handles None/null values
+    gracefully and validates input types.
+
+    Args:
+        dispatch_confidence: Confidence score from dispatch endpoint (float or None)
+        test_confidence: Confidence score from test endpoint (float or None)
+        tolerance: Maximum allowed difference between scores (default: 0.01)
+
+    Returns:
+        True if both scores are non-None and within tolerance, False otherwise
+
+    Examples:
+        >>> compare_confidence(0.9, 0.9)
+        True
+        >>> compare_confidence(0.9, 0.91, tolerance=0.02)
+        True
+        >>> compare_confidence(0.9, 0.85)
+        False
+        >>> compare_confidence(None, 0.9)
+        False
+        >>> compare_confidence(0.9, None)
+        False
+        >>> compare_confidence(1.5, 1.6)  # Values outside [0,1] still compared
+        True
+
+    Note:
+        None values never match — missing confidence scores are always a failure.
+        Values outside the [0,1] range are still compared (no range validation).
+        Use a larger tolerance for comparisons with lower-precision scores.
+    """
+    import math
+
+    # Handle None values - return False if either is None
+    if dispatch_confidence is None or test_confidence is None:
+        return False
+
+    # Ensure both are numeric (int or float)
+    if not isinstance(dispatch_confidence, (int, float)) or not isinstance(test_confidence, (int, float)):
+        return False
+
+    # Convert to float for comparison
+    dispatch_float = float(dispatch_confidence)
+    test_float = float(test_confidence)
+
+    # Handle infinity values - they match only if both are the same infinity
+    if math.isinf(dispatch_float) or math.isinf(test_float):
+        return dispatch_float == test_float
+
+    # Compare with tolerance, accounting for floating-point precision
+    # Use math.isclose for better floating-point comparison
+    return math.isclose(dispatch_float, test_float, abs_tol=tolerance)
+
+
 def compare_classifications(
     dispatch_result: Union[List[Dict], Dict],
     test_result: Union[List[Dict], Dict],
