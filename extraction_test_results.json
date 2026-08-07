@@ -1,0 +1,142 @@
+[
+  {
+    "log_file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb.log",
+    "file_exists": true,
+    "extraction_success": true,
+    "timestamp_checks": {
+      "creation_timestamp": {
+        "field_name": "creation_timestamp",
+        "is_valid": true,
+        "value": "2026-08-06T13:31:22.887710",
+        "error": null
+      },
+      "deletion_timestamp": {
+        "field_name": "deletion_timestamp",
+        "is_valid": false,
+        "value": null,
+        "error": "Timestamp is None"
+      }
+    },
+    "file_size_check": {
+      "file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-lab-rebuild-relay-79d6d858bb-lpqdb.log",
+      "reported_size": 24500,
+      "actual_size": 24500,
+      "matches": true,
+      "error": null
+    },
+    "deletion_check": {},
+    "errors": []
+  },
+  {
+    "log_file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-pbx-rebuild-relay-8596977857-4292b.log",
+    "file_exists": true,
+    "extraction_success": true,
+    "timestamp_checks": {
+      "creation_timestamp": {
+        "field_name": "creation_timestamp",
+        "is_valid": true,
+        "value": "2026-08-06T13:31:23.471708",
+        "error": null
+      },
+      "deletion_timestamp": {
+        "field_name": "deletion_timestamp",
+        "is_valid": false,
+        "value": null,
+        "error": "Timestamp is None"
+      }
+    },
+    "file_size_check": {
+      "file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-pbx-rebuild-relay-8596977857-4292b.log",
+      "reported_size": 24500,
+      "actual_size": 24500,
+      "matches": true,
+      "error": null
+    },
+    "deletion_check": {},
+    "errors": []
+  },
+  {
+    "log_file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-pbx-web-5ff68464d-lcfcp.log",
+    "file_exists": true,
+    "extraction_success": true,
+    "timestamp_checks": {
+      "creation_timestamp": {
+        "field_name": "creation_timestamp",
+        "is_valid": true,
+        "value": "2026-08-06T13:31:24.007706",
+        "error": null
+      },
+      "deletion_timestamp": {
+        "field_name": "deletion_timestamp",
+        "is_valid": false,
+        "value": null,
+        "error": "Timestamp is None"
+      }
+    },
+    "file_size_check": {
+      "file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pbx-web-pbx-web-5ff68464d-lcfcp.log",
+      "reported_size": 146,
+      "actual_size": 146,
+      "matches": true,
+      "error": null
+    },
+    "deletion_check": {},
+    "errors": []
+  },
+  {
+    "log_file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06.log",
+    "file_exists": true,
+    "extraction_success": true,
+    "timestamp_checks": {
+      "creation_timestamp": {
+        "field_name": "creation_timestamp",
+        "is_valid": true,
+        "value": "2026-08-06T12:11:44.793172",
+        "error": null
+      },
+      "deletion_timestamp": {
+        "field_name": "deletion_timestamp",
+        "is_valid": false,
+        "value": null,
+        "error": "Timestamp is None"
+      }
+    },
+    "file_size_check": {
+      "file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pod-lab-rebuild-relay-79957dbd4-xsqhl-2026-08-06.log",
+      "reported_size": 158298,
+      "actual_size": 158298,
+      "matches": true,
+      "error": null
+    },
+    "deletion_check": {},
+    "errors": []
+  },
+  {
+    "log_file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log",
+    "file_exists": true,
+    "extraction_success": true,
+    "timestamp_checks": {
+      "creation_timestamp": {
+        "field_name": "creation_timestamp",
+        "is_valid": true,
+        "value": "2026-08-06T12:11:19.261261",
+        "error": null
+      },
+      "deletion_timestamp": {
+        "field_name": "deletion_timestamp",
+        "is_valid": false,
+        "value": null,
+        "error": "Timestamp is None"
+      }
+    },
+    "file_size_check": {
+      "file_path": "/home/coding/aide-de-camp/research/pbx-web-30days/pod-logs/pod-pbx-rebuild-relay-588d79c5b9-vmmlz-2026-08-06.log",
+      "reported_size": 1774944,
+      "actual_size": 1774944,
+      "matches": true,
+      "error": null
+    },
+    "deletion_check": {},
+    "errors": []
+  }
+]
