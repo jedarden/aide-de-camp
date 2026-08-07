@@ -839,3 +839,83 @@ async def test_all_tables_can_be_cleared(test_db_store):
     assert len(non_empty_tables) == 0, (
         f"Expected all tables to be empty after cleanup, but found data in: {non_empty_tables}"
     )
+
+
+# =============================================================================
+# Test: Session table specific state verification (bead adc-62oxsd)
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_session_table_state_reset(test_db_store):
+    """Verify session table state reset and no orphaned records after test execution.
+
+    This test specifically verifies the sessions table (per bead adc-62oxsd scope):
+    1. Sessions can be created and exist in the database
+    2. Session records can be queried and counted
+    3. After cleanup (via fixture or manual), no orphaned session records remain
+    4. Test passes when run once (idempotent)
+
+    Scope: ONLY for session table verification. Other tables are covered by separate tests.
+    """
+    # Step 1: Create session records and verify they exist
+    session_id_1 = await test_db_store.create_session()
+    session_id_2 = await test_db_store.create_session()
+    session_id_3 = await test_db_store.create_session()
+
+    # Verify sessions were created by querying the sessions table directly
+    async with aiosqlite.connect(test_db_store.db_path) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Count total sessions
+        async with db.execute("SELECT COUNT(*) FROM sessions") as cur:
+            session_count = (await cur.fetchone())[0]
+
+        assert session_count == 3, (
+            f"Expected exactly 3 sessions after creating 3, but found {session_count}. "
+            f"This verifies that session records are properly persisted to the sessions table."
+        )
+
+        # Verify the specific session IDs exist
+        async with db.execute(
+            "SELECT id FROM sessions WHERE id IN (?, ?, ?)",
+            (session_id_1, session_id_2, session_id_3)
+        ) as cur:
+            found_sessions = await cur.fetchall()
+
+        assert len(found_sessions) == 3, (
+            f"Expected to find all 3 created session IDs, but found {len(found_sessions)}. "
+            f"This verifies that the session records are queryable by their IDs."
+        )
+
+    # Step 2: Manually delete sessions to simulate fixture cleanup behavior
+    # This tests the deletion mechanism directly (idempotent - can run multiple times)
+    await test_db_store.delete_session(session_id_1)
+    await test_db_store.delete_session(session_id_2)
+    await test_db_store.delete_session(session_id_3)
+
+    # Step 3: Verify no orphaned session records remain after deletion
+    async with aiosqlite.connect(test_db_store.db_path) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Query sessions table to verify row count is 0
+        async with db.execute("SELECT COUNT(*) FROM sessions") as cur:
+            final_session_count = (await cur.fetchone())[0]
+
+        assert final_session_count == 0, (
+            f"Expected 0 sessions after cleanup, but found {final_session_count}. "
+            f"This verifies that the delete_session method properly cleans up session records "
+            f"and leaves no orphaned session records in the database."
+        )
+
+        # Additional verification: query for any session records (should be empty)
+        async with db.execute("SELECT id FROM sessions") as cur:
+            any_sessions = await cur.fetchall()
+
+        assert len(any_sessions) == 0, (
+            f"Expected no session records after cleanup, but found {len(any_sessions)} records. "
+            f"This verifies that the sessions table is completely empty with no orphaned data."
+        )
+
+    # Test passes when run once - the session table state is verified to be clean
+    # The test_db_store fixture will perform additional cleanup after this test completes
