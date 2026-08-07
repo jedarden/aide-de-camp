@@ -1227,3 +1227,37 @@ class TestMalformedJSONBody:
 
         # Verify error status is included
         assert error_data.get("status") == 400
+
+    def test_malformed_json_unquoted_strings_simple(self, test_client):
+        """Test that JSON with unquoted strings (keys and values) returns HTTP 400 status code.
+
+        This tests the specific pattern: {utterance: "test"} (keys should be quoted).
+        Focuses on one specific JSON syntax error pattern where keys are not quoted.
+        """
+        malformed_json = '{utterance: "test"}'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        # Verify error status is returned
+        assert response.status_code == 400
+
+        # Verify error message indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") == "Validation failed"
+        assert "detail" in error_data
+        assert "errors" in error_data
+
+        # Verify the error specifically mentions JSON decode
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+        json_error = errors[0]
+        error_msg = json_error.get("message", "")
+        assert "JSON decode error" in error_msg or "json" in error_msg.lower()
+        assert json_error.get("type") == "json_invalid"
+
+        # Verify error status is included
+        assert error_data.get("status") == 400
