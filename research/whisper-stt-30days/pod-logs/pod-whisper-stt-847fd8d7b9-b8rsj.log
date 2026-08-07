@@ -1,0 +1,61 @@
+Name:             whisper-stt-847fd8d7b9-b8rsj
+Namespace:        whisper-stt
+Priority:         0
+Service Account:  default
+Node:             <none>
+Labels:           app=whisper-stt
+                  pod-template-hash=847fd8d7b9
+Annotations:      <none>
+Status:           Pending
+IP:               
+IPs:              <none>
+Controlled By:    ReplicaSet/whisper-stt-847fd8d7b9
+Containers:
+  whisper-stt:
+    Image:      ronaldraygun/whisper-stt:1.8.6
+    Port:       8080/TCP
+    Host Port:  0/TCP
+    Limits:
+      cpu:     8
+      memory:  8Gi
+    Requests:
+      cpu:      1
+      memory:   4Gi
+    Liveness:   http-get http://:8080/health delay=120s timeout=1s period=30s #success=1 #failure=3
+    Readiness:  http-get http://:8080/health delay=60s timeout=1s period=10s #success=1 #failure=3
+    Environment Variables from:
+      whisper-stt-secret  Secret  Optional: false
+    Environment:
+      POD:            whisper-stt-847fd8d7b9-b8rsj (v1:metadata.name)
+      NAMESPACE:      whisper-stt (v1:metadata.namespace)
+      WHISPER_MODEL:  distil-large-v3
+    Mounts:
+      /data from jobs-data (rw)
+      /root/.cache/huggingface from model-cache (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-pztq2 (ro)
+Conditions:
+  Type           Status
+  PodScheduled   False 
+Volumes:
+  model-cache:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  whisper-model-cache
+    ReadOnly:   false
+  jobs-data:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  whisper-stt-jobs
+    ReadOnly:   false
+  kube-api-access-pztq2:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason            Age                  From               Message
+  ----     ------            ----                 ----               -------
+  Warning  FailedScheduling  32m (x437 over 36h)  default-scheduler  0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
