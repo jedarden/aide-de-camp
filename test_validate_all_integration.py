@@ -83,9 +83,12 @@ def test_valid_complete_data():
 
     print(f"  Result: is_valid={is_valid}")
     print(f"  Errors: {errors}")
-    print(f"  ✓ PASS" if is_valid else "  ✗ FAIL")
+    # Explicit assertion for (True, []) expected result
+    assert is_valid == True, f"Expected is_valid=True, got {is_valid}"
+    assert errors == [], f"Expected empty errors list, got {errors}"
+    print(f"  ✓ PASS")
     print()
-    return is_valid
+    return True
 
 
 def test_invalid_json():
