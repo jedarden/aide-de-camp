@@ -426,23 +426,45 @@ class TelegramFallback:
         # This MUST be called before any logging to ensure state is updated first
         self._state_tracker.mark_as_unreachable(now)
 
-        # Capture exception context for logging
+        # ERROR CONTEXT PRESERVATION - Capture and structure error context for comprehensive logging
+        # This includes exception type, message, URL attempted, and any relevant parameters
         if error is not None:
+            # Exception type and message
             error_type = type(error).__name__
             error_message = str(error) or error_context or "unknown error"
         else:
+            # Non-exception error (e.g., HTTP non-2xx response)
             error_type = "HTTPError"
             error_message = error_context or "unknown error"
 
-        # Build URL context for logging
-        url_context = f" URL: {url}" if url else ""
+        # URL attempted (if available)
+        url_attempted = url
+
+        # Additional context from error object (if available)
+        error_params = {}
+        if error is not None:
+            # Capture common exception attributes for context
+            if hasattr(error, 'request'):
+                error_params['request_method'] = getattr(error.request, 'method', 'UNKNOWN')
+            if hasattr(error, 'response'):
+                error_params['response_status'] = getattr(error.response, 'status_code', 'UNKNOWN')
+
+        # Build URL context string for logging
+        url_context = f" URL: {url_attempted}" if url_attempted else ""
+
+        # Build complete error context for logging (exception type, message, URL, parameters)
+        # This structured context is used in all subsequent logging statements
+        error_context_summary = f"Error type: {error_type}. Error: {error_message}.{url_context}"
+        if error_params:
+            param_str = ", ".join(f"{k}: {v}" for k, v in error_params.items())
+            error_context_summary += f" Params: {param_str}."
 
         # LOGGING AFTER STATE UPDATE - Log WARNING on first failure after bridge was reachable
         # This uses the state tracker to prevent duplicate warnings per failure streak
+        # Uses the preserved error context (error_context_summary) for comprehensive logging
         if self._state_tracker.should_log_failure():
             logger.warning(
-                f"Telegram bridge unreachable: send failed.{url_context} "
-                f"Error type: {error_type}. Error: {error_message}. "
+                f"Telegram bridge unreachable: send failed. {error_context_summary} "
                 f"Bridge may be down or network issue."
             )
 
@@ -466,8 +488,7 @@ class TelegramFallback:
                 self._last_repeated_log_timestamp = now
                 self._failures_since_last_log = 0
                 logger.warning(
-                    f"Telegram bridge unreachable: send failed.{url_context} "
-                    f"Error type: {error_type}. Error: {error_message}. "
+                    f"Telegram bridge unreachable: send failed. {error_context_summary} "
                     f"Subsequent failures of the same type are rate-limited (one "
                     f"DEBUG summary per {self._failure_log_interval_seconds:g}s); "
                     f"a different failure type is logged independently."
@@ -493,8 +514,7 @@ class TelegramFallback:
             # Reset the counter for the new failure type, starting from this one
             self._failures_since_last_log = 0
             logger.warning(
-                f"New Telegram send failure type during ongoing outage:{url_context} "
-                f"{error_type}. Error: {error_message}. "
+                f"New Telegram send failure type during ongoing outage. {error_context_summary} "
                 f"Logged independently of the "
                 f"{self._failure_log_interval_seconds:g}s same-type cooldown. "
                 f"(Total failures: {self._failure_count}; distinct failure "
@@ -511,8 +531,7 @@ class TelegramFallback:
             if batch > 0:
                 logger.debug(
                     f"Repeated Telegram send failures: {batch} failure(s) since last "
-                    f"log (total {self._failure_count}).{url_context} "
-                    f"Latest error type: {error_type}. Error: {error_message}."
+                    f"log (total {self._failure_count}). {error_context_summary}"
                 )
                 self._last_repeated_log_timestamp = now
                 self._failures_since_last_log = 0
