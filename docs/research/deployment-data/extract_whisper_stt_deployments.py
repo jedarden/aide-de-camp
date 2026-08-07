@@ -35,6 +35,8 @@ def extract_image_tag(image: str) -> str:
 
 def main():
     # Read source data
+    # Source: Validated deployment data from research/whisper-stt-30days/deployment-data/
+    # Reference: adc-2fgg3 (validation), adc-24d33 (documentation)
     source_file = Path("/home/coding/aide-de-camp/whisper-stt-deployment-data-30days.json")
     output_file = Path("/home/coding/aide-de-camp/docs/research/deployment-data/whisper-stt-deployments.json")
 
