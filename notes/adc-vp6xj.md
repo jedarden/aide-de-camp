@@ -1,149 +1,140 @@
-# Telegram Send Function Analysis (Bead adc-vp6xj)
+# Telegram Send Function Analysis (adc-vp6xj)
 
-## Summary
-Located and analyzed the telegram send function in the aide-de-camp codebase. Current failure detection is comprehensive and well-integrated with state tracking.
+## Task Summary
+Locate telegram send function and identify failure modes to understand how send failures are currently detected and returned.
 
-## Primary Send Function Location
+## Findings
 
-**File:** `src/telegram/fallback.py`  
-**Method:** `send_message()`  
-**Lines:** 118-174
+### 1. Telegram Send Function Location
 
-## Failure Detection Mechanisms
+**Primary send function**: `src/telegram/fallback.py:send_message()` (lines 118-174)
 
-### 1. Configuration Failure (Lines 135-140)
-```python
-if self.bot_token is None:
-    logger.warning("send_message() called - no Telegram bot token configured")
-    return False
-```
-- **Detection:** No bot token configured
-- **Return:** `False`
-- **State impact:** Does NOT update state tracker
-- **Error context:** Logged as WARNING
+This is the core method that sends messages via Telegram Bot API.
 
-### 2. HTTP Failure (Lines 164-167)
-```python
-else:  # response.status_code != 200
-    error_msg = f"status {response.status_code} - {response.text}"
-    await self._handle_send_failure(error_context=error_msg, url=url)
-    return False
-```
-- **Detection:** Non-200 HTTP response
-- **Return:** `False`
-- **State impact:** DOES update state tracker via `_handle_send_failure()`
-- **Error context:** Status code + response body
+**Secondary send function**: `src/watcher/daemon.py:_send_to_telegram()` (lines 1151-1174)
 
-### 3. Network Request Error (Lines 169-171)
-```python
-except httpx.RequestError as e:
-    await self._handle_send_failure(error=e, url=...)
-    return False
-```
-- **Detection:** HTTP client errors (network, DNS, timeout)
-- **Return:** `False`
-- **State impact:** DOES update state tracker via `_handle_send_failure()`
-- **Error context:** Exception type + message
+This is a wrapper used by the bead watcher to send results to Telegram.
 
-### 4. Generic Exception (Lines 172-174)
-```python
-except Exception as e:
-    await self._handle_send_failure(error=e, url=...)
-    return False
-```
-- **Detection:** Any unhandled exception
-- **Return:** `False`
-- **State impact:** DOES update state tracker via `_handle_send_failure()`
-- **Error context:** Exception type + message
+### 2. Current Error Handling Approach
 
-## Return Codes
-
-- **`True`** — Successful send (HTTP 200 response)
-- **`False`** — All failure paths
-
-## Error Context Captured
-
-The `_handle_send_failure()` method (lines 348-370) captures:
-1. **Exception type** (`type(error).__name__`)
-2. **Exception message** (`str(error)`)
-3. **HTTP context** (status code + response text for non-200)
-4. **Target URL** (attempted endpoint)
-5. **Timestamp** (when failure occurred)
-
-## State Tracker Integration
-
-The `state_tracker.mark_as_unreachable()` is **ALREADY implemented** at line 427 in `_record_failure_locked()`:
+The `send_message()` function already has comprehensive error handling:
 
 ```python
-# STATE UPDATE FIRST - Update state tracker for reachability and deduplication
-# This MUST be called before any logging to ensure state is updated first
-self._state_tracker.mark_as_unreachable(now)
+async def send_message(
+    self,
+    chat_id: int | str,
+    message: str,
+    parse_mode: str = "HTML",
+) -> bool:
 ```
 
-### Where mark_as_unreachable() is Called
+**Try/except structure**:
+- ✅ Already has try/except blocks (lines 142-174)
+- ✅ Catches `httpx.RequestError` for network failures (lines 169-171)
+- ✅ Catches general `Exception` for any other errors (lines 172-174)
+- ✅ Returns `False` on any failure (lines 167, 171, 174)
+- ✅ Returns `True` on success (line 163)
 
-1. **`send_message()` failure path** (indirectly via `_handle_send_failure()` → `_record_failure_locked()` at line 427)
-   - Called for HTTP errors, network errors, and exceptions
-   
-2. **`check_telegram_available()` failure** (line 251, 274)
-   - Called during health check failures
+**Return codes indicating failure**:
+- `False` - Any failure (network error, HTTP non-200, exception, missing bot token)
+- `True` - Success (HTTP 200 response)
 
-### Current State Tracker Behavior
+### 3. What Constitutes a Send Failure
 
-The state tracker (`src/telegram/state_tracker.py`) provides:
-- **Failure counting** — increments on each `mark_as_unreachable()` call
-- **Timestamp tracking** — records last failure time
-- **Failure streak detection** — resets to 1 when transitioning from reachable → unreachable
-- **Logging control** — `should_log_failure()` returns True only once per failure streak
+The code identifies **four distinct failure modes**:
 
-## Related Send Functions
+1. **Missing bot token** (lines 135-140):
+   - `bot_token` is `None`
+   - Returns `False`, logs WARNING
+   - Graceful no-op behavior
 
-### High-level wrappers that call `send_message()`:
+2. **HTTP non-200 response** (lines 164-167):
+   - Telegram API returns status code != 200
+   - Error context includes status code and response body
+   - Calls `_handle_send_failure(error_context=...)`
 
-1. **`send_result()`** (lines 176-187)
-   - Formats result dict as message
-   - Calls `send_message()`
-   - Returns boolean success
+3. **Network errors** (lines 169-171):
+   - `httpx.RequestError` - connection failures, timeouts, DNS errors
+   - Calls `_handle_send_failure(error=e)`
 
-2. **`send_exception()`** (lines 189-212)
-   - Formats exception as message
-   - Routes to configured `chat_id`
-   - Returns boolean success
+4. **General exceptions** (lines 172-174):
+   - Any other unexpected exception
+   - Calls `_handle_send_failure(error=e)`
 
-3. **`send_workload_summary()`** (lines 214-237)
-   - Formats summary as message
-   - Routes to configured `chat_id`
-   - Returns boolean success
+### 4. Error Context Captured
 
-## Usage in Watcher Daemon
+The error handling captures excellent context:
 
-The watcher daemon (`src/watcher/daemon.py`) uses telegram send at:
-- **Method:** `_send_to_telegram()` (line 1151)
-- **Call pattern:** `await fallback.send_message(fallback.chat_id, message)` (line 1174)
-- **Return handling:** Boolean result is returned but not currently used for state management
+- **Error type**: Exception class name (e.g., `ConnectError`, `Timeout`)
+- **Error message**: Exception message or HTTP response body
+- **URL**: The exact Telegram API endpoint attempted
+- **Timestamp**: When the failure occurred
 
-## Key Findings
+### 5. State Tracking Implementation
 
-✅ **Comprehensive failure detection** — All failure paths are caught and handled  
-✅ **State tracking already integrated** — `mark_as_unreachable()` is called in all failure paths  
-✅ **Detailed error context** — Exception type, message, and URL are captured  
-✅ **Return code consistency** — All failures return `False`, success returns `True`  
-✅ **Logging strategy** — First failure logs WARNING, subsequent failures rate-limited to DEBUG  
+**KEY FINDING**: The `state_tracker.mark_as_unreachable()` call **is already present** in the code!
 
-## What Constitutes a Send Failure
+**Failure handling chain**:
+```
+send_message() (failure)
+  → _handle_send_failure() (line 166, 170, or 173)
+    → _record_failure_locked() (line 370)
+      → self._state_tracker.mark_as_unreachable(now) (line 427)
+```
 
-A send failure is when `send_message()` returns `False`, which occurs when:
-1. Bot token is not configured
-2. HTTP response status code is not 200
-3. Network request fails (timeout, DNS error, connection refused)
-4. Any unexpected exception is raised
+**Success handling chain**:
+```
+send_message() (success, HTTP 200)
+  → self._state_tracker.mark_as_reachable() (line 161)
+```
 
-## Modification Point for State Tracker
+### 6. State Tracker Location
 
-**No modification needed** — `state_tracker.mark_as_unreachable()` is already properly integrated in the failure handling path at line 427 of `src/telegram/fallback.py`.
+**State tracker class**: `src/telegram/state_tracker.py:BridgeState`
 
-The integration is correct because:
-- It's called BEFORE any logging (STATE UPDATE FIRST pattern)
-- It's in the locked section (`_record_failure_locked`) ensuring atomic updates
-- It's called for ALL failure types (HTTP errors, network errors, exceptions)
-- It includes proper timestamp tracking
+Key methods:
+- `mark_as_reachable()` - Resets failure state, marks bridge as reachable
+- `mark_as_unreachable(timestamp)` - Records failure, increments failure count
+- `should_log_failure()` - Prevents duplicate warning logs per failure streak
+- `is_reachable` property - Current reachability state
+
+### 7. Exact Modification Points
+
+**NO MODIFICATION NEEDED** - The state tracker is already correctly integrated!
+
+The existing implementation:
+1. ✅ Marks as unreachable on failure (`fallback.py:427`)
+2. ✅ Marks as reachable on success (`fallback.py:161`)
+3. ✅ Provides failure deduplication to prevent log spam
+4. ✅ Captures comprehensive error context
+5. ✅ Exposes status via `/api/v1/status/telegram` endpoint
+
+### 8. Watcher Integration
+
+The bead watcher (`src/watcher/daemon.py`) uses Telegram via:
+- `_send_to_telegram()` method (lines 1151-1174)
+- Calls `fallback.send_message()` (line 1174)
+- Inherits all state tracking behavior automatically
+
+## Conclusion
+
+The telegram send function already has **robust failure detection and state tracking**. The `state_tracker.mark_as_unreachable()` call is properly integrated into the failure handling chain at `src/telegram/fallback.py:427`.
+
+**No additional modifications are needed** to implement state tracking on send failures - it's already there!
+
+## Key Files
+
+1. `src/telegram/fallback.py` - Main send function with error handling
+2. `src/telegram/state_tracker.py` - Bridge state tracking
+3. `src/watcher/daemon.py` - Bead watcher integration
+4. `src/main.py` - Status endpoint wiring
+
+## Failure Mode Reference
+
+| Failure Mode | Detection Location | State Update |
+|--------------|-------------------|--------------|
+| Missing bot token | `fallback.py:135-140` | No state update (config issue) |
+| HTTP non-200 | `fallback.py:164-167` | `mark_as_unreachable()` at line 427 |
+| Network error | `fallback.py:169-171` | `mark_as_unreachable()` at line 427 |
+| General exception | `fallback.py:172-174` | `mark_as_unreachable()` at line 427 |
+| Success (HTTP 200) | `fallback.py:157-163` | `mark_as_reachable()` at line 161 |
