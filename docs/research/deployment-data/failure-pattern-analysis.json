@@ -1,0 +1,273 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T21:41:03.820324",
+    "data_directory": "docs/research/deployment-data",
+    "analysis_type": "failure_pattern_categorization"
+  },
+  "services": {
+    "pbx-web": {
+      "service_name": "pbx-web",
+      "total_events": 5,
+      "current_image": "ronaldraygun/pbx-web:1.0.9",
+      "events_by_type": {
+        "deployment_rollout": 4,
+        "deployment_rollback": 1
+      },
+      "failures_detected": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "date": "2026-07-13",
+          "pattern_type": "Deployment_rollback",
+          "severity": "medium",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "context": {
+            "event_type": "deployment_rollback",
+            "revision": 11,
+            "notes": "Rolled back to 1.0.8 on same day"
+          }
+        }
+      ],
+      "health_indicators": {},
+      "deployment_outcomes": {
+        "success": 4,
+        "rolled_back": 1
+      }
+    },
+    "whisper-stt": {
+      "service_name": "whisper-stt",
+      "total_events": 4,
+      "current_image": "ronaldraygun/whisper-stt:1.8.6",
+      "events_by_type": {
+        "deployment_rollout": 4
+      },
+      "failures_detected": [],
+      "health_indicators": {},
+      "deployment_outcomes": {
+        "success": 4
+      }
+    }
+  },
+  "pattern_matching_rules": {
+    "ImagePullBackOff": {
+      "description": "Container image cannot be pulled from registry",
+      "severity": "high",
+      "kubernetes_state": "Pod waiting with ImagePullBackOff status",
+      "observed_in_dataset": false,
+      "count_in_analysis": 0,
+      "pattern_matching_heuristics": {
+        "primary_indicators": [
+          "ImagePullBackOff",
+          "ErrImagePull",
+          "Failed to pull image",
+          "image pull error"
+        ],
+        "secondary_indicators": [
+          "Back-off pulling image",
+          "registry unavailable",
+          "authentication failed",
+          "manifest not found"
+        ],
+        "pod_status_patterns": [
+          "status.phase = Pending",
+          "status.containerStatuses[].state.waiting.reason = ImagePullBackOff",
+          "status.containerStatuses[].state.waiting.reason = ErrImagePull"
+        ],
+        "event_patterns": [
+          "events.type = Warning",
+          "events.reason = Failed",
+          "events.message includes 'Failed to pull image'"
+        ]
+      },
+      "example_messages": {
+        "theoretical": [
+          "Failed to pull image \"ronaldraygun/service:tag\": rpc error: code = Unknown desc = Error response from daemon: pull access denied",
+          "Back-off pulling image \"nginx:latest\"",
+          "ErrImagePull: rpc error: code = Unknown desc = Error: ImagePullBackOff",
+          "Failed to pull image: http connection timeout"
+        ],
+        "actual_observed": []
+      },
+      "common_causes": [
+        "Container registry unavailable or network issues",
+        "Image tag doesn't exist or was deleted",
+        "Authentication/authorization failures",
+        "Registry rate limiting",
+        "Image size too large for timeout window"
+      ],
+      "detection_pattern": "pod.state.waiting.reason IN [ImagePullBackOff, ErrImagePull] OR events.message CONTAINS 'Failed to pull image'"
+    },
+    "CrashLoopBackOff": {
+      "description": "Pod repeatedly crashes and restarts",
+      "severity": "critical",
+      "statistics": {
+        "frequency": 0,
+        "time_span_days": 0,
+        "services_affected": [],
+        "images_affected": [],
+        "average_frequency_per_day": 0
+      },
+      "sample_failures": [],
+      "indicators": [
+        "crash",
+        "CrashLoopBackOff",
+        "restart count",
+        "terminated"
+      ],
+      "common_causes": [
+        "application errors",
+        "misconfiguration",
+        "runtime exceptions",
+        "missing dependencies"
+      ]
+    },
+    "OOMKilled": {
+      "description": "Container killed due to exceeding memory limits",
+      "severity": "critical",
+      "statistics": {
+        "frequency": 0,
+        "time_span_days": 0,
+        "services_affected": [],
+        "images_affected": [],
+        "average_frequency_per_day": 0
+      },
+      "sample_failures": [],
+      "indicators": [
+        "OOMKilled",
+        "out of memory",
+        "memory limit exceeded"
+      ],
+      "common_causes": [
+        "memory leaks",
+        "insufficient limits",
+        "high load",
+        "memory-intensive operations"
+      ]
+    },
+    "Probe_failure": {
+      "description": "Health check failures (readiness, liveness, or startup probes)",
+      "severity": "medium",
+      "statistics": {
+        "frequency": 0,
+        "time_span_days": 0,
+        "services_affected": [],
+        "images_affected": [],
+        "average_frequency_per_day": 0
+      },
+      "sample_failures": [],
+      "indicators": [
+        "probe failed",
+        "readiness probe",
+        "liveness probe",
+        "unhealthy"
+      ],
+      "common_causes": [
+        "application not ready",
+        "deadlock",
+        "slow startup",
+        "health check misconfiguration"
+      ]
+    },
+    "Dependency_timeout": {
+      "description": "Timeouts connecting to external services or dependencies",
+      "severity": "high",
+      "statistics": {
+        "frequency": 0,
+        "time_span_days": 0,
+        "services_affected": [],
+        "images_affected": [],
+        "average_frequency_per_day": 0
+      },
+      "sample_failures": [],
+      "indicators": [
+        "timeout",
+        "connection refused",
+        "dependency unavailable",
+        "upstream error"
+      ],
+      "common_causes": [
+        "database unavailable",
+        "API timeout",
+        "network issues",
+        "service discovery failure"
+      ]
+    },
+    "Deployment_rollback": {
+      "description": "Deployment was rolled back to a previous version",
+      "severity": "medium",
+      "statistics": {
+        "frequency": 1,
+        "time_span_days": 1,
+        "services_affected": [],
+        "images_affected": [
+          "ronaldraygun/pbx-web:1.0.8"
+        ],
+        "average_frequency_per_day": 1.0
+      },
+      "sample_failures": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "date": "2026-07-13",
+          "pattern_type": "Deployment_rollback",
+          "severity": "medium",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "context": {
+            "event_type": "deployment_rollback",
+            "revision": 11,
+            "notes": "Rolled back to 1.0.8 on same day"
+          }
+        }
+      ],
+      "indicators": [
+        "rollback",
+        "rolled back",
+        "revert",
+        "previous version"
+      ],
+      "common_causes": [
+        "deployment failure",
+        "health check failures",
+        "configuration errors",
+        "errors detected post-deployment"
+      ]
+    },
+    "Other": {
+      "description": "Other failure patterns not matching standard categories",
+      "severity": "variable",
+      "statistics": {
+        "frequency": 0,
+        "time_span_days": 0,
+        "services_affected": [],
+        "images_affected": [],
+        "average_frequency_per_day": 0
+      },
+      "sample_failures": [],
+      "indicators": [
+        "error",
+        "failed",
+        "failure",
+        "issue"
+      ],
+      "common_causes": [
+        "various"
+      ]
+    }
+  },
+  "temporal_distribution": {},
+  "summary": {
+    "total_patterns_identified": 7,
+    "total_failures_detected": 1,
+    "patterns_with_occurrences": 1,
+    "failures_by_pattern": {
+      "Deployment_rollback": 1
+    },
+    "failures_by_severity": {
+      "medium": 1
+    },
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "analysis_period": "30 days (2026-07-07 to 2026-08-06)",
+    "data_quality": "complete"
+  }
+}
