@@ -1,0 +1,184 @@
+{
+    "apiVersion": "argoproj.io/v1alpha1",
+    "kind": "WorkflowTemplate",
+    "metadata": {
+        "annotations": {
+            "argocd.argoproj.io/tracking-id": "argo-workflows-ns-iad-ci:argoproj.io/WorkflowTemplate:argo-workflows/whisper-stt-build",
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"argoproj.io/v1alpha1\",\"kind\":\"WorkflowTemplate\",\"metadata\":{\"annotations\":{\"argocd.argoproj.io/tracking-id\":\"argo-workflows-ns-iad-ci:argoproj.io/WorkflowTemplate:argo-workflows/whisper-stt-build\"},\"labels\":{\"app\":\"whisper-stt-build\"},\"name\":\"whisper-stt-build\",\"namespace\":\"argo-workflows\"},\"spec\":{\"arguments\":{\"parameters\":[{\"name\":\"git-repo\",\"value\":\"jedarden/nixos-asterisk\"},{\"name\":\"branch\",\"value\":\"main\"},{\"name\":\"dockerfile-path\",\"value\":\"Dockerfile\"}]},\"entrypoint\":\"build\",\"serviceAccountName\":\"argo-workflow\",\"templates\":[{\"name\":\"build\",\"steps\":[[{\"name\":\"resolve-version\",\"template\":\"resolve-version\"}],[{\"arguments\":{\"parameters\":[{\"name\":\"version\",\"value\":\"{{steps.resolve-version.outputs.parameters.version}}\"}]},\"name\":\"docker-build\",\"template\":\"docker-build\"}]]},{\"activeDeadlineSeconds\":120,\"name\":\"resolve-version\",\"outputs\":{\"parameters\":[{\"name\":\"version\",\"valueFrom\":{\"path\":\"/tmp/version\"}}]},\"script\":{\"command\":[\"sh\"],\"env\":[{\"name\":\"GIT_CONFIG_COUNT\",\"value\":\"1\"},{\"name\":\"GIT_CONFIG_KEY_0\",\"value\":\"credential.helper\"},{\"name\":\"GIT_CONFIG_VALUE_0\",\"value\":\"!f() { test \\\"$1\\\" = get \\u0026\\u0026 echo \\\"username=x-access-token\\\" \\u0026\\u0026 echo \\\"password=$GH_TOKEN\\\"; }; f\"},{\"name\":\"GH_TOKEN\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"token\",\"name\":\"github-webhook-secret\"}}}],\"image\":\"alpine/git\",\"source\":\"set -e\\ngit clone --branch {{workflow.parameters.branch}} \\\\\\n  \\\"https://github.com/{{workflow.parameters.git-repo}}.git\\\" \\\\\\n  /tmp/repo\\ncd /tmp/repo\\n\\nVERSION_CHANGED=$(git diff --name-only HEAD~1 HEAD -- whisper-stt/VERSION | grep -c '^VERSION$' || true)\\n\\nif [ \\\"$VERSION_CHANGED\\\" -gt 0 ]; then\\n  VERSION=$(cat whisper-stt/VERSION | tr -d '[:space:]')\\n  echo \\\"VERSION changed in commit — using ${VERSION}\\\"\\nelse\\n  CURRENT=$(cat whisper-stt/VERSION | tr -d '[:space:]')\\n  MAJOR=$(echo \\\"$CURRENT\\\" | cut -d. -f1)\\n  MINOR=$(echo \\\"$CURRENT\\\" | cut -d. -f2)\\n  PATCH=$(echo \\\"$CURRENT\\\" | cut -d. -f3)\\n  PATCH=$((PATCH + 1))\\n  VERSION=\\\"${MAJOR}.${MINOR}.${PATCH}\\\"\\n  echo \\\"Auto-bumping ${CURRENT} → ${VERSION}\\\"\\n  echo \\\"$VERSION\\\" \\u003e whisper-stt/VERSION\\n  git config user.email \\\"github@jedarden.com\\\"\\n  git config user.name \\\"jedarden\\\"\\n  git add whisper-stt/VERSION\\n  git commit -m \\\"ci: auto-bump version to ${VERSION}\\\"\\n  git push\\nfi\\n\\necho \\\"$VERSION\\\" \\u003e /tmp/version\\necho \\\"Building version: ${VERSION}\\\"\\n\"}},{\"activeDeadlineSeconds\":1800,\"container\":{\"args\":[\"--context=git://github.com/{{workflow.parameters.git-repo}}.git#refs/heads/{{workflow.parameters.branch}}\",\"--context-sub-path=whisper-stt\",\"--dockerfile={{workflow.parameters.dockerfile-path}}\",\"--destination=ronaldraygun/whisper-stt:{{inputs.parameters.version}}\",\"--destination=ronaldraygun/whisper-stt:latest\",\"--cache=true\",\"--cache-repo=ronaldraygun/cache\",\"--snapshot-mode=redo\",\"--use-new-run=true\"],\"env\":[{\"name\":\"GIT_TOKEN\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"token\",\"name\":\"github-webhook-secret\"}}}],\"image\":\"gcr.io/kaniko-project/executor:v1.23.2\",\"resources\":{\"limits\":{\"cpu\":\"4000m\",\"memory\":\"8Gi\"},\"requests\":{\"cpu\":\"1000m\",\"memory\":\"5Gi\"}},\"volumeMounts\":[{\"mountPath\":\"/kaniko/.docker\",\"name\":\"docker-config\"}]},\"inputs\":{\"parameters\":[{\"name\":\"version\"}]},\"name\":\"docker-build\",\"retryStrategy\":{\"backoff\":{\"duration\":\"30s\",\"factor\":\"2\"},\"limit\":\"2\",\"retryPolicy\":\"OnError\"}}],\"volumes\":[{\"name\":\"docker-config\",\"secret\":{\"items\":[{\"key\":\".dockerconfigjson\",\"path\":\"config.json\"}],\"secretName\":\"docker-hub-registry\"}}]}}\n"
+        },
+        "creationTimestamp": "2026-05-27T02:26:47Z",
+        "generation": 9,
+        "labels": {
+            "app": "whisper-stt-build"
+        },
+        "name": "whisper-stt-build",
+        "namespace": "argo-workflows",
+        "resourceVersion": "50881504",
+        "uid": "c21efa55-b6d6-4702-bf38-dcc632a5c989"
+    },
+    "spec": {
+        "arguments": {
+            "parameters": [
+                {
+                    "name": "git-repo",
+                    "value": "jedarden/nixos-asterisk"
+                },
+                {
+                    "name": "branch",
+                    "value": "main"
+                },
+                {
+                    "name": "dockerfile-path",
+                    "value": "Dockerfile"
+                }
+            ]
+        },
+        "entrypoint": "build",
+        "serviceAccountName": "argo-workflow",
+        "templates": [
+            {
+                "name": "build",
+                "steps": [
+                    [
+                        {
+                            "name": "resolve-version",
+                            "template": "resolve-version"
+                        }
+                    ],
+                    [
+                        {
+                            "arguments": {
+                                "parameters": [
+                                    {
+                                        "name": "version",
+                                        "value": "{{steps.resolve-version.outputs.parameters.version}}"
+                                    }
+                                ]
+                            },
+                            "name": "docker-build",
+                            "template": "docker-build"
+                        }
+                    ]
+                ]
+            },
+            {
+                "activeDeadlineSeconds": 120,
+                "name": "resolve-version",
+                "outputs": {
+                    "parameters": [
+                        {
+                            "name": "version",
+                            "valueFrom": {
+                                "path": "/tmp/version"
+                            }
+                        }
+                    ]
+                },
+                "script": {
+                    "command": [
+                        "sh"
+                    ],
+                    "env": [
+                        {
+                            "name": "GIT_CONFIG_COUNT",
+                            "value": "1"
+                        },
+                        {
+                            "name": "GIT_CONFIG_KEY_0",
+                            "value": "credential.helper"
+                        },
+                        {
+                            "name": "GIT_CONFIG_VALUE_0",
+                            "value": "!f() { test \"$1\" = get \u0026\u0026 echo \"username=x-access-token\" \u0026\u0026 echo \"password=$GH_TOKEN\"; }; f"
+                        },
+                        {
+                            "name": "GH_TOKEN",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "key": "token",
+                                    "name": "github-webhook-secret"
+                                }
+                            }
+                        }
+                    ],
+                    "image": "alpine/git",
+                    "source": "set -e\ngit clone --branch {{workflow.parameters.branch}} \\\n  \"https://github.com/{{workflow.parameters.git-repo}}.git\" \\\n  /tmp/repo\ncd /tmp/repo\n\nVERSION_CHANGED=$(git diff --name-only HEAD~1 HEAD -- whisper-stt/VERSION | grep -c '^VERSION$' || true)\n\nif [ \"$VERSION_CHANGED\" -gt 0 ]; then\n  VERSION=$(cat whisper-stt/VERSION | tr -d '[:space:]')\n  echo \"VERSION changed in commit — using ${VERSION}\"\nelse\n  CURRENT=$(cat whisper-stt/VERSION | tr -d '[:space:]')\n  MAJOR=$(echo \"$CURRENT\" | cut -d. -f1)\n  MINOR=$(echo \"$CURRENT\" | cut -d. -f2)\n  PATCH=$(echo \"$CURRENT\" | cut -d. -f3)\n  PATCH=$((PATCH + 1))\n  VERSION=\"${MAJOR}.${MINOR}.${PATCH}\"\n  echo \"Auto-bumping ${CURRENT} → ${VERSION}\"\n  echo \"$VERSION\" \u003e whisper-stt/VERSION\n  git config user.email \"github@jedarden.com\"\n  git config user.name \"jedarden\"\n  git add whisper-stt/VERSION\n  git commit -m \"ci: auto-bump version to ${VERSION}\"\n  git push\nfi\n\necho \"$VERSION\" \u003e /tmp/version\necho \"Building version: ${VERSION}\"\n"
+                }
+            },
+            {
+                "activeDeadlineSeconds": 1800,
+                "container": {
+                    "args": [
+                        "--context=git://github.com/{{workflow.parameters.git-repo}}.git#refs/heads/{{workflow.parameters.branch}}",
+                        "--context-sub-path=whisper-stt",
+                        "--dockerfile={{workflow.parameters.dockerfile-path}}",
+                        "--destination=ronaldraygun/whisper-stt:{{inputs.parameters.version}}",
+                        "--destination=ronaldraygun/whisper-stt:latest",
+                        "--cache=true",
+                        "--cache-repo=ronaldraygun/cache",
+                        "--snapshot-mode=redo",
+                        "--use-new-run=true"
+                    ],
+                    "env": [
+                        {
+                            "name": "GIT_TOKEN",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "key": "token",
+                                    "name": "github-webhook-secret"
+                                }
+                            }
+                        }
+                    ],
+                    "image": "gcr.io/kaniko-project/executor:v1.23.2",
+                    "resources": {
+                        "limits": {
+                            "cpu": "4000m",
+                            "memory": "8Gi"
+                        },
+                        "requests": {
+                            "cpu": "1000m",
+                            "memory": "5Gi"
+                        }
+                    },
+                    "volumeMounts": [
+                        {
+                            "mountPath": "/kaniko/.docker",
+                            "name": "docker-config"
+                        }
+                    ]
+                },
+                "inputs": {
+                    "parameters": [
+                        {
+                            "name": "version"
+                        }
+                    ]
+                },
+                "name": "docker-build",
+                "retryStrategy": {
+                    "backoff": {
+                        "duration": "30s",
+                        "factor": "2"
+                    },
+                    "limit": "2",
+                    "retryPolicy": "OnError"
+                }
+            }
+        ],
+        "volumes": [
+            {
+                "name": "docker-config",
+                "secret": {
+                    "items": [
+                        {
+                            "key": ".dockerconfigjson",
+                            "path": "config.json"
+                        }
+                    ],
+                    "secretName": "docker-hub-registry"
+                }
+            }
+        ]
+    }
+}

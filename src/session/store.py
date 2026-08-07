@@ -928,6 +928,41 @@ class SessionStore:
             await db.commit()
         return utterance_id
 
+    async def get_utterance(self, utterance_id: str) -> Optional[dict]:
+        """Get an utterance by ID.
+
+        Returns:
+            Dict with utterance data or None if not found
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT id, session_id, raw_text, created_at, router_timing_breakdown FROM utterances WHERE id = ?",
+                (utterance_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return dict(row)
+        return None
+
+    async def get_result(self, result_id: str) -> Optional[dict]:
+        """Get a result by ID.
+
+        Returns:
+            Dict with result data or None if not found
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT id, intent_id, topic_id, session_id, summary, data, urgency, result_type, created_at
+                   FROM results WHERE id = ?""",
+                (result_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return dict(row)
+        return None
+
     async def update_utterance_router_timing(
         self,
         utterance_id: str,
