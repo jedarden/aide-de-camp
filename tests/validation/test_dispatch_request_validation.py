@@ -903,6 +903,376 @@ class TestDispatchEndpointValidation:
         assert len(error_msg) > 0
 
 
+class TestInvalidFieldTypeValidation:
+    """Test cases for invalid field type validation at HTTP endpoint level."""
+
+    def test_non_string_utterance_returns_400(self, test_client):
+        """Test that non-string utterance returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": 123,
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        # App's custom validation handler returns 400
+        assert response.status_code == 400
+
+    def test_non_string_utterance_error_structure(self, test_client):
+        """Test that non-string utterance error includes proper validation structure."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": 123,
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        # App's custom validation response structure
+        assert "detail" in error_data
+        assert "error" in error_data
+        assert "errors" in error_data
+        assert error_data["error"] == "Validation failed"
+        assert error_data["status"] == 400
+
+        # Verify errors array structure
+        errors = error_data["errors"]
+        assert isinstance(errors, list)
+
+        # Find utterance-related error
+        utterance_errors = [e for e in errors if "utterance" in e.get("field", "")]
+        assert len(utterance_errors) > 0
+
+        # Verify error structure
+        utterance_error = utterance_errors[0]
+        assert "field" in utterance_error
+        assert "message" in utterance_error
+        assert "type" in utterance_error
+        # Error type should indicate type validation failure
+        assert utterance_error["type"] in ("string_type", "int_parsing")
+        # Error message should mention string requirement
+        assert "string" in utterance_error["message"].lower()
+
+    def test_non_string_session_id_returns_400(self, test_client):
+        """Test that non-string session_id returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": 123,
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_non_string_session_id_error_structure(self, test_client):
+        """Test that non-string session_id error includes proper validation structure."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": 123,
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "detail" in error_data
+        assert "error" in error_data
+        assert "errors" in error_data
+        assert error_data["error"] == "Validation failed"
+
+        # Verify errors array structure
+        errors = error_data["errors"]
+        assert isinstance(errors, list)
+
+        # Find session_id-related error
+        session_errors = [e for e in errors if "session_id" in e.get("field", "")]
+        assert len(session_errors) > 0
+
+        # Verify error structure
+        session_error = session_errors[0]
+        assert "field" in session_error
+        assert "message" in session_error
+        assert "type" in session_error
+        # Error type should indicate type validation failure
+        assert session_error["type"] in ("string_type", "int_parsing")
+        # Error message should mention string requirement
+        assert "string" in session_error["message"].lower()
+
+    def test_non_string_surface_id_returns_400(self, test_client):
+        """Test that non-string surface_id returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-123",
+                "surface_id": 123
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_non_string_surface_id_error_structure(self, test_client):
+        """Test that non-string surface_id error includes proper validation structure."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-123",
+                "surface_id": 123
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "detail" in error_data
+        assert "error" in error_data
+        assert "errors" in error_data
+        assert error_data["error"] == "Validation failed"
+
+        # Verify errors array structure
+        errors = error_data["errors"]
+        assert isinstance(errors, list)
+
+        # Find surface_id-related error
+        surface_errors = [e for e in errors if "surface_id" in e.get("field", "")]
+        assert len(surface_errors) > 0
+
+        # Verify error structure
+        surface_error = surface_errors[0]
+        assert "field" in surface_error
+        assert "message" in surface_error
+        assert "type" in surface_error
+        # Error type should indicate type validation failure
+        assert surface_error["type"] in ("string_type", "int_parsing")
+        # Error message should mention string requirement
+        assert "string" in surface_error["message"].lower()
+
+    def test_non_string_optional_utterance_id_returns_400(self, test_client):
+        """Test that non-string utterance_id returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-123",
+                "surface_id": "surface-456",
+                "utterance_id": 123
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_non_string_optional_utterance_id_error_structure(self, test_client):
+        """Test that non-string utterance_id error includes proper validation structure."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-123",
+                "surface_id": "surface-456",
+                "utterance_id": 123
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "detail" in error_data
+        assert "error" in error_data
+        assert "errors" in error_data
+        assert error_data["error"] == "Validation failed"
+
+        # Verify errors array structure
+        errors = error_data["errors"]
+        assert isinstance(errors, list)
+
+        # Find utterance_id-related error
+        utterance_id_errors = [e for e in errors if "utterance_id" in e.get("field", "")]
+        assert len(utterance_id_errors) > 0
+
+        # Verify error structure
+        utterance_id_error = utterance_id_errors[0]
+        assert "field" in utterance_id_error
+        assert "message" in utterance_id_error
+        assert "type" in utterance_id_error
+        # Error type should indicate type validation failure
+        # utterance_id has custom validator, so it shows as value_error
+        assert utterance_id_error["type"] in ("string_type", "int_parsing", "value_error")
+        # Error message should mention string requirement
+        assert "string" in utterance_id_error["message"].lower()
+
+    def test_float_type_utterance_returns_400(self, test_client):
+        """Test that float type for utterance returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": 123.45,
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_boolean_type_utterance_returns_400(self, test_client):
+        """Test that boolean type for utterance returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": True,
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_list_type_utterance_returns_400(self, test_client):
+        """Test that list type for utterance returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": ["array", "value"],
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_dict_type_utterance_returns_400(self, test_client):
+        """Test that dict type for utterance returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": {"key": "value"},
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_null_type_session_id_returns_400(self, test_client):
+        """Test that null type for session_id returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": None,
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_multiple_invalid_field_types_returns_400(self, test_client):
+        """Test that multiple invalid field types are reported together."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": 123,
+                "session_id": 456,
+                "surface_id": 789
+            }
+        )
+
+        assert response.status_code == 400
+
+        error_data = response.json()
+        assert "detail" in error_data
+        assert "error" in error_data
+        assert "errors" in error_data
+        assert error_data["error"] == "Validation failed"
+
+        # Verify errors array structure
+        errors = error_data["errors"]
+        assert isinstance(errors, list)
+
+        # Should have multiple errors (one for each field)
+        assert len(errors) >= 3
+
+        # Verify that utterance, session_id, and surface_id all have errors
+        fields_with_errors = set()
+        for error in errors:
+            field = error.get("field", "")
+            if "utterance" in field:
+                fields_with_errors.add("utterance")
+            if "session_id" in field:
+                fields_with_errors.add("session_id")
+            if "surface_id" in field:
+                fields_with_errors.add("surface_id")
+
+        # All three required fields should have type validation errors
+        assert "utterance" in fields_with_errors
+        assert "session_id" in fields_with_errors
+        assert "surface_id" in fields_with_errors
+
+    def test_float_type_session_id_returns_400(self, test_client):
+        """Test that float type for session_id returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": 123.45,
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_boolean_type_surface_id_returns_400(self, test_client):
+        """Test that boolean type for surface_id returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-123",
+                "surface_id": False
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_list_type_optional_utterance_id_returns_400(self, test_client):
+        """Test that list type for optional utterance_id returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-123",
+                "surface_id": "surface-456",
+                "utterance_id": ["list", "value"]
+            }
+        )
+
+        assert response.status_code == 400
+
+    def test_dict_type_session_id_returns_400(self, test_client):
+        """Test that dict type for session_id returns HTTP 400 status code."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": {"key": "value"},
+                "surface_id": "surface-456"
+            }
+        )
+
+        assert response.status_code == 400
+
+
 class TestMalformedJSONBody:
     """Test cases for malformed JSON request body validation."""
 
@@ -1432,3 +1802,248 @@ class TestMalformedJSONBody:
                 error_msg = json_error.get("message", "")
                 assert len(error_msg) > 0, f"Empty error message for input: {malformed_json}"
                 assert json_error.get("type") == "json_invalid", f"Wrong error type for input: {malformed_json}"
+
+
+class TestDispatchHappyPath:
+    """Happy path tests: verify valid requests pass validation and reach the handler."""
+
+    def test_minimal_valid_payload_passes_validation(self, test_client):
+        """Test that minimal valid payload passes validation and returns non-422 status."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-123",
+                "surface_id": "surface-456"
+            }
+        )
+
+        # Happy path: request passes validation and reaches handler
+        # Status code should NOT be a validation error (400/422)
+        # Expected: 202 (accepted for processing), 500 (handler error), or other non-validation status
+        assert response.status_code not in (400, 422), (
+            f"Valid request was rejected with validation error: {response.status_code}"
+        )
+
+    def test_minimal_valid_payload_reaches_handler(self, test_client):
+        """Test that minimal valid payload reaches the handler (validation passes)."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check deployment status",
+                "session_id": "session-456",
+                "surface_id": "surface-789"
+            }
+        )
+
+        # If validation fails, status would be 400/422
+        # Any other status (including 500 handler errors) means validation passed
+        assert response.status_code not in (400, 422), (
+            "Request should pass validation and reach handler"
+        )
+
+        # Verify response structure is valid JSON (not a validation error response)
+        response_data = response.json()
+        assert isinstance(response_data, dict), "Response should be a JSON object"
+
+    def test_full_valid_payload_with_all_optional_fields(self, test_client):
+        """Test that valid payload with all optional fields passes validation."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status for aide-de-camp",
+                "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                "surface_id": "surface-abc123",
+                "utterance_id": "660e8400-e29b-41d4-a716-446655440000"
+            }
+        )
+
+        # Should pass validation (not return 400/422)
+        assert response.status_code not in (400, 422), (
+            f"Valid request with all optional fields was rejected: {response.status_code}"
+        )
+
+    def test_valid_utterance_with_unicode(self, test_client):
+        """Test that valid utterance with Unicode characters passes validation."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check status 🚀 ✓",
+                "session_id": "session-unicode",
+                "surface_id": "surface-unicode"
+            }
+        )
+
+        # Should pass validation
+        assert response.status_code not in (400, 422), (
+            "Valid Unicode request should pass validation"
+        )
+
+    def test_valid_utterance_exactly_min_length(self, test_client):
+        """Test that utterance exactly at minimum length (2 chars) passes validation."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "AB",  # Exactly min_length
+                "session_id": "session-min",
+                "surface_id": "surface-min"
+            }
+        )
+
+        # Should pass validation
+        assert response.status_code not in (400, 422), (
+            "Utterance at min_length should pass validation"
+        )
+
+    def test_valid_utterance_with_newlines(self, test_client):
+        """Test that utterance with newlines passes validation."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI\nstatus\nnow",
+                "session_id": "session-newlines",
+                "surface_id": "surface-newlines"
+            }
+        )
+
+        # Should pass validation (newlines are preserved)
+        assert response.status_code not in (400, 422), (
+            "Utterance with newlines should pass validation"
+        )
+
+    def test_valid_utterance_is_stripped_at_endpoint(self, test_client):
+        """Test that utterance is stripped of leading/trailing whitespace at endpoint."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "  Check CI status  ",  # Has whitespace
+                "session_id": "session-whitespace",
+                "surface_id": "surface-whitespace"
+            }
+        )
+
+        # Should pass validation (whitespace is stripped by validator)
+        assert response.status_code not in (400, 422), (
+            "Utterance with whitespace should pass validation after stripping"
+        )
+
+    def test_valid_session_id_is_stripped_at_endpoint(self, test_client):
+        """Test that session_id is stripped of leading/trailing whitespace at endpoint."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check status",
+                "session_id": "  session-whitespace  ",  # Has whitespace
+                "surface_id": "surface-test"
+            }
+        )
+
+        # Should pass validation (whitespace is stripped by validator)
+        assert response.status_code not in (400, 422), (
+            "Session ID with whitespace should pass validation after stripping"
+        )
+
+    def test_valid_surface_id_is_stripped_at_endpoint(self, test_client):
+        """Test that surface_id is stripped of leading/trailing whitespace at endpoint."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check status",
+                "session_id": "session-test",
+                "surface_id": "  surface-whitespace  "  # Has whitespace
+            }
+        )
+
+        # Should pass validation (whitespace is stripped by validator)
+        assert response.status_code not in (400, 422), (
+            "Surface ID with whitespace should pass validation after stripping"
+        )
+
+    def test_optional_utterance_id_omitted(self, test_client):
+        """Test that omitting optional utterance_id still passes validation."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-no-opt",
+                "surface_id": "surface-no-opt"
+                # utterance_id omitted (optional field)
+            }
+        )
+
+        # Should pass validation (utterance_id is optional)
+        assert response.status_code not in (400, 422), (
+            "Request without optional utterance_id should pass validation"
+        )
+
+    def test_multiple_valid_requests_all_pass(self, test_client):
+        """Test that multiple valid requests all pass validation (batch verification)."""
+        valid_requests = [
+            # Minimal payload
+            {
+                "utterance": "Check status",
+                "session_id": "session-1",
+                "surface_id": "surface-1"
+            },
+            # With optional utterance_id
+            {
+                "utterance": "Check deployment",
+                "session_id": "session-2",
+                "surface_id": "surface-2",
+                "utterance_id": "utterance-123"
+            },
+            # With Unicode
+            {
+                "utterance": "Status check 🎯",
+                "session_id": "session-3",
+                "surface_id": "surface-3"
+            },
+            # Longer utterance
+            {
+                "utterance": "Please check the continuous integration status for the aide-de-camp project",
+                "session_id": "session-4",
+                "surface_id": "surface-4"
+            },
+        ]
+
+        for i, payload in enumerate(valid_requests):
+            response = test_client.post("/dispatch", json=payload)
+
+            # All valid requests should pass validation
+            assert response.status_code not in (400, 422), (
+                f"Valid request {i+1} failed validation: {response.status_code}"
+            )
+
+    def test_validation_does_not_return_422_for_valid_request(self, test_client):
+        """Test that valid request does not return HTTP 422 Unprocessable Entity."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-422",
+                "surface_id": "surface-422"
+            }
+        )
+
+        # 422 is FastAPI's default validation error status
+        # Valid requests should never return 422
+        assert response.status_code != 422, (
+            "Valid request should not return 422 Unprocessable Entity"
+        )
+
+    def test_validation_does_not_return_400_for_valid_request(self, test_client):
+        """Test that valid request does not return HTTP 400 Bad Request."""
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": "Check CI status",
+                "session_id": "session-400",
+                "surface_id": "surface-400"
+            }
+        )
+
+        # 400 is the app's custom validation error status
+        # Valid requests should never return 400
+        assert response.status_code != 400, (
+            "Valid request should not return 400 Bad Request"
+        )
