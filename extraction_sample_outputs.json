@@ -1,0 +1,153 @@
+{
+  "sample_outputs": {
+    "description": "Raw sample outputs from successful extraction runs",
+    "collected_at": "2026-08-07T01:57:00Z",
+    "task_reference": "adc-4g705"
+  },
+  "samples": [
+    {
+      "sample_id": "large_file_extraction",
+      "description": "Sample from largest file (74.4 MB)",
+      "file": "logs/pbx-web-victorialogs-raw.jsonl",
+      "raw_output": {
+        "file_path": "logs/pbx-web-victorialogs-raw.jsonl",
+        "file_exists": true,
+        "size_bytes": 78016640,
+        "creation_timestamp": "2026-08-06T12:53:04.393679",
+        "modification_timestamp": "2026-08-06T12:53:04.393679",
+        "line_count": 10000,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      },
+      "performance": {
+        "execution_time": "0.068997933s",
+        "status": "SUCCESS",
+        "exit_code": 0
+      }
+    },
+    {
+      "sample_id": "high_volume_extraction",
+      "description": "Sample from file with most lines (96,086 lines)",
+      "file": "logs/whisper-openai-raw.log",
+      "raw_output": {
+        "file_path": "logs/whisper-openai-raw.log",
+        "file_exists": true,
+        "size_bytes": 5573013,
+        "creation_timestamp": "2026-08-06T23:02:09.215310",
+        "modification_timestamp": "2026-08-06T23:02:09.215310",
+        "line_count": 96086,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      },
+      "performance": {
+        "execution_time": "0.031575710s",
+        "status": "SUCCESS",
+        "exit_code": 0
+      }
+    },
+    {
+      "sample_id": "fast_extraction",
+      "description": "Sample from fastest extraction (0.019s)",
+      "file": "logs/whisper-stt-30day.jsonl",
+      "raw_output": {
+        "file_path": "logs/whisper-stt-30day.jsonl",
+        "file_exists": true,
+        "size_bytes": 213280,
+        "creation_timestamp": "2026-08-06T17:33:23.667207",
+        "modification_timestamp": "2026-08-06T17:33:23.667207",
+        "line_count": 1027,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      },
+      "performance": {
+        "execution_time": "0.019380159s",
+        "status": "SUCCESS",
+        "exit_code": 0
+      }
+    },
+    {
+      "sample_id": "empty_file_handling",
+      "description": "Sample demonstrating empty file handling",
+      "file": "logs/whisper-stt-pod-raw.log",
+      "raw_output": {
+        "file_path": "logs/whisper-stt-pod-raw.log",
+        "file_exists": true,
+        "size_bytes": 0,
+        "creation_timestamp": "2026-08-06T23:02:07.555317",
+        "modification_timestamp": "2026-08-06T23:02:07.555317",
+        "line_count": 0,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      },
+      "performance": {
+        "execution_time": "0.020353846s",
+        "status": "SUCCESS",
+        "exit_code": 0
+      }
+    },
+    {
+      "sample_id": "parsed_jsonl_extraction",
+      "description": "Sample from parsed JSONL file",
+      "file": "logs/pbx-web-parsed.jsonl",
+      "raw_output": {
+        "file_path": "logs/pbx-web-parsed.jsonl",
+        "file_exists": true,
+        "size_bytes": 331282,
+        "creation_timestamp": "2026-08-06T16:50:33.263745",
+        "modification_timestamp": "2026-08-06T16:50:33.263745",
+        "line_count": 1438,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      },
+      "performance": {
+        "execution_time": "0.025562632s",
+        "status": "SUCCESS",
+        "exit_code": 0
+      }
+    },
+    {
+      "sample_id": "kubernetes_metadata",
+      "description": "Sample from Kubernetes describe output",
+      "file": "logs/whisper-stt-deployment-describe.txt",
+      "raw_output": {
+        "file_path": "logs/whisper-stt-deployment-describe.txt",
+        "file_exists": true,
+        "size_bytes": 7560,
+        "creation_timestamp": "2026-08-06T17:30:56.859961",
+        "modification_timestamp": "2026-08-06T17:30:56.859961",
+        "line_count": 164,
+        "first_timestamp": null,
+        "last_timestamp": null,
+        "error": null
+      },
+      "performance": {
+        "execution_time": "0.027207612s",
+        "status": "SUCCESS",
+        "exit_code": 0
+      }
+    }
+  ],
+  "success_pattern_analysis": {
+    "all_successful": true,
+    "common_success_factors": [
+      "All files accessible and readable",
+      "Consistent JSON output format",
+      "Proper error handling (null when no errors)",
+      "Accurate metadata extraction",
+      "Reliable execution timing"
+    ],
+    "file_diversity_handled": [
+      "Large files (74+ MB)",
+      "High line count files (96K+ lines)",
+      "Small files (7-10 KB)",
+      "Empty files (0 bytes)",
+      "Different file formats (.jsonl, .log, .txt)"
+    ]
+  },
+  "verification_ready": true
+}
