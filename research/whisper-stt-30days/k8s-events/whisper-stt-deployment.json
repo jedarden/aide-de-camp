@@ -1,0 +1,27 @@
+{
+  "name": "whisper-stt",
+  "namespace": "whisper-stt",
+  "creationTimestamp": "2026-05-01T17:26:49Z",
+  "replicas": 1,
+  "updatedReplicas": 1,
+  "readyReplicas": 1,
+  "availableReplicas": 1,
+  "conditions": [
+    {
+      "lastTransitionTime": "2026-07-12T16:54:57Z",
+      "lastUpdateTime": "2026-07-12T16:54:57Z",
+      "message": "Deployment has minimum availability.",
+      "reason": "MinimumReplicasAvailable",
+      "status": "True",
+      "type": "Available"
+    },
+    {
+      "lastTransitionTime": "2026-06-24T20:55:35Z",
+      "lastUpdateTime": "2026-07-12T16:54:57Z",
+      "message": "ReplicaSet \"whisper-stt-847fd8d7b9\" has successfully progressed.",
+      "reason": "NewReplicaSetAvailable",
+      "status": "True",
+      "type": "Progressing"
+    }
+  ]
+}

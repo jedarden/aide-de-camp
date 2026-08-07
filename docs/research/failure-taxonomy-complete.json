@@ -1,0 +1,131 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T22:14:50.797432",
+    "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "cluster": "ardenone-cluster",
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "total_patterns_identified": 1,
+    "total_failures_categorized": 1,
+    "uncategorized_failures": 3,
+    "verification_complete": true
+  },
+  "service_statistics": {
+    "pbx-web": {
+      "total_events": 5,
+      "failures": 1,
+      "successes": 4,
+      "patterns_found": {
+        "Deployment_rollback": 1
+      }
+    },
+    "whisper-stt": {
+      "total_events": 9,
+      "failures": 3,
+      "successes": 6,
+      "patterns_found": {}
+    }
+  },
+  "pattern_taxonomy": {
+    "Deployment_rollback": {
+      "frequency": 1,
+      "severity": "medium",
+      "category": "configuration",
+      "description": "Deployment was rolled back to a previous version",
+      "time_span_days": 0,
+      "first_occurrence": "2026-07-13",
+      "last_occurrence": "2026-07-13",
+      "day_distribution": {
+        "2026-07-13": 1
+      },
+      "services_affected": {
+        "pbx-web": 1
+      },
+      "images_affected": {
+        "ronaldraygun/pbx-web:1.0.8": 1
+      },
+      "common_reasons": {
+        "Rolled back to 1.0.8 on same day": 1
+      },
+      "sample_failures": [
+        {
+          "timestamp": "2026-07-13T18:07:55Z",
+          "service": "pbx-web",
+          "deployment_id": "unknown",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "outcome": "rolled_back",
+          "namespace": "unknown",
+          "cluster": "ardenone-cluster",
+          "reason": "Rolled back to 1.0.8 on same day",
+          "event_type": "deployment_rollback",
+          "revision": 11,
+          "pattern_category": "configuration",
+          "pattern_severity": "medium",
+          "pattern_confidence": 0.5,
+          "pattern_description": "Deployment was rolled back to a previous version"
+        }
+      ]
+    }
+  },
+  "uncategorized_failures": [
+    {
+      "timestamp": "2026-07-08T03:26:44Z",
+      "service": "whisper-stt",
+      "deployment_id": "whisper-stt",
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "outcome": "inactive",
+      "namespace": "unknown",
+      "cluster": "ardenone-cluster",
+      "reason": "unknown",
+      "event_type": "deployment_rollout",
+      "revision": 31,
+      "pattern_category": "unknown",
+      "pattern_severity": "unknown",
+      "pattern_confidence": 0.0,
+      "pattern_description": "Uncategorized failure pattern"
+    },
+    {
+      "timestamp": "2026-07-08T03:16:13Z",
+      "service": "whisper-stt",
+      "deployment_id": "whisper-stt",
+      "image": "ronaldraygun/whisper-stt:1.8.4",
+      "outcome": "inactive",
+      "namespace": "unknown",
+      "cluster": "ardenone-cluster",
+      "reason": "unknown",
+      "event_type": "deployment_rollout",
+      "revision": 30,
+      "pattern_category": "unknown",
+      "pattern_severity": "unknown",
+      "pattern_confidence": 0.0,
+      "pattern_description": "Uncategorized failure pattern"
+    },
+    {
+      "timestamp": "2026-07-08T03:09:35Z",
+      "service": "whisper-stt",
+      "deployment_id": "whisper-stt",
+      "image": "ronaldraygun/whisper-stt:1.8.2",
+      "outcome": "inactive",
+      "namespace": "unknown",
+      "cluster": "ardenone-cluster",
+      "reason": "unknown",
+      "event_type": "deployment_rollout",
+      "revision": 29,
+      "pattern_category": "unknown",
+      "pattern_severity": "unknown",
+      "pattern_confidence": 0.0,
+      "pattern_description": "Uncategorized failure pattern"
+    }
+  ],
+  "verification": {
+    "total_records_processed": 14,
+    "success_records": 10,
+    "failure_records": 4,
+    "categorized_failures": 1,
+    "uncategorized_failures": 3,
+    "completeness_check": true,
+    "coverage_percentage": 25.0
+  }
+}

@@ -363,21 +363,197 @@ async def get_test_endpoint():
     }
 
 
-@app.post("/test")
-async def test_endpoint(request: dict):
+async def verify_storage_payload(
+    store,
+    utterance_id: str,
+    intent_id: str,
+    topic_id: str,
+    result_id: str,
+    session_id: str,
+    original_utterance: str,
+) -> bool:
     """
-    Test endpoint that accepts utterance and session_id.
+    Verify that stored payload matches /dispatch payload structure.
+
+    Checks that the stored records match what /dispatch would create:
+    - Utterance record exists with correct session_id
+    - Intent record exists with correct utterance_id and session_id
+    - Topic record exists with correct session_id
+    - Result record exists with correct intent_id, topic_id, and session_id
+
+    Returns:
+        bool: True if all records match expected structure, False otherwise
+    """
+    try:
+        # Verify utterance record
+        utterance = await store.get_utterance(utterance_id)
+        if not utterance or utterance.get("session_id") != session_id:
+            logger.warning(f"[TEST] Utterance verification failed for {utterance_id}")
+            return False
+
+        # Verify intent record
+        intent = await store.get_intent(intent_id)
+        if not intent or intent.get("utterance_id") != utterance_id or intent.get("session_id") != session_id:
+            logger.warning(f"[TEST] Intent verification failed for {intent_id}")
+            return False
+
+        # Verify topic record
+        topic = await store.get_topic(topic_id)
+        if not topic or topic.get("session_id") != session_id:
+            logger.warning(f"[TEST] Topic verification failed for {topic_id}")
+            return False
+
+        # Verify result record
+        result = await store.get_result(result_id)
+        if not result or result.get("intent_id") != intent_id or result.get("topic_id") != topic_id or result.get("session_id") != session_id:
+            logger.warning(f"[TEST] Result verification failed for {result_id}")
+            return False
+
+        logger.info(f"[TEST] Storage payload verification passed for all records")
+        return True
+
+    except Exception as e:
+        logger.error(f"[TEST] Storage payload verification error: {e}")
+        return False
+
+
+async def verify_payload_structure(
+    store,
+    utterance_id: str,
+    intent_id: str,
+    topic_id: str,
+    result_id: str,
+) -> dict:
+    """
+    Verify that stored payload fields match /dispatch payload structure.
+
+    Performs deep field-by-field comparison to ensure /test creates identical
+    payload structures as /dispatch would create for the same utterance.
+
+    Args:
+        store: Session store instance
+        utterance_id: Utterance ID to verify
+        intent_id: Intent ID to verify
+        topic_id: Topic ID to verify
+        result_id: Result ID to verify
+
+    Returns:
+        dict with keys:
+            - match: bool - True if all fields match expected structure
+            - field_matches: dict - Per-record field verification results
+            - missing_fields: dict - Any missing fields by record type
+    """
+    result = {
+        "match": True,
+        "field_matches": {},
+        "missing_fields": {},
+    }
+
+    try:
+        # Define expected fields for each record type (based on /dispatch structure)
+        expected_fields = {
+            "utterance": ["id", "session_id", "raw_text", "created_at"],
+            "intent": ["id", "utterance_id", "session_id", "topic_id", "project_slug",
+                       "intent_type", "status", "created_at"],
+            "topic": ["id", "label", "type", "project_slugs", "scope", "session_id",
+                      "created_at", "last_active"],
+            "result": ["id", "intent_id", "topic_id", "session_id", "summary",
+                       "data", "urgency", "result_type", "created_at"],
+        }
+
+        # Verify utterance fields
+        utterance = await store.get_utterance(utterance_id)
+        if utterance:
+            utterance_fields = set(utterance.keys())
+            expected_utterance = set(expected_fields["utterance"])
+            utterance_match = expected_utterance.issubset(utterance_fields)
+            result["field_matches"]["utterance"] = utterance_match
+            if not utterance_match:
+                result["missing_fields"]["utterance"] = list(expected_utterance - utterance_fields)
+                result["match"] = False
+        else:
+            result["field_matches"]["utterance"] = False
+            result["match"] = False
+
+        # Verify intent fields
+        intent = await store.get_intent(intent_id)
+        if intent:
+            intent_fields = set(intent.keys())
+            expected_intent = set(expected_fields["intent"])
+            intent_match = expected_intent.issubset(intent_fields)
+            result["field_matches"]["intent"] = intent_match
+            if not intent_match:
+                result["missing_fields"]["intent"] = list(expected_intent - intent_fields)
+                result["match"] = False
+        else:
+            result["field_matches"]["intent"] = False
+            result["match"] = False
+
+        # Verify topic fields
+        topic = await store.get_topic(topic_id)
+        if topic:
+            topic_fields = set(topic.keys())
+            expected_topic = set(expected_fields["topic"])
+            topic_match = expected_topic.issubset(topic_fields)
+            result["field_matches"]["topic"] = topic_match
+            if not topic_match:
+                result["missing_fields"]["topic"] = list(expected_topic - topic_fields)
+                result["match"] = False
+        else:
+            result["field_matches"]["topic"] = False
+            result["match"] = False
+
+        # Verify result fields
+        result_record = await store.get_result(result_id)
+        if result_record:
+            result_fields = set(result_record.keys())
+            expected_result = set(expected_fields["result"])
+            result_match = expected_result.issubset(result_fields)
+            result["field_matches"]["result"] = result_match
+            if not result_match:
+                result["missing_fields"]["result"] = list(expected_result - result_fields)
+                result["match"] = False
+        else:
+            result["field_matches"]["result"] = False
+            result["match"] = False
+
+        if result["match"]:
+            logger.info(f"[TEST] Payload structure verification passed - all fields match /dispatch structure")
+        else:
+            logger.warning(f"[TEST] Payload structure verification failed - missing fields: {result['missing_fields']}")
+
+    except Exception as e:
+        logger.error(f"[TEST] Payload structure verification error: {e}")
+        result["match"] = False
+        result["error"] = str(e)
+
+    return result
+
+
+@app.post("/test")
+async def test_endpoint(
+    request: dict,
+    session_id: Optional[str] = Query(None, description="Session ID for the test"),
+    surface_id: Optional[str] = Query(None, description="Surface ID for SSE broadcasting"),
+):
+    """
+    Test endpoint that accepts utterance and optional session_id/surface_id.
 
     Mirrors the /dispatch interface for basic testing and verification.
     Stores the utterance to the session database and returns a test response.
     Broadcasts SSE events to connected canvas surfaces when surface_id is provided.
+    Supports session_id and surface_id as both query parameters and request body fields.
 
     Request body:
     {
         "utterance": "test utterance here",
-        "session_id": "optional-session-id",
-        "surface_id": "optional-surface-id"  // If provided, broadcasts SSE event
+        "session_id": "optional-session-id",  // Can also use query parameter
+        "surface_id": "optional-surface-id"   // Can also use query parameter
     }
+
+    Query parameters:
+        session_id: Optional session ID (overrides request body if provided)
+        surface_id: Optional surface ID (overrides request body if provided)
 
     Returns:
     {
@@ -400,8 +576,12 @@ async def test_endpoint(request: dict):
     import uuid
 
     utterance = request.get("utterance", "")
-    session_id = request.get("session_id", "")
-    surface_id = request.get("surface_id", "")
+    # Query parameters take precedence over request body
+    req_session_id = request.get("session_id", "")
+    req_surface_id = request.get("surface_id", "")
+
+    session_id = session_id or req_session_id or ""
+    surface_id = surface_id or req_surface_id or ""
 
     logger.info(f"[TEST] Received test request - utterance: {utterance[:100]}..., session_id: {session_id}, surface_id: {surface_id}")
 
@@ -458,6 +638,7 @@ async def test_endpoint(request: dict):
 
     # Broadcast SSE event AFTER result is created (matches /dispatch pattern)
     # Timing: result → persist → broadcast
+    sse_broadcast_success = False
     if surface_id and _broadcaster:
         try:
             # Broadcast is async (non-blocking) but happens after result creation
@@ -474,10 +655,22 @@ async def test_endpoint(request: dict):
                     },
                 )
             )
+            sse_broadcast_success = True
             logger.info(f"[TEST] Broadcast SSE event to surface {surface_id}")
         except Exception as e:
             logger.warning(f"[TEST] Failed to broadcast SSE event: {e}")
             # Non-fatal: continue and return response
+
+    # Verify payload structure matches /dispatch
+    storage_match = await verify_storage_payload(
+        store, utterance_id, intent_id, topic_id, result_id, session_id, utterance
+    )
+
+    # Verify payload field structure matches /dispatch
+    payload_structure = await verify_payload_structure(
+        store, utterance_id, intent_id, topic_id, result_id
+    )
+    payload_match = payload_structure["match"]
 
     return {
         "status": "test",
@@ -492,6 +685,16 @@ async def test_endpoint(request: dict):
             "topic_id": topic_id,
             "result_id": result_id,
         },
+        "verification": {
+            "storage_match": storage_match,
+            "sse_broadcast": sse_broadcast_success,
+            "payload_match": payload_match,
+        },
+        "sse_broadcast": {
+            "sent": sse_broadcast_success,
+            "surface_id": surface_id if sse_broadcast_success else None,
+        },
+        "payload_structure": payload_structure,
         "message": "Test endpoint received and stored data successfully",
     }
 

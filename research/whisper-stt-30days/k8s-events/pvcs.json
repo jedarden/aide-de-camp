@@ -1,0 +1,105 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "PersistentVolumeClaim",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt:/PersistentVolumeClaim:whisper-stt/whisper-model-cache"
+                },
+                "creationTimestamp": "2026-05-13T14:20:50Z",
+                "finalizers": [
+                    "kubernetes.io/pvc-protection"
+                ],
+                "name": "whisper-model-cache",
+                "namespace": "whisper-stt",
+                "resourceVersion": "576264051",
+                "uid": "9c83a1e3-2ae1-48c6-8ee8-b5ca87fe5aca"
+            },
+            "spec": {
+                "accessModes": [
+                    "ReadWriteOnce"
+                ],
+                "resources": {
+                    "requests": {
+                        "storage": "10Gi"
+                    }
+                },
+                "storageClassName": "longhorn",
+                "volumeMode": "Filesystem"
+            },
+            "status": {
+                "phase": "Pending"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "PersistentVolumeClaim",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt:/PersistentVolumeClaim:whisper-stt/whisper-openai-model-cache"
+                },
+                "creationTimestamp": "2026-06-14T02:11:07Z",
+                "finalizers": [
+                    "kubernetes.io/pvc-protection"
+                ],
+                "name": "whisper-openai-model-cache",
+                "namespace": "whisper-stt",
+                "resourceVersion": "589284075",
+                "uid": "2c46bd55-e982-4893-8cbb-44fc3d61713a"
+            },
+            "spec": {
+                "accessModes": [
+                    "ReadWriteOnce"
+                ],
+                "resources": {
+                    "requests": {
+                        "storage": "10Gi"
+                    }
+                },
+                "storageClassName": "longhorn",
+                "volumeMode": "Filesystem"
+            },
+            "status": {
+                "phase": "Pending"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "PersistentVolumeClaim",
+            "metadata": {
+                "annotations": {
+                    "argocd.argoproj.io/tracking-id": "whisper-stt:/PersistentVolumeClaim:whisper-stt/whisper-stt-jobs"
+                },
+                "creationTimestamp": "2026-06-25T14:07:41Z",
+                "finalizers": [
+                    "kubernetes.io/pvc-protection"
+                ],
+                "name": "whisper-stt-jobs",
+                "namespace": "whisper-stt",
+                "resourceVersion": "593674102",
+                "uid": "515bb5bd-8e6c-4f05-b746-77684dac29cc"
+            },
+            "spec": {
+                "accessModes": [
+                    "ReadWriteOnce"
+                ],
+                "resources": {
+                    "requests": {
+                        "storage": "1Gi"
+                    }
+                },
+                "storageClassName": "longhorn",
+                "volumeMode": "Filesystem"
+            },
+            "status": {
+                "phase": "Pending"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

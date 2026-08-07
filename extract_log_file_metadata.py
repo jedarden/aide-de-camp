@@ -158,6 +158,62 @@ def extract_pod_deletion_from_replicaset_data(log_file_path: str, analysis_data:
     return None
 
 
+def extract_pod_metadata(log_file_path: str) -> Dict[str, Optional[str]]:
+    """
+    Extract creation_timestamp, deletion_timestamp, and log_size_bytes from a log file.
+
+    Args:
+        log_file_path: Path to the log file
+
+    Returns:
+        Dictionary with:
+        - creation_timestamp: ISO string from file mtime or first log line
+        - deletion_timestamp: ISO string from deletion indicators in log, or None
+        - log_size_bytes: File size in bytes
+
+    Handles edge cases:
+    - Missing timestamps (returns None)
+    - Malformed files (returns None with graceful error handling)
+    - Missing files (returns None for all fields)
+    """
+    result = {
+        "creation_timestamp": None,
+        "deletion_timestamp": None,
+        "log_size_bytes": None
+    }
+
+    try:
+        # Get file size
+        result["log_size_bytes"] = get_file_size(log_file_path)
+        if result["log_size_bytes"] is None:
+            return result
+
+        # Get creation timestamp from file mtime
+        creation_from_mtime = get_file_mtime(log_file_path)
+        if creation_from_mtime:
+            result["creation_timestamp"] = creation_from_mtime
+
+        # Also try to get creation timestamp from first log line
+        first_log_timestamp = extract_first_log_timestamp(log_file_path)
+        if first_log_timestamp and not result["creation_timestamp"]:
+            result["creation_timestamp"] = first_log_timestamp
+
+        # Get deletion timestamp from log content
+        deletion_from_log = extract_deletion_timestamp_from_log(log_file_path)
+        result["deletion_timestamp"] = deletion_from_log
+
+    except Exception as e:
+        # Handle unexpected errors gracefully
+        print(f"Error processing {log_file_path}: {e}")
+        return {
+            "creation_timestamp": None,
+            "deletion_timestamp": None,
+            "log_size_bytes": None
+        }
+
+    return result
+
+
 def create_unified_record(log_file_path: str, analysis_data: Dict[str, Any]) -> Dict[str, Any]:
     """Create a unified record with all collected fields."""
 

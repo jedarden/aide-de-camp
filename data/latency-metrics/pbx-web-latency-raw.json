@@ -1,0 +1,8 @@
+{
+  "service": "pbx-web",
+  "time_range": {
+    "start": "2026-07-07T00:00:00Z",
+    "end": "2026-08-06T23:59:59Z"
+  },
+  "raw_data": []
+}

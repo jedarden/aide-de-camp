@@ -134,26 +134,29 @@ def extract_timestamps_from_log_content(file_path: str) -> Dict[str, Optional[st
             "deletion_timestamp_from_content": None
         }
 
-def extract_pod_metadata(inventory_file: str, output_file: str) -> None:
+def extract_pod_metadata(inventory_file: str, output_jsonl: str, output_json: str) -> None:
     """
     Extract complete pod metadata from log files and combine with existing inventory.
 
     Args:
         inventory_file: Path to the existing inventory JSON
-        output_file: Path to write the enhanced metadata JSON
+        output_jsonl: Path to write the enhanced metadata as JSONL
+        output_json: Path to write the enhanced metadata as JSON
     """
     # Load existing inventory
     print(f"Loading inventory from {inventory_file}...")
     with open(inventory_file, 'r') as f:
         inventory = json.load(f)
 
-    mappings = inventory.get('mappings', [])
-    total = len(mappings)
+    entries = inventory.get('inventory', [])
+    total = len(entries)
 
     print(f"Processing {total} pod log files...")
 
-    for i, mapping in enumerate(mappings, 1):
-        log_file_path = mapping.get('log_file_path')
+    complete_metadata = []
+
+    for i, entry in enumerate(entries, 1):
+        log_file_path = entry.get('log_file_path')
         if not log_file_path:
             continue
 
@@ -162,9 +165,20 @@ def extract_pod_metadata(inventory_file: str, output_file: str) -> None:
 
         if not os.path.exists(full_path):
             print(f"Warning: File not found: {full_path}")
+            # Add entry with null metadata
+            complete_metadata.append({
+                'pod_name': entry.get('pod_name'),
+                'namespace': entry.get('namespace'),
+                'log_file_path': log_file_path,
+                'analysis_file_path': entry.get('analysis_file_path'),
+                'creation_timestamp': None,
+                'deletion_timestamp': None,
+                'log_size_bytes': 0,
+                'error': 'File not found'
+            })
             continue
 
-        print(f"[{i}/{total}] Processing {log_file_path}...")
+        print(f"[{i}/{total}] Processing {entry.get('pod_name')}...")
 
         # Get file metadata
         file_metadata = get_file_metadata(full_path)
@@ -172,42 +186,58 @@ def extract_pod_metadata(inventory_file: str, output_file: str) -> None:
         # Try to extract timestamps from content
         content_timestamps = extract_timestamps_from_log_content(full_path)
 
-        # Add to mapping
-        mapping['file_creation_timestamp'] = file_metadata['creation_timestamp']
-        mapping['file_modification_timestamp'] = file_metadata['modification_timestamp']
-        mapping['log_size_bytes'] = file_metadata['log_size_bytes']
-        mapping['creation_timestamp_from_content'] = content_timestamps['creation_timestamp_from_content']
-        mapping['deletion_timestamp_from_content'] = content_timestamps['deletion_timestamp_from_content']
+        # Combine all metadata
+        combined_entry = {
+            # Existing fields
+            'pod_name': entry.get('pod_name'),
+            'namespace': entry.get('namespace'),
+            'log_file_path': log_file_path,
+            'analysis_file_path': entry.get('analysis_file_path'),
 
-        # Determine best creation timestamp (prefer content, fall back to file metadata)
-        if content_timestamps['creation_timestamp_from_content']:
-            mapping['creation_timestamp'] = content_timestamps['creation_timestamp_from_content']
-        else:
-            mapping['creation_timestamp'] = file_metadata['creation_timestamp']
+            # Timestamp fields
+            'creation_timestamp': content_timestamps.get('creation_timestamp_from_content') or file_metadata.get('creation_timestamp'),
+            'deletion_timestamp': content_timestamps.get('deletion_timestamp_from_content'),
+            'file_creation_timestamp': file_metadata.get('creation_timestamp'),
+            'file_modification_timestamp': file_metadata.get('modification_timestamp'),
 
-        # Deletion timestamp only from content (if present)
-        mapping['deletion_timestamp'] = content_timestamps['deletion_timestamp_from_content']
+            # Size
+            'log_size_bytes': file_metadata.get('log_size_bytes'),
 
-    # Update summary stats
-    inventory['total_log_files'] = len(mappings)
-    inventory['files_with_creation_timestamp'] = sum(1 for m in mappings if m.get('creation_timestamp'))
-    inventory['files_with_deletion_timestamp'] = sum(1 for m in mappings if m.get('deletion_timestamp'))
+            # Additional metadata
+            'has_analysis': entry.get('has_analysis', False),
+            'collection_source': entry.get('collection_source'),
+        }
 
-    # Write enhanced inventory
-    print(f"\nWriting enhanced metadata to {output_file}...")
-    with open(output_file, 'w') as f:
-        json.dump(inventory, f, indent=2)
+        complete_metadata.append(combined_entry)
 
-    print(f"Done! Processed {total} files.")
-    print(f"  Files with creation timestamp: {inventory['files_with_creation_timestamp']}")
-    print(f"  Files with deletion timestamp: {inventory['files_with_deletion_timestamp']}")
+    # Write JSONL output
+    print(f"\nWriting JSONL to {output_jsonl}...")
+    with open(output_jsonl, 'w') as f:
+        for entry in complete_metadata:
+            f.write(json.dumps(entry) + '\n')
+
+    # Write JSON output
+    print(f"Writing JSON to {output_json}...")
+    with open(output_json, 'w') as f:
+        json.dump(complete_metadata, f, indent=2)
+
+    # Statistics
+    with_creation = sum(1 for m in complete_metadata if m.get('creation_timestamp'))
+    with_deletion = sum(1 for m in complete_metadata if m.get('deletion_timestamp'))
+    total_size = sum(m.get('log_size_bytes', 0) for m in complete_metadata)
+
+    print(f"\nDone! Processed {total} files.")
+    print(f"  Files with creation timestamp: {with_creation} ({with_creation*100//total}%)")
+    print(f"  Files with deletion timestamp: {with_deletion} ({with_deletion*100//total if total > 0 else 0}%)")
+    print(f"  Total size: {total_size:,} bytes ({total_size/1024/1024:.2f} MB)")
 
 def main():
     """Main entry point."""
-    inventory_file = '/home/coding/aide-de-camp/tmp/pod-logs-mapping.json'
-    output_file = '/home/coding/aide-de-camp/tmp/pod-logs-enhanced-metadata.json'
+    inventory_file = '/home/coding/aide-de-camp/tmp/pod-logs-inventory.json'
+    output_jsonl = '/home/coding/aide-de-camp/tmp/pod-metadata-complete.jsonl'
+    output_json = '/home/coding/aide-de-camp/tmp/pod-metadata-complete.json'
 
-    extract_pod_metadata(inventory_file, output_file)
+    extract_pod_metadata(inventory_file, output_jsonl, output_json)
 
 if __name__ == '__main__':
     main()

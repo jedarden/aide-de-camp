@@ -1,0 +1,168 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "action": "Scheduling",
+            "apiVersion": "v1",
+            "eventTime": "2026-08-05T12:46:54.263615Z",
+            "firstTimestamp": null,
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "whisper-openai-68966786fb-tng29",
+                "namespace": "whisper-stt",
+                "resourceVersion": "589386460",
+                "uid": "4994039a-b510-473c-96e3-9d6023aeaf4f"
+            },
+            "kind": "Event",
+            "lastTimestamp": null,
+            "message": "0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.",
+            "metadata": {
+                "creationTimestamp": "2026-08-05T12:46:54Z",
+                "name": "whisper-openai-68966786fb-tng29.18c8e9861078a023",
+                "namespace": "whisper-stt",
+                "resourceVersion": "610933712",
+                "uid": "bc176d11-7017-4cbf-854e-4629e543563f"
+            },
+            "reason": "FailedScheduling",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "default-scheduler-k3s-manager",
+            "series": {
+                "count": 443,
+                "lastObservedTime": "2026-08-07T01:44:58.821162Z"
+            },
+            "source": {},
+            "type": "Warning"
+        },
+        {
+            "action": "Scheduling",
+            "apiVersion": "v1",
+            "eventTime": "2026-08-05T12:46:54.263704Z",
+            "firstTimestamp": null,
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "whisper-stt-847fd8d7b9-b8rsj",
+                "namespace": "whisper-stt",
+                "resourceVersion": "600246760",
+                "uid": "1f420ce7-99a8-404e-99bb-0023815465a1"
+            },
+            "kind": "Event",
+            "lastTimestamp": null,
+            "message": "0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.",
+            "metadata": {
+                "creationTimestamp": "2026-08-05T12:46:54Z",
+                "name": "whisper-stt-847fd8d7b9-b8rsj.18c8e9861079c0eb",
+                "namespace": "whisper-stt",
+                "resourceVersion": "610933708",
+                "uid": "8756482e-de40-4a7e-a79a-a3ff19582d97"
+            },
+            "reason": "FailedScheduling",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "default-scheduler-k3s-manager",
+            "series": {
+                "count": 443,
+                "lastObservedTime": "2026-08-07T01:44:58.821575Z"
+            },
+            "source": {},
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 8901,
+            "eventTime": null,
+            "firstTimestamp": "2026-08-05T12:46:59Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "PersistentVolumeClaim",
+                "name": "whisper-model-cache",
+                "namespace": "whisper-stt",
+                "resourceVersion": "576264051",
+                "uid": "9c83a1e3-2ae1-48c6-8ee8-b5ca87fe5aca"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-08-07T01:52:08Z",
+            "message": "storageclass.storage.k8s.io \"longhorn\" not found",
+            "metadata": {
+                "creationTimestamp": "2026-08-05T12:47:00Z",
+                "name": "whisper-model-cache.18c8e9875a678ffd",
+                "namespace": "whisper-stt",
+                "resourceVersion": "610938067",
+                "uid": "92b6f64f-9b80-4c8e-b6c0-a45d2e271adf"
+            },
+            "reason": "ProvisioningFailed",
+            "reportingComponent": "persistentvolume-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "persistentvolume-controller"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 8901,
+            "eventTime": null,
+            "firstTimestamp": "2026-08-05T12:46:59Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "PersistentVolumeClaim",
+                "name": "whisper-openai-model-cache",
+                "namespace": "whisper-stt",
+                "resourceVersion": "589284075",
+                "uid": "2c46bd55-e982-4893-8cbb-44fc3d61713a"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-08-07T01:52:08Z",
+            "message": "storageclass.storage.k8s.io \"longhorn\" not found",
+            "metadata": {
+                "creationTimestamp": "2026-08-05T12:47:01Z",
+                "name": "whisper-openai-model-cache.18c8e9875a6804f3",
+                "namespace": "whisper-stt",
+                "resourceVersion": "610938069",
+                "uid": "3c3490d7-d868-46b2-b578-a1a151e496c2"
+            },
+            "reason": "ProvisioningFailed",
+            "reportingComponent": "persistentvolume-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "persistentvolume-controller"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 8901,
+            "eventTime": null,
+            "firstTimestamp": "2026-08-05T12:46:59Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "PersistentVolumeClaim",
+                "name": "whisper-stt-jobs",
+                "namespace": "whisper-stt",
+                "resourceVersion": "593674102",
+                "uid": "515bb5bd-8e6c-4f05-b746-77684dac29cc"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-08-07T01:52:08Z",
+            "message": "storageclass.storage.k8s.io \"longhorn\" not found",
+            "metadata": {
+                "creationTimestamp": "2026-08-05T12:47:01Z",
+                "name": "whisper-stt-jobs.18c8e9875a686cef",
+                "namespace": "whisper-stt",
+                "resourceVersion": "610938070",
+                "uid": "4c446c89-b2ab-4c55-9156-61dbe69cb29d"
+            },
+            "reason": "ProvisioningFailed",
+            "reportingComponent": "persistentvolume-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "persistentvolume-controller"
+            },
+            "type": "Warning"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
