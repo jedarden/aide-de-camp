@@ -1,0 +1,213 @@
+=== Sample File Extraction Results ===
+Started at: Fri Aug  7 01:53:43 AM EDT 2026
+
+Processing file 1/10: logs/whisper-stt-raw.jsonl
+
+=== File 1: logs/whisper-stt-raw.jsonl ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .037358655s
+Output:
+{
+  "file_path": "logs/whisper-stt-raw.jsonl",
+  "file_exists": true,
+  "size_bytes": 2856767,
+  "creation_timestamp": "2026-08-06T23:57:28.757170",
+  "modification_timestamp": "2026-08-06T23:57:28.757170",
+  "line_count": 83671,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+Processing file 2/10: logs/pbx-web-victorialogs-raw.jsonl
+
+=== File 2: logs/pbx-web-victorialogs-raw.jsonl ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .068997933s
+Output:
+{
+  "file_path": "logs/pbx-web-victorialogs-raw.jsonl",
+  "file_exists": true,
+  "size_bytes": 78016640,
+  "creation_timestamp": "2026-08-06T12:53:04.393679",
+  "modification_timestamp": "2026-08-06T12:53:04.393679",
+  "line_count": 10000,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+Processing file 3/10: logs/whisper-stt-30day.jsonl
+
+=== File 3: logs/whisper-stt-30day.jsonl ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .019380159s
+Output:
+{
+  "file_path": "logs/whisper-stt-30day.jsonl",
+  "file_exists": true,
+  "size_bytes": 213280,
+  "creation_timestamp": "2026-08-06T17:33:23.667207",
+  "modification_timestamp": "2026-08-06T17:33:23.667207",
+  "line_count": 1027,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+Processing file 4/10: logs/pbx-web-parsed.jsonl
+
+=== File 4: logs/pbx-web-parsed.jsonl ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .025562632s
+Output:
+{
+  "file_path": "logs/pbx-web-parsed.jsonl",
+  "file_exists": true,
+  "size_bytes": 331282,
+  "creation_timestamp": "2026-08-06T16:50:33.263745",
+  "modification_timestamp": "2026-08-06T16:50:33.263745",
+  "line_count": 1438,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+Processing file 5/10: logs/pbx-web-nginx.log
+
+=== File 5: logs/pbx-web-nginx.log ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .020806654s
+Output:
+{
+  "file_path": "logs/pbx-web-nginx.log",
+  "file_exists": true,
+  "size_bytes": 96000,
+  "creation_timestamp": "2026-08-06T12:29:24.092070",
+  "modification_timestamp": "2026-08-06T12:29:24.092070",
+  "line_count": 1000,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+Processing file 6/10: logs/whisper-openai-raw.log
+
+=== File 6: logs/whisper-openai-raw.log ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .031575710s
+Output:
+{
+  "file_path": "logs/whisper-openai-raw.log",
+  "file_exists": true,
+  "size_bytes": 5573013,
+  "creation_timestamp": "2026-08-06T23:02:09.215310",
+  "modification_timestamp": "2026-08-06T23:02:09.215310",
+  "line_count": 96086,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+Processing file 7/10: logs/pbx-web-site-generator.log
+
+=== File 7: logs/pbx-web-site-generator.log ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .021185137s
+Output:
+{
+  "file_path": "logs/pbx-web-site-generator.log",
+  "file_exists": true,
+  "size_bytes": 62833,
+  "creation_timestamp": "2026-08-06T12:29:24.092070",
+  "modification_timestamp": "2026-08-06T12:29:24.092070",
+  "line_count": 2761,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+Processing file 8/10: logs/whisper-stt-deployment-describe.txt
+
+=== File 8: logs/whisper-stt-deployment-describe.txt ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .027207612s
+Output:
+{
+  "file_path": "logs/whisper-stt-deployment-describe.txt",
+  "file_exists": true,
+  "size_bytes": 7560,
+  "creation_timestamp": "2026-08-06T17:30:56.859961",
+  "modification_timestamp": "2026-08-06T17:30:56.859961",
+  "line_count": 164,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+Processing file 9/10: logs/pbx-web-pods-describe.txt
+
+=== File 9: logs/pbx-web-pods-describe.txt ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .025926476s
+Output:
+{
+  "file_path": "logs/pbx-web-pods-describe.txt",
+  "file_exists": true,
+  "size_bytes": 11075,
+  "creation_timestamp": "2026-08-06T12:51:35.370218",
+  "modification_timestamp": "2026-08-06T12:51:35.370218",
+  "line_count": 259,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+Processing file 10/10: logs/whisper-stt-pod-raw.log
+
+=== File 10: logs/whisper-stt-pod-raw.log ===
+Status: SUCCESS
+Exit code: 0
+Execution time: .020353846s
+Output:
+{
+  "file_path": "logs/whisper-stt-pod-raw.log",
+  "file_exists": true,
+  "size_bytes": 0,
+  "creation_timestamp": "2026-08-06T23:02:07.555317",
+  "modification_timestamp": "2026-08-06T23:02:07.555317",
+  "line_count": 0,
+  "first_timestamp": null,
+  "last_timestamp": null,
+  "error": null
+}
+
+
+=== EXTRACTION SUMMARY ===
+Completed at: Fri Aug  7 01:53:44 AM EDT 2026
+
+Total files processed: 10
+Successful extractions: 10
+Failed extractions: 0
+
+=== Successful Files ===
+  ✓ logs/whisper-stt-raw.jsonl (.037358655s)
+  ✓ logs/pbx-web-victorialogs-raw.jsonl (.068997933s)
+  ✓ logs/whisper-stt-30day.jsonl (.019380159s)
+  ✓ logs/pbx-web-parsed.jsonl (.025562632s)
+  ✓ logs/pbx-web-nginx.log (.020806654s)
+  ✓ logs/whisper-openai-raw.log (.031575710s)
+  ✓ logs/pbx-web-site-generator.log (.021185137s)
+  ✓ logs/whisper-stt-deployment-describe.txt (.027207612s)
+  ✓ logs/pbx-web-pods-describe.txt (.025926476s)
+  ✓ logs/whisper-stt-pod-raw.log (.020353846s)
+
