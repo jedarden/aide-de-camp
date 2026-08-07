@@ -916,14 +916,22 @@ class TestMalformedJSONBody:
             headers={"Content-Type": "application/json"}
         )
 
-        # App returns 400 with custom error structure for malformed JSON
+        # App returns 400 with validation error for malformed JSON
         assert response.status_code == 400
 
-        # Verify error response structure matches app's custom handler
+        # Verify error response structure indicates JSON parsing failure
         error_data = response.json()
-        assert error_data.get("error") == "Invalid JSON"
+        assert error_data.get("error") == "Validation failed"
         assert "detail" in error_data
         assert error_data.get("status") == 400
+        assert "errors" in error_data
+
+        # Verify the error specifically mentions JSON decode
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+        json_error = errors[0]
+        assert "JSON decode error" in json_error.get("message", "")
+        assert json_error.get("type") == "json_invalid"
 
     def test_malformed_json_missing_opening_brace(self, test_client):
         """Test that JSON with missing opening brace returns HTTP 400 status code."""
@@ -939,8 +947,16 @@ class TestMalformedJSONBody:
 
         # Verify error response indicates JSON parsing failure
         error_data = response.json()
-        assert error_data.get("error") == "Invalid JSON"
+        assert error_data.get("error") == "Validation failed"
         assert "detail" in error_data
+        assert "errors" in error_data
+
+        # Verify the error specifically mentions JSON decode
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+        json_error = errors[0]
+        assert "JSON decode error" in json_error.get("message", "")
+        assert json_error.get("type") == "json_invalid"
         assert "JSON" in error_data.get("detail", "")
 
     def test_malformed_json_unquoted_keys(self, test_client):
@@ -957,8 +973,16 @@ class TestMalformedJSONBody:
 
         # Verify error response indicates JSON parsing failure
         error_data = response.json()
-        assert error_data.get("error") == "Invalid JSON"
+        assert error_data.get("error") == "Validation failed"
         assert "detail" in error_data
+        assert "errors" in error_data
+
+        # Verify the error specifically mentions JSON decode
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+        json_error = errors[0]
+        assert "JSON decode error" in json_error.get("message", "")
+        assert json_error.get("type") == "json_invalid"
 
     def test_malformed_json_trailing_comma(self, test_client):
         """Test that JSON with trailing comma returns HTTP 400 status code."""
@@ -991,8 +1015,16 @@ class TestMalformedJSONBody:
 
         # Verify error response indicates JSON parsing failure
         error_data = response.json()
-        assert error_data.get("error") == "Invalid JSON"
+        assert error_data.get("error") == "Validation failed"
         assert "detail" in error_data
+        assert "errors" in error_data
+
+        # Verify the error specifically mentions JSON decode
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+        json_error = errors[0]
+        assert "JSON decode error" in json_error.get("message", "")
+        assert json_error.get("type") == "json_invalid"
 
     def test_malformed_json_invalid_escape_sequence(self, test_client):
         """Test that JSON with invalid escape sequence returns HTTP 400 status code."""
@@ -1008,8 +1040,16 @@ class TestMalformedJSONBody:
 
         # Verify error response indicates JSON parsing failure
         error_data = response.json()
-        assert error_data.get("error") == "Invalid JSON"
+        assert error_data.get("error") == "Validation failed"
         assert "detail" in error_data
+        assert "errors" in error_data
+
+        # Verify the error specifically mentions JSON decode
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+        json_error = errors[0]
+        assert "JSON decode error" in json_error.get("message", "")
+        assert json_error.get("type") == "json_invalid"
 
     def test_malformed_json_error_message_indicates_parse_failure(self, test_client):
         """Test that malformed JSON error message indicates JSON parsing failure."""
@@ -1024,14 +1064,19 @@ class TestMalformedJSONBody:
         assert response.status_code == 400
 
         error_data = response.json()
-        error_detail = error_data.get("detail", "")
 
-        # Error message should reference JSON parsing or invalid format
-        assert len(error_detail) > 0
-        # App's custom handler includes "Malformed JSON:" prefix
-        error_lower = error_detail.lower()
-        assert "json" in error_lower or "malformed" in error_lower or "invalid" in error_lower
-        assert error_data.get("error") == "Invalid JSON"
+        # Verify error response structure
+        assert error_data.get("error") == "Validation failed"
+        assert "detail" in error_data
+        assert "errors" in error_data
+
+        # Verify the error specifically mentions JSON decode
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+        json_error = errors[0]
+        error_msg = json_error.get("message", "")
+        assert "JSON decode error" in error_msg or "json" in error_msg.lower()
+        assert json_error.get("type") == "json_invalid"
 
     def test_malformed_json_with_missing_colon(self, test_client):
         """Test that JSON with missing colon returns HTTP 400 status code."""
@@ -1079,13 +1124,21 @@ class TestMalformedJSONBody:
 
         # Verify error response indicates JSON parsing failure
         error_data = response.json()
-        assert error_data.get("error") == "Invalid JSON"
+        assert error_data.get("error") == "Validation failed"
         assert "detail" in error_data
+        assert "errors" in error_data
+
+        # Verify the error specifically mentions JSON decode
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+        json_error = errors[0]
+        assert "JSON decode error" in json_error.get("message", "")
+        assert json_error.get("type") == "json_invalid"
         error_detail = error_data.get("detail", "")
         assert len(error_detail) > 0
 
     def test_malformed_json_includes_position_info(self, test_client):
-        """Test that malformed JSON error includes line and column information."""
+        """Test that malformed JSON error includes position information in field path."""
         malformed_json = '{"utterance": "Check CI status", "session_id": "session-123"'
 
         response = test_client.post(
@@ -1097,12 +1150,16 @@ class TestMalformedJSONBody:
         assert response.status_code == 400
 
         error_data = response.json()
-        # App's custom handler includes line and column info
-        assert "line" in error_data
-        assert "column" in error_data
-        # Line and column should be positive integers
-        assert error_data.get("line", 0) > 0
-        assert error_data.get("column", 0) > 0
+        # App's validation handler includes position info in the field path
+        assert "errors" in error_data
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+
+        # Position information is included in the field path (e.g., "body -> 89")
+        field_path = errors[0].get("field", "")
+        assert "->" in field_path  # Indicates position information
+        # Field path should contain numeric position
+        assert any(c.isdigit() for c in field_path)
 
     def test_malformed_json_error_structure(self, test_client):
         """Test that malformed JSON error has consistent structure."""
@@ -1121,12 +1178,52 @@ class TestMalformedJSONBody:
         assert "error" in error_data
         assert "detail" in error_data
         assert "status" in error_data
-        assert "line" in error_data
-        assert "column" in error_data
+        assert "errors" in error_data
 
         # Verify field values
-        assert error_data["error"] == "Invalid JSON"
+        assert error_data["error"] == "Validation failed"
         assert error_data["status"] == 400
         assert len(error_data["detail"]) > 0
-        assert isinstance(error_data["line"], int)
-        assert isinstance(error_data["column"], int)
+        assert isinstance(error_data["errors"], list)
+        assert len(error_data["errors"]) > 0
+
+        # Verify error structure
+        json_error = error_data["errors"][0]
+        assert "field" in json_error
+        assert "message" in json_error
+        assert "type" in json_error
+        assert json_error["type"] == "json_invalid"
+
+    def test_malformed_json_simple_missing_closing_brace(self, test_client):
+        """Test that simple JSON with missing closing brace returns HTTP 400 status code.
+
+        This tests the specific pattern: {"utterance": "test" (missing closing })
+        Focuses on one specific JSON syntax error pattern with minimal fields.
+        """
+        malformed_json = '{"utterance": "test"'
+
+        response = test_client.post(
+            "/dispatch",
+            content=malformed_json,
+            headers={"Content-Type": "application/json"}
+        )
+
+        # Verify error status is returned
+        assert response.status_code == 400
+
+        # Verify error message indicates JSON parsing failure
+        error_data = response.json()
+        assert error_data.get("error") == "Validation failed"
+        assert "detail" in error_data
+        assert "errors" in error_data
+
+        # Verify the error specifically mentions JSON decode
+        errors = error_data.get("errors", [])
+        assert len(errors) > 0
+        json_error = errors[0]
+        error_msg = json_error.get("message", "")
+        assert "JSON decode error" in error_msg or "json" in error_msg.lower()
+        assert json_error.get("type") == "json_invalid"
+
+        # Verify error status is included
+        assert error_data.get("status") == 400
