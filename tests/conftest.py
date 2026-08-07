@@ -101,6 +101,25 @@ async def async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
 
 
 @pytest.fixture(scope="function")
+def test_client():
+    """Create a FastAPI TestClient for testing endpoints.
+
+    This fixture provides a TestClient for testing FastAPI endpoints
+    without needing to start a server. It's suitable for unit tests and
+    integration tests that don't require the full server infrastructure.
+
+    Usage in tests:
+        def test_dispatch_validation(test_client):
+            response = test_client.post("/dispatch", json={...})
+            assert response.status_code == 400
+    """
+    from fastapi.testclient import TestClient
+    from src.main import app
+
+    return TestClient(app)
+
+
+@pytest.fixture(scope="function")
 async def event_loop():
     """Create event loop for async tests."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
