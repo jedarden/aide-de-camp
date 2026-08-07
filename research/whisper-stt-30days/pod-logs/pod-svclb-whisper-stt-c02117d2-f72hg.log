@@ -1,0 +1,5 @@
+E0806 21:46:35.594302  313383 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"http://traefik-ardenone-manager:8000/api?timeout=32s\": dial tcp 100.101.205.34:8000: i/o timeout"
+E0806 21:47:05.595619  313383 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"http://traefik-ardenone-manager:8000/api?timeout=32s\": dial tcp 100.101.205.34:8000: i/o timeout"
+E0806 21:47:35.596826  313383 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"http://traefik-ardenone-manager:8000/api?timeout=32s\": dial tcp 100.101.205.34:8000: i/o timeout"
+E0806 21:48:05.597391  313383 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"http://traefik-ardenone-manager:8000/api?timeout=32s\": dial tcp 100.101.205.34:8000: i/o timeout"
+Unable to connect to the server: dial tcp 100.101.205.34:8000: i/o timeout
