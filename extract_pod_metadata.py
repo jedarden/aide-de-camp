@@ -1,263 +1,213 @@
 #!/usr/bin/env python3
 """
-Extract pod metadata from log files.
-
-This script reads the existing pod-logs-index.jsonl and enhances it with
-additional metadata extracted from the log files themselves, including:
-- creation_timestamp (from file metadata or first log entry)
-- deletion_timestamp (null unless explicitly found)
-- log_size_bytes (verified from file stats)
+Extract pod metadata from log files including timestamps and file size.
+Combines with existing inventory data to create comprehensive metadata.
 """
 
 import json
-import re
+import os
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Optional, Tuple
+from typing import Optional, Dict, Any
 
+def get_file_metadata(file_path: str) -> Dict[str, Optional[str]]:
+    """
+    Extract file metadata including creation and modification timestamps.
 
-# Timestamp patterns found in log files
-TIMESTAMP_PATTERNS = [
-    # ISO 8601 with timezone (like 2026-08-03T17:03:54.634456037-04:00)
-    r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z))',
-    # Common log format (like [03/Aug/2026:21:03:54 +0000])
-    r'\[(\d{2}/\w{3}/\d{4}:\d{2}:\d{2}:\d{2}\s[+-]\d{4})\]',
-    # Simple ISO (like 2026-08-03 17:03:54)
-    r'^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})',
-    # Syslog format (like Aug  3 17:03:54)
-    r'^(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})',
-]
+    Args:
+        file_path: Path to the log file
 
+    Returns:
+        Dict with creation_timestamp, modification_timestamp, and log_size_bytes
+    """
+    try:
+        stat = os.stat(file_path)
 
-def parse_timestamp(ts_string: str) -> Optional[datetime]:
-    """Parse a timestamp string into a datetime object."""
-    if not ts_string:
-        return None
+        # Get modification time (always available on Unix)
+        mod_time = datetime.fromtimestamp(stat.st_mtime).isoformat()
 
-    # Try different datetime formats
-    formats = [
-        '%Y-%m-%dT%H:%M:%S.%f%z',  # ISO 8601 with microseconds and timezone
-        '%Y-%m-%dT%H:%M:%S%z',     # ISO 8601 with timezone
-        '%Y-%m-%dT%H:%M:%S.%f',    # ISO 8601 with microseconds, no timezone
-        '%Y-%m-%dT%H:%M:%S',       # ISO 8601, no timezone
-        '%Y-%m-%d %H:%M:%S',       # Simple date time
-        '%d/%b/%Y:%H:%M:%S %z',    # Common log format
-        '%b %d %H:%M:%S',          # Syslog format (no year)
-    ]
+        # Get birth time (creation time) - available on some Unix systems
+        # Fall back to modification time if not available
+        if hasattr(stat, 'st_birthtime'):
+            creation_time = datetime.fromtimestamp(stat.st_birthtime).isoformat()
+        else:
+            # On Linux, st_birthtime is not available; use modification time as fallback
+            creation_time = mod_time
 
-    for fmt in formats:
-        try:
-            return datetime.strptime(ts_string, fmt)
-        except (ValueError, TypeError):
+        # Get file size
+        file_size = stat.st_size
+
+        return {
+            "creation_timestamp": creation_time,
+            "modification_timestamp": mod_time,
+            "log_size_bytes": file_size
+        }
+    except Exception as e:
+        print(f"Error getting metadata for {file_path}: {e}")
+        return {
+            "creation_timestamp": None,
+            "modification_timestamp": None,
+            "log_size_bytes": None
+        }
+
+def extract_timestamps_from_log_content(file_path: str) -> Dict[str, Optional[str]]:
+    """
+    Try to extract creation and deletion timestamps from log file content.
+
+    This looks for Kubernetes pod lifecycle events in the logs.
+
+    Args:
+        file_path: Path to the log file
+
+    Returns:
+        Dict with creation_timestamp and deletion_timestamp if found
+    """
+    try:
+        with open(file_path, 'r', errors='ignore') as f:
+            # Read first 100 lines to find creation timestamp
+            first_lines = []
+            for i, line in enumerate(f):
+                if i >= 100:
+                    break
+                first_lines.append(line.strip())
+
+        # Reset and read last 100 lines to find deletion timestamp
+        with open(file_path, 'r', errors='ignore') as f:
+            # Read all lines and take last 100
+            all_lines = f.readlines()
+            last_lines = [line.strip() for line in all_lines[-100:]]
+
+        # Look for common patterns in pod logs
+        # These are heuristic - actual format varies by application
+        creation_ts = None
+        deletion_ts = None
+
+        # Patterns that might indicate timestamps
+        timestamp_patterns = [
+            r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}',  # ISO format
+            r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',  # Space-separated
+            r'\w{3} \d{1,2} \d{2}:\d{2}:\d{2}',       # Syslog format
+        ]
+
+        # Try to extract first timestamp as creation hint
+        for line in first_lines[:20]:  # Check first 20 lines
+            # Simple extraction - look for ISO-like timestamps
+            if 'T' in line and len(line) > 10:
+                parts = line.split('T')
+                if len(parts) >= 2:
+                    date_part = parts[0].split()[-1]  # Get last part before T
+                    time_part = parts[1].split()[0]   # Get first part after T
+                    if len(date_part) == 10 and len(time_part) >= 8:
+                        try:
+                            # Try to parse as ISO timestamp
+                            potential_ts = f"{date_part}T{time_part[:8]}"
+                            datetime.fromisoformat(potential_ts.replace('Z', '+00:00'))
+                            creation_ts = potential_ts
+                            break
+                        except:
+                            continue
+
+        # Try to extract last timestamp as deletion hint
+        for line in reversed(last_lines[-20:]):  # Check last 20 lines
+            if 'T' in line and len(line) > 10:
+                parts = line.split('T')
+                if len(parts) >= 2:
+                    date_part = parts[0].split()[-1]
+                    time_part = parts[1].split()[0]
+                    if len(date_part) == 10 and len(time_part) >= 8:
+                        try:
+                            potential_ts = f"{date_part}T{time_part[:8]}"
+                            datetime.fromisoformat(potential_ts.replace('Z', '+00:00'))
+                            deletion_ts = potential_ts
+                            break
+                        except:
+                            continue
+
+        return {
+            "creation_timestamp_from_content": creation_ts,
+            "deletion_timestamp_from_content": deletion_ts
+        }
+    except Exception as e:
+        print(f"Error extracting timestamps from {file_path}: {e}")
+        return {
+            "creation_timestamp_from_content": None,
+            "deletion_timestamp_from_content": None
+        }
+
+def extract_pod_metadata(inventory_file: str, output_file: str) -> None:
+    """
+    Extract complete pod metadata from log files and combine with existing inventory.
+
+    Args:
+        inventory_file: Path to the existing inventory JSON
+        output_file: Path to write the enhanced metadata JSON
+    """
+    # Load existing inventory
+    print(f"Loading inventory from {inventory_file}...")
+    with open(inventory_file, 'r') as f:
+        inventory = json.load(f)
+
+    mappings = inventory.get('mappings', [])
+    total = len(mappings)
+
+    print(f"Processing {total} pod log files...")
+
+    for i, mapping in enumerate(mappings, 1):
+        log_file_path = mapping.get('log_file_path')
+        if not log_file_path:
             continue
 
-    return None
+        # Convert relative path to absolute
+        full_path = os.path.join('/home/coding/aide-de-camp', log_file_path)
 
+        if not os.path.exists(full_path):
+            print(f"Warning: File not found: {full_path}")
+            continue
 
-def extract_timestamps_from_log(log_path: Path) -> Tuple[Optional[datetime], Optional[datetime]]:
-    """
-    Extract first and last timestamps from a log file.
+        print(f"[{i}/{total}] Processing {log_file_path}...")
 
-    Returns:
-        Tuple of (first_timestamp, last_timestamp) as datetime objects or None
-    """
-    if not log_path.exists() or log_path.stat().st_size == 0:
-        return None, None
+        # Get file metadata
+        file_metadata = get_file_metadata(full_path)
 
-    first_ts = None
-    last_ts = None
+        # Try to extract timestamps from content
+        content_timestamps = extract_timestamps_from_log_content(full_path)
 
-    try:
-        with open(log_path, 'r', errors='ignore') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
+        # Add to mapping
+        mapping['file_creation_timestamp'] = file_metadata['creation_timestamp']
+        mapping['file_modification_timestamp'] = file_metadata['modification_timestamp']
+        mapping['log_size_bytes'] = file_metadata['log_size_bytes']
+        mapping['creation_timestamp_from_content'] = content_timestamps['creation_timestamp_from_content']
+        mapping['deletion_timestamp_from_content'] = content_timestamps['deletion_timestamp_from_content']
 
-                # Try each timestamp pattern
-                for pattern in TIMESTAMP_PATTERNS:
-                    match = re.search(pattern, line)
-                    if match:
-                        ts_str = match.group(1)
-                        parsed_ts = parse_timestamp(ts_str)
-                        if parsed_ts:
-                            if first_ts is None:
-                                first_ts = parsed_ts
-                            last_ts = parsed_ts
-                            break  # Found a timestamp in this line, move to next line
-                if first_ts is not None:
-                    break  # Found first timestamp, can stop scanning for first
-
-        # If we found first timestamp, scan entire file for last timestamp
-        if first_ts is not None:
-            with open(log_path, 'r', errors='ignore') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-
-                    for pattern in TIMESTAMP_PATTERNS:
-                        match = re.search(pattern, line)
-                        if match:
-                            ts_str = match.group(1)
-                            parsed_ts = parse_timestamp(ts_str)
-                            if parsed_ts:
-                                last_ts = parsed_ts
-                                break
-    except Exception as e:
-        print(f"  Error reading {log_path}: {e}")
-
-    return first_ts, last_ts
-
-
-def get_file_metadata(log_path: Path) -> Dict:
-    """
-    Get file metadata including timestamps and size.
-
-    Returns:
-        Dict with creation_timestamp, deletion_timestamp, and log_size_bytes
-    """
-    metadata = {
-        'creation_timestamp': None,
-        'deletion_timestamp': None,
-        'log_size_bytes': 0
-    }
-
-    if not log_path.exists():
-        return metadata
-
-    try:
-        stat_info = log_path.stat()
-        metadata['log_size_bytes'] = stat_info.st_size
-
-        # Use birth time (creation time) as creation_timestamp
-        # Convert to ISO 8601 format
-        if hasattr(stat_info, 'st_birthtime'):
-            birth_time = datetime.fromtimestamp(stat_info.st_birthtime)
-            metadata['creation_timestamp'] = birth_time.isoformat()
+        # Determine best creation timestamp (prefer content, fall back to file metadata)
+        if content_timestamps['creation_timestamp_from_content']:
+            mapping['creation_timestamp'] = content_timestamps['creation_timestamp_from_content']
         else:
-            # Fallback to ctime (metadata change time) on systems without birthtime
-            birth_time = datetime.fromtimestamp(stat_info.st_ctime)
-            metadata['creation_timestamp'] = birth_time.isoformat()
+            mapping['creation_timestamp'] = file_metadata['creation_timestamp']
 
-        # Also extract timestamps from log content for better accuracy
-        first_ts, last_ts = extract_timestamps_from_log(log_path)
+        # Deletion timestamp only from content (if present)
+        mapping['deletion_timestamp'] = content_timestamps['deletion_timestamp_from_content']
 
-        # Use log timestamp if available and more recent than file birth
-        if first_ts:
-            log_first_ts = first_ts.isoformat()
-            # Prefer log timestamp if file birth time is not available
-            if not metadata['creation_timestamp']:
-                metadata['creation_timestamp'] = log_first_ts
-            # Could also compare and use the more accurate one, but file birth is fine
+    # Update summary stats
+    inventory['total_log_files'] = len(mappings)
+    inventory['files_with_creation_timestamp'] = sum(1 for m in mappings if m.get('creation_timestamp'))
+    inventory['files_with_deletion_timestamp'] = sum(1 for m in mappings if m.get('deletion_timestamp'))
 
-        # deletion_timestamp stays null unless there's explicit deletion info
-        # (not typically found in log files)
+    # Write enhanced inventory
+    print(f"\nWriting enhanced metadata to {output_file}...")
+    with open(output_file, 'w') as f:
+        json.dump(inventory, f, indent=2)
 
-    except Exception as e:
-        print(f"  Error getting metadata for {log_path}: {e}")
-
-    return metadata
-
-
-def update_index_with_metadata(index_file: Path, repo_root: Path):
-    """
-    Update the pod-logs-index.jsonl with extracted metadata.
-    """
-    if not index_file.exists():
-        print(f"Error: Index file {index_file} does not exist")
-        return
-
-    # Read existing index
-    updated_entries = []
-    missing_files = []
-    updated_count = 0
-
-    print(f"Reading index from: {index_file}")
-
-    with open(index_file, 'r') as f:
-        for line_num, line in enumerate(f, 1):
-            if not line.strip():
-                continue
-
-            try:
-                entry = json.loads(line)
-
-                # Get log file path
-                log_file_rel = entry.get('log_file_metadata', {}).get('log_file_path')
-                if not log_file_rel:
-                    print(f"  Line {line_num}: Missing log_file_path")
-                    updated_entries.append(entry)
-                    continue
-
-                # Resolve full path
-                log_file_abs = repo_root / log_file_rel
-
-                if not log_file_abs.exists():
-                    missing_files.append(log_file_rel)
-                    print(f"  Line {line_num}: File not found: {log_file_rel}")
-                    updated_entries.append(entry)
-                    continue
-
-                # Extract metadata from log file
-                file_metadata = get_file_metadata(log_file_abs)
-
-                # Update entry if metadata was missing or different
-                needs_update = False
-                pod_id = entry.get('pod_identification', {})
-
-                if not pod_id.get('creation_timestamp') and file_metadata['creation_timestamp']:
-                    pod_id['creation_timestamp'] = file_metadata['creation_timestamp']
-                    needs_update = True
-
-                # deletion_timestamp is typically null, so we don't overwrite it
-                # log_size_bytes might already be set, but we verify it
-                log_metadata = entry.get('log_file_metadata', {})
-                if log_metadata.get('log_size_bytes') != file_metadata['log_size_bytes']:
-                    log_metadata['log_size_bytes'] = file_metadata['log_size_bytes']
-                    needs_update = True
-
-                if needs_update:
-                    updated_count += 1
-
-                entry['pod_identification'] = pod_id
-                entry['log_file_metadata'] = log_metadata
-                updated_entries.append(entry)
-
-            except json.JSONDecodeError as e:
-                print(f"  Line {line_num}: JSON decode error: {e}")
-                continue
-            except Exception as e:
-                print(f"  Line {line_num}: Error processing entry: {e}")
-                continue
-
-    # Write updated index
-    print(f"\nWriting updated index to: {index_file}")
-    with open(index_file, 'w') as f:
-        for entry in updated_entries:
-            f.write(json.dumps(entry) + '\n')
-
-    print(f"Updated {updated_count} entries")
-    if missing_files:
-        print(f"Warning: {len(missing_files)} log files were not found:")
-        for mf in missing_files[:5]:  # Show first 5
-            print(f"  - {mf}")
-        if len(missing_files) > 5:
-            print(f"  ... and {len(missing_files) - 5} more")
-
+    print(f"Done! Processed {total} files.")
+    print(f"  Files with creation timestamp: {inventory['files_with_creation_timestamp']}")
+    print(f"  Files with deletion timestamp: {inventory['files_with_deletion_timestamp']}")
 
 def main():
-    """Main function."""
-    repo_root = Path('/home/coding/aide-de-camp')
-    index_file = repo_root / 'pod-logs-index.jsonl'
+    """Main entry point."""
+    inventory_file = '/home/coding/aide-de-camp/tmp/pod-logs-mapping.json'
+    output_file = '/home/coding/aide-de-camp/tmp/pod-logs-enhanced-metadata.json'
 
-    print("Extracting Pod Metadata from Log Files")
-    print("=" * 50)
-
-    update_index_with_metadata(index_file, repo_root)
-
-    print("\nDone!")
-
+    extract_pod_metadata(inventory_file, output_file)
 
 if __name__ == '__main__':
     main()
