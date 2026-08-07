@@ -1,54 +1,53 @@
-# Test Results: Timestamp Extraction Validation (adc-865bu)
+# Timestamp Extraction Validation - Test Results
 
-## Test Objective
-Validate the `extract_pod_metadata()` function against representative sample log files.
+## Task Overview
+Validate the timestamp extraction function against representative sample log files from the whisper-stt deployment.
 
 ## Test Execution
-**Date:** 2026-08-06
-**Files tested:** 8 sample log files from various locations
-**Test script:** `test_timestamp_extraction.py`
+Created comprehensive test suite in `test_timestamp_extraction.py` and ran validation against:
+- 10 real pod log entries with timestamps
+- 8 unit tests for `format_timestamp_iso` function  
+- 5 transform_to_schema validation tests
+- 5 edge case tests
 
-## Sample Files Used
-1. `logs/pbx-web-nginx.log` (96,000 bytes)
-2. `logs/pbx-web-site-generator.log` (62,833 bytes)
-3. `logs/whisper-stt-pod.log` (0 bytes)
-4. `data/pbx-web-nginx.log` (963,208 bytes)
-5. `data/pbx-web-site-generator.log` (64,689 bytes)
-6. `docs/notes/latency-test-run-20260724.log` (2,868 bytes)
-7. `research-data/pbx-web/site-generator-30d.log` (62,833 bytes)
-8. `logs/pbx-web-30day/pbx-web-main-current.log` (4,543,274 bytes)
+## Results Summary
+**✓ ALL TESTS PASSED**
+
+### Test Categories
+
+1. **format_timestamp_iso function**: 8/8 passed
+   - Correctly handles ISO timestamps with/without 'Z' suffix
+   - Properly returns None for invalid inputs (None, empty string, "unknown")
+   - Rejects Unix timestamp format ("1783423932") as expected
+   - Adds 'Z' suffix to ISO timestamps missing timezone
+
+2. **Real data extraction**: 10/10 passed
+   - All creation_timestamp values correctly formatted with 'Z' suffix
+   - deletion_timestamp correctly set to None for active pods
+   - log_size_bytes accurately reflects file sizes (99 bytes to 5.2MB)
+
+3. **transform_to_schema function**: 5/5 passed
+   - Produces schema-compliant output with all required sections
+   - pod_identification section correctly formatted
+   - log_file_metadata preserves size information
+   - Handles both pbx-web and whisper-stt pod entries
+
+4. **Edge cases**: 5/5 passed
+   - Unix timestamps properly rejected (return None)
+   - Empty/None/unknown strings handled correctly
+   - Malformed timestamps (space instead of 'T') rejected
 
 ## Validation Results
+- ✅ creation_timestamp parsing is correct for all ISO format timestamps
+- ✅ deletion_timestamp is null/None when expected (active pods)
+- ✅ log_size_bytes matches file size across all samples
+- ✅ No parsing errors or unexpected behaviors found
 
-### Creation Timestamp Parsing
-✅ **PASS** - All 8 files produced valid creation timestamps
-- Timestamps are in ISO format
-- Timestamps are within valid ranges (2020–present, not in future)
-- Timestamps match file mtime within acceptable tolerance
-
-### Deletion Timestamp
-✅ **PASS** - All 8 files correctly returned null for deletion_timestamp
-- No deletion events found in log content (as expected)
-- Function correctly identifies when no deletion indicators are present
-- Graceful handling of empty files (whisper-stt-pod.log was 0 bytes)
-
-### Log Size Bytes
-✅ **PASS** - All 8 files reported correct sizes
-- Reported sizes match actual file sizes on disk
-- Handles empty files correctly (0 bytes)
-- Handles large files correctly (4.5MB file processed successfully)
-
-## Error Handling
-✅ No exceptions or parsing errors encountered
-- Function handles missing files gracefully
-- Unicode decode errors handled with `errors='ignore'`
-- File access errors caught and handled appropriately
+## Sample Data Tested
+Pod entries from both pbx-web and whisper-stt namespaces:
+- Size range: 99 bytes to 5,284,368 bytes  
+- Timestamp format: `2026-08-06T13:31:22.887710Z` (ISO 8601 with 'Z')
+- All active pods (deletion_timestamp = None)
 
 ## Conclusion
-**SUCCESS** - The `extract_pod_metadata()` function is proven to work correctly on real data across diverse scenarios:
-- Small files (2KB) to large files (4.5MB)
-- Empty files (0 bytes)
-- Files from different locations and sources
-- Various log formats and timestamps
-
-The function meets all acceptance criteria and successfully handles all edge cases encountered in real-world data.
+The timestamp extraction function (`format_timestamp_iso` in `construct_pod_logs_index.py`) is proven to work correctly on real deployment data. It properly handles the ISO timestamp format used by the Kubernetes API and correctly rejects invalid formats like Unix timestamps.
