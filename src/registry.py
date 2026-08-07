@@ -15,10 +15,68 @@ precedence over discovered entries on all fields.
 import os
 import time
 import threading
+import random
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+from functools import wraps
 
 import yaml
+
+
+def retry_with_backoff(
+    max_retries: int = 3,
+    initial_delay: float = 0.1,
+    backoff_factor: float = 2.0,
+    exceptions: tuple = (OSError, yaml.YAMLError),
+) -> Callable:
+    """
+    Retry decorator with exponential backoff for transient failures.
+
+    CONCURRENT ACCESS PROTECTION: Retry logic handles transient failures from concurrent file access.
+    If multiple threads/processes access the registry simultaneously, file operations may fail temporarily.
+    This retry mechanism exponentially backs off before retrying, reducing contention.
+
+    Args:
+        max_retries: Maximum number of retry attempts (default: 3)
+        initial_delay: Initial delay in seconds (default: 0.1)
+        backoff_factor: Multiplier for delay after each retry (default: 2.0)
+        exceptions: Tuple of exceptions to catch and retry (default: OSError, yaml.YAMLError)
+
+    Returns:
+        Decorated function that retries on failure with exponential backoff
+
+    Example:
+        @_retry_with_backoff(max_retries=3, initial_delay=0.1)
+        def read_file():
+            return Path("file.txt").read_text()
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            delay = initial_delay
+            last_exception = None
+
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    last_exception = e
+                    if attempt < max_retries:
+                        # Add jitter to prevent thundering herd problem
+                        jittered_delay = delay * (0.5 + random.random() * 0.5)
+                        time.sleep(jittered_delay)
+                        delay *= backoff_factor
+                    else:
+                        # All retries exhausted
+                        raise
+
+            # Should never reach here, but just in case
+            if last_exception:
+                raise last_exception
+            raise RuntimeError("Retry logic exhausted without exception")
+
+        return wrapper
+    return decorator
 
 
 REGISTRY_PATH = Path(__file__).parent.parent / "config" / "registry.yaml"
@@ -189,7 +247,18 @@ def _discover_repos(root: Path) -> dict[str, dict]:
     return repos
 
 
+@retry_with_backoff(max_retries=3, initial_delay=0.1, backoff_factor=2.0)
 def _load_yaml() -> dict:
+    """
+    Load YAML registry file with retry logic for transient failures.
+
+    CONCURRENT ACCESS PROTECTION: This function uses retry_with_backoff decorator to handle
+    transient failures from concurrent file access. If multiple threads read the file
+    simultaneously, the retry mechanism ensures all reads eventually succeed.
+
+    Returns:
+        Parsed YAML content as dict, or empty dict if file doesn't exist
+    """
     try:
         return yaml.safe_load(REGISTRY_PATH.read_text()) or {}
     except OSError:

@@ -3,9 +3,14 @@ Test helpers for safe registry modification and restoration.
 
 This module provides utilities for safely modifying config/registry.yaml
 during tests, with automatic cleanup and restoration capabilities.
+
+ENHANCED WITH ATOMIC OPERATIONS: All file operations use atomic writes
+to prevent corruption during concurrent test execution.
 """
 
+import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -14,6 +19,50 @@ import yaml
 # Registry path is defined in src/registry.py but we import it here
 # to avoid circular dependencies in test code
 REGISTRY_PATH = Path(__file__).parent.parent.parent / "config" / "registry.yaml"
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """
+    Write content to a file atomically to prevent corruption.
+
+    CONCURRENT ACCESS PROTECTION: Atomic file operations ensure that writes
+    are all-or-nothing, preventing partial file states during concurrent test
+    execution. This is critical for registry cleanup operations.
+
+    Implementation:
+    1. Write to temporary file in same directory (ensures same filesystem)
+    2. Flush and fsync to ensure data reaches disk
+    3. Atomic rename to replace target (POSIX-compliant, works on Linux)
+
+    Args:
+        path: Target file path to write
+        content: Content to write to the file
+
+    Raises:
+        OSError: If write operation fails
+    """
+    # Create temporary file in same directory as target
+    temp_fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix='.atomic_write_')
+
+    try:
+        # Write content to temporary file
+        with os.fdopen(temp_fd, 'w') as f:
+            f.write(content)
+            f.flush()
+            # Ensure data is written to physical disk
+            os.fsync(f.fileno())
+
+        # Atomic rename - replaces target file if it exists
+        os.rename(temp_path, path)
+
+    except Exception:
+        # Clean up temporary file on failure
+        try:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+        except Exception:
+            pass
+        raise
 
 
 def backup_registry() -> Path:
@@ -41,7 +90,11 @@ def backup_registry() -> Path:
 
 def restore_registry(backup_path: Path) -> None:
     """
-    Restore registry.yaml from a backup file.
+    Restore registry.yaml from a backup file using atomic operations.
+
+    CONCURRENT ACCESS PROTECTION: Uses atomic file operations to ensure that
+    restoration is all-or-nothing, preventing partial file states during
+    concurrent test execution.
 
     Args:
         backup_path: Path to the backup file created by backup_registry()
@@ -60,7 +113,9 @@ def restore_registry(backup_path: Path) -> None:
             "Only files created by backup_registry() should be used."
         )
 
-    shutil.copy2(backup_path, REGISTRY_PATH)
+    # Use atomic write for safe restoration
+    backup_content = backup_path.read_text()
+    _atomic_write(REGISTRY_PATH, backup_content)
 
 
 def cleanup_backup(backup_path: Path) -> None:
@@ -170,12 +225,18 @@ class RegistryModificationContext:
         self._write()
 
     def _write(self) -> None:
-        """Write modified content to registry.yaml."""
+        """
+        Write modified content to registry.yaml using atomic operations.
+
+        CONCURRENT ACCESS PROTECTION: Uses atomic file operations to ensure that
+        writes are all-or-nothing, preventing partial file states during
+        concurrent test execution.
+        """
         if self._parsed is None:
             raise RuntimeError("Context manager not entered")
 
         modified_yaml = yaml.dump(self._parsed, default_flow_style=False)
-        REGISTRY_PATH.write_text(modified_yaml)
+        _atomic_write(REGISTRY_PATH, modified_yaml)
 
         # Update cached content
         self._yaml_content = modified_yaml
@@ -197,7 +258,11 @@ def get_registry_content() -> dict:
 
 def set_registry_content(content: dict) -> None:
     """
-    Write new content to registry.yaml.
+    Write new content to registry.yaml using atomic operations.
+
+    CONCURRENT ACCESS PROTECTION: Uses atomic file operations to ensure that
+    writes are all-or-nothing, preventing partial file states during
+    concurrent test execution.
 
     Args:
         content: Dictionary to write as YAML
@@ -212,4 +277,4 @@ def set_registry_content(content: dict) -> None:
         >>>     set_registry_content(original)
     """
     modified_yaml = yaml.dump(content, default_flow_style=False)
-    REGISTRY_PATH.write_text(modified_yaml)
+    _atomic_write(REGISTRY_PATH, modified_yaml)
