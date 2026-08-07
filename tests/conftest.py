@@ -611,3 +611,359 @@ async def in_memory_db_connection():
 
     # Cleanup: close the connection (in-memory database is automatically destroyed)
     await db.close()
+
+
+# -----------------------------------------------------------------------------
+# Global singleton reset fixture
+# -----------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function", autouse=True)
+def reset_global_store_singleton(tmp_path):
+    """
+    Reset the global SessionStore singleton before each test.
+
+    This fixture ensures that tests calling get_store() directly receive
+    a fresh instance instead of sharing state with previous tests.
+
+    The global _store singleton in src.session.store persists across tests,
+    which violates test isolation when tests call get_store() instead of using
+    the isolated fixtures (test_db_store, in_memory_db_store, etc.).
+
+    This fixture is autouse=True so it runs automatically before every test,
+    ensuring complete isolation even when tests bypass the explicit fixtures.
+
+    It also sets ADC_DB_PATH to a unique test-specific database file, ensuring
+    that even if tests call get_store(), they get an isolated database instead
+    of the production data/session.db or a shared test database.
+
+    Usage in tests:
+        # No explicit usage needed - runs automatically
+        async def test_something():
+            store = get_store()  # Gets fresh instance with isolated database
+            # Test with guaranteed fresh store and database
+    """
+    import os
+    import uuid
+    from src.session import store as store_module
+
+    # Create a unique test-specific database path for this test
+    test_db_path = tmp_path / f"singleton_test_db_{uuid.uuid4().hex}.db"
+
+    # Store original values
+    original_store = store_module._store
+    original_env = os.environ.get("ADC_DB_PATH")
+
+    # Set the environment variable to point to the test-specific database
+    os.environ["ADC_DB_PATH"] = str(test_db_path)
+
+    # Reset the global singleton to None
+    store_module._store = None
+
+    yield
+
+    # Cleanup: restore original state
+    store_module._store = original_store
+    if original_env is not None:
+        os.environ["ADC_DB_PATH"] = original_env
+    else:
+        os.environ.pop("ADC_DB_PATH", None)
+
+    # Clean up test database file if it exists
+    try:
+        if test_db_path.exists():
+            os.unlink(test_db_path)
+        # Also clean up WAL files if they exist
+        wal_path = str(test_db_path) + "-wal"
+        shm_path = str(test_db_path) + "-shm"
+        if os.path.exists(wal_path):
+            os.unlink(wal_path)
+        if os.path.exists(shm_path):
+            os.unlink(shm_path)
+    except Exception:
+        pass  # Ignore cleanup errors
+
+
+# -----------------------------------------------------------------------------
+# SSE event capture fixtures
+# -----------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function")
+async def mock_sse_broadcaster():
+    """
+    Provide a mock SSE broadcaster that captures all broadcast events.
+
+    This fixture creates a broadcaster mock that records all events sent via
+    broadcast(), enabling tests to verify what events were broadcast without
+    managing actual SSE connections.
+
+    Usage in tests:
+        async def test_something(mock_sse_broadcaster):
+            broadcaster, events = mock_sse_broadcaster
+
+            # Broadcast an event
+            await broadcaster.broadcast(SSEEvent(event_type="result_created", data={...}))
+
+            # Verify the event was captured
+            assert len(events) == 1
+            assert events[0].event_type == "result_created"
+
+    Returns:
+        Tuple of (broadcaster_instance, events_list)
+    """
+    from src.sse.broadcaster import SSEBroadcaster, SSEEvent
+    from unittest.mock import AsyncMock, patch
+
+    events = []
+
+    async def mock_broadcast(event: SSEEvent) -> int:
+        """Mock broadcast that captures events."""
+        events.append(event)
+        return 1  # Return fake sent count
+
+    # Create a real broadcaster instance
+    broadcaster = SSEBroadcaster()
+
+    # Patch the broadcast method to capture events
+    with patch.object(broadcaster, 'broadcast', side_effect=mock_broadcast):
+        yield broadcaster, events
+
+
+@pytest.fixture(scope="function")
+async def mock_sse_connection():
+    """
+    Provide a mock SSE connection that can receive events.
+
+    This fixture creates a connection-like object with a queue that can be
+    used to test event delivery without managing real SSE connections.
+
+    Usage in tests:
+        async def test_something(mock_sse_connection):
+            connection, queue = mock_sse_connection
+
+            # Queue an event
+            await queue.put(SSEEvent(event_type="result_created", data={...}))
+
+            # Verify the event was received
+            event = await queue.get()
+            assert event.event_type == "result_created"
+
+    Returns:
+        Tuple of (connection_dict, event_queue)
+    """
+    import asyncio
+    from uuid import uuid4
+
+    queue = asyncio.Queue()
+    connection = {
+        "connection_id": str(uuid4()),
+        "surface_id": str(uuid4()),
+        "session_id": str(uuid4()),
+        "surface_type": "canvas",
+        "queue": queue,
+    }
+
+    return connection, queue
+
+
+# -----------------------------------------------------------------------------
+# Test data builder fixtures
+# -----------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function")
+async def test_topic_builder(in_memory_db_store):
+    """
+    Provide a helper function to create test topics.
+
+    This fixture provides a convenient builder function for creating test topics
+    with default values, reducing boilerplate in tests.
+
+    Usage in tests:
+        async def test_something(test_topic_builder):
+            # Create a simple topic
+            topic_id = await test_topic_builder(label="Test Topic")
+
+            # Create a topic with specific parameters
+            topic_id = await test_topic_builder(
+                label="Project Topic",
+                topic_type="project",
+                project_slugs=["my-project"],
+                scope="session"
+            )
+
+    Returns:
+        Async function that creates a topic and returns its ID.
+    """
+    async def build_topic(
+        label: str = "Test Topic",
+        topic_type: str = "adhoc",
+        project_slugs: list[str] | None = None,
+        scope: str = "session",
+        session_id: str | None = None,
+    ) -> str:
+        """Create a test topic with the given parameters."""
+        return await in_memory_db_store.create_topic(
+            label=label,
+            topic_type=topic_type,
+            project_slugs=project_slugs,
+            scope=scope,
+            session_id=session_id,
+        )
+
+    return build_topic
+
+
+@pytest.fixture(scope="function")
+async def test_topic_with_session(in_memory_db_store, test_topic_builder):
+    """
+    Provide a pre-built test topic and session ID.
+
+    This fixture creates both a session and a topic for that session, returning
+    both IDs for use in tests.
+
+    Usage in tests:
+        async def test_something(test_topic_with_session):
+            session_id, topic_id = test_topic_with_session
+
+            # Both are ready to use
+            result = await store.create_result(
+                intent_id=None,
+                topic_id=topic_id,
+                session_id=session_id,
+                summary="Test result",
+                data={"test": "data"}
+            )
+
+    Returns:
+        Tuple of (session_id, topic_id)
+    """
+    session_id = await in_memory_db_store.create_session()
+    topic_id = await test_topic_builder(
+        label="Test Topic",
+        session_id=session_id,
+    )
+    return session_id, topic_id
+
+
+@pytest.fixture(scope="function")
+async def test_utterance_builder(in_memory_db_store):
+    """
+    Provide a helper function to create test utterances.
+
+    This fixture provides a convenient builder function for creating test utterances
+    with default values, reducing boilerplate in tests.
+
+    Usage in tests:
+        async def test_something(test_utterance_builder, test_session_id):
+            # Create a simple utterance
+            utterance_id = await test_utterance_builder(
+                session_id=test_session_id,
+                raw_text="Test utterance"
+            )
+
+    Returns:
+        Async function that creates an utterance and returns its ID.
+    """
+    async def build_utterance(
+        session_id: str,
+        raw_text: str = "Test utterance",
+        utterance_id: str | None = None,
+    ) -> str:
+        """Create a test utterance with the given parameters."""
+        return await in_memory_db_store.create_utterance(
+            session_id=session_id,
+            raw_text=raw_text,
+            utterance_id=utterance_id,
+        )
+
+    return build_utterance
+
+
+@pytest.fixture(scope="function")
+async def test_intent_builder(in_memory_db_store):
+    """
+    Provide a helper function to create test intents.
+
+    This fixture provides a convenient builder function for creating test intents
+    with default values, reducing boilerplate in tests.
+
+    Usage in tests:
+        async def test_something(test_intent_builder, test_session_id, test_utterance_id):
+            # Create a simple intent
+            intent_id = await test_intent_builder(
+                utterance_id=test_utterance_id,
+                session_id=test_session_id,
+                intent_type="status",
+                project_slug="my-project"
+            )
+
+    Returns:
+        Async function that creates an intent and returns its ID.
+    """
+    async def build_intent(
+        utterance_id: str,
+        session_id: str,
+        intent_type: str = "status",
+        project_slug: str | None = None,
+        bead_ref: str | None = None,
+        lookup_kind: str | None = None,
+        topic_id: str | None = None,
+    ) -> str:
+        """Create a test intent with the given parameters."""
+        return await in_memory_db_store.create_intent(
+            utterance_id=utterance_id,
+            session_id=session_id,
+            project_slug=project_slug,
+            intent_type=intent_type,
+            bead_ref=bead_ref,
+            lookup_kind=lookup_kind,
+            topic_id=topic_id,
+        )
+
+    return build_intent
+
+
+@pytest.fixture(scope="function")
+async def test_result_builder(in_memory_db_store):
+    """
+    Provide a helper function to create test results.
+
+    This fixture provides a convenient builder function for creating test results
+    with default values, reducing boilerplate in tests.
+
+    Usage in tests:
+        async def test_something(test_result_builder, test_session_id, test_topic_id):
+            # Create a simple result
+            result_id = await test_result_builder(
+                topic_id=test_topic_id,
+                session_id=test_session_id,
+                summary="Test result",
+                data={"test": "data"}
+            )
+
+    Returns:
+        Async function that creates a result and returns its ID.
+    """
+    async def build_result(
+        topic_id: str,
+        session_id: str,
+        summary: str = "Test result",
+        data: dict | None = None,
+        intent_id: str | None = None,
+        urgency: str = "normal",
+        result_type: str | None = None,
+    ) -> str:
+        """Create a test result with the given parameters."""
+        return await in_memory_db_store.create_result(
+            intent_id=intent_id,
+            topic_id=topic_id,
+            session_id=session_id,
+            summary=summary,
+            data=data or {},
+            urgency=urgency,
+            result_type=result_type,
+        )
+
+    return build_result
