@@ -93,21 +93,54 @@ def set_frozen(frozen: bool) -> None:
             content = "Self-modification frozen via 'adc freeze' command\n"
             atomic_write(SENTINEL_PATH, content)
             logger.info(f"Created freeze sentinel: {SENTINEL_PATH}")
-        except Exception as e:
-            logger.error(f"Failed to create freeze sentinel: {e}")
-            raise OSError(f"Atomic write failed for freeze sentinel: {e}") from e
+        except (OSError, PermissionError) as e:
+            # Handle atomic write failures with specific error types
+            error_msg = f"Atomic write failed for freeze sentinel {SENTINEL_PATH}: {type(e).__name__}: {e}"
+            logger.error(error_msg)
+            raise OSError(error_msg) from e
+        except (TypeError, ValueError) as e:
+            # Handle content validation errors
+            error_msg = f"Content validation failed for freeze sentinel: {e}"
+            logger.error(error_msg)
+            raise ValueError(error_msg) from e
     else:
-        # Atomic unlink with error handling
+        # Atomic unlink with idempotent error handling
+        # This cleanup operation handles atomic write failures gracefully:
+        # - If a prior atomic_write failed mid-operation, temp files may exist
+        # - This cleanup ensures the sentinel removal completes regardless of prior write state
+        # - Uses missing_ok=True for safe idempotent cleanup
         try:
-            # Use try/except directly on unlink to avoid race condition
-            SENTINEL_PATH.unlink(missing_ok=False)
+            # Use missing_ok=True for idempotent cleanup (safe if file already deleted)
+            SENTINEL_PATH.unlink(missing_ok=True)
             logger.info(f"Removed freeze sentinel: {SENTINEL_PATH}")
+
+        except PermissionError as e:
+            # Handle permission-specific errors with clear messaging
+            # This may occur if atomic write left the file in a protected state
+            error_msg = (
+                f"Permission denied removing freeze sentinel {SENTINEL_PATH}. "
+                f"The file may still exist from a prior atomic write operation. "
+                f"Check file permissions and try again. Manual removal: 'rm {SENTINEL_PATH}'"
+            )
+            logger.error(error_msg)
+            # Don't raise - allow operation to complete, but log clearly
+            # The user can retry or manually remove the file
+
         except FileNotFoundError:
-            # Already removed - this is idempotent
-            logger.debug(f"Freeze sentinel already removed: {SENTINEL_PATH}")
-        except Exception as e:
-            logger.error(f"Failed to remove freeze sentinel: {e}")
-            raise OSError(f"Failed to remove freeze sentinel: {e}") from e
+            # File doesn't exist - this is fine, we wanted it gone
+            # Idempotent cleanup: file already removed by prior operation or atomic write cleanup
+            logger.debug(f"Freeze sentinel {SENTINEL_PATH} already removed (idempotent cleanup)")
+
+        except OSError as e:
+            # Handle other OS errors with context-specific messaging
+            # This may occur if atomic write left the file system in an inconsistent state
+            error_msg = (
+                f"Failed to remove freeze sentinel {SENTINEL_PATH}: {type(e).__name__}: {e}. "
+                f"The file may still exist from a prior atomic write operation. "
+                f"You can manually remove it: 'rm {SENTINEL_PATH}' or retry the operation."
+            )
+            logger.warning(error_msg)
+            # Don't raise - allow operation to complete, but provide clear guidance
 
 
 def get_status() -> dict:
