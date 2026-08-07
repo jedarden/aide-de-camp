@@ -12,15 +12,18 @@ overwritten by discovery. The _merge() function enforces this: YAML entries take
 precedence over discovered entries on all fields.
 """
 
+import asyncio
+import logging
 import os
 import time
-import threading
 import random
 from pathlib import Path
 from typing import Any, Callable
 from functools import wraps
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 def retry_with_backoff(
@@ -62,12 +65,21 @@ def retry_with_backoff(
                 except exceptions as e:
                     last_exception = e
                     if attempt < max_retries:
+                        # Log retry attempt with attempt number and error type
+                        logger.info(
+                            f"Retry attempt {attempt + 1}/{max_retries} for {func.__name__}: "
+                            f"{type(e).__name__}: {e}"
+                        )
                         # Add jitter to prevent thundering herd problem
                         jittered_delay = delay * (0.5 + random.random() * 0.5)
                         time.sleep(jittered_delay)
                         delay *= backoff_factor
                     else:
-                        # All retries exhausted
+                        # All retries exhausted - log final failure
+                        logger.error(
+                            f"All {max_retries} retry attempts exhausted for {func.__name__}: "
+                            f"{type(e).__name__}: {e}"
+                        )
                         raise
 
             # Should never reach here, but just in case
@@ -83,11 +95,11 @@ REGISTRY_PATH = Path(__file__).parent.parent / "config" / "registry.yaml"
 DISCOVERY_ROOT = Path("/home/coding")
 CACHE_TTL = 300  # 5 minutes
 
-# CONCURRENT ACCESS PROTECTION: Thread-safe registry access
+# ASYNCIO LOCKING PROTECTION: Async-safe registry access
 # _cache_lock protects all access to _cache and _cache_at to prevent race conditions
-# This ensures that multiple threads can safely access the registry without corruption
-# The lock uses a reentrant lock (RLock) to allow recursive calls within the same thread
-_cache_lock = threading.RLock()
+# This ensures that multiple async tasks can safely access the registry without corruption
+# Uses asyncio.Lock() for proper async concurrent access protection in FastAPI context
+_cache_lock = asyncio.Lock()
 
 # HOT-RELOAD MECHANISM: TTL-based cache invalidation
 # _cache stores the merged registry (YAML + discovered projects)
@@ -208,7 +220,21 @@ def _slug(name: str) -> str:
     return name.lower().replace("_", "-").replace(" ", "-")
 
 
+@retry_with_backoff(max_retries=3, initial_delay=0.1, backoff_factor=2.0)
 def _read_description(repo_path: Path) -> str:
+    """
+    Read project description from README files with retry logic for transient failures.
+
+    CONCURRENT ACCESS PROTECTION: This function uses retry_with_backoff decorator to handle
+    transient failures from concurrent file access. If multiple threads read README files
+    simultaneously, the retry mechanism ensures all reads eventually succeed.
+
+    Args:
+        repo_path: Path to the repository root
+
+    Returns:
+        First meaningful line from README, or empty string if not found
+    """
     for name in ("README.md", "README.rst", "README.txt", "README"):
         f = repo_path / name
         if f.exists():
@@ -337,9 +363,9 @@ def _build_registry() -> dict:
     return registry
 
 
-def get_registry(force: bool = False) -> dict:
+async def get_registry(force: bool = False) -> dict:
     """
-    Return the merged registry with hot-reload support and thread-safe concurrent access.
+    Return the merged registry with hot-reload support and async-safe concurrent access.
 
     HOT-RELOAD MECHANISM: TTL-Based Cache Invalidation
     ====================================================
@@ -350,10 +376,10 @@ def get_registry(force: bool = False) -> dict:
     3. After TTL expires, next call rebuilds registry from disk
     4. force=True bypasses cache and rebuilds immediately
 
-    CONCURRENT ACCESS PROTECTION:
+    ASYNCIO LOCKING PROTECTION:
     =============================
-    This function uses _cache_lock to ensure thread-safe access to the registry:
-    - Multiple threads can safely read the cache concurrently
+    This function uses _cache_lock (asyncio.Lock()) to ensure async-safe access:
+    - Multiple async tasks can safely read the cache concurrently
     - Cache updates are atomic - readers see consistent state
     - No race conditions between cache validation and updates
     - Uses double-checked locking pattern for performance
@@ -362,8 +388,8 @@ def get_registry(force: bool = False) -> dict:
     - Changes to config/registry.yaml take effect within 5 minutes
     - Or immediately with force=True (used in tests and manual reloads)
     - No server restart required to pick up new projects/aliases
-    - Thread-safe concurrent access without corruption
-    - Cache hit is very fast (read lock acquisition, no disk I/O)
+    - Async-safe concurrent access without corruption
+    - Cache hit is very fast (lock acquisition, no disk I/O)
     - Cache miss rebuilds entire registry (includes git repo discovery)
 
     Args:
@@ -377,7 +403,7 @@ def get_registry(force: bool = False) -> dict:
     """
     global _cache, _cache_at
 
-    # CONCURRENT ACCESS: Double-checked locking pattern
+    # ASYNCIO LOCKING: Double-checked locking pattern
     # First check without lock for performance (fast path for cache hits)
     cache_is_stale = force or _cache is None or (time.time() - _cache_at) > CACHE_TTL
 
@@ -385,26 +411,36 @@ def get_registry(force: bool = False) -> dict:
         # Fast path: return cached registry without lock contention
         return _cache
 
-    # Slow path: need to rebuild cache - acquire lock for thread safety
-    with _cache_lock:
-        # Double-check: another thread may have rebuilt cache while we waited for lock
+    # Slow path: need to rebuild cache - acquire lock for async safety
+    logger.debug("Acquiring registry cache lock for rebuild")
+    async with _cache_lock:
+        logger.debug("Registry cache lock acquired, checking if rebuild still needed")
+        # Double-check: another task may have rebuilt cache while we waited for lock
         cache_is_stale = force or _cache is None or (time.time() - _cache_at) > CACHE_TTL
 
         if cache_is_stale:
+            logger.debug("Registry cache is stale, rebuilding")
             # Rebuild cache under lock protection
             _cache = _build_registry()
             _cache_at = time.time()
+            logger.debug("Registry cache rebuilt successfully")
+        else:
+            logger.debug("Registry cache already rebuilt by another task, using cached version")
 
+        logger.debug("Releasing registry cache lock")
         return _cache
 
 
-def get_project(slug: str) -> dict | None:
+async def get_project(slug: str) -> dict | None:
     """
     Get a single project entry from the registry.
 
     HOT-RELOAD: This function calls get_registry() which implements TTL-based cache
     invalidation. Changes to registry.yaml will be picked up within 5 minutes or
     immediately with get_registry(force=True). No server restart required.
+
+    ASYNCIO LOCKING: Protected by async lock in get_registry() to ensure safe
+    concurrent access to registry cache.
 
     Args:
         slug: Project slug to look up
@@ -414,18 +450,40 @@ def get_project(slug: str) -> dict | None:
 
     Verified in: test_registry_hot_reload (tests/test_config_hot_reload.py)
     """
-    return get_registry()["projects"].get(slug)
+    registry = await get_registry()
+    return registry["projects"].get(slug)
 
 
-def repo_path_for(slug: str) -> str | None:
-    p = get_project(slug)
+async def repo_path_for(slug: str) -> str | None:
+    """
+    Get repository path for a project slug.
+
+    ASYNCIO LOCKING: Protected by async lock in get_project() to ensure safe
+    concurrent access to registry cache.
+
+    Args:
+        slug: Project slug to look up
+
+    Returns:
+        Repository path string or None if not found
+    """
+    p = await get_project(slug)
     return p.get("repo_path") if p else None
 
 
-def projects_summary() -> str:
-    """One-line-per-project summary for the LLM router prompt."""
+async def projects_summary() -> str:
+    """
+    One-line-per-project summary for the LLM router prompt.
+
+    ASYNCIO LOCKING: Protected by async lock in get_registry() to ensure safe
+    concurrent access to registry cache.
+
+    Returns:
+        Multi-line string with project summaries
+    """
     lines = []
-    for slug, entry in get_registry()["projects"].items():
+    registry = await get_registry()
+    for slug, entry in registry["projects"].items():
         aliases = entry.get("aliases", [])
         desc = entry.get("description", "")
         cluster = entry.get("cluster") or "local"
