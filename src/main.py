@@ -275,6 +275,42 @@ async def health_check():
     return response
 
 
+@app.get("/test")
+async def get_test_endpoint():
+    """
+    GET test endpoint that returns a simple test result structure.
+
+    Returns a result object with id, type, and content fields matching
+    the structure used by /dispatch for testing and verification.
+
+    Returns:
+        {
+            "id": "test-...",
+            "type": "test",
+            "content": {...}
+        }
+    """
+    import uuid
+    from datetime import datetime
+
+    test_result = {
+        "id": f"test-{uuid.uuid4()}",
+        "type": "test",
+        "content": {
+            "test_mode": True,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "summary": "Test result from GET endpoint",
+            "urgency": "normal",
+            "data": {
+                "message": "This is a test result structure",
+                "fields_present": ["id", "type", "content"],
+            }
+        }
+    }
+
+    return test_result
+
+
 @app.post("/test")
 async def test_endpoint(request: dict):
     """
