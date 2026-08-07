@@ -442,6 +442,54 @@ class TestCompareStructuredFields:
         result = compare_structured_fields(dispatch, test)
         assert result["entities"] is False
 
+    def test_empty_list_vs_none_in_dispatch(self):
+        """Verify empty list vs None in dispatch is treated as mismatch."""
+        dispatch = {"entities": []}
+        test = {"entities": None}
+        result = compare_structured_fields(dispatch, test)
+        assert result["entities"] is False
+
+    def test_empty_list_vs_none_in_test(self):
+        """Verify empty list vs None in test is treated as mismatch."""
+        dispatch = {"entities": None}
+        test = {"entities": []}
+        result = compare_structured_fields(dispatch, test)
+        assert result["entities"] is False
+
+    def test_nested_empty_list_vs_none(self):
+        """Verify nested empty list vs None is treated as mismatch."""
+        dispatch = {"parameters": {"tags": []}}
+        test = {"parameters": {"tags": None}}
+        result = compare_structured_fields(dispatch, test)
+        assert result["parameters.tags"] is False
+
+    def test_nested_empty_dict_vs_none(self):
+        """Verify nested empty dict vs None is treated as mismatch."""
+        dispatch = {"parameters": {"metadata": {}}}
+        test = {"parameters": {"metadata": None}}
+        result = compare_structured_fields(dispatch, test)
+        assert result["parameters.metadata"] is False
+
+    def test_multiple_edge_cases_combination(self):
+        """Verify multiple edge cases in a single comparison."""
+        dispatch = {
+            "field1": None,
+            "field2": [],
+            "field3": {},
+            "field4": "value"
+        }
+        test = {
+            "field1": None,  # Match: both None
+            "field2": None,  # Mismatch: [] vs None
+            "field3": None,  # Mismatch: {} vs None
+            "field4": "value"  # Match: both "value"
+        }
+        result = compare_structured_fields(dispatch, test)
+        assert result["field1"] is True  # None vs None → match
+        assert result["field2"] is False  # [] vs None → mismatch
+        assert result["field3"] is False  # {} vs None → mismatch
+        assert result["field4"] is True  # "value" vs "value" → match
+
     def test_float_tolerance(self):
         """Verify float comparison with tolerance."""
         dispatch = {"confidence": 0.9}
