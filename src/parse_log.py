@@ -7,7 +7,7 @@ basic JSON parsing, with field extraction and normalization.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Dict, Optional, Any
 
@@ -123,7 +123,7 @@ def normalize_timestamp(ts_input: Optional[Any]) -> Optional[str]:
             # Detect if timestamp is in milliseconds (typically > 10^11)
             if ts_input > 100_000_000_000:  # Milliseconds since epoch
                 ts_input = ts_input / 1000
-            dt = datetime.utcfromtimestamp(ts_input)
+            dt = datetime.fromtimestamp(ts_input, tz=timezone.utc)
             return dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
         # Handle string timestamps
