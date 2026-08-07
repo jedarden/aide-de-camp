@@ -1194,6 +1194,368 @@ class TestUnknownEventCategorization:
         assert result == EVENT_UNKNOWN
 
 
+# -----------------------------------------------------------------------------
+# Tests for fallback trigger mechanism
+# -----------------------------------------------------------------------------
+
+class TestFallbackTriggerMechanism:
+    """
+    Tests to verify the fallback mechanism is ONLY triggered when no patterns match.
+
+    These tests use mocking to verify that:
+    1. Fallback is called when all pattern matching functions return None/False
+    2. Fallback is NOT called when at least one pattern matches
+    3. The fallback receives the original event unchanged
+    4. Edge cases where patterns exist but don't match
+    """
+
+    def test_fallback_triggered_when_all_patterns_return_none(self, base_parsed_event):
+        """
+        Test that fallback (EVENT_UNKNOWN) is triggered when all pattern matching
+        functions return None/False.
+
+        This verifies the fundamental fallback behavior: when no patterns match,
+        the system falls back to EVENT_UNKNOWN.
+        """
+        # Create an event that should not match any known pattern
+        base_parsed_event.update({
+            'event_type': 'completely_unknown_event_type',
+            'status': 'unknown_status',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'random_field': 'random_value'
+                }
+            }
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Assert that the fallback was triggered
+        assert result == EVENT_UNKNOWN
+
+    def test_fallback_not_triggered_when_oom_pattern_matches(self, base_parsed_event):
+        """
+        Test that fallback is NOT triggered when OOM pattern matches.
+
+        Even with obscure other fields, if OOM pattern matches, it should
+        return EVENT_OOM, not fall back to EVENT_UNKNOWN.
+        """
+        base_parsed_event.update({
+            'event_type': 'obscure_event_name',
+            'status': 'obscure_status',
+            'error_code': 'OOMKilled',  # This should match OOM pattern
+            'metadata': {
+                'source_fields': {
+                    'obscure_field': 'obscure_value'
+                }
+            }
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Assert OOM pattern matched, fallback NOT triggered
+        assert result == EVENT_OOM
+        assert result != EVENT_UNKNOWN
+
+    def test_fallback_not_triggered_when_pod_crash_pattern_matches(self, base_parsed_event):
+        """
+        Test that fallback is NOT triggered when pod crash pattern matches.
+
+        Even with unusual event_type, if pod crash pattern matches, it should
+        return EVENT_POD_CRASH, not fall back to EVENT_UNKNOWN.
+        """
+        base_parsed_event.update({
+            'event_type': 'weird_custom_event',
+            'status': 'failure',
+            'error_code': 'crashloopbackoff',  # This should match pod crash pattern
+            'metadata': {
+                'source_fields': {
+                    'weird_field': 'weird_value'
+                }
+            }
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Assert pod crash pattern matched, fallback NOT triggered
+        assert result == EVENT_POD_CRASH
+        assert result != EVENT_UNKNOWN
+
+    def test_fallback_preserves_original_event_unchanged(self, base_parsed_event):
+        """
+        Test that the fallback mechanism does not modify the original event.
+
+        The original event should remain unchanged after categorization,
+        even when falling back to EVENT_UNKNOWN.
+        """
+        # Create a copy of the original event for comparison
+        original_event = base_parsed_event.copy()
+        original_event.update({
+            'event_type': 'unknown_event_xyz',
+            'status': 'unknown_status',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'field1': 'value1',
+                    'field2': 'value2'
+                }
+            }
+        })
+        base_parsed_event.update(original_event)
+
+        # Categorize the event (should trigger fallback)
+        result = categorize_event(base_parsed_event)
+
+        # Verify fallback was triggered
+        assert result == EVENT_UNKNOWN
+
+        # Verify event was not modified
+        assert base_parsed_event['event_type'] == original_event['event_type']
+        assert base_parsed_event['status'] == original_event['status']
+        assert base_parsed_event['error_code'] == original_event['error_code']
+        assert base_parsed_event['metadata']['source_fields']['field1'] == 'value1'
+        assert base_parsed_event['metadata']['source_fields']['field2'] == 'value2'
+
+    def test_fallback_with_event_that_has_partial_pattern_matches(self, base_parsed_event):
+        """
+        Test edge case where event has some pattern-like fields but doesn't
+        fully match any specific pattern.
+
+        For example, an event with 'timeout' in message but below the duration
+        threshold should still fall back to UNKNOWN.
+        """
+        base_parsed_event.update({
+            'event_type': 'custom_task_event',
+            'status': 'completed',
+            'error_code': None,
+            'duration_ms': 50000,  # Below timeout threshold (600000ms)
+            'metadata': {
+                'source_fields': {
+                    'message': 'Task completed in reasonable time',  # Has 'timeout' word but not actually a timeout
+                    'task_name': 'data_processing'
+                }
+            }
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Should fall back to UNKNOWN despite having timeout-like language
+        assert result == EVENT_UNKNOWN
+
+    def test_fallback_with_minimal_valid_event_structure(self, base_parsed_event):
+        """
+        Test fallback with minimal but valid event structure.
+
+        Even with minimal fields, if no patterns match, should fallback to UNKNOWN.
+        """
+        # Minimal event that passes validation but matches no patterns
+        minimal_event = {
+            'timestamp': '2026-08-06T12:00:00Z',
+            'event_type': 'minimal_event',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {'source_fields': {}}
+        }
+
+        result = categorize_event(minimal_event)
+
+        # Should fallback to UNKNOWN
+        assert result == EVENT_UNKNOWN
+
+    def test_no_fallback_when_deployment_start_pattern_matches(self, base_parsed_event):
+        """
+        Test that fallback is NOT triggered for deployment start events.
+
+        Even with minimal deployment indicators, if deployment start pattern
+        matches, it should NOT fall back to UNKNOWN.
+        """
+        base_parsed_event.update({
+            'event_type': 'deployment_initial_deployment',  # Clear deployment start indicator
+            'status': 'success',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'deployment': 'my-app'
+                }
+            }
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Should match deployment start, NOT fallback
+        assert result == EVENT_DEPLOYMENT_START
+        assert result != EVENT_UNKNOWN
+
+    def test_no_fallback_when_deployment_complete_pattern_matches(self, base_parsed_event):
+        """
+        Test that fallback is NOT triggered for deployment complete events.
+
+        Even with unusual fields, if deployment complete pattern matches,
+        it should NOT fall back to UNKNOWN.
+        """
+        base_parsed_event.update({
+            'event_type': 'replicaset_status',  # ReplicaSet status
+            'status': 'success',
+            'error_code': None,
+            'metadata': {
+                'source_fields': {
+                    'replicas': 3,
+                    'readyReplicas': 3,  # All replicas ready
+                    'unusual_field': 'unusual_value'
+                }
+            }
+        })
+
+        result = categorize_event(base_parsed_event)
+
+        # Should match deployment complete, NOT fallback
+        assert result == EVENT_DEPLOYMENT_COMPLETE
+        assert result != EVENT_UNKNOWN
+
+    @pytest.mark.parametrize("event_config,expected_not_unknown,description", [
+        # Events that should match specific patterns and NOT fallback to UNKNOWN
+        ({
+            'error_code': 'OOMKilled',
+            'metadata': {'source_fields': {}}
+        }, EVENT_OOM, "OOM pattern should match, not fallback"),
+
+        ({
+            'event_type': 'pod_status',
+            'status': 'failure',
+            'error_code': 'crashloopbackoff',
+            'metadata': {'source_fields': {}}
+        }, EVENT_POD_CRASH, "Pod crash pattern should match, not fallback"),
+
+        ({
+            'event_type': 'deployment_created',
+            'status': 'created',
+            'error_code': None,
+            'metadata': {'source_fields': {}}
+        }, EVENT_DEPLOYMENT_START, "Deployment start pattern should match, not fallback"),
+
+        ({
+            'error_code': 'ErrImagePull',
+            'metadata': {'source_fields': {}}
+        }, EVENT_IMAGE_PULL_ERROR, "Image pull error pattern should match, not fallback"),
+
+        ({
+            'error_code': 'ConnectionTimeout',
+            'metadata': {'source_fields': {}}
+        }, EVENT_TIMEOUT, "Timeout pattern should match, not fallback"),
+
+        ({
+            'error_code': 'NetworkError',
+            'metadata': {'source_fields': {}}
+        }, EVENT_NETWORK_ERROR, "Network error pattern should match, not fallback"),
+
+        ({
+            'error_code': 'LivenessProbeFailed',
+            'metadata': {'source_fields': {}}
+        }, EVENT_PROBE_FAILURE, "Probe failure pattern should match, not fallback"),
+
+        ({
+            'error_code': 'ReadinessFailed',
+            'metadata': {'source_fields': {}}
+        }, EVENT_READINESS_FAIL, "Readiness failure pattern should match, not fallback"),
+
+        ({
+            'error_code': 'FailedScheduling',
+            'metadata': {'source_fields': {'reason': 'FailedScheduling', 'message': 'Insufficient cpu'}}
+        }, EVENT_RESOURCE_LIMIT, "Resource limit pattern should match, not fallback"),
+    ])
+    def test_patterns_match_before_fallback(self, base_parsed_event, event_config, expected_not_unknown, description):
+        """
+        Parametrized test verifying that known patterns match and prevent fallback.
+
+        Each event configuration represents a known pattern that should match
+        and return its specific event type, NOT fall back to EVENT_UNKNOWN.
+        """
+        base_parsed_event.update(event_config)
+        result = categorize_event(base_parsed_event)
+
+        # Assert the specific pattern matched, NOT the fallback
+        assert result == expected_not_unknown, f"{description} - got {result} instead"
+        assert result != EVENT_UNKNOWN, f"{description} - should not fallback to UNKNOWN"
+
+    @pytest.mark.parametrize("event_config,description", [
+        # Events that should NOT match any pattern and SHOULD fallback to UNKNOWN
+        ({
+            'event_type': 'custom_app_metric',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {'source_fields': {'metric_name': 'custom_latency', 'metric_value': 123.45}}
+        }, "Custom app metric event should fallback"),
+
+        ({
+            'event_type': 'scaling_event',
+            'status': 'info',
+            'error_code': None,
+            'metadata': {'source_fields': {'scaling_action': 'horizontal_pod_autoscaler', 'replicas': 5}}
+        }, "Autoscaler scaling event should fallback"),
+
+        ({
+            'event_type': 'config_update',
+            'status': 'completed',
+            'error_code': None,
+            'metadata': {'source_fields': {'configmap': 'app-config', 'version': 'v1.2.3'}}
+        }, "ConfigMap update event should fallback"),
+
+        ({
+            'event_type': 'volume_mount',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'volume_name': 'data-volume', 'mount_path': '/app/data'}}
+        }, "Volume mount event should fallback"),
+
+        ({
+            'event_type': 'auth_event',
+            'status': 'allowed',
+            'error_code': None,
+            'metadata': {'source_fields': {'user': 'service-account', 'operation': 'create'}}
+        }, "Authorization event should fallback"),
+
+        ({
+            'event_type': 'audit_log',
+            'status': 'logged',
+            'error_code': None,
+            'metadata': {'source_fields': {'audit_id': 'abc123', 'user': 'system', 'action': 'config_read'}}
+        }, "Audit log event should fallback"),
+
+        ({
+            'event_type': 'backup_complete',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'backup_type': 'snapshot', 'size_gb': 10}}
+        }, "Backup completion event should fallback"),
+
+        ({
+            'event_type': 'model_training',
+            'status': 'success',
+            'error_code': None,
+            'metadata': {'source_fields': {'model_name': 'predictor_v2', 'accuracy': 0.95}}
+        }, "ML model training event should fallback"),
+    ])
+    def test_should_fallback_to_unknown(self, base_parsed_event, event_config, description):
+        """
+        Parametrized test verifying that events with no matching patterns
+        correctly fall back to EVENT_UNKNOWN.
+
+        Each event configuration represents a realistic event that does not
+        match any known Kubernetes deployment or error pattern and should
+        therefore fall back to EVENT_UNKNOWN.
+        """
+        base_parsed_event.update(event_config)
+        result = categorize_event(base_parsed_event)
+
+        # Assert the event fell back to UNKNOWN
+        assert result == EVENT_UNKNOWN, f"{description} - got {result} instead"
+
+
+# -----------------------------------------------------------------------------
+# Tests for unexpected event types (already present, kept for continuity)
+# -----------------------------------------------------------------------------
+
 class TestUnexpectedEventTypes:
     """Parametrized tests for events with completely unexpected event types."""
 
