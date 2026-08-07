@@ -18,6 +18,7 @@ dependencies = [
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
+    "pytest-repeat>=0.9.4",
     "ruff>=0.8.0",
     # Objective screenshot analysis for the canvas browser suites (bead adc-jr35):
     # counts distinct rendered colours so a screenshot can be verified to contain
