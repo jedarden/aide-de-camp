@@ -9,7 +9,7 @@ basic JSON parsing, with field extraction and normalization.
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator, Dict, Optional, Any
+from typing import Dict, Optional, Any
 
 from logging import getLogger
 
@@ -59,18 +59,21 @@ def detect_format(raw_entry: Dict[str, Any]) -> str:
     return FORMAT_UNKNOWN
 
 
-def load_jsonl(file_path: str) -> Iterator[Dict]:
+def load_jsonl(file_path: str) -> tuple[list[Dict], int, int]:
     """
     Load a JSONL file and parse each line as a JSON object.
 
     Reads the file line by line, parsing each line as a separate JSON object.
-    Empty lines are skipped. Yields individual parsed dict objects.
+    Empty lines are skipped. Returns successfully parsed entries with error statistics.
 
     Args:
         file_path: Path to the JSONL file (str).
 
-    Yields:
-        Dict objects parsed from each line in the file.
+    Returns:
+        Tuple of (entries, errors_count, skipped_count):
+        - entries: List of successfully parsed dict objects
+        - errors_count: Number of lines that failed JSON parsing
+        - skipped_count: Number of empty lines skipped
 
     Raises:
         FileNotFoundError: If the specified file does not exist.
@@ -78,10 +81,16 @@ def load_jsonl(file_path: str) -> Iterator[Dict]:
     path = Path(file_path)
 
     if not path.exists():
+        logger.error(f"JSONL file not found: {path}")
         raise FileNotFoundError(f"JSONL file not found: {path}")
 
     if not path.is_file():
+        logger.error(f"Path is not a file: {path}")
         raise ValueError(f"Path is not a file: {path}")
+
+    entries = []
+    errors_count = 0
+    skipped_count = 0
 
     with path.open('r', encoding='utf-8') as f:
         for line_num, line in enumerate(f, 1):
@@ -89,14 +98,21 @@ def load_jsonl(file_path: str) -> Iterator[Dict]:
 
             # Skip empty lines
             if not line:
+                skipped_count += 1
+                logger.debug(f"Skipping empty line {line_num} in {path}")
                 continue
 
             try:
                 obj = json.loads(line)
-                yield obj
+                entries.append(obj)
+                logger.debug(f"Successfully parsed line {line_num} in {path}")
             except json.JSONDecodeError as e:
+                errors_count += 1
                 logger.warning(f"Failed to parse line {line_num} in {path}: {e}")
                 continue
+
+    logger.info(f"Loaded {len(entries)} entries from {path} with {errors_count} errors and {skipped_count} skipped lines")
+    return entries, errors_count, skipped_count
 
 
 def normalize_timestamp(ts_input: Optional[Any]) -> Optional[str]:
@@ -667,5 +683,108 @@ def extract_fields(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
             'metadata': {...}
         }
     """
-    # Use the new multi-format parser
-    return parse_entry(raw_entry)
+    # Validate input type
+    if not isinstance(raw_entry, dict):
+        logger.error(f"Invalid entry type: expected dict, got {type(raw_entry).__name__}")
+        return _get_fallback_entry("invalid_input_type", str(type(raw_entry).__name__))
+
+    # Check for completely invalid/empty data
+    if not raw_entry:
+        logger.warning("Empty entry provided, using fallback")
+        return _get_fallback_entry("empty_entry", "No data present")
+
+    # Validate timestamp format before normalization (if present)
+    timestamp_val = raw_entry.get('timestamp') or raw_entry.get('startTime') or raw_entry.get('createdAt') or raw_entry.get('lastTimestamp') or raw_entry.get('firstTimestamp')
+    if timestamp_val is not None:
+        # Validate timestamp format
+        if not _is_valid_timestamp_format(timestamp_val):
+            logger.warning(f"Invalid timestamp format: {timestamp_val} (type: {type(timestamp_val).__name__})")
+            # Continue processing - normalize_timestamp handles invalid values gracefully
+
+    try:
+        # Use the new multi-format parser
+        result = parse_entry(raw_entry)
+        logger.debug(f"Successfully extracted fields for entry with format: {result.get('metadata', {}).get('raw_format', 'unknown')}")
+        return result
+    except Exception as e:
+        logger.error(f"Unexpected error during field extraction: {e}")
+        return _get_fallback_entry("extraction_error", str(e))
+
+
+def _is_valid_timestamp_format(ts_input: Any) -> bool:
+    """
+    Validate if timestamp input has a recognized format.
+
+    Args:
+        ts_input: Timestamp value to validate
+
+    Returns:
+        True if format is recognized, False otherwise
+    """
+    if ts_input is None:
+        return True  # None is valid (will be normalized to None)
+
+    # Check numeric types (Unix epoch)
+    if isinstance(ts_input, (int, float)):
+        # Basic sanity check: timestamp should be reasonable
+        # Negative values are valid (before epoch), very large values might be milliseconds
+        try:
+            if ts_input > 1e15:  # Too large even for milliseconds
+                return False
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    # Check string types
+    if isinstance(ts_input, str):
+        ts_input = ts_input.strip()
+        if not ts_input:
+            return True  # Empty string is valid (will be normalized to None)
+
+        # Check for ISO 8601 format (contains 'T' or 'Z')
+        if 'T' in ts_input or 'Z' in ts_input or '+' in ts_input:
+            return True
+
+        # Check if it's a number string (Unix epoch as string)
+        try:
+            float(ts_input)
+            return True
+        except ValueError:
+            return False
+
+    # Check datetime objects
+    if isinstance(ts_input, datetime):
+        return True
+
+    return False
+
+
+def _get_fallback_entry(error_reason: str, error_detail: str) -> Dict[str, Any]:
+    """
+    Generate a fallback entry for when field extraction fails.
+
+    Args:
+        error_reason: Category of error that occurred
+        error_detail: Specific error details
+
+    Returns:
+        Minimal valid entry with error context
+    """
+    return {
+        'timestamp': None,
+        'service': 'unknown',
+        'event_type': 'unknown',
+        'status': 'unknown',
+        'error_code': f"extraction_failed_{error_reason}",
+        'duration_ms': None,
+        'cluster': 'unknown',
+        'namespace': 'unknown',
+        'metadata': {
+            'source_fields': {
+                'error_reason': error_reason,
+                'error_detail': error_detail
+            },
+            'raw_format': FORMAT_UNKNOWN,
+            'extraction_failed': True
+        }
+    }

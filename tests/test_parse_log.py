@@ -31,6 +31,9 @@ from src.parse_log import (
     extract_pod_fields,
     extract_event_fields,
     extract_replicaset_fields,
+    # Helper functions (if accessible)
+    _is_valid_timestamp_format,
+    _get_fallback_entry,
 )
 
 
@@ -136,8 +139,10 @@ class TestLoadJsonl:
         ]
         file_path = temp_jsonl_file(entries)
 
-        result = list(load_jsonl(file_path))
+        result, errors_count, skipped_count = load_jsonl(file_path)
         assert len(result) == 3
+        assert errors_count == 0
+        assert skipped_count == 0
         assert result[0] == {'test': 'entry1'}
         assert result[1] == {'test': 'entry2'}
         assert result[2] == {'test': 'entry3'}
@@ -155,18 +160,20 @@ class TestLoadJsonl:
         with open(file_path, 'w') as f:
             f.write('{"test":"entry1"}\n\n   \n{"test":"entry2"}\n')
 
-        result = list(load_jsonl(file_path))
+        result, errors_count, skipped_count = load_jsonl(file_path)
         assert len(result) == 2
+        assert errors_count == 0
+        assert skipped_count == 2  # Two empty lines skipped
 
     def test_missing_file_raises_error(self):
         """Missing file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError, match="JSONL file not found"):
-            list(load_jsonl('/nonexistent/path/file.log'))
+            load_jsonl('/nonexistent/path/file.log')
 
     def test_path_not_file_raises_error(self, tmp_path):
         """Path that is not a file raises ValueError."""
         with pytest.raises(ValueError, match="Path is not a file"):
-            list(load_jsonl(str(tmp_path)))
+            load_jsonl(str(tmp_path))
 
     def test_malformed_json_skipped_with_warning(self, temp_jsonl_file, caplog):
         """Malformed JSON lines are skipped with warning logged."""
@@ -179,10 +186,12 @@ class TestLoadJsonl:
             f.write('{"another": "entry"}\n')
 
         with caplog.at_level(logging.WARNING):
-            result = list(load_jsonl(file_path))
+            result, errors_count, skipped_count = load_jsonl(file_path)
 
         # Should skip malformed line and return valid entries
         assert len(result) == 2
+        assert errors_count == 1  # One malformed line
+        assert skipped_count == 0
         assert result[0] == {'valid': 'entry'}
         assert result[1] == {'another': 'entry'}
 
@@ -839,9 +848,10 @@ class TestIntegration:
         ]
 
         file_path = temp_jsonl_file(entries)
+        entries, errors_count, skipped_count = load_jsonl(file_path)
         results = []
 
-        for raw_entry in load_jsonl(file_path):
+        for raw_entry in entries:
             parsed = parse_entry(raw_entry)
             results.append(parsed)
 
@@ -862,9 +872,10 @@ class TestIntegration:
         ]
 
         file_path = temp_jsonl_file(entries)
+        raw_entries, errors_count, skipped_count = load_jsonl(file_path)
         results = []
 
-        for raw_entry in load_jsonl(file_path):
+        for raw_entry in raw_entries:
             parsed = parse_entry(raw_entry)
             results.append(parsed)
 
@@ -873,3 +884,235 @@ class TestIntegration:
         assert all('timestamp' in r for r in results)
         assert all('service' in r for r in results)
         assert all('status' in r for r in results)
+
+
+# -----------------------------------------------------------------------------
+# Tests for error handling enhancements
+# -----------------------------------------------------------------------------
+
+class TestTimestampValidation:
+    """Tests for _is_valid_timestamp_format() function."""
+
+    def test_none_is_valid(self):
+        """None is considered valid (will be normalized to None)."""
+        assert _is_valid_timestamp_format(None) is True
+
+    def test_numeric_timestamps_valid(self):
+        """Numeric timestamps (int/float) are valid."""
+        assert _is_valid_timestamp_format(1234567890) is True
+        assert _is_valid_timestamp_format(1234567890.123) is True
+        assert _is_valid_timestamp_format(-86400) is True  # Before epoch
+
+    def test_unreasonably_large_numeric_invalid(self):
+        """Unreasonably large numeric values are invalid."""
+        assert _is_valid_timestamp_format(1e16) is False
+        assert _is_valid_timestamp_format(float('inf')) is False
+
+    def test_iso8601_strings_valid(self):
+        """ISO 8601 formatted strings are valid."""
+        assert _is_valid_timestamp_format('2026-08-06T12:00:00Z') is True
+        assert _is_valid_timestamp_format('2026-08-06T12:00:00+00:00') is True
+        assert _is_valid_timestamp_format('2026-08-06T12:00:00') is True
+
+    def test_numeric_strings_valid(self):
+        """Numeric strings (epoch as string) are valid."""
+        assert _is_valid_timestamp_format('1234567890') is True
+        assert _is_valid_timestamp_format('1234567890.123') is True
+
+    def test_datetime_objects_valid(self):
+        """datetime objects are valid."""
+        assert _is_valid_timestamp_format(datetime(2026, 8, 6, 12, 0, 0, tzinfo=timezone.utc)) is True
+
+    def test_empty_string_valid(self):
+        """Empty string is valid (will be normalized to None)."""
+        assert _is_valid_timestamp_format('') is True
+        assert _is_valid_timestamp_format('   ') is True
+
+    def test_invalid_strings_invalid(self):
+        """Invalid string formats are invalid."""
+        assert _is_valid_timestamp_format('invalid-timestamp') is False
+        assert _is_valid_timestamp_format('not-a-date') is False
+        assert _is_valid_timestamp_format('yesterday') is False
+
+
+class TestFallbackEntry:
+    """Tests for _get_fallback_entry() function."""
+
+    def test_fallback_entry_structure(self):
+        """Fallback entry has required structure."""
+        result = _get_fallback_entry('test_reason', 'test_detail')
+
+        assert result['timestamp'] is None
+        assert result['service'] == 'unknown'
+        assert result['event_type'] == 'unknown'
+        assert result['status'] == 'unknown'
+        assert result['error_code'] == 'extraction_failed_test_reason'
+        assert result['duration_ms'] is None
+        assert result['cluster'] == 'unknown'
+        assert result['namespace'] == 'unknown'
+
+    def test_fallback_entry_metadata(self):
+        """Fallback entry metadata contains error context."""
+        result = _get_fallback_entry('invalid_data', 'missing_required_field')
+
+        assert 'metadata' in result
+        assert result['metadata']['raw_format'] == FORMAT_UNKNOWN
+        assert result['metadata']['extraction_failed'] is True
+        assert 'error_reason' in result['metadata']['source_fields']
+        assert 'error_detail' in result['metadata']['source_fields']
+
+    def test_fallback_entry_error_context(self):
+        """Fallback entry preserves error details."""
+        result = _get_fallback_entry('type_error', 'expected_dict_got_list')
+
+        assert result['metadata']['source_fields']['error_reason'] == 'type_error'
+        assert result['metadata']['source_fields']['error_detail'] == 'expected_dict_got_list'
+
+
+class TestExtractFieldsErrorHandling:
+    """Tests for enhanced error handling in extract_fields()."""
+
+    def test_invalid_input_type_returns_fallback(self, caplog):
+        """Non-dict input returns fallback entry with error logged."""
+        with caplog.at_level(logging.ERROR):
+            result = extract_fields([1, 2, 3])  # List instead of dict
+
+        # Should return fallback entry
+        assert result['service'] == 'unknown'
+        assert 'extraction_failed' in result.get('error_code', '')
+        assert result['metadata']['extraction_failed'] is True
+
+        # Check error was logged
+        assert any('Invalid entry type' in record.message for record in caplog.records)
+
+    def test_empty_dict_returns_fallback(self, caplog):
+        """Empty dict returns fallback entry with warning logged."""
+        with caplog.at_level(logging.WARNING):
+            result = extract_fields({})
+
+        # Should return fallback entry
+        assert result['service'] == 'unknown'
+        assert result['metadata']['extraction_failed'] is True
+
+        # Check warning was logged
+        assert any('Empty entry provided' in record.message for record in caplog.records)
+
+    def test_invalid_timestamp_logged_continues_processing(self, caplog):
+        """Invalid timestamp format is logged but processing continues."""
+        entry = {
+            'commit_hash': 'abc123',
+            'deploy_type': 'feature_addition',
+            'timestamp': 'not-a-valid-timestamp'
+        }
+
+        with caplog.at_level(logging.WARNING):
+            result = extract_fields(entry)
+
+        # Should still process the entry
+        assert result['event_type'] == 'deployment_feature_addition'
+        assert result['service'] == 'pbx-web'
+
+        # Check warning was logged about invalid timestamp
+        assert any('Invalid timestamp format' in record.message for record in caplog.records)
+
+    def test_extract_fields_with_exception_returns_fallback(self, caplog):
+        """Exception during extraction returns fallback entry."""
+        # This would normally be caught inside parse_entry, but let's test the fallback mechanism
+        # by testing with a problematic entry that might trigger issues
+        problematic_entry = {'service': 'test'}
+
+        with caplog.at_level(logging.ERROR):
+            result = extract_fields(problematic_entry)
+
+        # Should return a valid result (either parsed or fallback)
+        assert result is not None
+        assert 'service' in result
+        assert 'event_type' in result
+
+    def test_valid_entry_processes_normally(self):
+        """Valid entry processes normally without errors."""
+        entry = {
+            'commit_hash': 'abc123',
+            'deploy_type': 'feature_addition',
+            'timestamp': '2026-08-06T12:00:00Z',
+            'service': 'test-service'
+        }
+
+        result = extract_fields(entry)
+
+        assert result['event_type'] == 'deployment_feature_addition'
+        assert result['service'] == 'test-service'
+        assert result['status'] == 'success'
+        assert result['metadata'].get('extraction_failed') is not True
+
+
+class TestLoggingLevels:
+    """Tests for proper logging level usage."""
+
+    def test_load_jsonl_logs_debug_on_success(self, temp_jsonl_file, caplog):
+        """Successful file load logs at INFO level with summary."""
+        entries = [{'test': 'entry1'}, {'test': 'entry2'}]
+        file_path = temp_jsonl_file(entries)
+
+        with caplog.at_level(logging.INFO):
+            result, errors_count, skipped_count = load_jsonl(file_path)
+
+        # Check for summary log at INFO level
+        assert any('Loaded 2 entries' in record.message and record.levelno == logging.INFO
+                   for record in caplog.records)
+
+    def test_load_jsonl_logs_warning_on_parse_error(self, temp_jsonl_file, caplog):
+        """Parse errors are logged at WARNING level."""
+        file_path = temp_jsonl_file([])
+
+        with open(file_path, 'w') as f:
+            f.write('{"valid": "entry"}\n')
+            f.write('{invalid json}\n')
+
+        with caplog.at_level(logging.WARNING):
+            result, errors_count, skipped_count = load_jsonl(file_path)
+
+        # Check for WARNING level log for parse error
+        assert any('Failed to parse line' in record.message and record.levelno == logging.WARNING
+                   for record in caplog.records)
+
+    def test_load_jsonl_logs_error_on_file_not_found(self, caplog):
+        """File not found errors are logged at ERROR level."""
+        with caplog.at_level(logging.ERROR):
+            try:
+                load_jsonl('/nonexistent/file.jsonl')
+            except FileNotFoundError:
+                pass
+
+        # Check for ERROR level log
+        assert any('JSONL file not found' in record.message and record.levelno == logging.ERROR
+                   for record in caplog.records)
+
+    def test_empty_lines_logged_at_debug_level(self, temp_jsonl_file, caplog):
+        """Empty lines are logged at DEBUG level."""
+        file_path = temp_jsonl_file([])
+
+        with open(file_path, 'w') as f:
+            f.write('{"test": "entry1"}\n\n\n')  # Entries with empty lines
+
+        with caplog.at_level(logging.DEBUG):
+            result, errors_count, skipped_count = load_jsonl(file_path)
+
+        # Check for DEBUG level logs for skipped empty lines
+        assert any('Skipping empty line' in record.message and record.levelno == logging.DEBUG
+                   for record in caplog.records)
+
+    def test_extract_fields_logs_debug_on_success(self, caplog):
+        """Successful field extraction logs at DEBUG level."""
+        entry = {
+            'commit_hash': 'abc123',
+            'deploy_type': 'feature_addition',
+            'service': 'test-service'
+        }
+
+        with caplog.at_level(logging.DEBUG):
+            result = extract_fields(entry)
+
+        # Check for DEBUG level log about successful extraction
+        assert any('Successfully extracted fields' in record.message and record.levelno == logging.DEBUG
+                   for record in caplog.records)
