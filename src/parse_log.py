@@ -15,6 +15,49 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 
+# Format constants
+FORMAT_DEPLOYMENT = 'deployment'
+FORMAT_POD = 'pod'
+FORMAT_EVENT = 'event'
+FORMAT_REPLICASET = 'replicaset'
+FORMAT_UNKNOWN = 'unknown'
+
+
+def detect_format(raw_entry: Dict[str, Any]) -> str:
+    """
+    Detect the service log format based on entry structure and field names.
+
+    Analyzes the raw entry's field names and structure to determine which
+    service format it uses. Each format has a unique signature of fields.
+
+    Args:
+        raw_entry: Raw log entry dictionary
+
+    Returns:
+        Format string: 'deployment', 'pod', 'event', 'replicaset', or 'unknown'
+    """
+    # Deployment format: has commit_hash and deploy_type (pbx-web build history)
+    if 'commit_hash' in raw_entry and 'deploy_type' in raw_entry:
+        return FORMAT_DEPLOYMENT
+
+    # Pod format: has name/status/podIP but no commit_hash (whisper-stt pods)
+    if 'name' in raw_entry and 'status' in raw_entry and 'podIP' in raw_entry:
+        if 'commit_hash' not in raw_entry:
+            return FORMAT_POD
+
+    # Event format: has type/reason/object fields (Kubernetes events)
+    if 'type' in raw_entry and 'reason' in raw_entry and 'object' in raw_entry:
+        return FORMAT_EVENT
+
+    # ReplicaSet format: has name/replicas/readyReplicas but no podIP/commit_hash
+    if 'name' in raw_entry and 'replicas' in raw_entry and 'readyReplicas' in raw_entry:
+        if 'commit_hash' not in raw_entry and 'podIP' not in raw_entry:
+            return FORMAT_REPLICASET
+
+    # Fallback for unknown formats
+    logger.debug(f"Unable to detect format for entry with keys: {list(raw_entry.keys())}")
+    return FORMAT_UNKNOWN
+
 
 def load_jsonl(file_path: str) -> Iterator[Dict]:
     """
@@ -157,6 +200,328 @@ def detect_entry_type(raw_entry: Dict[str, Any]) -> str:
     return 'unknown'
 
 
+def extract_deployment_fields(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract and normalize fields from deployment log entries.
+
+    Handles pbx-web build history format with commit tracking.
+
+    Args:
+        raw_entry: Raw deployment entry with commit_hash, deploy_type, etc.
+
+    Returns:
+        Normalized dictionary with standard schema fields
+    """
+    timestamp = normalize_timestamp(raw_entry.get('timestamp'))
+    service = raw_entry.get('service', 'pbx-web')
+
+    # Determine status from deploy_type
+    deploy_type = raw_entry.get('deploy_type', '').lower()
+    if deploy_type == 'rollback':
+        status = 'failure'
+    elif deploy_type == 'bugfix':
+        status = 'warning'
+    elif deploy_type in ['feature_addition', 'config_change', 'initial_deployment']:
+        status = 'success'
+    else:
+        status = 'unknown'
+
+    # Determine event type
+    event_type = f"deployment_{deploy_type}" if deploy_type else 'deployment'
+
+    # Extract error code if failure
+    error_code = deploy_type if deploy_type == 'rollback' else None
+
+    # Build metadata
+    metadata = {
+        'source_fields': {
+            'commit_hash': raw_entry.get('commit_hash'),
+            'author': raw_entry.get('author'),
+            'message': raw_entry.get('message'),
+            'files_changed': raw_entry.get('files_changed'),
+            'files': raw_entry.get('files', []),
+            'image_version': raw_entry.get('image_version')
+        },
+        'raw_format': FORMAT_DEPLOYMENT
+    }
+
+    return {
+        'timestamp': timestamp,
+        'service': service,
+        'event_type': event_type,
+        'status': status,
+        'error_code': error_code,
+        'duration_ms': None,
+        'cluster': raw_entry.get('cluster', 'ardenone-cluster'),
+        'namespace': raw_entry.get('namespace', 'pbx-web'),
+        'metadata': metadata
+    }
+
+
+def extract_pod_fields(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract and normalize fields from pod log entries.
+
+    Handles whisper-stt pod status format with pod health information.
+
+    Args:
+        raw_entry: Raw pod entry with name, status, restartCount, etc.
+
+    Returns:
+        Normalized dictionary with standard schema fields
+    """
+    timestamp = normalize_timestamp(raw_entry.get('startTime'))
+    service = raw_entry.get('service', 'whisper-stt')
+
+    # Determine status from pod status
+    pod_status = raw_entry.get('status', '').lower()
+    if pod_status == 'running':
+        status = 'success' if raw_entry.get('ready', False) else 'warning'
+    elif pod_status in ['failed', 'error', 'crashloopbackoff']:
+        status = 'failure'
+    elif pod_status in ['pending', 'containercreating']:
+        status = 'warning'
+    else:
+        status = 'unknown'
+
+    event_type = 'pod_status'
+
+    # Extract error code if failure
+    error_code = pod_status if pod_status in ['failed', 'error', 'crashloopbackoff'] else None
+
+    # Duration: calculate from startTime to now
+    duration_ms = None
+    start_time = raw_entry.get('startTime')
+    if start_time:
+        try:
+            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            now = datetime.now(start_dt.tzinfo)
+            duration_ms = int((now - start_dt).total_seconds() * 1000)
+        except (ValueError, OSError):
+            pass
+
+    # Build metadata
+    metadata = {
+        'source_fields': {
+            'name': raw_entry.get('name'),
+            'ready': raw_entry.get('ready'),
+            'restartCount': raw_entry.get('restartCount'),
+            'nodeName': raw_entry.get('nodeName'),
+            'podIP': raw_entry.get('podIP'),
+            'image': raw_entry.get('image'),
+            'conditions': raw_entry.get('conditions', [])
+        },
+        'raw_format': FORMAT_POD
+    }
+
+    return {
+        'timestamp': timestamp,
+        'service': service,
+        'event_type': event_type,
+        'status': status,
+        'error_code': error_code,
+        'duration_ms': duration_ms,
+        'cluster': raw_entry.get('cluster', 'ardenone-cluster'),
+        'namespace': raw_entry.get('namespace', 'whisper-stt'),
+        'metadata': metadata
+    }
+
+
+def extract_event_fields(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract and normalize fields from Kubernetes event log entries.
+
+    Handles Kubernetes event format with type, reason, and object fields.
+
+    Args:
+        raw_entry: Raw event entry with type, reason, object, message, etc.
+
+    Returns:
+        Normalized dictionary with standard schema fields
+    """
+    timestamp = normalize_timestamp(raw_entry.get('lastTimestamp') or raw_entry.get('firstTimestamp'))
+    service = raw_entry.get('service', 'pbx-web')
+
+    # Determine status from event type
+    event_type_field = raw_entry.get('type', '').lower()
+    if event_type_field == 'warning':
+        status = 'warning'
+    elif event_type_field == 'normal':
+        status = 'success'
+    else:
+        status = 'unknown'
+
+    event_type = f"event_{raw_entry.get('reason', '').lower()}" if raw_entry.get('reason') else 'event'
+
+    # Error code from reason
+    error_code = raw_entry.get('reason') if event_type_field == 'warning' else None
+
+    # Build metadata
+    metadata = {
+        'source_fields': {
+            'type': raw_entry.get('type'),
+            'reason': raw_entry.get('reason'),
+            'object': raw_entry.get('object'),
+            'message': raw_entry.get('message'),
+            'firstTimestamp': raw_entry.get('firstTimestamp'),
+            'lastTimestamp': raw_entry.get('lastTimestamp')
+        },
+        'raw_format': FORMAT_EVENT
+    }
+
+    return {
+        'timestamp': timestamp,
+        'service': service,
+        'event_type': event_type,
+        'status': status,
+        'error_code': error_code,
+        'duration_ms': None,
+        'cluster': raw_entry.get('cluster', 'ardenone-cluster'),
+        'namespace': raw_entry.get('namespace', 'pbx-web'),
+        'metadata': metadata
+    }
+
+
+def extract_replicaset_fields(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract and normalize fields from ReplicaSet log entries.
+
+    Handles Kubernetes ReplicaSet format with replica and readiness information.
+
+    Args:
+        raw_entry: Raw replicaset entry with name, replicas, readyReplicas, etc.
+
+    Returns:
+        Normalized dictionary with standard schema fields
+    """
+    timestamp = normalize_timestamp(raw_entry.get('createdAt'))
+    service = raw_entry.get('service', 'pbx-web')
+
+    # Determine status from replica readiness
+    replicas = raw_entry.get('replicas', 0)
+    ready_replicas = raw_entry.get('readyReplicas', 0)
+
+    if ready_replicas == replicas and replicas > 0:
+        status = 'success'
+    elif ready_replicas == 0 and replicas > 0:
+        status = 'failure'
+    elif ready_replicas < replicas:
+        status = 'warning'
+    else:
+        status = 'unknown'
+
+    event_type = 'replicaset_status'
+
+    # Error code if not all replicas ready
+    error_code = 'replicas_unready' if ready_replicas < replicas else None
+
+    # Duration: calculate from createdAt to now
+    duration_ms = None
+    created_at = raw_entry.get('createdAt')
+    if created_at:
+        try:
+            created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            now = datetime.now(created_dt.tzinfo)
+            duration_ms = int((now - created_dt).total_seconds() * 1000)
+        except (ValueError, OSError):
+            pass
+
+    # Build metadata
+    metadata = {
+        'source_fields': {
+            'name': raw_entry.get('name'),
+            'replicas': replicas,
+            'readyReplicas': ready_replicas,
+            'observedGeneration': raw_entry.get('observedGeneration'),
+            'conditions': raw_entry.get('conditions')
+        },
+        'raw_format': FORMAT_REPLICASET
+    }
+
+    return {
+        'timestamp': timestamp,
+        'service': service,
+        'event_type': event_type,
+        'status': status,
+        'error_code': error_code,
+        'duration_ms': duration_ms,
+        'cluster': raw_entry.get('cluster', 'ardenone-cluster'),
+        'namespace': raw_entry.get('namespace', 'pbx-web'),
+        'metadata': metadata
+    }
+
+
+def parse_entry(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Parse a log entry and normalize it to the unified schema.
+
+    This is the main entry point for multi-format log parsing. It detects
+    the format of the raw entry and dispatches to the appropriate field
+    extraction function, normalizing all formats to the same output schema.
+
+    Args:
+        raw_entry: Raw log entry dictionary from JSONL file
+
+    Returns:
+        Normalized dictionary with fields:
+        - timestamp: ISO 8601 formatted timestamp (or None)
+        - service: Service name (pbx-web, whisper-stt, etc.)
+        - event_type: Entry type (deployment, pod_status, event, replicaset_status, unknown)
+        - status: Normalized status (success, failure, warning, unknown)
+        - error_code: Error identifier or None
+        - duration_ms: Duration in milliseconds or None
+        - cluster: Cluster name
+        - namespace: Namespace name
+        - metadata: Additional metadata including source fields and format
+
+    Examples:
+        >>> raw = {"commit_hash": "abc123", "deploy_type": "feature_addition", "service": "pbx-web"}
+        >>> parse_entry(raw)
+        {
+            'timestamp': None,
+            'service': 'pbx-web',
+            'event_type': 'deployment_feature_addition',
+            'status': 'success',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': 'ardenone-cluster',
+            'namespace': 'pbx-web',
+            'metadata': {...}
+        }
+    """
+    # Detect the format
+    log_format = detect_format(raw_entry)
+
+    # Dispatch to appropriate extraction function
+    if log_format == FORMAT_DEPLOYMENT:
+        return extract_deployment_fields(raw_entry)
+    elif log_format == FORMAT_POD:
+        return extract_pod_fields(raw_entry)
+    elif log_format == FORMAT_EVENT:
+        return extract_event_fields(raw_entry)
+    elif log_format == FORMAT_REPLICASET:
+        return extract_replicaset_fields(raw_entry)
+    else:
+        # Unknown format - log a warning and return minimal info
+        logger.warning(f"Unknown log format for entry with keys: {list(raw_entry.keys())}")
+
+        # Return minimal normalized entry for unknown formats
+        return {
+            'timestamp': None,
+            'service': raw_entry.get('service', 'unknown'),
+            'event_type': 'unknown',
+            'status': 'unknown',
+            'error_code': None,
+            'duration_ms': None,
+            'cluster': raw_entry.get('cluster', 'unknown'),
+            'namespace': raw_entry.get('namespace', 'unknown'),
+            'metadata': {
+                'source_fields': raw_entry,
+                'raw_format': FORMAT_UNKNOWN
+            }
+        }
+
+
 def extract_status(raw_entry: Dict[str, Any], entry_type: str) -> str:
     """
     Extract and normalize status from raw entry.
@@ -268,8 +633,9 @@ def extract_fields(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract and normalize fields from a raw log entry.
 
-    This function implements field extraction and normalization for pbx-web
-    service logs, mapping raw field names to the standardized output schema.
+    This function implements field extraction and normalization for multiple
+    service log formats. It now uses the multi-format parser which automatically
+    detects the format and normalizes all formats to the same output schema.
 
     Args:
         raw_entry: Raw log entry dictionary from JSONL file
@@ -277,85 +643,29 @@ def extract_fields(raw_entry: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Normalized dictionary with fields:
         - timestamp: ISO 8601 formatted timestamp (or None)
-        - service: Service name (always 'pbx-web' for now)
-        - event_type: Entry type (metadata, pod_info, deployment, error, health_metric, unknown)
+        - service: Service name (pbx-web, whisper-stt, etc.)
+        - event_type: Entry type (deployment, pod_status, event, replicaset_status, unknown)
         - status: Normalized status (success, failure, warning, unknown)
         - error_code: Error identifier or None
         - duration_ms: Duration in milliseconds or None
         - cluster: Cluster name
         - namespace: Namespace name
-        - metadata: Additional metadata including source fields
+        - metadata: Additional metadata including source fields and format
 
     Examples:
-        >>> raw = {
-        ...     "pod_name": "pbx-web-5ff68464d-mkn8n",
-        ...     "age_days": 8,
-        ...     "restart_count": 0,
-        ...     "status": "running"
-        ... }
+        >>> raw = {"commit_hash": "abc123", "deploy_type": "feature_addition", "service": "pbx-web"}
         >>> extract_fields(raw)
         {
             'timestamp': None,
             'service': 'pbx-web',
-            'event_type': 'pod_info',
+            'event_type': 'deployment_feature_addition',
             'status': 'success',
             'error_code': None,
-            'duration_ms': 691200000,
+            'duration_ms': None,
             'cluster': 'ardenone-cluster',
             'namespace': 'pbx-web',
             'metadata': {...}
         }
     """
-    # Detect entry type
-    entry_type = detect_entry_type(raw_entry)
-
-    # Extract timestamp (check multiple possible fields)
-    timestamp = None
-    for ts_field in ['timestamp', 'data_collection_timestamp', 'creation_timestamp', 'time']:
-        if ts_field in raw_entry:
-            timestamp = normalize_timestamp(raw_entry[ts_field])
-            if timestamp:
-                break
-
-    # Extract service (hardcoded for pbx-web initially)
-    service = raw_entry.get('service', 'pbx-web')
-
-    # Extract and normalize status
-    status = extract_status(raw_entry, entry_type)
-
-    # Extract error code
-    error_code = extract_error_code(raw_entry, entry_type)
-
-    # Extract duration
-    duration_ms = extract_duration_ms(raw_entry, entry_type)
-
-    # Extract cluster and namespace
-    cluster = raw_entry.get('cluster', 'ardenone-cluster')
-    namespace = raw_entry.get('namespace', 'pbx-web')
-
-    # Build metadata object with source fields
-    metadata = {
-        'source_fields': {},
-        'raw_entry_type': entry_type
-    }
-
-    # Preserve select source fields in metadata
-    preserve_fields = ['pod_name', 'image', 'restart_count', 'health_status',
-                      'error_pattern', 'severity', 'metric_type', 'health_metric']
-
-    for field in preserve_fields:
-        if field in raw_entry:
-            metadata['source_fields'][field] = raw_entry[field]
-
-    # Return normalized entry
-    return {
-        'timestamp': timestamp,
-        'service': service,
-        'event_type': entry_type,
-        'status': status,
-        'error_code': error_code,
-        'duration_ms': duration_ms,
-        'cluster': cluster,
-        'namespace': namespace,
-        'metadata': metadata
-    }
+    # Use the new multi-format parser
+    return parse_entry(raw_entry)
