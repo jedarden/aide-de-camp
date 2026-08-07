@@ -1,0 +1,32 @@
+{
+  "collection_timestamp": "2026-08-06T23:59:59Z",
+  "collection_period": {
+    "start": "2026-07-07T00:00:00Z",
+    "end": "2026-08-06T23:59:59Z"
+  },
+  "workflow_templates": [
+    {
+      "name": "whisper-stt-build",
+      "namespace": "argo-workflows",
+      "age_days": 72,
+      "description": "Builds and deploys whisper-stt container image"
+    },
+    {
+      "name": "nixos-asterisk-ci",
+      "namespace": "argo-workflows",
+      "age_days": 72,
+      "description": "CI workflow for nixos-asterisk project"
+    }
+  ],
+  "workflow_runs": {
+    "whisper-stt-build": [],
+    "nixos-asterisk-ci": []
+  },
+  "summary": {
+    "total_runs_in_period": 0,
+    "successful_runs": 0,
+    "failed_runs": 0,
+    "last_build_date": null,
+    "note": "No whisper-stt-build workflow runs detected in the 30-day period. The last deployment was on 2026-07-12 via image ronaldraygun/whisper-stt:1.8.6, suggesting deployment was done through ArgoCD sync rather than CI build pipeline."
+  }
+}

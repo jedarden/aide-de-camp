@@ -1,0 +1,63 @@
+{
+  "collection_timestamp": "2026-08-06T23:59:59Z",
+  "collection_period": {
+    "start": "2026-07-07T00:00:00Z",
+    "end": "2026-08-06T23:59:59Z"
+  },
+  "deployments": [
+    {
+      "name": "whisper-stt",
+      "namespace": "whisper-stt",
+      "created": "2026-05-01T17:26:49Z",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "updated_replicas": 1,
+      "current_replicaset": "whisper-stt-847fd8d7b9",
+      "last_update": "2026-07-12T16:54:57Z",
+      "conditions": [
+        {
+          "type": "Available",
+          "status": "True",
+          "reason": "MinimumReplicasAvailable",
+          "message": "Deployment has minimum availability.",
+          "lastTransitionTime": "2026-07-12T16:54:57Z"
+        },
+        {
+          "type": "Progressing",
+          "status": "True",
+          "reason": "NewReplicaSetAvailable",
+          "message": "ReplicaSet \"whisper-stt-847fd8d7b9\" has successfully progressed.",
+          "lastTransitionTime": "2026-07-12T16:54:57Z"
+        }
+      ]
+    },
+    {
+      "name": "whisper-openai",
+      "namespace": "whisper-stt",
+      "created": "2026-06-14T02:10:48Z",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "updated_replicas": 1,
+      "current_replicaset": "whisper-openai-68966786fb",
+      "last_update": "2026-06-14T04:56:53Z",
+      "conditions": [
+        {
+          "type": "Available",
+          "status": "True",
+          "reason": "MinimumReplicasAvailable",
+          "message": "Deployment has minimum availability.",
+          "lastTransitionTime": "2026-06-14T03:50:27Z"
+        },
+        {
+          "type": "Progressing",
+          "status": "True",
+          "reason": "NewReplicaSetAvailable",
+          "message": "ReplicaSet \"whisper-openai-68966786fb\" has successfully progressed.",
+          "lastTransitionTime": "2026-06-14T04:56:53Z"
+        }
+      ]
+    }
+  ]
+}
