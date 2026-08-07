@@ -26,7 +26,8 @@ Usage:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, Dict, List, Union
+from datetime import datetime, timedelta
+from typing import Any, Optional, Dict, List, Union, Tuple
 
 
 @dataclass(frozen=True)
@@ -225,8 +226,134 @@ class ComparisonReport:
         return (self.matching_count + self.partial_match_count) / self.total_comparisons
 
 
+def detect_coverage_gaps(
+    deployments: List[Dict[str, Any]],
+    timestamp_field: str = "created_at",
+    gap_threshold_days: int = 1
+) -> List[Tuple[datetime, datetime]]:
+    """
+    Detect coverage gaps in a deployment sequence.
+
+    This function identifies temporal gaps between deployments, which can indicate
+    periods where no deployments occurred. Useful for validating deployment coverage
+    and identifying potential data collection or deployment issues.
+
+    Args:
+        deployments: List of deployment dictionaries with timestamp fields
+        timestamp_field: Name of the field containing ISO 8601 timestamp (default: "created_at")
+        gap_threshold_days: Minimum number of days to consider a gap (default: 1)
+
+    Returns:
+        List of tuples (start_timestamp, end_timestamp) representing detected gaps.
+        Returns empty list if no gaps are found or if input is invalid.
+
+    Edge Cases Handled:
+        - Empty deployment sequence: returns empty list
+        - Single deployment: returns empty list (cannot detect gaps with one data point)
+        - Unsorted timestamps: automatically sorts before gap detection
+        - Invalid timestamps: skips deployments with missing/invalid timestamps
+        - Missing timestamp_field: uses default field name
+
+    Example:
+        >>> deployments = [
+        ...     {"name": "deploy-1", "created_at": "2026-08-01T00:00:00Z"},
+        ...     {"name": "deploy-2", "created_at": "2026-08-05T00:00:00Z"},
+        ...     {"name": "deploy-3", "created_at": "2026-08-06T00:00:00Z"},
+        ... ]
+        >>> gaps = detect_coverage_gaps(deployments, gap_threshold_days=2)
+        >>> len(gaps)
+        1
+        >>> # Gap detected between 2026-08-01 and 2026-08-05 (4 days)
+    """
+    # Handle edge cases
+    if not deployments:
+        return []
+
+    if len(deployments) < 2:
+        return []
+
+    gaps = []
+    valid_timestamps = []
+
+    # Extract and parse timestamps
+    for deployment in deployments:
+        if not isinstance(deployment, dict):
+            continue
+
+        timestamp_str = deployment.get(timestamp_field)
+        if not timestamp_str:
+            continue
+
+        try:
+            # Parse ISO 8601 timestamp
+            timestamp = _parse_timestamp(timestamp_str)
+            valid_timestamps.append(timestamp)
+        except (ValueError, TypeError):
+            # Skip invalid timestamps
+            continue
+
+    # Need at least 2 valid timestamps to detect gaps
+    if len(valid_timestamps) < 2:
+        return []
+
+    # Sort timestamps to ensure chronological order
+    valid_timestamps.sort()
+
+    # Detect gaps between consecutive deployments
+    for i in range(len(valid_timestamps) - 1):
+        current_timestamp = valid_timestamps[i]
+        next_timestamp = valid_timestamps[i + 1]
+
+        # Calculate time difference
+        time_diff = next_timestamp - current_timestamp
+
+        # Check if gap exceeds threshold
+        if time_diff.days >= gap_threshold_days:
+            # Gap starts after current deployment and ends at next deployment
+            gap_start = current_timestamp + timedelta(seconds=1)
+            gap_end = next_timestamp - timedelta(seconds=1)
+            gaps.append((gap_start, gap_end))
+
+    return gaps
+
+
+def _parse_timestamp(timestamp_str: str) -> datetime:
+    """
+    Parse ISO 8601 timestamp string to datetime object.
+
+    Handles various ISO 8601 formats including:
+    - 2026-08-01T00:00:00Z
+    - 2026-08-01T00:00:00+00:00
+    - 2026-08-01T00:00:00.123Z
+
+    Args:
+        timestamp_str: ISO 8601 timestamp string
+
+    Returns:
+        datetime object
+
+    Raises:
+        ValueError: If timestamp string is invalid or cannot be parsed
+    """
+    if not timestamp_str:
+        raise ValueError("Timestamp string cannot be empty")
+
+    # Handle Z suffix (UTC)
+    ts = timestamp_str
+    if ts.endswith('Z'):
+        ts = ts[:-1] + '+00:00'
+
+    # Parse using fromisoformat
+    try:
+        return datetime.fromisoformat(ts.replace('+00:00', ''))
+    except ValueError as e:
+        raise ValueError(f"Invalid ISO 8601 timestamp: {timestamp_str}") from e
+
+
 __all__ = [
     "FieldDiff",
     "ComparisonResult",
     "ComparisonReport",
+    "detect_coverage_gaps",
+    "_parse_timestamp",
 ]
