@@ -181,18 +181,18 @@ def categorize_event(log_data: Dict[str, Any]) -> EventType:
 
     if _is_deployment_complete(event_type, status, source_fields):
         return EventType.DEPLOYMENT_COMPLETE
-
-    # Final fallback: unknown events
-    # This is the last resort when no specific pattern matches.
-    # Events reach this point when they:
-    # - Pass all validation checks (not None, proper dict structure)
-    # - Have valid event_type, status, and metadata fields
-    # - Do NOT match any of the specific detection patterns above
-    #
-    # This fallback ensures ALL events are categorized, preventing data loss
-    # and allowing for later analysis of emerging event types that may not
-    # fit into known patterns.
-    return EventType.UNKNOWN
+    else:
+        # Final fallback: unknown events
+        # This is the last resort when no specific pattern matches.
+        # Events reach this point when they:
+        # - Pass all validation checks (not None, proper dict structure)
+        # - Have valid event_type, status, and metadata fields
+        # - Do NOT match any of the specific detection patterns above
+        #
+        # This fallback ensures ALL events are categorized, preventing data loss
+        # and allowing for later analysis of emerging event types that may not
+        # fit into known patterns.
+        return EventType.UNKNOWN
 
 
 def _is_oom_event(error_code: Optional[str], source_fields: Dict[str, Any]) -> bool:
