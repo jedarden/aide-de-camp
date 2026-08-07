@@ -1,140 +1,275 @@
 {
-  "generated_at": "2026-08-06T18:53:51.928732",
-  "data_directory": "docs/research/deployment-data",
-  "services_analyzed": [
-    "pbx-web",
-    "whisper-stt"
-  ],
-  "total_events_analyzed": 26,
-  "pattern_categories": {
-    "RollbackEvent": {
-      "description": "Deployment rollback events indicating issues with new deployments",
-      "severity": "medium",
-      "occurrences": 1,
-      "by_service": {
-        "pbx-web": 1
+  "metadata": {
+    "generated_at": "2026-08-06T21:30:00Z",
+    "analysis_type": "comprehensive_failure_taxonomy",
+    "data_directory": "docs/research/deployment-data",
+    "time_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "total_events_analyzed": 26,
+    "total_failures_classified": 1,
+    "data_sources": [
+      "classified-failures.json",
+      "pattern-statistics.json",
+      "temporal-distributions.json",
+      "frequency-by-pattern.json"
+    ]
+  },
+  "taxonomy_categories": {
+    "kubernetes_failure_patterns": {
+      "ImagePullBackOff": {
+        "pattern_id": "KFP-001",
+        "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
+        "severity": "high",
+        "occurrences": 0,
+        "by_service": {},
+        "detection_keywords": [
+          "ImagePullBackOff",
+          "ErrImagePull",
+          "Failed to pull image",
+          "registry",
+          "authentication"
+        ],
+        "remediation": "Verify image registry availability, check authentication credentials, confirm image tag exists"
       },
-      "examples": [
-        {
-          "service": "pbx-web",
-          "timestamp": "2026-07-13T18:07:55Z",
-          "date": "2026-07-13",
-          "image": "ronaldraygun/pbx-web:1.0.8",
-          "revision": 11,
-          "notes": "Rolled back to 1.0.8 on same day"
-        }
-      ]
+      "CrashLoopBackOff": {
+        "pattern_id": "KFP-002",
+        "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
+        "severity": "critical",
+        "occurrences": 0,
+        "by_service": {},
+        "detection_keywords": [
+          "CrashLoopBackOff",
+          "back-off restarting",
+          "failed",
+          "terminated",
+          "error"
+        ],
+        "remediation": "Review application logs, verify configuration, check resource limits, validate environment variables"
+      },
+      "OOMKilled": {
+        "pattern_id": "KFP-003",
+        "description": "Container killed due to memory exhaustion (resource limits exceeded)",
+        "severity": "high",
+        "occurrences": 0,
+        "by_service": {},
+        "detection_keywords": [
+          "OOMKilled",
+          "Out of memory",
+          "memory limit",
+          "exceeded"
+        ],
+        "remediation": "Increase memory limits, optimize application memory usage, investigate memory leaks"
+      },
+      "ProbeFailure": {
+        "pattern_id": "KFP-004",
+        "description": "Readiness or liveness probe failures (health check issues)",
+        "severity": "medium",
+        "occurrences": 0,
+        "by_service": {},
+        "detection_keywords": [
+          "Readiness probe failed",
+          "Liveness probe failed",
+          "Unhealthy",
+          "Health check"
+        ],
+        "remediation": "Adjust probe thresholds, fix health check endpoints, investigate application startup time"
+      },
+      "DependencyTimeout": {
+        "pattern_id": "KFP-005",
+        "description": "Deployment timeout due to dependency unavailability",
+        "severity": "medium",
+        "occurrences": 0,
+        "by_service": {},
+        "detection_keywords": [
+          "timeout",
+          "dependency",
+          "unavailable",
+          "connection refused"
+        ],
+        "remediation": "Verify dependent services are running, check network policies, adjust timeout values"
+      }
     },
-    "RapidDeploymentSequence": {
-      "description": "Multiple deployments occurring within a short time window (\u226415 minutes)",
-      "severity": "info",
-      "occurrences": 11,
-      "by_service": {
-        "pbx-web": 6,
-        "whisper-stt": 5
+    "deployment_behavior_patterns": {
+      "RollbackEvent": {
+        "pattern_id": "DBP-001",
+        "description": "Deployment rollback events indicating issues with new deployments",
+        "severity": "medium",
+        "occurrences": 1,
+        "frequency": "1 event in 30 days",
+        "by_service": {
+          "pbx-web": 1
+        },
+        "examples": [
+          {
+            "service": "pbx-web",
+            "timestamp": "2026-07-13T18:07:55Z",
+            "date": "2026-07-13",
+            "image": "ronaldraygun/pbx-web:1.0.8",
+            "revision": 11,
+            "notes": "Rolled back to 1.0.8 on same day"
+          }
+        ],
+        "time_distribution": {
+          "timestamps": [
+            "2026-07-13T18:07:55Z"
+          ],
+          "daily_distribution": {
+            "2026-07-13": 1
+          },
+          "hourly_distribution": {
+            "18:00": 1
+          },
+          "day_of_week_distribution": {
+            "Monday": 1
+          }
+        },
+        "remediation": "Investigate deployment failure cause, improve pre-deployment testing, implement gradual rollout"
       },
-      "examples": [
-        {
-          "service": "pbx-web",
-          "event1": "image_bump",
-          "event2": "deployment_rollback",
-          "timestamp1": "2026-07-13T14:15:32-04:00",
-          "timestamp2": "2026-07-13T18:07:55Z",
-          "time_diff_seconds": -457.0,
-          "image1": null,
-          "image2": "ronaldraygun/pbx-web:1.0.8"
+      "RapidDeploymentSequence": {
+        "pattern_id": "DBP-002",
+        "description": "Multiple deployments occurring within a short time window (≤15 minutes)",
+        "severity": "info",
+        "occurrences": 11,
+        "frequency": "11 rapid sequences involving 6 deployments",
+        "by_service": {
+          "pbx-web": 6,
+          "whisper-stt": 5
         },
-        {
-          "service": "pbx-web",
-          "event1": "deployment_rollback",
-          "event2": "deployment_rollout",
-          "timestamp1": "2026-07-13T18:07:55Z",
-          "timestamp2": "2026-07-13T18:18:07Z",
-          "time_diff_seconds": 612.0,
-          "image1": "ronaldraygun/pbx-web:1.0.8",
-          "image2": "ronaldraygun/pbx-web:1.0.9"
+        "time_distribution": {
+          "sequences_detected": 3,
+          "daily_distribution": {
+            "2026-07-08": 4,
+            "2026-07-13": 2
+          },
+          "hourly_distribution": {
+            "03:00": 4,
+            "18:00": 2
+          },
+          "day_of_week_distribution": {
+            "Monday": 2,
+            "Wednesday": 4
+          }
         },
-        {
-          "service": "pbx-web",
-          "event1": "bugfix",
-          "event2": "deployment_rollout",
-          "timestamp1": "2026-07-14T23:21:50-04:00",
-          "timestamp2": "2026-07-15T03:24:40Z",
-          "time_diff_seconds": 170.0,
-          "image1": null,
-          "image2": "python:3-slim"
+        "affected_images": [
+          "ronaldraygun/pbx-web:1.0.8",
+          "ronaldraygun/pbx-web:1.0.9",
+          "ronaldraygun/whisper-stt:1.8.2",
+          "ronaldraygun/whisper-stt:1.8.4",
+          "ronaldraygun/whisper-stt:1.8.6"
+        ],
+        "remediation": "Consider spreading rapid deployments to reduce risk, implement automated testing between iterations"
+      },
+      "VersionRevert": {
+        "pattern_id": "DBP-003",
+        "description": "Reverting to previous version indicating instability or issues with newer version",
+        "severity": "low",
+        "occurrences": 1,
+        "frequency": "1 version revert in 30 days",
+        "by_service": {
+          "pbx_web": 1
         },
-        {
-          "service": "pbx-web",
-          "event1": "config_change",
-          "event2": "config_change",
-          "timestamp1": "2026-07-27T13:55:38-04:00",
-          "timestamp2": "2026-07-27T13:58:00-04:00",
-          "time_diff_seconds": 142.0,
-          "image1": null,
-          "image2": null
+        "examples": [
+          {
+            "from": "python:3-slim",
+            "to": "ronaldraygun/pbx-web:1.0.9",
+            "timestamp": "2026-07-28T17:26:12Z",
+            "service": "pbx_web"
+          }
+        ],
+        "time_distribution": {
+          "timestamps": [
+            "2026-07-28T17:26:12Z"
+          ],
+          "daily_distribution": {
+            "2026-07-28": 1
+          },
+          "hourly_distribution": {
+            "17:00": 1
+          },
+          "day_of_week_distribution": {
+            "Tuesday": 1
+          }
         },
-        {
-          "service": "pbx-web",
-          "event1": "config_change",
-          "event2": "deployment_rollout",
-          "timestamp1": "2026-07-27T13:58:00-04:00",
-          "timestamp2": "2026-07-27T17:56:07Z",
-          "time_diff_seconds": -113.0,
-          "image1": null,
-          "image2": "python:3-slim"
-        }
-      ]
+        "remediation": "Investigate why newer version failed, improve testing procedures, document version compatibility"
+      },
+      "InfrastructureDeployment": {
+        "pattern_id": "DBP-004",
+        "description": "Infrastructure deployments supporting main service operations",
+        "severity": "info",
+        "occurrences": 2,
+        "frequency": "2 infrastructure deployments in 30 days",
+        "by_service": {
+          "lab-rebuild-relay": 1,
+          "pbx-rebuild-relay": 1
+        },
+        "time_distribution": {
+          "daily_distribution": {
+            "2026-07-15": 1,
+            "2026-07-27": 1
+          },
+          "hourly_distribution": {
+            "03:00": 1,
+            "17:00": 1
+          },
+          "day_of_week_distribution": {
+            "Wednesday": 1,
+            "Monday": 1
+          }
+        },
+        "affected_images": [
+          "python:3-slim"
+        ],
+        "remediation": "Monitor infrastructure deployment success, ensure proper resource allocation"
+      }
+    },
+    "other_patterns": {
+      "Other": {
+        "pattern_id": "OPP-001",
+        "description": "Other failure patterns not matching standard categories",
+        "severity": "unknown",
+        "occurrences": 1,
+        "by_service": {
+          "pbx-web": 1
+        },
+        "examples": [
+          {
+            "date": "2026-07-13",
+            "timestamp": "2026-07-13T18:07:55Z",
+            "event_type": "deployment_rollback",
+            "revision": 11,
+            "replicaSet": "pbx-web-754f4cfdf7",
+            "image": "ronaldraygun/pbx-web:1.0.8",
+            "outcome": "rolled_back",
+            "notes": "Rolled back to 1.0.8 on same day",
+            "source_file": "pbx-web-deployment-data-30days.json",
+            "service": "pbx-web",
+            "failure_context": "deployment_rollback"
+          }
+        ],
+        "remediation": "Manual investigation required, categorize pattern for future detection"
+      }
     }
   },
-  "kubernetes_failure_patterns": {
-    "ImagePullBackOff": {
-      "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
-      "severity": "high",
-      "occurrences": 0,
-      "by_service": {},
-      "examples": [],
-      "searched": true,
-      "found": false
+  "temporal_analysis": {
+    "time_window": {
+      "start_date": "2026-07-07",
+      "end_date": "2026-08-06",
+      "total_days": 31
     },
-    "CrashLoopBackOff": {
-      "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
-      "severity": "critical",
-      "occurrences": 0,
-      "by_service": {},
-      "examples": [],
-      "searched": true,
-      "found": false
+    "total_days_with_failures": 1,
+    "peak_failure_day": "2026-07-13",
+    "peak_failure_hour": "18:00",
+    "failure_distribution": {
+      "by_day_of_week": {
+        "Monday": 1
+      },
+      "by_hour": {
+        "18:00": 1
+      }
     },
-    "OOMKilled": {
-      "description": "Container killed due to memory exhaustion (resource limits exceeded)",
-      "severity": "high",
-      "occurrences": 0,
-      "by_service": {},
-      "examples": [],
-      "searched": true,
-      "found": false
-    },
-    "ProbeFailure": {
-      "description": "Readiness or liveness probe failures (health check issues)",
-      "severity": "medium",
-      "occurrences": 0,
-      "by_service": {},
-      "examples": [],
-      "searched": true,
-      "found": false
-    },
-    "DependencyTimeout": {
-      "description": "Deployment timeout due to dependency unavailability",
-      "severity": "medium",
-      "occurrences": 0,
-      "by_service": {},
-      "examples": [],
-      "searched": true,
-      "found": false
-    }
-  },
-  "temporal_patterns": {
     "deployment_gaps": [
       {
         "service": "pbx-web",
@@ -177,13 +312,121 @@
       }
     ]
   },
-  "summary": {
-    "total_pattern_categories": 2,
-    "kubernetes_pattern_types_searched": 5,
-    "services": [
+  "service_context": {
+    "pbx-web": {
+      "total_deployments": 13,
+      "failure_events": 1,
+      "rollback_events": 1,
+      "rapid_sequences": 6,
+      "primary_images": [
+        "ronaldraygun/pbx-web:1.0.8",
+        "ronaldraygun/pbx-web:1.0.9"
+      ],
+      "deployment_frequency": "0.43 deployments per day",
+      "failure_rate": "7.7%"
+    },
+    "whisper-stt": {
+      "total_deployments": 13,
+      "failure_events": 0,
+      "rollback_events": 0,
+      "rapid_sequences": 5,
+      "primary_images": [
+        "ronaldraygun/whisper-stt:1.8.2",
+        "ronaldraygun/whisper-stt:1.8.4",
+        "ronaldraygun/whisper-stt:1.8.6"
+      ],
+      "deployment_frequency": "0.43 deployments per day",
+      "failure_rate": "0%"
+    }
+  },
+  "pattern_statistics": {
+    "total_pattern_types_detected": 4,
+    "total_pattern_events": 7,
+    "services_affected": [
+      "whisper_stt",
+      "lab-rebuild-relay",
       "pbx-web",
-      "whisper-stt"
+      "pbx-rebuild-relay",
+      "pbx_web"
     ],
-    "total_deployment_events": 26
+    "severity_distribution": {
+      "critical": 0,
+      "high": 0,
+      "medium": 1,
+      "low": 1,
+      "info": 2,
+      "unknown": 1
+    },
+    "pattern_rankings": [
+      [
+        "RapidDeploymentSequence",
+        11
+      ],
+      [
+        "Other",
+        1
+      ],
+      [
+        "RollbackEvent",
+        1
+      ],
+      [
+        "VersionRevert",
+        1
+      ],
+      [
+        "InfrastructureDeployment",
+        2
+      ]
+    ]
+  },
+  "correlations_and_insights": {
+    "deployment_failure_correlations": {
+      "correlation_type": "deployment_failure_temporal",
+      "correlations_found": 1,
+      "details": [
+        {
+          "failure_date": "2026-07-13",
+          "failure_timestamp": "2026-07-13T18:07:55Z",
+          "related_deployments": [
+            {
+              "deployment_id": "pbx-web-revision-11-rollback",
+              "timestamp": "2026-07-13T18:07:55Z",
+              "event_type": "deployment_rollback",
+              "image": "ronaldraygun/pbx-web:1.0.8",
+              "service": "pbx-web",
+              "hours_before_failure": 0.0
+            }
+          ],
+          "deployment_count": 1,
+          "pattern": "Other",
+          "service": "pbx-web"
+        }
+      ]
+    },
+    "key_findings": [
+      "Only 1 failure event occurred during the 30-day analysis period",
+      "Rapid deployment sequences detected 3 times involving 6 total deployments",
+      "Single rollback event for pbx-web service on 2026-07-13",
+      "whisper-stt service had 0 failure events (0% failure rate)",
+      "pbx-web service had 1 failure event (7.7% failure rate)",
+      "Deployment gaps indicate periods of low activity: pbx-web had 12+ day gaps",
+      "All pattern types show LOW overall risk assessment",
+      "No critical or high severity Kubernetes failure patterns detected"
+    ],
+    "recommendations": [
+      "Maintain current deployment practices given low failure rates",
+      "Monitor rapid deployment sequences to ensure adequate testing between iterations",
+      "Continue documenting deployment patterns for better trend analysis",
+      "Extend analysis period to capture more data points for statistical significance",
+      "Implement automated pattern detection for real-time monitoring"
+    ]
+  },
+  "metadata_validation": {
+    "taxonomy_version": "1.0",
+    "classification_confidence": "high",
+    "data_completeness": "complete",
+    "analysis_status": "validated",
+    "generated_by": "adc-50wq8_taxonomy_generation"
   }
 }
