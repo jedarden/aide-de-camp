@@ -1,0 +1,463 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aide-de-camp.ardenone.com/schemas/core-deployment.json",
+  "title": "Core Deployment Data Schema",
+  "description": "Core JSON schema for deployment data validation. Defines essential fields and validation rules for deployment entries across services.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "deployment_info",
+    "current_status",
+    "metrics"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Metadata about the deployment data generation and coverage period",
+      "required": [
+        "generated_at",
+        "data_period_start",
+        "data_period_end",
+        "service_name",
+        "namespace",
+        "cluster"
+      ],
+      "properties": {
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when deployment data was generated (ISO 8601 format)",
+          "examples": ["2026-08-06T12:03:32.329077Z"]
+        },
+        "data_period_start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start of the analysis period (ISO 8601 format)",
+          "examples": ["2026-07-07T09:07:50Z"]
+        },
+        "data_period_end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "End of the analysis period (ISO 8601 format)",
+          "examples": ["2026-08-06T09:07:50Z"]
+        },
+        "service_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the service",
+          "examples": ["whisper-stt", "pbx-web"]
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Kubernetes namespace",
+          "examples": ["whisper-stt", "pbx-web"]
+        },
+        "cluster": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Kubernetes cluster identifier",
+          "examples": ["ardenone-cluster", "apexalgo-iad"]
+        },
+        "data_sources": {
+          "type": "array",
+          "description": "Data sources used to compile deployment information",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "examples": [["kubernetes_replicasets", "argo_cd", "argo_workflows"]]
+        }
+      }
+    },
+    "deployment_info": {
+      "type": "object",
+      "description": "Core deployment information",
+      "required": [
+        "deployment_name",
+        "created_at",
+        "current_image",
+        "current_replicas"
+      ],
+      "properties": {
+        "deployment_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Kubernetes deployment name",
+          "examples": ["whisper-stt", "pbx-web"]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Initial deployment creation timestamp (ISO 8601 format)",
+          "examples": ["2026-05-01T17:26:49Z"]
+        },
+        "current_image": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+          "description": "Current container image in use (format: registry/image:tag)",
+          "examples": ["ronaldraygun/whisper-stt:1.8.6", "ronaldraygun/pbx-web:2.1.0"]
+        },
+        "current_replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current number of desired replicas"
+        },
+        "last_updated": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Most recent deployment update timestamp (ISO 8601 format)"
+        }
+      }
+    },
+    "current_status": {
+      "type": "object",
+      "description": "Current deployment and replica status",
+      "required": [
+        "sync_status",
+        "health_status",
+        "ready_replicas",
+        "available_replicas",
+        "updated_replicas"
+      ],
+      "properties": {
+        "sync_status": {
+          "type": "string",
+          "enum": ["Synced", "OutOfSync", "Unknown"],
+          "description": "ArgoCD sync status",
+          "examples": ["Synced"]
+        },
+        "health_status": {
+          "type": "string",
+          "enum": ["Healthy", "Progressing", "Degraded", "Missing", "Unknown"],
+          "description": "Overall deployment health status",
+          "examples": ["Healthy"]
+        },
+        "ready_replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of ready replicas"
+        },
+        "available_replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of available replicas"
+        },
+        "updated_replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of updated replicas"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Deployment metrics for the analysis period",
+      "required": [
+        "total_deployments",
+        "successful_deployments",
+        "failed_deployments",
+        "deployment_success_rate",
+        "last_deployment_timestamp",
+        "days_since_last_deployment"
+      ],
+      "properties": {
+        "total_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of deployments in the analysis period"
+        },
+        "successful_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of successful deployments"
+        },
+        "failed_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failed or scaled-down deployments"
+        },
+        "deployment_success_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Deployment success rate as decimal (0.0 to 1.0)",
+          "examples": [0.857, 1.0, 0.5]
+        },
+        "last_deployment_timestamp": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Last deployment timestamp (ISO 8601 format)"
+        },
+        "days_since_last_deployment": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days since the last deployment"
+        },
+        "rollbacks": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of rollback operations"
+        },
+        "deployment_frequency_days": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average days between deployments"
+        }
+      }
+    },
+    "replica_history": {
+      "type": "array",
+      "description": "Historical ReplicaSet data for the analysis period",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "created_at",
+          "image",
+          "replicas",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "ReplicaSet name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ReplicaSet creation timestamp (ISO 8601 format)"
+          },
+          "image": {
+            "type": "string",
+            "description": "Container image used in this ReplicaSet"
+          },
+          "replicas": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of replicas in this ReplicaSet"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["successful", "rolled_over", "scaled_down_or_failed", "failed"],
+            "description": "ReplicaSet deployment status"
+          },
+          "days_ago": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Days since this ReplicaSet was created"
+          },
+          "available_replicas": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "Number of available replicas"
+          },
+          "ready_replicas": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "Number of ready replicas"
+          }
+        }
+      }
+    },
+    "pod_health": {
+      "type": "object",
+      "description": "Current pod health and runtime statistics",
+      "required": [
+        "total_pods",
+        "running_pods",
+        "failed_pods",
+        "pending_pods",
+        "total_restarts"
+      ],
+      "properties": {
+        "total_pods": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of pods"
+        },
+        "running_pods": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of running pods"
+        },
+        "failed_pods": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failed pods"
+        },
+        "pending_pods": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of pending pods"
+        },
+        "total_restarts": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total container restarts across all pods"
+        },
+        "crashloops": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of pods in CrashLoopBackOff"
+        },
+        "oomkills": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of OOMKilled containers"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Resource allocation and limits",
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "description": "Resource requests",
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "pattern": "^[\\d]+m?$|^\\d+$",
+              "description": "CPU request (e.g., '1', '100m')",
+              "examples": ["1", "500m"]
+            },
+            "memory": {
+              "type": "string",
+              "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+              "description": "Memory request (e.g., '4Gi', '512Mi')",
+              "examples": ["4Gi", "512Mi"]
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "description": "Resource limits",
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "pattern": "^[\\d]+m?$|^\\d+$",
+              "description": "CPU limit (e.g., '8', '8000m')",
+              "examples": ["8", "8000m"]
+            },
+            "memory": {
+              "type": "string",
+              "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+              "description": "Memory limit (e.g., '8Gi', '16384Mi')",
+              "examples": ["8Gi", "16384Mi"]
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "array",
+      "description": "Storage information for PVCs and volumes",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "capacity",
+          "storage_class",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "PVC or volume name"
+          },
+          "capacity": {
+            "type": "string",
+            "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+            "description": "Storage capacity (e.g., '10Gi')",
+            "examples": ["10Gi", "100Gi"]
+          },
+          "storage_class": {
+            "type": "string",
+            "description": "Kubernetes storage class name",
+            "examples": ["sata", "sata-large", "ssd", "ssd-large"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["Bound", "Pending", "Lost", "Available"],
+            "description": "PVC binding status"
+          },
+          "age_days": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Storage age in days"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Summary statistics for the analysis period",
+      "required": [
+        "overall_health_status",
+        "data_coverage",
+        "gaps_detected"
+      ],
+      "properties": {
+        "overall_health_status": {
+          "type": "string",
+          "enum": ["excellent", "good", "degraded", "poor", "critical"],
+          "description": "Overall service health status"
+        },
+        "data_coverage": {
+          "type": "string",
+          "pattern": "^\\d+%$",
+          "description": "Percentage of data coverage (e.g., '100%')",
+          "examples": ["100%", "95%"]
+        },
+        "gaps_detected": {
+          "type": "boolean",
+          "description": "Whether data gaps were detected in the period"
+        },
+        "largest_gap_days": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Size of the largest gap in days"
+        },
+        "recommendation": {
+          "type": "string",
+          "description": "Operational recommendation based on deployment data"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "timestampFormats": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp format",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "imagePattern": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+      "description": "Container image format: registry/image:tag"
+    },
+    "resourcePattern": {
+      "type": "string",
+      "description": "Kubernetes resource pattern",
+      "anyOf": [
+        {
+          "pattern": "^[\\d]+m?$",
+          "description": "CPU in cores or millicores"
+        },
+        {
+          "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+          "description": "Memory with unit suffix"
+        }
+      ]
+    }
+  }
+}

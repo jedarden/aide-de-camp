@@ -1,0 +1,85 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T12:03:32.329077Z",
+    "data_period_start": "2026-07-07T09:07:50Z",
+    "data_period_end": "2026-08-06T09:07:50Z",
+    "service_name": "whisper-stt",
+    "namespace": "whisper-stt",
+    "cluster": "ardenone-cluster",
+    "data_sources": [
+      "kubernetes_replicasets",
+      "argo_cd"
+    ]
+  },
+  "deployment_info": {
+    "deployment_name": "whisper-stt",
+    "created_at": "2026-05-01T17:26:49Z",
+    "current_image": "ronaldraygun/whisper-stt:1.8.6",
+    "current_replicas": 1,
+    "last_updated": "2026-07-15T10:30:00Z"
+  },
+  "current_status": {
+    "sync_status": "Synced",
+    "health_status": "Healthy",
+    "ready_replicas": 1,
+    "available_replicas": 1,
+    "updated_replicas": 1
+  },
+  "metrics": {
+    "total_deployments": 2,
+    "successful_deployments": 2,
+    "failed_deployments": 0,
+    "deployment_success_rate": 1.0,
+    "last_deployment_timestamp": "2026-07-15T10:30:00Z",
+    "days_since_last_deployment": 22,
+    "rollbacks": 0,
+    "deployment_frequency_days": 15.0
+  },
+  "replica_history": [
+    {
+      "name": "whisper-stt-1234567890",
+      "created_at": "2026-07-15T10:30:00Z",
+      "image": "ronaldraygun/whisper-stt:1.8.6",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "status": "successful",
+      "days_ago": 22
+    }
+  ],
+  "pod_health": {
+    "total_pods": 1,
+    "running_pods": 1,
+    "failed_pods": 0,
+    "pending_pods": 0,
+    "total_restarts": 0,
+    "crashloops": 0,
+    "oomkills": 0
+  },
+  "resources": {
+    "requests": {
+      "cpu": "500m",
+      "memory": "4Gi"
+    },
+    "limits": {
+      "cpu": "8",
+      "memory": "8Gi"
+    }
+  },
+  "storage": [
+    {
+      "name": "whisper-model-cache",
+      "capacity": "10Gi",
+      "storage_class": "sata",
+      "status": "Bound",
+      "age_days": 90
+    }
+  ],
+  "summary": {
+    "overall_health_status": "excellent",
+    "data_coverage": "100%",
+    "gaps_detected": false,
+    "largest_gap_days": 0,
+    "recommendation": "Deployment is healthy with excellent stability."
+  }
+}
