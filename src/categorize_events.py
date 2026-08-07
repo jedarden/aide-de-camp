@@ -275,6 +275,8 @@ def _is_deployment_complete(event_type: str, status: str, source_fields: Dict[st
     - event_type is 'replicaset_status' and status is 'success'
     - event_type is 'pod_status' with ready=True and restartCount=0
     - Kubernetes event with reason 'Ready' or 'Completed'
+    - Message patterns: "Rollout completed", "Deployment successfully updated", "successfully updated"
+    - ReplicaSet update success patterns
 
     Args:
         event_type: Event type from parsed event
@@ -301,6 +303,31 @@ def _is_deployment_complete(event_type: str, status: str, source_fields: Dict[st
     # Kubernetes events indicating completion
     if event_type in ('event_ready', 'event_completed'):
         return True
+
+    # Check for rollout completion and deployment update success patterns
+    if isinstance(source_fields, dict):
+        message = source_fields.get('message', '')
+        reason = source_fields.get('reason', '')
+
+        # Check message for deployment completion patterns
+        if isinstance(message, str):
+            message_lower = message.lower()
+            completion_patterns = [
+                'rollout completed',
+                'deployment successfully updated',
+                'successfully updated',
+                'replica set updated',
+                'replicaset successfully updated',
+                'deployment complete'
+            ]
+            if any(pattern in message_lower for pattern in completion_patterns):
+                return True
+
+        # Check reason for successful deployment completion indicators
+        if isinstance(reason, str):
+            reason_lower = reason.lower()
+            if reason in ('RolloutComplete', 'DeploymentComplete', 'Updated', 'ReplicaSetUpdated'):
+                return True
 
     return False
 
