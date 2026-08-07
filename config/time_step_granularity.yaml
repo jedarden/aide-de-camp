@@ -1,0 +1,106 @@
+# Time Step Granularity Configuration for whisper-stt Latency Aggregation
+# Task: adc-1e1j1
+# Created: 2026-08-06
+
+# Recommended configuration for 30-day latency aggregation
+default:
+  step: "6h"  # 6-hour granularity for balanced performance and detail
+  window_days: 30  # Standard analysis window
+
+  # Result estimates
+  estimated_data_points: 120  # 30 days × 24 hours ÷ 6 hours
+  estimated_entries_per_bucket: 876  # 6h × 146 avg entries/hour
+  query_performance: "good"  # Fast query execution
+  statistical_significance: "high"  # Robust statistics with ~876 samples
+
+# Alternative granularities for specific use cases
+alternatives:
+  detailed_analysis:
+    step: "1h"
+    use_case: "Detailed hourly trend analysis"
+    estimated_data_points: 720
+    estimated_entries_per_bucket: 146
+    performance: "moderate"
+    significance: "high"
+    recommendation: "Use for detailed diagnostics of specific time periods"
+
+  high_level_trends:
+    step: "1d"
+    use_case: "High-level daily trends and reporting"
+    estimated_data_points: 30
+    estimated_entries_per_bucket: 3512
+    performance: "excellent"
+    significance: "high"
+    recommendation: "Use for executive dashboards and long-term patterns"
+
+  fine_grained:
+    step: "15m"
+    use_case: "Fine-grained analysis of short periods"
+    estimated_data_points: 2880
+    estimated_entries_per_bucket: 36
+    performance: "slow"
+    significance: "medium"
+    recommendation: "Only for specific time ranges (<7 days)"
+
+# Step parameter format for VictoriaLogs queries
+step_format:
+  description: "VictoriaLogs step parameter format: <value><unit>"
+  units:
+    s: "seconds"
+    m: "minutes"
+    h: "hours"
+    d: "days"
+  examples:
+    - "30s - 30 seconds"
+    - "5m - 5 minutes"
+    - "1h - 1 hour"
+    - "6h - 6 hours"
+    - "1d - 1 day"
+
+# Data volume metrics (from actual whisper-stt logs)
+data_metrics:
+  total_entries_analyzed: 96239
+  time_span_days: 27.4
+  average_entries_per_hour: 146
+  average_entries_per_minute: 2.44
+  data_collection_period: "2026-07-10 to 2026-08-06"
+
+# Query templates with step configuration
+query_templates:
+  # Recommended 6-hour granularity
+  standard_6h:
+    template: '{namespace="whisper-stt"} |= "duration" | stats avg(duration) by (_time, 6h)'
+    time_range: "@now()-30d -> @now()"
+    step: "6h"
+
+  # 1-hour detailed analysis
+  detailed_1h:
+    template: '{namespace="whisper-stt"} | json | stats avg(processing_time) by (_time, 1h)'
+    time_range: "@now()-7d -> @now()"
+    step: "1h"
+
+  # 1-day high-level trends
+  daily_1d:
+    template: '{namespace="whisper-stt"} | json | quantile_over_time(0.95, duration) by (_time, 1d)'
+    time_range: "@now()-30d -> @now()"
+    step: "1d"
+
+# Performance guidelines
+performance_guidelines:
+  max_data_points: 1000  # Maximum recommended for visualization
+  optimal_range: [50, 500]  # Optimal range for most use cases
+  min_samples_per_bucket: 30  # Minimum for statistical significance
+
+# Decision matrix
+decision_matrix:
+  performance_priority:
+    recommended_step: "6h"
+    reasoning: "Balances fast queries with sufficient detail"
+
+  detail_priority:
+    recommended_step: "1h"
+    reasoning: "Maximum detail while maintaining good performance"
+
+  statistical_robustness:
+    recommended_step: "1d"
+    reasoning: "Maximum samples per bucket for robust statistics"

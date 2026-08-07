@@ -5,6 +5,7 @@ Voice mode server using OpenAI Realtime API.
 Replaces text input with voice session.
 """
 import asyncio
+import json
 import logging
 import os
 import time
@@ -24,7 +25,7 @@ from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator, ValidationError
 
 from .realtime.session import VoiceSession, load_voice_prompt, AVAILABLE_VOICES
 from .realtime.dispatch import dispatch_intent, result_listener
@@ -211,6 +212,68 @@ app = FastAPI(title="ADC (aide-de-camp)", version=read_version(), lifespan=lifes
 
 # Include test router (includes /api/v1/test/dispatch with correct broadcast timing)
 app.include_router(test_router, prefix="/api/v1", tags=["test"])
+
+
+# =============================================================================
+# Exception handlers for validation errors
+# =============================================================================
+
+@app.exception_handler(ValidationError)
+async def validation_exception_handler(request, exc: ValidationError):
+    """
+    Handle Pydantic validation errors with clear error messages.
+
+    Returns 400 with detailed field-level error messages for validation failures.
+    Logs validation failures for monitoring.
+    """
+    errors = []
+    for error in exc.errors():
+        field = " -> ".join(str(loc) for loc in error["loc"])
+        message = error["msg"]
+        errors.append({
+            "field": field,
+            "message": message,
+            "type": error["type"]
+        })
+
+    # Log validation failure
+    logger.warning(
+        f"Request validation failed: {len(errors)} error(s) - "
+        + "; ".join(f"{e['field']}: {e['message']}" for e in errors)
+    )
+
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": "Validation failed",
+            "detail": "Request contains invalid or missing fields",
+            "errors": errors,
+            "status": 400
+        }
+    )
+
+
+@app.exception_handler(json.JSONDecodeError)
+async def json_decode_exception_handler(request, exc: json.JSONDecodeError):
+    """
+    Handle malformed JSON requests.
+
+    Returns 400 with clear error message for malformed JSON.
+    Logs JSON parsing failures.
+    """
+    # Log JSON parsing failure
+    logger.warning(f"Malformed JSON in request: {exc.msg} at line {exc.lineno}, column {exc.colno}")
+
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": "Invalid JSON",
+            "detail": f"Malformed JSON: {exc.msg}",
+            "line": exc.lineno,
+            "column": exc.colno,
+            "status": 400
+        }
+    )
 
 
 async def get_store():
@@ -938,7 +1001,7 @@ async def route_intent(request: dict):
 
 
 @app.post("/dispatch")
-async def dispatch_intent(request: dict):
+async def dispatch_intent(request: DispatchRequest):
     """
     Dispatch endpoint: router → N parallel synthesize calls → SSE stream.
 
@@ -950,11 +1013,19 @@ async def dispatch_intent(request: dict):
 
     Returns acknowledgment immediately with intent IDs for tracking.
     Results are streamed via SSE to connected canvas surfaces.
+
+    Request validation:
+    - utterance: required, non-empty string (after stripping whitespace)
+    - session_id: optional string, non-empty if provided
+    - surface_id: optional string, non-empty if provided
+    - utterance_id: optional string, auto-generated if not provided
+
+    Returns 400 for validation errors with detailed error messages.
     """
-    utterance = request.get("utterance", "")
-    utterance_id = request.get("utterance_id")
-    session_id = request.get("session_id")
-    surface_id = request.get("surface_id")
+    utterance = request.utterance
+    utterance_id = request.utterance_id
+    session_id = request.session_id
+    surface_id = request.surface_id
 
     logger.info(f"Dispatching utterance: {utterance[:100]}...")
 
@@ -1408,6 +1479,36 @@ class SurfaceRegisterRequest(BaseModel):
 class HeartbeatRequest(BaseModel):
     session_id: str
     surface_id: str
+
+
+class DispatchRequest(BaseModel):
+    """Request model for POST /dispatch endpoint."""
+    utterance: str = Field(..., description="The utterance text to dispatch")
+    session_id: Optional[str] = Field(None, description="Session ID for the dispatch")
+    surface_id: Optional[str] = Field(None, description="Surface ID for SSE targeting")
+    utterance_id: Optional[str] = Field(None, description="Optional utterance ID (generated if not provided)")
+
+    @field_validator('utterance')
+    @classmethod
+    def utterance_must_be_non_empty(cls, v: str) -> str:
+        """Validate that utterance is a non-empty string."""
+        if not isinstance(v, str):
+            raise ValueError('utterance must be a string')
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError('utterance must be a non-empty string')
+        return stripped
+
+    @field_validator('session_id', 'surface_id', 'utterance_id')
+    @classmethod
+    def validate_optional_strings(cls, v: Optional[str]) -> Optional[str]:
+        """Validate optional string fields."""
+        if v is not None:
+            if not isinstance(v, str):
+                raise ValueError('must be a string')
+            if v.strip() == "":
+                raise ValueError('must be a non-empty string if provided')
+        return v
 
 
 class FeedbackRequestModel(BaseModel):
