@@ -1,0 +1,544 @@
+"""
+Test Data Injection Utilities for Canvas Testing
+
+Provides utilities for creating test sessions, topics, and results via API calls.
+Supports test isolation with separate database files and cleanup functionality.
+"""
+import asyncio
+import logging
+import tempfile
+from pathlib import Path
+from typing import Optional, Dict, List, Any
+from uuid import uuid4
+
+import httpx
+
+logger = logging.getLogger(__name__)
+
+
+class TestSessionClient:
+    """API client for creating and managing test sessions."""
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000",
+        test_db_path: Optional[Path] = None,
+    ):
+        """
+        Initialize the test session client.
+
+        Args:
+            base_url: Base URL of the ADC server
+            test_db_path: Optional path to isolated test database
+        """
+        self.base_url = base_url.rstrip("/")
+        self.test_db_path = test_db_path
+        self.client = None
+        self._created_session_ids: List[str] = []
+        self._created_surface_ids: List[str] = []
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        self.client = httpx.AsyncClient(timeout=60.0)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit with cleanup."""
+        await self.cleanup_all()
+        if self.client:
+            await self.client.aclose()
+
+    async def create_session(
+        self,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a test session via POST /api/v1/sessions.
+
+        Args:
+            session_id: Optional session ID (generated if not provided)
+
+        Returns:
+            Dict with session_id and surface_id
+        """
+        session_id = session_id or f"test-inject-{uuid4().hex[:12]}"
+
+        # Create the session via test endpoint
+        response = await self.client.post(
+            f"{self.base_url}/api/v1/sessions",
+            json={"session_id": session_id}
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+        # Register a canvas surface for the session
+        surface_response = await self.client.post(
+            f"{self.base_url}/api/v1/surfaces/register",
+            json={
+                "session_id": session_id,
+                "surface_type": "canvas",
+            }
+        )
+
+        surface_response.raise_for_status()
+        surface_data = surface_response.json()
+
+        self._created_session_ids.append(session_id)
+        if "surface_id" in surface_data:
+            self._created_surface_ids.append(surface_data["surface_id"])
+
+        logger.info(f"[TEST] Created session: {session_id}, surface: {surface_data.get('surface_id')}")
+        return {
+            "session_id": session_id,
+            "surface_id": surface_data.get("surface_id"),
+            "created": data.get("created", True),
+        }
+
+    async def dispatch_utterance(
+        self,
+        utterance: str,
+        session_id: str,
+        surface_id: Optional[str] = None,
+        wait_for_results: bool = False,
+        timeout_seconds: int = 30,
+    ) -> Dict[str, Any]:
+        """
+        Dispatch a test utterance via POST /api/v1/test/dispatch.
+
+        Args:
+            utterance: Test utterance text
+            session_id: Session ID
+            surface_id: Optional surface ID for SSE broadcast
+            wait_for_results: If True, wait for results before returning
+            timeout_seconds: Max wait time for results
+
+        Returns:
+            Dispatch response with intent IDs and optional results
+        """
+        request_data = {
+            "utterance": utterance,
+            "session_id": session_id,
+            "wait_for_results": wait_for_results,
+            "timeout_seconds": timeout_seconds,
+        }
+
+        if surface_id:
+            request_data["surface_id"] = surface_id
+
+        response = await self.client.post(
+            f"{self.base_url}/api/v1/test/dispatch",
+            json=request_data,
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+        logger.info(
+            f"[TEST] Dispatched utterance: {utterance[:50]}... "
+            f"(intent_count: {data.get('intent_count')})"
+        )
+        return data
+
+    async def create_synthetic_result(
+        self,
+        session_id: str,
+        surface_id: Optional[str] = None,
+        test_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a synthetic result via POST /api/v1/test/dispatch-synthetic.
+
+        Args:
+            session_id: Session ID
+            surface_id: Optional surface ID for SSE broadcast
+            test_data: Optional custom test data
+
+        Returns:
+            Synthetic result response with all IDs
+        """
+        request_data = {
+            "session_id": session_id,
+        }
+
+        if surface_id:
+            request_data["surface_id"] = surface_id
+
+        if test_data:
+            request_data["test_data"] = test_data
+
+        response = await self.client.post(
+            f"{self.base_url}/api/v1/test/dispatch-synthetic",
+            json=request_data,
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+        logger.info(f"[TEST] Created synthetic result: {data.get('result_id')}")
+        return data
+
+    async def get_session_topics(self, session_id: str) -> Dict[str, Any]:
+        """
+        Get topics for a session via GET /api/v1/sessions/{session_id}/topics.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            Dict with list of topic cards
+        """
+        response = await self.client.get(
+            f"{self.base_url}/api/v1/sessions/{session_id}/topics"
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    async def delete_result(
+        self,
+        session_id: str,
+        result_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Delete a result via DELETE /api/v1/sessions/{session_id}/results/{result_id}.
+
+        Args:
+            session_id: Session ID
+            result_id: Result ID to delete
+
+        Returns:
+            Deletion result
+        """
+        response = await self.client.delete(
+            f"{self.base_url}/api/v1/sessions/{session_id}/results/{result_id}"
+        )
+
+        response.raise_for_status()
+        logger.info(f"[TEST] Deleted result: {result_id}")
+        return response.json()
+
+    async def cleanup_session(self, session_id: str) -> bool:
+        """
+        Clean up all test data for a session.
+
+        Args:
+            session_id: Session ID to clean up
+
+        Returns:
+            True if cleanup successful
+        """
+        try:
+            # Get all topics for the session
+            topics_response = await self.get_session_topics(session_id)
+            cards = topics_response.get("cards", [])
+
+            # Delete each result (this cascades to intents and topics)
+            for card in cards:
+                result_id = card.get("result_id")
+                if result_id:
+                    try:
+                        await self.delete_result(session_id, result_id)
+                    except Exception as e:
+                        logger.warning(f"[TEST] Failed to delete result {result_id}: {e}")
+
+            logger.info(f"[TEST] Cleaned up session: {session_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"[TEST] Session cleanup failed for {session_id}: {e}")
+            return False
+
+    async def cleanup_all(self) -> None:
+        """Clean up all created sessions and data."""
+        for session_id in self._created_session_ids:
+            await self.cleanup_session(session_id)
+
+        self._created_session_ids.clear()
+        self._created_surface_ids.clear()
+        logger.info("[TEST] Cleaned up all test data")
+
+
+class TestDataBuilder:
+    """Builder for creating structured test data."""
+
+    @staticmethod
+    def build_test_utterance(
+        text: str,
+        intent_type: str = "status",
+        project_slug: Optional[str] = None,
+    ) -> str:
+        """
+        Build a test utterance with expected characteristics.
+
+        Args:
+            text: Utterance text
+            intent_type: Expected intent type
+            project_slug: Expected project slug
+
+        Returns:
+            The utterance text (unchanged, but validates inputs)
+        """
+        if not text or not text.strip():
+            raise ValueError("Utterance text must be non-empty")
+
+        return text
+
+    @staticmethod
+    def build_synthetic_data(
+        utterance: str = "Test utterance",
+        project_slug: str = "test-project",
+        intent_type: str = "status",
+        topic_label: str = "Test Topic",
+        topic_type: str = "research",
+        summary: str = "Test result summary",
+        data: Optional[Dict[str, Any]] = None,
+        urgency: str = "normal",
+        result_type: str = "status",
+    ) -> Dict[str, Any]:
+        """
+        Build synthetic test data matching the /dispatch structure.
+
+        Args:
+            utterance: Test utterance text
+            project_slug: Project slug for the test
+            intent_type: Intent type
+            topic_label: Topic label
+            topic_type: Topic type
+            summary: Result summary
+            data: Optional custom data dict
+            urgency: Result urgency level
+            result_type: Result type for component matching
+
+        Returns:
+            Complete test data dictionary
+        """
+        default_data = {
+            "test_mode": True,
+            "synthetic": True,
+            "message": "Synthetic test result",
+        }
+
+        if data:
+            default_data.update(data)
+
+        return {
+            "utterance": utterance,
+            "project_slug": project_slug,
+            "intent_type": intent_type,
+            "topic_label": topic_label,
+            "topic_type": topic_type,
+            "summary": summary,
+            "data": default_data,
+            "urgency": urgency,
+            "result_type": result_type,
+        }
+
+    @staticmethod
+    def build_multi_intent_scenario() -> List[Dict[str, Any]]:
+        """
+        Build a multi-intent test scenario.
+
+        Returns:
+            List of test utterances that should generate multiple intents
+        """
+        return [
+            {
+                "name": "multi_status",
+                "utterance": "check the pipeline and also look at the ibkr status",
+                "expected_intent_count": 2,
+                "expected_intents": ["status", "status"],
+            },
+            {
+                "name": "lookup_and_status",
+                "utterance": "find recent logs and tell me the system health",
+                "expected_intent_count": 2,
+                "expected_intents": ["lookup", "status"],
+            },
+        ]
+
+
+class TestDatabaseIsolation:
+    """Utilities for creating isolated test databases."""
+
+    @staticmethod
+    def create_temp_db_path() -> Path:
+        """
+        Create a temporary database file path for isolated testing.
+
+        Returns:
+            Path to temporary database file
+        """
+        temp_dir = Path(tempfile.mkdtemp())
+        db_path = temp_dir / "test_session.db"
+        return db_path
+
+    @staticmethod
+    def create_in_memory_db_connection_string() -> str:
+        """
+        Get an in-memory database connection string.
+
+        Returns:
+            Connection string for in-memory SQLite database
+        """
+        return ":memory:"
+
+
+class TestFixture:
+    """
+    Comprehensive test fixture for canvas testing.
+
+    Combines session management, test data injection, and cleanup
+    in a single easy-to-use interface.
+    """
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000",
+        auto_cleanup: bool = True,
+    ):
+        """
+        Initialize the test fixture.
+
+        Args:
+            base_url: Base URL of the ADC server
+            auto_cleanup: If True, automatically clean up on exit
+        """
+        self.base_url = base_url.rstrip("/")
+        self.auto_cleanup = auto_cleanup
+        self._client: Optional[TestSessionClient] = None
+        self._session_id: Optional[str] = None
+        self._surface_id: Optional[str] = None
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        self._client = TestSessionClient(base_url=self.base_url)
+        await self._client.__aenter__()
+
+        # Create a default test session
+        session_data = await self._client.create_session()
+        self._session_id = session_data.get("session_id")
+        self._surface_id = session_data.get("surface_id")
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        if self.auto_cleanup and self._client:
+            await self._client.cleanup_all()
+            await self._client.__aexit__(exc_type, exc_val, exc_tb)
+
+    async def dispatch(self, utterance: str, **kwargs) -> Dict[str, Any]:
+        """Dispatch a test utterance."""
+        if not self._client:
+            raise RuntimeError("TestFixture not initialized. Use as async context manager.")
+
+        return await self._client.dispatch_utterance(
+            utterance=utterance,
+            session_id=self._session_id,
+            surface_id=self._surface_id,
+            **kwargs
+        )
+
+    async def create_synthetic(self, test_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Create a synthetic test result."""
+        if not self._client:
+            raise RuntimeError("TestFixture not initialized. Use as async context manager.")
+
+        return await self._client.create_synthetic_result(
+            session_id=self._session_id,
+            surface_id=self._surface_id,
+            test_data=test_data,
+        )
+
+    async def get_topics(self) -> Dict[str, Any]:
+        """Get topics for the test session."""
+        if not self._client:
+            raise RuntimeError("TestFixture not initialized. Use as async context manager.")
+
+        return await self._client.get_session_topics(self._session_id)
+
+    @property
+    def session_id(self) -> str:
+        """Get the test session ID."""
+        if not self._session_id:
+            raise RuntimeError("TestFixture not initialized. Use as async context manager.")
+        return self._session_id
+
+    @property
+    def surface_id(self) -> str:
+        """Get the test surface ID."""
+        if not self._surface_id:
+            raise RuntimeError("TestFixture not initialized. Use as async context manager.")
+        return self._surface_id
+
+
+# Convenience functions for quick testing
+async def create_test_session(
+    base_url: str = "http://localhost:8000",
+    session_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Quick function to create a test session.
+
+    Args:
+        base_url: Base URL of the ADC server
+        session_id: Optional session ID
+
+    Returns:
+        Session data dict
+    """
+    async with TestSessionClient(base_url=base_url) as client:
+        return await client.create_session(session_id=session_id)
+
+
+async def dispatch_test_utterance(
+    utterance: str,
+    session_id: str,
+    base_url: str = "http://localhost:8000",
+    surface_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Quick function to dispatch a test utterance.
+
+    Args:
+        utterance: Test utterance text
+        session_id: Session ID
+        base_url: Base URL of the ADC server
+        surface_id: Optional surface ID
+
+    Returns:
+        Dispatch response dict
+    """
+    async with TestSessionClient(base_url=base_url) as client:
+        return await client.dispatch_utterance(
+            utterance=utterance,
+            session_id=session_id,
+            surface_id=surface_id,
+        )
+
+
+async def create_synthetic_test_result(
+    session_id: str,
+    base_url: str = "http://localhost:8000",
+    surface_id: Optional[str] = None,
+    test_data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Quick function to create a synthetic test result.
+
+    Args:
+        session_id: Session ID
+        base_url: Base URL of the ADC server
+        surface_id: Optional surface ID
+        test_data: Optional custom test data
+
+    Returns:
+        Synthetic result response dict
+    """
+    async with TestSessionClient(base_url=base_url) as client:
+        return await client.create_synthetic_result(
+            session_id=session_id,
+            surface_id=surface_id,
+            test_data=test_data,
+        )

@@ -355,6 +355,14 @@ class EventType:
     ACTION_DESIGN_ONLY = "action_design_only"
     REMINDER_UNAVAILABLE = "reminder_unavailable"
 
+    # Action workflow events
+    ACTION_WORKFLOW_STARTED = "action_workflow_started"
+    ACTION_STEP_STARTED = "action_step_started"
+    ACTION_STEP_COMPLETED = "action_step_completed"
+    ACTION_WORKFLOW_COMPLETED = "action_workflow_completed"
+    ACTION_WORKFLOW_FAILED = "action_workflow_failed"
+    ACTION_WORKFLOW_CANCELLED = "action_workflow_cancelled"
+
 
 async def broadcast_result(
     result: dict,
