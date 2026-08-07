@@ -1,183 +1,274 @@
 {
   "metadata": {
-    "analysis_date": "2026-08-07T00:39:57.331429Z",
-    "data_window_days": 31,
-    "total_failures_analyzed": 1,
-    "total_deployments_analyzed": 9,
-    "services_analyzed": [
-      "pbx-web",
-      "whisper-stt"
-    ],
-    "analysis_period": {
-      "start_date": "2026-07-07",
-      "end_date": "2026-08-06"
-    }
+    "analysis_type": "pattern_statistics_and_metrics",
+    "generated_at": "2026-08-06T20:51:33.478799",
+    "time_period": "2026-07-07 to 2026-08-06 (30 days)",
+    "data_sources": [
+      "deployment-events-30days.json",
+      "deployment-patterns-analysis-report.json"
+    ]
   },
-  "summary": {
-    "total_patterns_identified": 6,
-    "patterns_with_occurrences": 1,
-    "total_failures": 1,
-    "services_with_failures": 1,
-    "pattern_rankings": [
-      [
-        "Other",
-        1
-      ],
-      [
-        "ImagePullBackOff",
-        0
-      ],
-      [
-        "CrashLoopBackOff",
-        0
-      ],
-      [
-        "OOMKilled",
-        0
-      ],
-      [
-        "Probe_failure",
-        0
-      ],
-      [
-        "Dependency_timeout",
-        0
-      ]
-    ],
-    "high_severity_patterns": [],
-    "critical_severity_patterns": [],
-    "peak_failure_day": "2026-07-13",
-    "total_days_with_failures": 1,
-    "total_correlations": 1
-  },
-  "pattern_statistics": {
-    "ImagePullBackOff": {
-      "pattern_type": "ImagePullBackOff",
-      "description": "Container image cannot be pulled (registry issues, authentication, missing image)",
-      "severity": "high",
-      "occurrence_count": 0,
-      "frequency_per_day": 0.0,
-      "affected_services": {},
-      "image_versions": {},
-      "time_distribution": {
-        "first_occurrence": null,
-        "last_occurrence": null,
-        "dates_with_occurrences": [],
-        "peak_failure_day": null,
-        "total_days_with_failures": 0
-      },
-      "deployment_correlations": []
-    },
-    "CrashLoopBackOff": {
-      "pattern_type": "CrashLoopBackOff",
-      "description": "Pod repeatedly crashes and restarts (application errors, misconfiguration)",
-      "severity": "critical",
-      "occurrence_count": 0,
-      "frequency_per_day": 0.0,
-      "affected_services": {},
-      "image_versions": {},
-      "time_distribution": {
-        "first_occurrence": null,
-        "last_occurrence": null,
-        "dates_with_occurrences": [],
-        "peak_failure_day": null,
-        "total_days_with_failures": 0
-      },
-      "deployment_correlations": []
-    },
-    "OOMKilled": {
-      "pattern_type": "OOMKilled",
-      "description": "Container killed due to memory exhaustion (resource limits exceeded)",
-      "severity": "high",
-      "occurrence_count": 0,
-      "frequency_per_day": 0.0,
-      "affected_services": {},
-      "image_versions": {},
-      "time_distribution": {
-        "first_occurrence": null,
-        "last_occurrence": null,
-        "dates_with_occurrences": [],
-        "peak_failure_day": null,
-        "total_days_with_failures": 0
-      },
-      "deployment_correlations": []
-    },
-    "Probe_failure": {
-      "pattern_type": "Probe_failure",
-      "description": "Readiness or liveness probe failures (health check issues)",
-      "severity": "medium",
-      "occurrence_count": 0,
-      "frequency_per_day": 0.0,
-      "affected_services": {},
-      "image_versions": {},
-      "time_distribution": {
-        "first_occurrence": null,
-        "last_occurrence": null,
-        "dates_with_occurrences": [],
-        "peak_failure_day": null,
-        "total_days_with_failures": 0
-      },
-      "deployment_correlations": []
-    },
-    "Dependency_timeout": {
-      "pattern_type": "Dependency_timeout",
-      "description": "Deployment timeout due to dependency unavailability",
-      "severity": "medium",
-      "occurrence_count": 0,
-      "frequency_per_day": 0.0,
-      "affected_services": {},
-      "image_versions": {},
-      "time_distribution": {
-        "first_occurrence": null,
-        "last_occurrence": null,
-        "dates_with_occurrences": [],
-        "peak_failure_day": null,
-        "total_days_with_failures": 0
-      },
-      "deployment_correlations": []
-    },
-    "Other": {
-      "pattern_type": "Other",
-      "description": "Other failure patterns not matching standard categories",
-      "severity": "unknown",
+  "pattern_analyses": {
+    "rollback_pattern": {
+      "pattern_type": "rollback",
       "occurrence_count": 1,
-      "frequency_per_day": 0.0323,
-      "affected_services": {
-        "pbx-web": 1
-      },
-      "image_versions": {
-        "ronaldraygun/pbx-web:1.0.8": 1
-      },
+      "frequency": "1 events in 30 days",
       "time_distribution": {
-        "first_occurrence": "2026-07-13",
-        "last_occurrence": "2026-07-13",
-        "dates_with_occurrences": [
+        "timestamps": [
+          "2026-07-13T18:07:55Z"
+        ],
+        "temporal_analysis": {
+          "daily_distribution": {
+            "2026-07-13": 1
+          },
+          "hourly_distribution": {
+            "18:00": 1
+          },
+          "day_of_week_distribution": {
+            "Monday": 1
+          },
+          "total_active_days": 1,
+          "peak_day": [
+            "2026-07-13",
+            1
+          ],
+          "peak_hour": [
+            "18:00",
+            1
+          ]
+        }
+      },
+      "affected_services": [
+        "pbx-web"
+      ],
+      "image_context": {
+        "images_involved": [
+          "ronaldraygun/pbx-web:1.0.8"
+        ],
+        "rollback_details": [
           {
             "date": "2026-07-13",
-            "count": 1,
-            "rate_percentage": 100.0
+            "timestamp": "2026-07-13T18:07:55Z",
+            "event_type": "deployment_rollback",
+            "deployment": "pbx-web",
+            "revision": 11,
+            "replicaSet": "pbx-web-754f4cfdf7",
+            "image": "ronaldraygun/pbx-web:1.0.8",
+            "outcome": "rolled_back",
+            "notes": "Rolled back from 1.0.9 to 1.0.8 on same day"
+          }
+        ]
+      },
+      "severity": "LOW",
+      "impact": "Service continuity maintained via automatic rollback"
+    },
+    "rapid_deployment_pattern": {
+      "pattern_type": "rapid_deployment",
+      "occurrence_count": 3,
+      "frequency": "3 rapid sequences involving 6 deployments",
+      "time_distribution": {
+        "sequences_detected": 3,
+        "temporal_analysis": {
+          "daily_distribution": {
+            "2026-07-08": 4,
+            "2026-07-13": 2
+          },
+          "hourly_distribution": {
+            "03:00": 4,
+            "18:00": 2
+          },
+          "day_of_week_distribution": {
+            "Monday": 2,
+            "Wednesday": 4
+          },
+          "total_active_days": 2,
+          "peak_day": [
+            "2026-07-08",
+            4
+          ],
+          "peak_hour": [
+            "03:00",
+            4
+          ]
+        },
+        "total_deployments_in_rapid_sequences": 6
+      },
+      "affected_services": [
+        "whisper_stt",
+        "pbx_web"
+      ],
+      "image_context": {
+        "rapid_image_progressions": [
+          {
+            "service": "pbx_web",
+            "sequence": [
+              "ronaldraygun/pbx-web:1.0.8",
+              "ronaldraygun/pbx-web:1.0.9"
+            ],
+            "start_time": "2026-07-13T18:07:55+00:00",
+            "duration_seconds": 612.0
+          },
+          {
+            "service": "whisper_stt",
+            "sequence": [
+              "ronaldraygun/whisper-stt:1.8.2",
+              "ronaldraygun/whisper-stt:1.8.4"
+            ],
+            "start_time": "2026-07-08T03:09:35+00:00",
+            "duration_seconds": 398.0
+          },
+          {
+            "service": "whisper_stt",
+            "sequence": [
+              "ronaldraygun/whisper-stt:1.8.4",
+              "ronaldraygun/whisper-stt:1.8.6"
+            ],
+            "start_time": "2026-07-08T03:16:13+00:00",
+            "duration_seconds": 631.0
           }
         ],
-        "peak_failure_day": "2026-07-13",
-        "total_days_with_failures": 1
+        "average_duration_seconds": 547.0
       },
-      "deployment_correlations": [
-        {
-          "failure_date": "2026-07-13",
-          "failure_timestamp": "2026-07-13T18:07:55Z",
-          "related_deployments": [
-            {
-              "deployment_id": "pbx-web-revision-11-rollback",
-              "timestamp": "2026-07-13T18:07:55Z",
-              "event_type": "deployment_rollback",
-              "image": "ronaldraygun/pbx-web:1.0.8",
-              "service": "pbx-web",
-              "hours_before_failure": 0.0
-            }
-          ],
-          "deployment_count": 1
-        }
+      "severity": "MEDIUM",
+      "impact": "Rapid iterations may increase risk if not properly tested",
+      "recommendations": [
+        "Consider spreading rapid deployments to reduce risk",
+        "Implement automated testing between rapid iterations"
       ]
+    },
+    "version_revert_pattern": {
+      "pattern_type": "version_revert",
+      "occurrence_count": 1,
+      "frequency": "1 version reverts in 30 days",
+      "time_distribution": {
+        "timestamps": [
+          "2026-07-28T17:26:12Z"
+        ],
+        "temporal_analysis": {
+          "daily_distribution": {
+            "2026-07-28": 1
+          },
+          "hourly_distribution": {
+            "17:00": 1
+          },
+          "day_of_week_distribution": {
+            "Tuesday": 1
+          },
+          "total_active_days": 1,
+          "peak_day": [
+            "2026-07-28",
+            1
+          ],
+          "peak_hour": [
+            "17:00",
+            1
+          ]
+        }
+      },
+      "affected_services": [
+        "pbx_web"
+      ],
+      "image_context": {
+        "revert_details": [
+          {
+            "from": "python:3-slim",
+            "to": "ronaldraygun/pbx-web:1.0.9",
+            "timestamp": "2026-07-28T17:26:12Z",
+            "service": "pbx_web"
+          }
+        ],
+        "from_images": [
+          "python:3-slim"
+        ],
+        "to_images": [
+          "ronaldraygun/pbx-web:1.0.9"
+        ]
+      },
+      "severity": "LOW",
+      "impact": "Reverting to previous version indicates instability or issues with newer version"
+    },
+    "infrastructure_deployment_pattern": {
+      "pattern_type": "infrastructure_deployment",
+      "occurrence_count": 2,
+      "frequency": "2 infrastructure deployments in 30 days",
+      "time_distribution": {
+        "temporal_analysis": {
+          "daily_distribution": {
+            "2026-07-15": 1,
+            "2026-07-27": 1
+          },
+          "hourly_distribution": {
+            "03:00": 1,
+            "17:00": 1
+          },
+          "day_of_week_distribution": {
+            "Wednesday": 1,
+            "Monday": 1
+          },
+          "total_active_days": 2,
+          "peak_day": [
+            "2026-07-15",
+            1
+          ],
+          "peak_hour": [
+            "03:00",
+            1
+          ]
+        }
+      },
+      "affected_services": [
+        "lab-rebuild-relay",
+        "pbx-rebuild-relay"
+      ],
+      "image_context": {
+        "images_used": [
+          "python:3-slim",
+          "python:3-slim"
+        ],
+        "deployment_types": [
+          "PBX rebuild relay deployment - supporting infrastructure",
+          "Lab rebuild relay deployment - supporting infrastructure"
+        ]
+      },
+      "severity": "INFO",
+      "impact": "Infrastructure deployments support main service operations"
     }
-  }
+  },
+  "deployment_failure_correlations": {
+    "correlation_type": "deployment_failure_temporal",
+    "correlations_found": 0,
+    "details": [],
+    "interpretation": "Deployments occurring near failure events may indicate deployment-related issues"
+  },
+  "summary_statistics": {
+    "total_pattern_types_detected": 4,
+    "total_pattern_events": 7,
+    "services_affected": [
+      "whisper_stt",
+      "lab-rebuild-relay",
+      "pbx-web",
+      "pbx-rebuild-relay",
+      "pbx_web"
+    ],
+    "severity_distribution": {
+      "LOW": 2,
+      "MEDIUM": 1,
+      "INFO": 1
+    },
+    "pattern_categories": [
+      "rollback",
+      "rapid_deployment",
+      "version_revert",
+      "infrastructure_deployment"
+    ],
+    "overall_assessment": "LOW_RISK"
+  },
+  "key_findings": [
+    "Total pattern types detected: 4",
+    "Services affected by patterns: whisper_stt, lab-rebuild-relay, pbx-web, pbx-rebuild-relay, pbx_web",
+    "Overall risk assessment: LOW_RISK",
+    "Rapid deployment sequences: 3 detected",
+    "Rollback events: 1 detected",
+    "Version reverts: 1 detected"
+  ]
 }
