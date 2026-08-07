@@ -45,25 +45,40 @@ def validate_all(data: Dict[str, Any]) -> Tuple[bool, List[str]]:
         >>> is_valid
         True
     """
-    # Import the JSON well-formedness validator
+    # Import validators
     from src.validation.completeness import validate_json_wellformedness
+    from src.validation.deployment_data import (
+        validate_required_fields,
+        validate_data_types,
+        DEPLOYMENT_DATA_SCHEMA,
+    )
 
-    # Step 1: JSON well-formedness validation (EARLY TERMINATION)
-    # This is called first to ensure data is well-formed JSON before proceeding.
-    # On failure, we immediately return to prevent further validation attempts
-    # on malformed data that could cause unexpected errors or false positives.
-    is_valid, error = validate_json_wellformedness(data)
-    if not is_valid:
-        # Early termination: return immediately with JSON validation error
-        # No further validation functions are called when JSON is invalid
-        return (False, [f"JSON validation: {error}"])
+    # Collect all validation errors
+    errors = []
 
-    # TODO: Add remaining validation steps in future beads:
-    # - Step 2: Required fields validation (validate_required_fields)
-    # - Step 3: Data types validation (validate_data_types)
+    # Step 1: JSON well-formedness validation
+    is_valid_json, error_json = validate_json_wellformedness(data)
+    if not is_valid_json:
+        errors.append(f"JSON validation: {error_json}")
+
+    # Step 2: Required fields validation
+    # Run regardless of JSON validation result to collect all errors
+    is_valid_fields, error_fields = validate_required_fields(data)
+    if not is_valid_fields:
+        errors.append(f"Required fields validation: {error_fields}")
+
+    # Step 3: Data types validation
+    # Run regardless of previous validation results to collect all errors
+    is_valid_types, error_types = validate_data_types(data, DEPLOYMENT_DATA_SCHEMA)
+    if not is_valid_types:
+        errors.append(f"Data types validation: {error_types}")
+
+    # TODO: Add Step 4 in future beads:
     # - Step 4: Completeness validation (validate_completeness)
 
-    return (True, [])
+    # Return result
+    is_valid = len(errors) == 0
+    return (is_valid, errors)
 
 
 __all__ = [
