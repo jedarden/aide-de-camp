@@ -370,3 +370,239 @@ class TestCompareStructuredFields:
         assert "level1.level2.level3.sibling" in result
         assert result["level1.level2.level3.level4"] is True
         assert result["level1.level2.level3.sibling"] is True
+
+
+class TestListComparison:
+    """Test suite for order-insensitive list comparison."""
+
+    def test_list_of_strings_same_elements_different_order(self):
+        """Test that lists of strings match regardless of order."""
+        dispatch = {"tags": ["project", "status", "urgent"]}
+        test = {"tags": ["urgent", "project", "status"]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["tags"] is True
+
+    def test_list_of_strings_different_elements(self):
+        """Test that lists with different string elements don't match."""
+        dispatch = {"tags": ["project", "status"]}
+        test = {"tags": ["project", "different"]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["tags"] is False
+
+    def test_list_of_integers_same_elements_different_order(self):
+        """Test that lists of integers match regardless of order."""
+        dispatch = {"counts": [1, 2, 3, 4]}
+        test = {"counts": [4, 3, 2, 1]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["counts"] is True
+
+    def test_list_of_floats_same_elements_different_order(self):
+        """Test that lists of floats match regardless of order."""
+        dispatch = {"scores": [0.1, 0.5, 0.9]}
+        test = {"scores": [0.9, 0.1, 0.5]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["scores"] is True
+
+    def test_list_of_booleans_same_elements_different_order(self):
+        """Test that lists of booleans match regardless of order."""
+        dispatch = {"flags": [True, False, True]}
+        test = {"flags": [True, True, False]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["flags"] is True
+
+    def test_list_of_strings_different_lengths(self):
+        """Test that lists of different lengths don't match."""
+        dispatch = {"tags": ["project", "status"]}
+        test = {"tags": ["project", "status", "urgent"]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["tags"] is False
+
+    def test_list_of_integers_different_lengths(self):
+        """Test that integer lists of different lengths don't match."""
+        dispatch = {"counts": [1, 2, 3]}
+        test = {"counts": [1, 2]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["counts"] is False
+
+    def test_list_of_dicts_same_elements_different_order(self):
+        """Test that lists of dicts match by comparing dict fields, not identity."""
+        dispatch = {
+            "entities": [
+                {"name": "project", "type": "resource"},
+                {"name": "status", "type": "query"}
+            ]
+        }
+        test = {
+            "entities": [
+                {"name": "status", "type": "query"},
+                {"name": "project", "type": "resource"}
+            ]
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["entities"] is True
+
+    def test_list_of_dicts_different_nested_values(self):
+        """Test that lists of dicts with different values don't match."""
+        dispatch = {
+            "entities": [
+                {"name": "project", "type": "resource"},
+                {"name": "status", "type": "query"}
+            ]
+        }
+        test = {
+            "entities": [
+                {"name": "project", "type": "different"},
+                {"name": "status", "type": "query"}
+            ]
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["entities"] is False
+
+    def test_list_of_dicts_different_keys(self):
+        """Test that lists of dicts with different keys don't match."""
+        dispatch = {
+            "entities": [
+                {"name": "project", "type": "resource"},
+            ]
+        }
+        test = {
+            "entities": [
+                {"name": "project", "category": "resource"},
+            ]
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["entities"] is False
+
+    def test_list_of_dicts_different_lengths(self):
+        """Test that lists of dicts with different lengths don't match."""
+        dispatch = {
+            "entities": [
+                {"name": "project", "type": "resource"},
+            ]
+        }
+        test = {
+            "entities": [
+                {"name": "project", "type": "resource"},
+                {"name": "status", "type": "query"}
+            ]
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["entities"] is False
+
+    def test_nested_list_of_primitives(self):
+        """Test nested lists containing primitive values."""
+        dispatch = {
+            "metadata": {
+                "tags": ["alpha", "beta"]
+            }
+        }
+        test = {
+            "metadata": {
+                "tags": ["beta", "alpha"]
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert "metadata.tags" in result
+        assert result["metadata.tags"] is True
+
+    def test_nested_list_of_dicts(self):
+        """Test nested lists containing dictionaries."""
+        dispatch = {
+            "metadata": {
+                "entities": [
+                    {"name": "project", "value": 1},
+                    {"name": "status", "value": 2}
+                ]
+            }
+        }
+        test = {
+            "metadata": {
+                "entities": [
+                    {"name": "status", "value": 2},
+                    {"name": "project", "value": 1}
+                ]
+            }
+        }
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert "metadata.entities" in result
+        assert result["metadata.entities"] is True
+
+    def test_empty_lists_match(self):
+        """Test that empty lists match."""
+        dispatch = {"items": []}
+        test = {"items": []}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["items"] is True
+
+    def test_list_with_single_element_matches(self):
+        """Test that single-element lists match."""
+        dispatch = {"items": ["single"]}
+        test = {"items": ["single"]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["items"] is True
+
+    def test_list_with_duplicates_matches(self):
+        """Test that lists with duplicate elements match correctly."""
+        dispatch = {"items": ["a", "b", "a"]}
+        test = {"items": ["a", "a", "b"]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["items"] is True
+
+    def test_list_with_different_duplicate_counts_doesnt_match(self):
+        """Test that lists with different duplicate counts don't match."""
+        dispatch = {"items": ["a", "b", "a"]}
+        test = {"items": ["a", "b", "b"]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["items"] is False
+
+    def test_mixed_type_list_matches(self):
+        """Test that lists with mixed comparable types match."""
+        dispatch = {"items": [1, "two", 3.0]}
+        test = {"items": [3.0, 1, "two"]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["items"] is True
+
+    def test_mixed_type_list_different_elements_doesnt_match(self):
+        """Test that mixed type lists with different elements don't match."""
+        dispatch = {"items": [1, "two", 3.0]}
+        test = {"items": [1, "different", 3.0]}
+
+        result = compare_structured_fields(dispatch, test)
+
+        assert result["items"] is False

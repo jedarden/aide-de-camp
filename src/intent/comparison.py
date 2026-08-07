@@ -214,7 +214,8 @@ def compare_structured_fields(
                         for i, item2 in enumerate(list2):
                             if i in matched_indices:
                                 continue
-                            if _compare_dicts(item1, item2, prefix=field_path):
+                            nested_results = _compare_dicts(item1, item2, prefix=field_path)
+                            if nested_results and all(nested_results.values()):
                                 matched_indices.add(i)
                                 found = True
                                 break
