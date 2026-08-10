@@ -22,6 +22,7 @@ See docs/plan/plan.md → Fetch Strand → Cluster→ArgoCD Endpoint Resolution.
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path
+import threading
 from typing import Optional
 
 import yaml
@@ -39,6 +40,7 @@ CONSUMABLE_ACCESS = "read-only-proxy"
 # mtime-checked cache (mirrors src/components/hot_reload.py's pattern).
 _cache: Optional[dict] = None
 _cache_mtime: Optional[float] = None
+_cache_lock = threading.RLock()
 
 
 def _read_clusters_file(path: Path = CLUSTERS_PATH) -> dict:
@@ -79,22 +81,24 @@ def get_clusters(force: bool = False) -> dict:
         # File vanished: keep the last-known-good cache (best effort).
         return _cache or {}
 
-    if force or _cache is None or mtime != _cache_mtime:
-        parsed = _read_clusters_file()
-        # Don't poison the cache on a parse failure: _read_clusters_file
-        # already returns the prior cache in that case, so this is a no-op
-        # when parsing failed — but guard explicitly for clarity.
-        _cache = parsed
-        _cache_mtime = mtime
-        logger.debug(f"Reloaded clusters config ({len(parsed)} clusters) from {CLUSTERS_PATH}")
-    return _cache
+    with _cache_lock:
+        if force or _cache is None or mtime != _cache_mtime:
+            parsed = _read_clusters_file()
+            # Publish mapping and mtime together. A failed parse returns the
+            # previous mapping, but does not advertise it as a new generation.
+            if parsed is not _cache or _cache is None:
+                _cache = parsed
+                _cache_mtime = mtime
+            logger.debug(f"Reloaded clusters config ({len(parsed)} clusters) from {CLUSTERS_PATH}")
+        return _cache or {}
 
 
 def reset_cache() -> None:
     """Clear the mtime cache (test hook)."""
     global _cache, _cache_mtime
-    _cache = None
-    _cache_mtime = None
+    with _cache_lock:
+        _cache = None
+        _cache_mtime = None
 
 
 @dataclass(frozen=True)

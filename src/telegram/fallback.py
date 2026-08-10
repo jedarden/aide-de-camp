@@ -157,11 +157,12 @@ class TelegramFallback:
                 if response.status_code == 200:
                     logger.info(f"Sent Telegram message to chat {chat_id}")
                     # Update reachability state - reset state tracker if was unreachable
-                    if not self._state_tracker.is_reachable:
-                        self._state_tracker.mark_as_reachable()
-                        # Reset the fallback's internal failure count when recovering from unreachable state
-                        self._failure_count = 0
-                    self._set_reachable(True)  # Update reachability state
+                    async with self._first_failure_lock:
+                        if not self._state_tracker.is_reachable:
+                            self._state_tracker.mark_as_reachable()
+                            # Reset the fallback's internal failure count when recovering from unreachable state
+                            self._failure_count = 0
+                        self._set_reachable(True)  # Update reachability state
                     return True
                 else:
                     error_msg = f"status {response.status_code} - {response.text}"
@@ -250,8 +251,9 @@ class TelegramFallback:
             True if the bridge is reachable, False otherwise.
         """
         if self.bot_token is None:
-            self._state_tracker.mark_as_unreachable(datetime.now())
-            self._set_reachable(False)
+            async with self._first_failure_lock:
+                self._state_tracker.mark_as_unreachable(datetime.now())
+                self._set_reachable(False)
             return False
 
         url = f"{self.TELEGRAM_API_BASE}/bot{self.bot_token}/getMe"
@@ -265,19 +267,21 @@ class TelegramFallback:
                     timeout=2.5,
                 )
                 is_available = response.status_code == 200
-                if is_available:
-                    # Reset state tracker and failure count when transitioning from unreachable to reachable
-                    if not self._state_tracker.is_reachable:
-                        self._state_tracker.mark_as_reachable()
-                        self._failure_count = 0
-                else:
-                    self._state_tracker.mark_as_unreachable(datetime.now())
-                self._set_reachable(is_available)
+                async with self._first_failure_lock:
+                    if is_available:
+                        # Reset state tracker and failure count when transitioning from unreachable to reachable
+                        if not self._state_tracker.is_reachable:
+                            self._state_tracker.mark_as_reachable()
+                            self._failure_count = 0
+                    else:
+                        self._state_tracker.mark_as_unreachable(datetime.now())
+                    self._set_reachable(is_available)
                 return is_available
         except Exception as e:
             # STATE UPDATE FIRST - Mark as unreachable before logging
-            self._state_tracker.mark_as_unreachable(datetime.now())
-            self._set_reachable(False)
+            async with self._first_failure_lock:
+                self._state_tracker.mark_as_unreachable(datetime.now())
+                self._set_reachable(False)
 
             # LOGGING AFTER STATE UPDATE - Capture error context
             error_type = type(e).__name__

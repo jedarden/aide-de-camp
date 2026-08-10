@@ -7,6 +7,7 @@ for the background analysis bead to process.
 
 import asyncio
 import json
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -59,17 +60,20 @@ class ImplicitFeedbackTracker:
     def __init__(self):
         # Track result creation times for ack speed calculation
         self._result_created_at: dict[str, int] = {}  # result_id -> created_at
+        self._ack_inflight: dict[str, tuple[int, str]] = {}
         # Track recent utterances per topic for pattern detection
         self._recent_utterances: dict[str, list[dict]] = {}  # session_id -> [{utterance, topic_id, timestamp}]
         # Track re-query attempts
         self._query_attempts: dict[str, list[str]] = {}  # normalized_query -> [result_ids]
         # Track surface switches
         self._surface_switches: dict[str, list[dict]] = {}  # session_id -> [{from_surface, to_surface, timestamp, result_id}]
+        self._state_lock = threading.RLock()
 
     async def track_result_created(self, result_id: str, session_id: str, topic_id: Optional[str]) -> None:
         """Track when a result was created for ack speed calculation."""
         now = int(datetime.now(timezone.utc).timestamp())
-        self._result_created_at[result_id] = now
+        with self._state_lock:
+            self._result_created_at[result_id] = now
         logger.debug(f"Tracked result creation: {result_id} at {now}")
 
     async def track_result_acknowledged(
@@ -83,16 +87,17 @@ class ImplicitFeedbackTracker:
 
         Generates an ack_speed signal.
         """
-        if result_id not in self._result_created_at:
-            logger.warning(f"Result {result_id} not tracked for creation time")
-            return None
-
-        created_at = self._result_created_at[result_id]
+        ack_id = str(uuid4())
+        with self._state_lock:
+            created_at = self._result_created_at.get(result_id)
+            if created_at is None or result_id in self._ack_inflight:
+                logger.warning(f"Result {result_id} not available for acknowledgement claim")
+                return None
+            # Keep the source timestamp until persistence succeeds. The
+            # in-flight token prevents duplicate acknowledgements meanwhile.
+            self._ack_inflight[result_id] = (created_at, ack_id)
         now = int(datetime.now(timezone.utc).timestamp())
         ack_delay_seconds = now - created_at
-
-        # Clean up old entries
-        del self._result_created_at[result_id]
 
         # Determine signal quality
         # Fast ack (< 10s) = positive signal
@@ -109,7 +114,8 @@ class ImplicitFeedbackTracker:
             quality = "strongly_negative"
 
         signal = FeedbackSignal(
-            signal_id=str(uuid4()),
+            # The acknowledgement claim ID is the idempotency key for retry.
+            signal_id=ack_id,
             signal_type=SignalType.ACK_SPEED,
             session_id=session_id,
             result_id=result_id,
@@ -123,7 +129,21 @@ class ImplicitFeedbackTracker:
             surface_type=surface_type,
         )
 
-        await self._store_signal(signal)
+        try:
+            await self._store_signal(signal)
+        except BaseException:
+            with self._state_lock:
+                self._ack_inflight.pop(result_id, None)
+                # Restore only if no newer creation timestamp replaced it.
+                self._result_created_at.setdefault(result_id, created_at)
+            raise
+
+        with self._state_lock:
+            if self._ack_inflight.get(result_id) == (created_at, ack_id):
+                self._ack_inflight.pop(result_id, None)
+                # Persistence is the commit point for removing the source.
+                if self._result_created_at.get(result_id) == created_at:
+                    self._result_created_at.pop(result_id, None)
         logger.info(f"Tracked ack_speed signal: {ack_delay_seconds}s ({quality})")
 
         return signal
@@ -142,20 +162,18 @@ class ImplicitFeedbackTracker:
         """
         now = int(datetime.now(timezone.utc).timestamp())
 
-        # Store utterance
-        if session_id not in self._recent_utterances:
-            self._recent_utterances[session_id] = []
-
-        self._recent_utterances[session_id].append({
-            "utterance": utterance,
-            "topic_id": topic_id,
-            "timestamp": now,
-            "is_follow_up": is_follow_up,
-        })
-
-        # Keep only last 50 utterances
-        if len(self._recent_utterances[session_id]) > 50:
-            self._recent_utterances[session_id] = self._recent_utterances[session_id][-50:]
+        # Store utterance and publish the bounded replacement as one session
+        # state transition. A clear cannot interleave halfway through it.
+        with self._state_lock:
+            utterances = self._recent_utterances.setdefault(session_id, [])
+            utterances.append({
+                "utterance": utterance,
+                "topic_id": topic_id,
+                "timestamp": now,
+                "is_follow_up": is_follow_up,
+            })
+            if len(utterances) > 50:
+                self._recent_utterances[session_id] = utterances[-50:]
 
         # Check for follow-up pattern
         if is_follow_up and topic_id:
@@ -286,21 +304,16 @@ class ImplicitFeedbackTracker:
         """
         now = int(datetime.now(timezone.utc).timestamp())
 
-        if session_id not in self._surface_switches:
-            self._surface_switches[session_id] = []
-
-        switch_data = {
-            "from_surface": from_surface,
-            "to_surface": to_surface,
-            "timestamp": now,
-            "pending_result_count": pending_result_count,
-        }
-
-        self._surface_switches[session_id].append(switch_data)
-
-        # Keep only last 20 switches
-        if len(self._surface_switches[session_id]) > 20:
-            self._surface_switches[session_id] = self._surface_switches[session_id][-20:]
+        with self._state_lock:
+            switches = self._surface_switches.setdefault(session_id, [])
+            switches.append({
+                "from_surface": from_surface,
+                "to_surface": to_surface,
+                "timestamp": now,
+                "pending_result_count": pending_result_count,
+            })
+            if len(switches) > 20:
+                self._surface_switches[session_id] = switches[-20:]
 
         # If switching from audio to canvas with pending results, signal
         if from_surface == "audio" and to_surface == "canvas" and pending_result_count > 0:
@@ -421,8 +434,11 @@ class ImplicitFeedbackTracker:
 
     def clear_session(self, session_id: str) -> None:
         """Clear tracking data for a session."""
-        self._recent_utterances.pop(session_id, None)
-        self._surface_switches.pop(session_id, None)
+        with self._state_lock:
+            # Both structures are swapped under one owner lock, so a new
+            # event cannot leave a half-cleared session visible.
+            self._recent_utterances.pop(session_id, None)
+            self._surface_switches.pop(session_id, None)
         logger.debug(f"Cleared feedback tracking for session {session_id}")
 
 

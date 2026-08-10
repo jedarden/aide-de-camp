@@ -8,7 +8,7 @@ Provides three-layer freeze protection for self-modification writes:
 """
 
 import os
-import uuid
+import threading
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
@@ -23,6 +23,7 @@ logger = getLogger(__name__)
 # Constants
 ENV_VAR_NAME = "ADC_SELFMOD_FREEZE"
 SENTINEL_PATH = Path("/home/coding/aide-de-camp/data/FREEZE")
+_freeze_lock = threading.RLock()
 
 
 @dataclass
@@ -87,6 +88,12 @@ def set_frozen(frozen: bool) -> None:
     Raises:
         OSError: If atomic operations fail
     """
+    with _freeze_lock:
+        _set_frozen_locked(frozen)
+
+
+def _set_frozen_locked(frozen: bool) -> None:
+    """Apply the sentinel transition; caller holds ``_freeze_lock``."""
     if frozen:
         # Use atomic_write utility for atomic sentinel file creation
         try:
@@ -123,8 +130,9 @@ def set_frozen(frozen: bool) -> None:
                 f"Check file permissions and try again. Manual removal: 'rm {SENTINEL_PATH}'"
             )
             logger.error(error_msg)
-            # Don't raise - allow operation to complete, but log clearly
-            # The user can retry or manually remove the file
+            # Permission failure is not success; retain the observable frozen
+            # state and let the caller retry.
+            raise OSError(error_msg) from e
 
         except FileNotFoundError:
             # File doesn't exist - this is fine, we wanted it gone
@@ -140,7 +148,7 @@ def set_frozen(frozen: bool) -> None:
                 f"You can manually remove it: 'rm {SENTINEL_PATH}' or retry the operation."
             )
             logger.warning(error_msg)
-            # Don't raise - allow operation to complete, but provide clear guidance
+            raise OSError(error_msg) from e
 
 
 def get_status() -> dict:

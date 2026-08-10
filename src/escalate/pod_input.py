@@ -7,6 +7,7 @@ deletion operations.
 """
 
 import sys
+import threading
 from typing import Dict, List, Optional, Tuple
 
 
@@ -23,6 +24,7 @@ class PodInputCollector:
         """Initialize the pod input collector."""
         self._selected_pod: Optional[str] = None
         self._available_pods: List[Dict] = []
+        self._state_lock = threading.RLock()
 
     def set_available_pods(self, pods: List[Dict]) -> None:
         """
@@ -32,7 +34,8 @@ class PodInputCollector:
             pods: List of pod dictionaries containing pod information.
                    Each pod should have at least a 'name' field.
         """
-        self._available_pods = pods
+        with self._state_lock:
+            self._available_pods = list(pods)
 
     def get_available_pod_names(self) -> List[str]:
         """
@@ -41,7 +44,9 @@ class PodInputCollector:
         Returns:
             List of pod names available for selection.
         """
-        return [pod.get("name", "") for pod in self._available_pods if pod.get("name")]
+        with self._state_lock:
+            pods = list(self._available_pods)
+        return [pod.get("name", "") for pod in pods if pod.get("name")]
 
     def validate_pod_name(self, pod_name: str) -> Tuple[bool, Optional[str]]:
         """
@@ -77,7 +82,9 @@ class PodInputCollector:
         Returns:
             The validated pod name, or None if the user cancels/enters empty.
         """
-        if not self._available_pods:
+        with self._state_lock:
+            has_available_pods = bool(self._available_pods)
+        if not has_available_pods:
             print("❌ No pods available for selection.", file=sys.stderr)
             print("   Please ensure pods are listed before attempting selection.", file=sys.stderr)
             return None
@@ -103,7 +110,8 @@ class PodInputCollector:
                 is_valid, error_msg = self.validate_pod_name(user_input)
 
                 if is_valid:
-                    self._selected_pod = user_input
+                    with self._state_lock:
+                        self._selected_pod = user_input
                     print(f"\n✓ Selected pod: {user_input}")
                     return user_input
                 else:
@@ -135,7 +143,9 @@ class PodInputCollector:
         # Group pods by namespace if available
         pods_by_namespace: Dict[str, List[Dict]] = {}
 
-        for pod in self._available_pods:
+        with self._state_lock:
+            pods = list(self._available_pods)
+        for pod in pods:
             namespace = pod.get("namespace", "default")
             if namespace not in pods_by_namespace:
                 pods_by_namespace[namespace] = []
@@ -168,12 +178,15 @@ class PodInputCollector:
         Returns:
             The selected pod name, or None if no pod has been selected.
         """
-        return self._selected_pod
+        with self._state_lock:
+            return self._selected_pod
 
     def reset(self) -> None:
         """Reset the collector state (clear selected pod and available list)."""
-        self._selected_pod = None
-        self._available_pods = []
+        with self._state_lock:
+            # Publish a fresh empty collector generation in one transition.
+            self._selected_pod = None
+            self._available_pods = []
 
 
 # Global collector instance

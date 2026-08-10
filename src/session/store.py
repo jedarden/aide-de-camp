@@ -190,6 +190,7 @@ CREATE INDEX IF NOT EXISTS idx_signals_result ON feedback_signals(result_id);
 -- first token separately) — see src/instrument/timings.py.
 CREATE TABLE IF NOT EXISTS dispatch_timings (
     intent_id                 TEXT PRIMARY KEY,
+    session_id                TEXT,
     router_ms                 INTEGER,
     json_parse_ms             INTEGER,
     fetch_first_source_ms     INTEGER,
@@ -204,6 +205,7 @@ CREATE TABLE IF NOT EXISTS dispatch_timings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dispatch_timings_created ON dispatch_timings(created_at);
+CREATE INDEX IF NOT EXISTS idx_dispatch_timings_session ON dispatch_timings(session_id);
 
 -- Bead watch table: circuit breaker tracking for async beads
 -- Persistence layer for the async-path circuit breaker (plan §10 The Async Path).
@@ -284,7 +286,8 @@ CREATE TABLE IF NOT EXISTS card_cache (
     layout_bucket  TEXT NOT NULL,
     rendered_html  TEXT NOT NULL,
     created_at     INTEGER NOT NULL,
-    PRIMARY KEY (result_id, component_id, layout_bucket)
+    PRIMARY KEY (result_id, component_id, layout_bucket),
+    FOREIGN KEY (result_id) REFERENCES results(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_card_cache_result_id ON card_cache(result_id);
@@ -331,6 +334,9 @@ class SessionStore:
         self.db_path = db_path
         # ASYNCIO LOCKING PROTECTION: Protect critical sections from concurrent access
         self._lock = asyncio.Lock()
+        self._close_lock = asyncio.Lock()
+        self._closed = False
+        self._close_degraded = False
         logger.debug("SessionStore lock initialized")
 
         # Connection monitoring for leak detection (disabled by default)
@@ -444,6 +450,10 @@ class SessionStore:
 
         # Migrate dispatch_timings table to add json_parse_ms column
         await SessionStore._migrate_dispatch_timings_json_parse_ms(db)
+
+        # Migrate dispatch_timings table to retain the owning session. This
+        # lets session deletion remove routed thread timing rows atomically.
+        await SessionStore._migrate_dispatch_timings_session_id(db)
 
         await db.commit()
 
@@ -766,11 +776,52 @@ class SessionStore:
             logger.error(f"Failed to migrate dispatch_timings.json_parse_ms: {e}")
             raise
 
+    @staticmethod
+    async def _migrate_dispatch_timings_session_id(db: aiosqlite.Connection) -> None:
+        """Add the nullable session ownership column to dispatch timings."""
+        async with db.execute("PRAGMA table_info(dispatch_timings)") as cur:
+            timing_cols = {row[1] for row in await cur.fetchall()}
+        if "session_id" not in timing_cols:
+            await db.execute("ALTER TABLE dispatch_timings ADD COLUMN session_id TEXT")
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_dispatch_timings_session "
+                "ON dispatch_timings(session_id)"
+            )
+
     async def close(self) -> None:
-        """Close database connection pool."""
-        # aiosqlite uses connection-per-context, so just ensure checkpoint
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        """Checkpoint SQLite WAL state with bounded, retryable shutdown."""
+        async with self._close_lock:
+            if self._closed:
+                return
+
+            last_error = None
+            # A checkpoint is not rollback-able. PASSIVE/FULL preserve the WAL
+            # for SQLite recovery when another reader is busy; TRUNCATE is only
+            # an optimization after the durable checkpoint succeeds.
+            for attempt in range(3):
+                try:
+                    async with aiosqlite.connect(self.db_path) as db:
+                        await db.execute("PRAGMA busy_timeout = 1000")
+                        await db.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                        await db.execute("PRAGMA wal_checkpoint(FULL)")
+                        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    self._closed = True
+                    self._close_degraded = False
+                    return
+                except (sqlite3.OperationalError, aiosqlite.OperationalError) as error:
+                    last_error = error
+                    message = str(error).lower()
+                    if "busy" not in message and "locked" not in message:
+                        break
+                    if attempt < 2:
+                        await asyncio.sleep(0.05 * (2 ** attempt))
+
+            # Keep the WAL untouched so SQLite can recover it on the next
+            # open. The caller gets a truthful degraded close and may retry.
+            self._close_degraded = True
+            raise RuntimeError(
+                f"SQLite WAL checkpoint did not complete; WAL retained for retry: {last_error}"
+            ) from last_error
 
     # Session operations
     @retry_with_exponential_backoff(
@@ -840,33 +891,43 @@ class SessionStore:
         Returns the new count.
         """
         async with aiosqlite.connect(self.db_path) as db:
-            # First get current count
-            current_count = await self.get_reformulation_count(session_id)
-            new_count = current_count + 1
-
-            # Update the count
+            # One SQL UPDATE is the linearization point; a separate read would
+            # allow two concurrent reformulations to overwrite one another.
             await db.execute(
-                "UPDATE sessions SET reformulation_count = ? WHERE id = ?",
-                (new_count, session_id)
+                "UPDATE sessions SET reformulation_count = COALESCE(reformulation_count, 0) + 1 WHERE id = ?",
+                (session_id,),
             )
+            async with db.execute(
+                "SELECT reformulation_count FROM sessions WHERE id = ?", (session_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+            new_count = row[0] if row else 0
             await db.commit()
 
             logger.info(f"Incremented reformulation_count for session {session_id} to {new_count}")
             return new_count
 
-    async def reset_reformulation_count(self, session_id: str) -> None:
+    async def reset_reformulation_count(self, session_id: str, expected_count: int | None = None) -> None:
         """Reset the re-formulation attempt count for a session.
 
         Called when a valid bead is successfully created, allowing the session
         to attempt re-formulation again for future intents.
         """
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                "UPDATE sessions SET reformulation_count = 0 WHERE id = ?",
-                (session_id,)
-            )
+            if expected_count is None:
+                cursor = await db.execute(
+                    "UPDATE sessions SET reformulation_count = 0 "
+                    "WHERE id = ? AND COALESCE(reformulation_count, 0) <> 0",
+                    (session_id,),
+                )
+            else:
+                cursor = await db.execute(
+                    "UPDATE sessions SET reformulation_count = 0 "
+                    "WHERE id = ? AND COALESCE(reformulation_count, 0) = ?",
+                    (session_id, expected_count),
+                )
             await db.commit()
-            logger.info(f"Reset reformulation_count for session {session_id}")
+            logger.info("Reset reformulation_count for session %s (updated=%s)", session_id, cursor.rowcount)
 
     async def delete_session(self, session_id: str) -> dict:
         """Delete a session and every row tied to it. Returns a removal summary.
@@ -901,6 +962,19 @@ class SessionStore:
                 "DELETE FROM feedback_signals WHERE session_id = ?", (session_id,)
             )
             await db.execute(
+                "DELETE FROM pending_bead_approvals WHERE session_id = ?", (session_id,)
+            )
+            await db.execute(
+                "DELETE FROM confirmation_prompts WHERE session_id = ?", (session_id,)
+            )
+            # Explicitly remove cache children before results so this remains
+            # atomic for databases created before the FK migration as well.
+            await db.execute(
+                "DELETE FROM card_cache WHERE result_id IN "
+                "(SELECT id FROM results WHERE session_id = ?)",
+                (session_id,),
+            )
+            await db.execute(
                 "DELETE FROM results WHERE session_id = ?", (session_id,)
             )
             await db.execute(
@@ -908,15 +982,13 @@ class SessionStore:
                 "(SELECT id FROM intents WHERE session_id = ?)",
                 (session_id,),
             )
-            # dispatch_timings is keyed by the intent *thread* id
-            # (routed_intent.intent_id), which differs from intents.id for the
-            # current router path (see the table comment in SCHEMA_SQL), so this
-            # is best-effort: it catches rows keyed by the store intent id, while
-            # thread-keyd rows survive until the thread id is known to the caller.
+            # Timing rows are keyed by routed thread ID, so session_id is the
+            # authoritative ownership link; the intent subquery preserves
+            # compatibility with rows written before that column existed.
             await db.execute(
-                "DELETE FROM dispatch_timings WHERE intent_id IN "
+                "DELETE FROM dispatch_timings WHERE session_id = ? OR intent_id IN "
                 "(SELECT id FROM intents WHERE session_id = ?)",
-                (session_id,),
+                (session_id, session_id),
             )
             await db.execute(
                 "DELETE FROM intents WHERE session_id = ?", (session_id,)
@@ -1376,8 +1448,18 @@ class SessionStore:
                 """DELETE FROM results WHERE id = ? AND session_id = ?""",
                 (result_id, session_id)
             )
+            # Keep the result row and every rendered card in one transaction;
+            # a renderer cannot observe a committed result deletion with an
+            # orphaned cache entry.
+            cache_cursor = await db.execute(
+                "DELETE FROM card_cache WHERE result_id = ?",
+                (result_id,),
+            )
             await db.commit()
-            return {"result_deleted": cursor.rowcount}
+            return {
+                "result_deleted": cursor.rowcount,
+                "card_cache_deleted": cache_cursor.rowcount,
+            }
 
     # Card cache operations
     async def write_card_cache(
@@ -1909,6 +1991,7 @@ class SessionStore:
     async def record_dispatch_timings(
         self,
         intent_id: str,
+        session_id: str | None = None,
         **fields: int | None,
     ) -> None:
         """Persist per-stage timings for one dispatch intent thread.
@@ -1929,12 +2012,21 @@ class SessionStore:
         async with aiosqlite.connect(self.db_path) as db:
             # Ensure the row exists (created_at set once, on first write).
             await db.execute(
-                "INSERT OR IGNORE INTO dispatch_timings (intent_id, created_at) VALUES (?, ?)",
-                (intent_id, now),
+                "INSERT OR IGNORE INTO dispatch_timings "
+                "(intent_id, session_id, created_at) VALUES (?, ?, ?)",
+                (intent_id, session_id, now),
             )
+            updates = []
+            params = []
+            if session_id is not None:
+                updates.append("session_id = COALESCE(session_id, ?)")
+                params.append(session_id)
             if cols:
-                set_clause = ", ".join(f"{c} = ?" for c in cols)
-                params = [*cols.values(), intent_id]
+                updates.extend(f"{c} = ?" for c in cols)
+                params.extend(cols.values())
+            if updates:
+                set_clause = ", ".join(updates)
+                params.append(intent_id)
                 await db.execute(
                     f"UPDATE dispatch_timings SET {set_clause} WHERE intent_id = ?",
                     params,

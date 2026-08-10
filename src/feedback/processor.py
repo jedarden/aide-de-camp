@@ -75,6 +75,8 @@ class FeedbackProcessor:
         self.library = get_library()
         self.broadcaster = get_broadcaster()
         self._pending_approvals: Dict[str, ArtifactDiff] = {}
+        self._approval_states: Dict[str, str] = {}
+        self._approval_lock = asyncio.Lock()
 
     async def process_feedback(self, request: FeedbackRequest) -> FeedbackResponse:
         """
@@ -163,7 +165,11 @@ class FeedbackProcessor:
 
         # Otherwise, propose for approval
         approval_id = self._generate_approval_id()
-        self._pending_approvals[approval_id] = diff
+        # Publish the diff and its PENDING state together. Later approval
+        # calls use this state as the claim token for the external side effect.
+        async with self._approval_lock:
+            self._pending_approvals[approval_id] = diff
+            self._approval_states[approval_id] = "PENDING"
 
         return FeedbackResponse(
             status="proposed",
@@ -184,41 +190,92 @@ class FeedbackProcessor:
         Returns:
             Response confirming application
         """
-        diff = self._pending_approvals.get(approval_id)
-        if not diff:
-            return FeedbackResponse(
-                status="rejected",
-                diff=None,
-                message="Approval ID not found or already processed.",
-                confidence=0.0,
-                artifact_name=None,
-                artifact_type=None
-            )
+        async with self._approval_lock:
+            diff = self._pending_approvals.get(approval_id)
+            state = self._approval_states.get(approval_id)
+            if diff is None:
+                return FeedbackResponse(
+                    status="rejected",
+                    diff=None,
+                    message="Approval ID not found or already processed.",
+                    confidence=0.0,
+                    artifact_name=None,
+                    artifact_type=None,
+                )
+            if state in {"APPLYING", "NOTIFYING"}:
+                return FeedbackResponse(
+                    status="proposed",
+                    diff=diff,
+                    message="Approval is already being processed; retry after it completes.",
+                    confidence=diff.confidence,
+                    artifact_name=diff.artifact_name,
+                    artifact_type=diff.artifact_type,
+                )
+            if state == "APPLIED_NOT_BROADCAST":
+                # The external change is already committed; retry only the
+                # notification side effect and never apply the diff again.
+                self._approval_states[approval_id] = "NOTIFYING"
+                needs_apply = False
+            elif state in {"PENDING", "FAILED_RETRYABLE"}:
+                self._approval_states[approval_id] = "APPLYING"
+                needs_apply = True
+            else:
+                return FeedbackResponse(
+                    status="applied",
+                    diff=diff,
+                    message=f"Change already applied to {diff.artifact_name}",
+                    confidence=diff.confidence,
+                    artifact_name=diff.artifact_name,
+                    artifact_type=diff.artifact_type,
+                )
 
-        # Apply the diff
-        success = self.self_mod_agent.apply_diff(diff)
+        if needs_apply:
+            # Claim before the external call. A concurrent approval observes
+            # APPLYING and cannot duplicate the self-modification.
+            success = self.self_mod_agent.apply_diff(diff)
+            if not success:
+                async with self._approval_lock:
+                    self._approval_states[approval_id] = "FAILED_RETRYABLE"
+                return FeedbackResponse(
+                    status="rejected",
+                    diff=diff,
+                    message=f"Failed to apply change to {diff.artifact_name}; approval retained for retry",
+                    confidence=diff.confidence,
+                    artifact_name=diff.artifact_name,
+                    artifact_type=diff.artifact_type,
+                )
+            async with self._approval_lock:
+                # Keep a terminal notification record until the broadcast
+                # commits; this is the in-memory outbox boundary.
+                self._approval_states[approval_id] = "APPLIED_NOT_BROADCAST"
 
-        if success:
-            del self._pending_approvals[approval_id]
+        try:
             await self._broadcast_artifact_update(diff)
-
+        except Exception as error:
+            async with self._approval_lock:
+                self._approval_states[approval_id] = "APPLIED_NOT_BROADCAST"
+            logger.error("Approval %s notification failed: %s", approval_id, error)
             return FeedbackResponse(
                 status="applied",
                 diff=diff,
-                message=f"Change applied to {diff.artifact_name}: {diff.change_summary}",
+                message=f"Change applied to {diff.artifact_name}; notification retained for retry",
                 confidence=diff.confidence,
                 artifact_name=diff.artifact_name,
-                artifact_type=diff.artifact_type
+                artifact_type=diff.artifact_type,
             )
-        else:
-            return FeedbackResponse(
-                status="rejected",
-                diff=diff,
-                message=f"Failed to apply change to {diff.artifact_name}",
-                confidence=diff.confidence,
-                artifact_name=diff.artifact_name,
-                artifact_type=diff.artifact_type
-            )
+
+        async with self._approval_lock:
+            self._approval_states[approval_id] = "APPLIED"
+            self._pending_approvals.pop(approval_id, None)
+
+        return FeedbackResponse(
+            status="applied",
+            diff=diff,
+            message=f"Change applied to {diff.artifact_name}: {diff.change_summary}",
+            confidence=diff.confidence,
+            artifact_name=diff.artifact_name,
+            artifact_type=diff.artifact_type,
+        )
 
     async def reject_change(self, approval_id: str, reason: Optional[str] = None) -> FeedbackResponse:
         """
@@ -231,19 +288,47 @@ class FeedbackProcessor:
         Returns:
             Response confirming rejection
         """
-        diff = self._pending_approvals.get(approval_id)
-        if not diff:
+        async with self._approval_lock:
+            diff = self._pending_approvals.get(approval_id)
+            state = self._approval_states.get(approval_id)
+            if diff is None:
+                return FeedbackResponse(
+                    status="rejected",
+                    diff=None,
+                    message="Approval ID not found.",
+                    confidence=0.0,
+                    artifact_name=None,
+                    artifact_type=None,
+                )
+            if state in {"APPLYING", "NOTIFYING", "REJECTING"}:
+                return FeedbackResponse(
+                    status="proposed",
+                    diff=diff,
+                    message="Approval is already being processed; retry after it completes.",
+                    confidence=diff.confidence,
+                    artifact_name=diff.artifact_name,
+                    artifact_type=diff.artifact_type,
+                )
+            self._approval_states[approval_id] = "REJECTING"
+
+        try:
+            # Claim before the agent call; failed rejection remains retryable.
+            self.self_mod_agent.reject_diff(diff)
+        except Exception as error:
+            async with self._approval_lock:
+                self._approval_states[approval_id] = "FAILED_RETRYABLE"
             return FeedbackResponse(
                 status="rejected",
-                diff=None,
-                message="Approval ID not found.",
-                confidence=0.0,
-                artifact_name=None,
-                artifact_type=None
+                diff=diff,
+                message=f"Rejection failed and was retained for retry: {error}",
+                confidence=diff.confidence,
+                artifact_name=diff.artifact_name,
+                artifact_type=diff.artifact_type,
             )
 
-        self.self_mod_agent.reject_diff(diff)
-        del self._pending_approvals[approval_id]
+        async with self._approval_lock:
+            self._approval_states[approval_id] = "REJECTED"
+            self._pending_approvals.pop(approval_id, None)
 
         return FeedbackResponse(
             status="rejected",
@@ -262,7 +347,7 @@ class FeedbackProcessor:
         else:
             # For prompts/configs, broadcast a generic update event
             event = SSEEvent(
-                type=EventType.COMPONENT_UPDATED,  # Reuse event type
+                event_type=EventType.COMPONENT_UPDATED,  # Reuse event type
                 data={
                     "artifact_type": diff.artifact_type.value,
                     "artifact_name": diff.artifact_name,
@@ -270,7 +355,7 @@ class FeedbackProcessor:
                     "timestamp": int(asyncio.get_event_loop().time())
                 }
             )
-            await self.sse_manager.broadcast_to_all(event)
+            await self.broadcaster.broadcast(event)
 
     def _generate_approval_id(self) -> str:
         """Generate a unique approval ID."""
@@ -307,6 +392,7 @@ class FeedbackProcessor:
                 "confidence": diff.confidence
             }
             for apr_id, diff in self._pending_approvals.items()
+            if self._approval_states.get(apr_id) != "APPLIED"
         ]
 
     async def rollback(self, artifact_name: str, artifact_type: ArtifactType) -> FeedbackResponse:

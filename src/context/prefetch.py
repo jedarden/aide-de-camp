@@ -6,6 +6,7 @@ responses faster.
 """
 
 import asyncio
+import threading
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -78,6 +79,8 @@ class SpeculativePrefetcher:
         self.ttl_seconds = ttl_seconds
         self._cache: dict[str, PrefetchCache] = {}
         self._recent_utterances: dict[str, list[dict]] = {}  # session_id -> utterances
+        self._cache_lock = threading.RLock()
+        self._session_lock = threading.RLock()
         self._fetch_callbacks: dict[FollowUpPattern, Callable] = {}
         self._fetch_strand = get_fetch_strand()
 
@@ -322,19 +325,16 @@ class SpeculativePrefetcher:
         intent_type: str,
     ) -> None:
         """Store utterance for pattern analysis."""
-        if session_id not in self._recent_utterances:
-            self._recent_utterances[session_id] = []
-
-        self._recent_utterances[session_id].append({
-            "utterance": utterance,
-            "topic_id": topic_id,
-            "intent_type": intent_type,
-            "timestamp": int(datetime.now(timezone.utc).timestamp()),
-        })
-
-        # Keep only last 20 utterances
-        if len(self._recent_utterances[session_id]) > 20:
-            self._recent_utterances[session_id] = self._recent_utterances[session_id][-20:]
+        with self._session_lock:
+            utterances = self._recent_utterances.setdefault(session_id, [])
+            utterances.append({
+                "utterance": utterance,
+                "topic_id": topic_id,
+                "intent_type": intent_type,
+                "timestamp": int(datetime.now(timezone.utc).timestamp()),
+            })
+            if len(utterances) > 20:
+                self._recent_utterances[session_id] = utterances[-20:]
 
     async def prefetch_for_predictions(
         self,
@@ -354,10 +354,12 @@ class SpeculativePrefetcher:
 
             # Check if we already have valid cache
             cache_key = f"{prediction.topic_id}:{prediction.pattern.value}"
-            if cache_key in self._cache and self._cache[cache_key].is_valid():
-                logger.debug(f"Cache hit for {cache_key}")
-                cache_entries[cache_key] = self._cache[cache_key]
-                continue
+            with self._cache_lock:
+                cached = self._cache.get(cache_key)
+                if cached is not None and cached.is_valid():
+                    logger.debug(f"Cache hit for {cache_key}")
+                    cache_entries[cache_key] = cached
+                    continue
 
             # Fetch data
             callback = self._fetch_callbacks.get(prediction.pattern)
@@ -379,8 +381,14 @@ class SpeculativePrefetcher:
                     expires_at=prediction.expires_at,
                 )
 
-                self._cache[cache_key] = cache_entry
-                cache_entries[cache_key] = cache_entry
+                with self._cache_lock:
+                    # A slower fetch must not overwrite a fresh entry
+                    # published by another task while this callback awaited.
+                    existing = self._cache.get(cache_key)
+                    if existing is None or not existing.is_valid():
+                        self._cache[cache_key] = cache_entry
+                        existing = cache_entry
+                    cache_entries[cache_key] = existing
 
                 logger.info(f"Prefetched data for {cache_key}")
 
@@ -401,18 +409,17 @@ class SpeculativePrefetcher:
         """
         cache_key = f"{topic_id}:{pattern.value}"
 
-        if cache_key not in self._cache:
-            return None
-
-        cache_entry = self._cache[cache_key]
-
-        if not cache_entry.is_valid():
-            # Cache expired, remove it
-            del self._cache[cache_key]
-            return None
-
-        # Record cache hit
-        cache_entry.record_hit()
+        with self._cache_lock:
+            cache_entry = self._cache.get(cache_key)
+            if cache_entry is None:
+                return None
+            if not cache_entry.is_valid():
+                # The identity check is the commit point: a fresh replacement
+                # cannot be removed by this stale reader.
+                if self._cache.get(cache_key) is cache_entry:
+                    self._cache.pop(cache_key, None)
+                return None
+            cache_entry.record_hit()
 
         return cache_entry.data
 
@@ -421,7 +428,9 @@ class SpeculativePrefetcher:
         result = {}
         prefix = f"{topic_id}:"
 
-        for key, cache_entry in self._cache.items():
+        with self._cache_lock:
+            entries = list(self._cache.items())
+        for key, cache_entry in entries:
             if key.startswith(prefix) and cache_entry.is_valid():
                 pattern = key[len(prefix):]
                 result[pattern] = {
@@ -436,39 +445,40 @@ class SpeculativePrefetcher:
         """Clean up expired cache entries using atomic operations. Returns count of cleaned entries."""
         now = int(datetime.now(timezone.utc).timestamp())
 
-        # Atomic cleanup: build expired keys list first
-        expired_keys = [
-            key for key, cache in self._cache.items()
-            if cache.expires_at < now
-        ]
-
-        # Atomic batch deletion using dict comprehension
-        if expired_keys:
-            # Create new dict without expired keys (atomic operation)
-            self._cache = {
+        with self._cache_lock:
+            # Build and publish one immutable replacement under the owner lock;
+            # writers cannot be lost between the expiry scan and swap.
+            replacement = {
                 key: cache
                 for key, cache in self._cache.items()
-                if key not in expired_keys
+                if cache.expires_at >= now
             }
-            logger.info(f"Cleaned up {len(expired_keys)} expired prefetch entries")
+            expired_count = len(self._cache) - len(replacement)
+            if expired_count:
+                self._cache = replacement
+                logger.info(f"Cleaned up {expired_count} expired prefetch entries")
 
-        return len(expired_keys)
+        return expired_count
 
     def get_stats(self) -> dict:
         """Get prefetch statistics."""
-        total_hits = sum(cache.hit_count for cache in self._cache.values())
+        with self._cache_lock:
+            entries = list(self._cache.values())
+        total_hits = sum(cache.hit_count for cache in entries)
 
         return {
-            "cache_size": len(self._cache),
+            "cache_size": len(entries),
             "total_hits": total_hits,
-            "valid_entries": sum(1 for cache in self._cache.values() if cache.is_valid()),
-            "expired_entries": sum(1 for cache in self._cache.values() if not cache.is_valid()),
+            "valid_entries": sum(1 for cache in entries if cache.is_valid()),
+            "expired_entries": sum(1 for cache in entries if not cache.is_valid()),
         }
 
     def clear_session(self, session_id: str) -> None:
         """Clear utterance history for a session."""
-        if session_id in self._recent_utterances:
-            del self._recent_utterances[session_id]
+        with self._session_lock:
+            # pop is idempotent and is the clear commit point; an utterance
+            # after this lock boundary belongs to the new session generation.
+            self._recent_utterances.pop(session_id, None)
 
 
 # Global prefetcher instance

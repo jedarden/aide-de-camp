@@ -142,6 +142,9 @@ class BeadWatcher:
         self._watch_task: Optional[asyncio.Task] = None
         # Ambient monitoring task - runs independently from bead watch loop
         self._ambient_task: Optional[asyncio.Task] = None
+        self._lifecycle_lock = asyncio.Lock()
+        self._stop_task: Optional[asyncio.Task] = None
+        self._lifecycle_state = "STOPPED"
         # Consecutive crashes since the last healthy tick; drives the backoff
         # schedule. Reset to 0 whenever a tick completes successfully.
         self._restart_count = 0
@@ -182,15 +185,18 @@ class BeadWatcher:
         and the lifespan wiring in src/main.py is unchanged — ``_bead_watcher``
         stays the module-level instance.
         """
-        self._running = True
-        # Start bead watch supervisor
-        self._supervisor_task = asyncio.create_task(
-            self._supervise(), name="bead-watcher-supervisor"
-        )
-        # Start ambient monitoring loop (independent timer)
-        self._ambient_task = asyncio.create_task(
-            self._ambient_monitoring_loop(), name="ambient-monitoring-loop"
-        )
+        async with self._lifecycle_lock:
+            if self._running:
+                return
+            self._running = True
+            self._lifecycle_state = "RUNNING"
+            # Publish all three task handles as one lifecycle generation.
+            self._supervisor_task = asyncio.create_task(
+                self._supervise(), name="bead-watcher-supervisor"
+            )
+            self._ambient_task = asyncio.create_task(
+                self._ambient_monitoring_loop(), name="ambient-monitoring-loop"
+            )
         logger.info(
             "Bead watcher started (bead interval=%ss, ambient interval=%ss)",
             self.check_interval_seconds,
@@ -206,28 +212,44 @@ class BeadWatcher:
         not automatically cancel the awaited task. Also cancels the ambient
         monitoring task.
         """
+        async with self._lifecycle_lock:
+            if self._stop_task is None or self._stop_task.done():
+                self._lifecycle_state = "STOPPING"
+                self._stop_task = asyncio.create_task(self._stop_impl())
+            stop_task = self._stop_task
+        await stop_task
+
+    async def _stop_impl(self) -> None:
         self._running = False
-        supervisor = self._supervisor_task
-        if supervisor and not supervisor.done():
-            supervisor.cancel()
+        handles = [self._supervisor_task, self._watch_task, self._ambient_task]
+        handles = [task for task in dict.fromkeys(handles) if task is not None]
+        failures = []
+        # Cancel every independent task even if an earlier cancel call fails.
+        for task in handles:
             try:
-                await supervisor
-            except asyncio.CancelledError:
-                pass
-        watch = self._watch_task
-        if watch and not watch.done():
-            watch.cancel()
-            try:
-                await watch
-            except BaseException:  # noqa: BLE001 — tearing down, swallow anything
-                pass
-        ambient = self._ambient_task
-        if ambient and not ambient.done():
-            ambient.cancel()
-            try:
-                await ambient
-            except BaseException:  # noqa: BLE001 — tearing down, swallow anything
-                pass
+                if not task.done():
+                    task.cancel()
+            except BaseException as error:  # pragma: no cover - Task API defensive
+                failures.append(error)
+        results = await asyncio.gather(*handles, return_exceptions=True) if handles else []
+        failures.extend(
+            error for error in results
+            if isinstance(error, Exception) and not isinstance(error, asyncio.CancelledError)
+        )
+
+        # Retire only terminal handles. An unfinished task stays attached to
+        # this daemon so the next stop call can retry instead of lying about a
+        # fully drained watcher.
+        if self._supervisor_task is not None and self._supervisor_task.done():
+            self._supervisor_task = None
+        if self._watch_task is not None and self._watch_task.done():
+            self._watch_task = None
+        if self._ambient_task is not None and self._ambient_task.done():
+            self._ambient_task = None
+        if failures or self._supervisor_task or self._watch_task or self._ambient_task:
+            self._lifecycle_state = "FAILED_STOP"
+            raise RuntimeError("Bead watcher cleanup incomplete")
+        self._lifecycle_state = "STOPPED"
         logger.info("Bead watcher stopped")
 
     async def _supervise(self) -> None:

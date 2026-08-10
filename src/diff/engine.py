@@ -6,6 +6,7 @@ Used by synthesize strand to generate diff-aware results.
 """
 
 import json
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from logging import getLogger
@@ -58,6 +59,7 @@ class DiffEngine:
 
     def __init__(self):
         self._cache: dict[str, tuple[dict, dict]] = {}  # topic_id -> (prev_result, timestamp)
+        self._cache_lock = threading.RLock()
 
     async def compute_diff(
         self,
@@ -249,27 +251,33 @@ class DiffEngine:
     def cache_previous_result(self, topic_id: str, result: dict) -> None:
         """Cache a result as the previous result for a topic."""
         timestamp = result.get("created_at", int(datetime.now(timezone.utc).timestamp()))
-        self._cache[topic_id] = (result, timestamp)
+        with self._cache_lock:
+            self._cache[topic_id] = (result, timestamp)
 
     def get_cached_result(self, topic_id: str) -> Optional[dict]:
         """Get the cached previous result for a topic."""
-        if topic_id in self._cache:
-            result, timestamp = self._cache[topic_id]
-            # Check if cache is still valid (within 1 hour)
+        with self._cache_lock:
+            entry = self._cache.get(topic_id)
+            if entry is None:
+                return None
+            result, timestamp = entry
             age = int(datetime.now(timezone.utc).timestamp()) - timestamp
             if age < 3600:
                 return result
-            else:
-                # Cache expired
-                del self._cache[topic_id]
+            # Conditional pop is the expiry commit point: a newer result
+            # cannot be deleted by this stale reader.
+            if self._cache.get(topic_id) is entry:
+                self._cache.pop(topic_id, None)
         return None
 
     def clear_cache(self, topic_id: Optional[str] = None) -> None:
         """Clear cached results for a topic or all topics."""
-        if topic_id:
-            self._cache.pop(topic_id, None)
-        else:
-            self._cache.clear()
+        with self._cache_lock:
+            if topic_id:
+                self._cache.pop(topic_id, None)
+            else:
+                # Replace the complete cache generation under one lock.
+                self._cache = {}
 
 
 # Global diff engine instance

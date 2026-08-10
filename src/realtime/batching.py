@@ -6,6 +6,8 @@ quiet hours, and batching windows.
 """
 
 import asyncio
+import inspect
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -13,6 +15,7 @@ from logging import getLogger
 from typing import Any, Callable, Optional
 import yaml
 from pathlib import Path
+from uuid import uuid4
 
 
 logger = getLogger(__name__)
@@ -112,6 +115,8 @@ class ResultBatcher:
         self._on_narrate_callback: Optional[Callable[[list[PendingResult]], Any]] = None
         self._batch_task: Optional[asyncio.Task] = None
         self._running: bool = False
+        self._queue_lock = threading.RLock()
+        self._in_flight: dict[str, tuple[list[PendingResult], str]] = {}
 
         if config_path and config_path.exists():
             self._load_config(config_path)
@@ -186,17 +191,24 @@ class ResultBatcher:
         # Handle based on urgency
         if urgency_enum == Urgency.CRITICAL:
             # Critical: interrupt immediately
-            await self._narrate_now([pending])
+            with self._queue_lock:
+                self._pending.append(pending)
+            token = self._claim_results([pending], "pending")
+            if token is not None:
+                success = await self._narrate_now([pending])
+                self._finish_claim(token, success)
 
         elif urgency_enum == Urgency.HIGH:
             # High: wait for natural pause (or timeout)
-            self._waiting_for_pause.append(pending)
+            with self._queue_lock:
+                self._waiting_for_pause.append(pending)
             # Set timeout for high urgency (30s max wait)
             asyncio.create_task(self._high_urgency_timeout(pending))
 
         elif urgency_enum == Urgency.NORMAL:
             # Normal: batch within window
-            self._pending.append(pending)
+            with self._queue_lock:
+                self._pending.append(pending)
             # Schedule batch if not already scheduled
             if self._batch_task is None or self._batch_task.done():
                 self._batch_task = asyncio.create_task(
@@ -207,30 +219,69 @@ class ResultBatcher:
             # Low: only narrate if idle (no active conversation)
             if self._session_active:
                 # Session is active, queue for idle narration
-                self._pending.append(pending)
+                with self._queue_lock:
+                    self._pending.append(pending)
             else:
                 # Session idle, narrate immediately
-                await self._narrate_now([pending])
+                with self._queue_lock:
+                    self._pending.append(pending)
+                token = self._claim_results([pending], "pending")
+                if token is not None:
+                    success = await self._narrate_now([pending])
+                    self._finish_claim(token, success)
 
-    async def _narrate_now(self, results: list[PendingResult]) -> None:
-        """Narrate results immediately."""
+    async def _narrate_now(self, results: list[PendingResult]) -> bool:
+        """Narrate results immediately and report callback success."""
         if not results:
-            return
+            return True
 
         self._last_narration = int(datetime.now(timezone.utc).timestamp())
 
         if self._on_narrate_callback:
             try:
-                await self._on_narrate_callback(results)
+                callback_result = self._on_narrate_callback(results)
+                if inspect.isawaitable(callback_result):
+                    await callback_result
+                return True
             except Exception as e:
                 logger.error(f"Error in narrate callback: {e}", exc_info=True)
+                return False
+        return True
+
+    def _claim_results(self, results: list[PendingResult], source: str) -> str | None:
+        """Move results to in-flight before awaiting narration."""
+        with self._queue_lock:
+            claimed = []
+            for result in results:
+                for queue in (self._waiting_for_pause, self._pending):
+                    if result in queue:
+                        queue.remove(result)
+                        claimed.append(result)
+                        break
+            if not claimed:
+                return None
+            token = str(uuid4())
+            self._in_flight[token] = (claimed, source)
+            return token
+
+    def _finish_claim(self, token: str, success: bool) -> None:
+        """Ack successful narration or nack/requeue a failed claim."""
+        with self._queue_lock:
+            claim = self._in_flight.pop(token, None)
+            if claim is None:
+                return
+            results, source = claim
+            if not success:
+                target = self._waiting_for_pause if source == "waiting" else self._pending
+                target[0:0] = results
 
     async def _high_urgency_timeout(self, pending: PendingResult) -> None:
         """Timeout for high urgency results that haven't found a pause."""
         await asyncio.sleep(30)  # 30 second max wait
-        if pending in self._waiting_for_pause:
-            self._waiting_for_pause.remove(pending)
-            await self._narrate_now([pending])
+        token = self._claim_results([pending], "waiting")
+        if token is not None:
+            success = await self._narrate_now([pending])
+            self._finish_claim(token, success)
 
     async def _normal_batch_timer(self, pending: PendingResult) -> None:
         """Timer for normal urgency batch window."""
@@ -238,15 +289,15 @@ class ResultBatcher:
 
         # Collect all normal urgency results that are ready
         now = int(datetime.now(timezone.utc).timestamp())
-        ready = [r for r in self._pending if now - r.created_at >= self.config.normal_urgency_batch_seconds]
-
-        # Remove from pending
-        for r in ready:
-            if r in self._pending:
-                self._pending.remove(r)
-
-        # Narrate batch
-        await self._narrate_now(ready)
+        with self._queue_lock:
+            ready = [
+                r for r in self._pending
+                if now - r.created_at >= self.config.normal_urgency_batch_seconds
+            ]
+        token = self._claim_results(ready, "pending")
+        if token is not None:
+            success = await self._narrate_now(ready)
+            self._finish_claim(token, success)
 
     async def signal_pause(self) -> None:
         """
@@ -254,10 +305,12 @@ class ResultBatcher:
 
         High urgency results waiting for pause can be narrated now.
         """
-        if self._waiting_for_pause:
+        with self._queue_lock:
             results = self._waiting_for_pause.copy()
-            self._waiting_for_pause.clear()
-            await self._narrate_now(results)
+        token = self._claim_results(results, "waiting")
+        if token is not None:
+            success = await self._narrate_now(results)
+            self._finish_claim(token, success)
 
     async def signal_idle(self) -> None:
         """
@@ -265,35 +318,39 @@ class ResultBatcher:
 
         All pending results (including low urgency) can be narrated.
         """
-        self._session_active = False
-
-        if self._pending:
+        with self._queue_lock:
+            self._session_active = False
             results = self._pending.copy()
-            self._pending.clear()
-            await self._narrate_now(results)
+        token = self._claim_results(results, "pending")
+        if token is not None:
+            success = await self._narrate_now(results)
+            self._finish_claim(token, success)
 
     async def signal_active(self) -> None:
         """Signal session is active (conversation happening)."""
-        self._session_active = True
+        with self._queue_lock:
+            self._session_active = True
 
     async def flush(self) -> None:
         """Flush all pending results immediately."""
-        all_pending = self._waiting_for_pause + self._pending
-
-        if all_pending:
-            self._waiting_for_pause.clear()
-            self._pending.clear()
-            await self._narrate_now(all_pending)
+        with self._queue_lock:
+            all_pending = self._waiting_for_pause + self._pending
+        token = self._claim_results(all_pending, "pending")
+        if token is not None:
+            success = await self._narrate_now(all_pending)
+            self._finish_claim(token, success)
 
     def get_queue_status(self) -> dict:
         """Get current queue status for monitoring."""
-        return {
-            "pending": len(self._pending),
-            "waiting_for_pause": len(self._waiting_for_pause),
-            "session_active": self._session_active,
-            "last_narration": self._last_narration,
-            "quiet_hours_active": self.config.quiet_hours.is_quiet(),
-        }
+        with self._queue_lock:
+            return {
+                "pending": len(self._pending),
+                "waiting_for_pause": len(self._waiting_for_pause),
+                "in_flight": sum(len(items) for items, _ in self._in_flight.values()),
+                "session_active": self._session_active,
+                "last_narration": self._last_narration,
+                "quiet_hours_active": self.config.quiet_hours.is_quiet(),
+            }
 
 
 # Global batcher instance
