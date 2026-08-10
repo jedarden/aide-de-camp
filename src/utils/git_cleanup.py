@@ -364,10 +364,19 @@ class GitStateCleanup:
                 check=True,
             )
 
-            # Look for merge conflict indicators.  A clean repository is already
-            # in the desired state; do not report a failed ``merge --abort`` for
-            # a no-op call.
-            if not result.stdout.strip() or "UU" not in result.stdout:
+            # Unmerged entries can use several porcelain status codes (AA, DD,
+            # AU, UA, DU, UD, and UU).  Checking only for ``UU`` leaves
+            # modify/delete and add/add conflicts in an active merge.  Also
+            # honor MERGE_HEAD when conflicts have already been staged as
+            # resolved: the repository still needs ``merge --abort``.
+            status_lines = result.stdout.splitlines()
+            has_unmerged_entries = any(
+                len(line) >= 2
+                and ("U" in line[:2] or line[:2] in {"AA", "DD"})
+                for line in status_lines
+            )
+            merge_head = self.repo_path / ".git" / "MERGE_HEAD"
+            if not has_unmerged_entries and not merge_head.exists():
                 logger.debug("No conflicted merge to abort in %s", self.repo_path)
                 return True
 
@@ -479,9 +488,11 @@ class GitStateCleanup:
         try:
             # Check for merge conflicts
             conflict_files = detect_merge_conflicts(self.repo_path, timeout=self.timeout)
+            merge_head = self.repo_path / ".git" / "MERGE_HEAD"
 
-            if conflict_files:
-                logger.warning(f"Cleaning up {len(conflict_files)} conflicted files")
+            if conflict_files or merge_head.exists():
+                if conflict_files:
+                    logger.warning(f"Cleaning up {len(conflict_files)} conflicted files")
                 # Abort the merge to clean up conflict state
                 if not self.abort_merge(", ".join(conflict_files)):
                     return False
