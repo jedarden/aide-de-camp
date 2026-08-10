@@ -37,26 +37,9 @@ from src.watcher.daemon import BeadWatcher
 
 
 @pytest.fixture
-    # Use a temporary file database for proper test isolation
-    # Each test gets its own database file to avoid leakage
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-        db_path = Path(f.name)
-
-    s = SessionStore(db_path)
-    # Initialize schema asynchronously
-    await s.initialize()
-    yield s
-    # Cleanup: close the database connection and delete the file
-    await s.close()
-    try:
-        db_path.unlink()
-    except OSError:
-        pass  # File already deleted or doesn't exist
-
-
-@pytest.fixture
-
-@pytest.fixture
+async def store(test_db_store):
+    """Use the shared per-test isolated database fixture."""
+    yield test_db_store
 
 # --- Refusal comment parsing ----------------------------------------------------
 

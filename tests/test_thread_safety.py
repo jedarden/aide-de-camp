@@ -23,7 +23,8 @@ class TestGlobalSingletons:
         """Test that get_store() creates only one instance under concurrent load."""
         # Reset global state
         import src.session.store as store_module
-        store_module._store = None
+        with store_module._store_lock:
+            store_module._store = None
 
         # Create 100 concurrent requests
         tasks = [store_module.get_store() for _ in range(100)]
@@ -42,10 +43,14 @@ class TestGlobalSingletons:
         """Test that get_router() creates only one instance under concurrent load."""
         # Reset global state
         import src.intent.router as router_module
-        router_module._router = None
+        with router_module._router_lock:
+            router_module._router = None
 
         # Create 100 concurrent requests
-        tasks = [router_module.get_router() for _ in range(100)]
+        # get_router is intentionally synchronous: it is also used by normal
+        # non-async call sites.  Run it in worker threads to exercise the
+        # process-wide lock instead of passing plain objects to gather().
+        tasks = [asyncio.to_thread(router_module.get_router) for _ in range(100)]
         results = await asyncio.gather(*tasks)
 
         # Verify all results are the same instance
@@ -61,10 +66,11 @@ class TestGlobalSingletons:
         """Test that get_degraded_state_handler() is safe under concurrent load."""
         # Reset global state
         import src.errors.degraded_state as degraded_module
-        degraded_module._degraded_state_handler = None
+        with degraded_module._degraded_state_handler_lock:
+            degraded_module._degraded_state_handler = None
 
         # Create 100 concurrent requests
-        tasks = [degraded_module.get_degraded_state_handler() for _ in range(100)]
+        tasks = [asyncio.to_thread(degraded_module.get_degraded_state_handler) for _ in range(100)]
         results = await asyncio.gather(*tasks)
 
         # Verify all results are the same instance
@@ -104,7 +110,7 @@ class TestCacheConcurrency:
 
         # Perform 100 concurrent reads
         tasks = [
-            router._get_cached_classification(utterance, session_id)
+            asyncio.to_thread(router._get_cached_classification, utterance, session_id)
             for _ in range(100)
         ]
         results = await asyncio.gather(*tasks)
@@ -137,9 +143,9 @@ class TestCacheConcurrency:
                     urgency="normal"
                 )
             ]
-            tasks.append(
-                router._cache_classification(utterance, session_id, classifications)
-            )
+            tasks.append(asyncio.to_thread(
+                router._cache_classification, utterance, session_id, classifications
+            ))
 
         await asyncio.gather(*tasks)
 
@@ -171,14 +177,14 @@ class TestCacheConcurrency:
                     urgency="normal"
                 )
             ]
-            tasks.append(
-                router._cache_classification(utterance, session_id, classifications)
-            )
+            tasks.append(asyncio.to_thread(
+                router._cache_classification, utterance, session_id, classifications
+            ))
 
             # Read (may or may not hit)
-            tasks.append(
-                router._get_cached_classification(utterance, session_id)
-            )
+            tasks.append(asyncio.to_thread(
+                router._get_cached_classification, utterance, session_id
+            ))
 
         await asyncio.gather(*tasks)
 
@@ -193,7 +199,7 @@ class TestDatabaseConcurrency:
     @pytest.mark.asyncio
     async def test_concurrent_session_creation(self):
         """Test that concurrent session creation doesn't cause corruption."""
-        store = get_store()
+        store = await get_store()
 
         # Create 100 concurrent sessions
         session_ids = [str(uuid4()) for _ in range(100)]
@@ -211,7 +217,7 @@ class TestDatabaseConcurrency:
     @pytest.mark.asyncio
     async def test_concurrent_result_creation(self):
         """Test that concurrent result creation works correctly."""
-        store = get_store()
+        store = await get_store()
         session_id = await store.create_session()
 
         # Create topic

@@ -122,7 +122,7 @@ async def lifespan(app: FastAPI):
     Path("/home/coding/aide-de-camp/data").mkdir(exist_ok=True)
 
     # Initialize session store
-    _store = session_store_get_store(DB_PATH)
+    _store = await session_store_get_store(DB_PATH)
     await _store.initialize()
     logger.info(f"Session store initialized: {DB_PATH}")
 
@@ -330,7 +330,7 @@ async def get_store():
     """Get or initialize the global session store."""
     global _store
     if _store is None:
-        _store = session_store_get_store(DB_PATH)
+        _store = await session_store_get_store(DB_PATH)
         await _store.initialize()
     return _store
 
@@ -1879,7 +1879,7 @@ async def api_v1_approve_bead(request: BeadApproveRequest):
     from .escalate.handler import get_escalate_handler, EscalateRequest
     import json
 
-    store = session_store_get_store()
+    store = await session_store_get_store()
 
     # Get the pending approval
     approval = await store.get_pending_approval(request.approval_id)
@@ -1989,7 +1989,7 @@ async def api_v1_reject_bead(request: BeadRejectRequest):
 
     Marks the approval as rejected and updates the intent status.
     """
-    store = session_store_get_store()
+    store = await session_store_get_store()
 
     # Get the pending approval
     approval = await store.get_pending_approval(request.approval_id)

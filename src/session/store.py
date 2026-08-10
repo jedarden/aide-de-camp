@@ -8,6 +8,8 @@ Provides concurrent read access with serialized writes via WAL mode.
 import asyncio
 import logging
 import os
+import threading
+from concurrent.futures import Future
 
 import aiosqlite
 import sqlite3
@@ -2719,6 +2721,8 @@ class SessionStore:
 
 # Global session store instance
 _store: SessionStore | None = None
+_store_lock = threading.RLock()
+_store_initialization: Future[SessionStore] | None = None
 
 
 async def get_store(db_path: Path | None = None) -> SessionStore:
@@ -2732,12 +2736,47 @@ async def get_store(db_path: Path | None = None) -> SessionStore:
     The initialize() method is idempotent, so calling it when the database
     already exists is safe.
     """
-    global _store
-    if _store is None:
-        if db_path is None:
-            env_path = os.environ.get("ADC_DB_PATH")
-            db_path = Path(env_path) if env_path else DEFAULT_DB_PATH
-        _store = SessionStore(db_path)
-        # Initialize the database with schema
-        await _store.initialize()
-    return _store
+    global _store, _store_initialization
+
+    # The store is shared by callers that may use different event loops (for
+    # example, worker threads and pytest's per-test loops).  A process-wide
+    # lock protects publication, while a concurrent Future lets all callers
+    # await one asynchronous initialization without exposing a half-created
+    # store or binding an asyncio.Lock to one event loop.
+    with _store_lock:
+        if _store is not None:
+            return _store
+
+        initialization = _store_initialization
+        owns_initialization = initialization is None
+        if owns_initialization:
+            if db_path is None:
+                env_path = os.environ.get("ADC_DB_PATH")
+                db_path = Path(env_path) if env_path else DEFAULT_DB_PATH
+            store = SessionStore(db_path)
+            initialization = Future()
+            _store_initialization = initialization
+
+    if not owns_initialization:
+        # concurrent.futures.Future is loop-independent; wrap_future gives
+        # each waiting caller an awaitable owned by its current event loop.
+        return await asyncio.wrap_future(initialization)
+
+    try:
+        await store.initialize()
+    except BaseException as error:
+        with _store_lock:
+            if _store_initialization is initialization:
+                _store_initialization = None
+                initialization.set_exception(error)
+                # The owner re-raises below; retrieve the Future exception as
+                # well so a failure with no waiters is not reported as stale.
+                initialization.exception()
+        raise
+
+    with _store_lock:
+        if _store_initialization is initialization:
+            _store = store
+            _store_initialization = None
+            initialization.set_result(store)
+        return _store

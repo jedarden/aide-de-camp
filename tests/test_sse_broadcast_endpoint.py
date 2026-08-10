@@ -19,25 +19,6 @@ from src.main import app
 # --- fixtures ---------------------------------------------------------------
 
 
-@pytest.fixture
-    import src.session.store as store_mod
-    import src.main as main_mod
-
-    saved_store = store_mod._store
-    saved_main_store = main_mod._store
-
-    store_mod._store = None
-    main_mod._store = None
-
-    store = store_mod.get_store()
-    await test_db_store.initialize()
-
-    yield store
-
-    main_mod._store = saved_main_store
-    store_mod._store = saved_store
-
-
 async def _started_broadcaster():
     """Start the process-wide SSE broadcaster singleton if not already running."""
     b = get_broadcaster()

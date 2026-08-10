@@ -5,6 +5,7 @@ Verify that in-memory database fixtures provide complete isolation from
 production data and between tests.
 """
 
+import aiosqlite
 import pytest
 from src.session.store import SessionStore
 
@@ -46,7 +47,7 @@ async def test_in_memory_db_store_is_isolated_from_other_tests(in_memory_db_stor
 
 
 @pytest.mark.asyncio
-async def in_memory_db_session_id_creates_valid_session(in_memory_db_store, in_memory_db_session_id):
+async def test_in_memory_db_session_id_creates_valid_session(in_memory_db_store, in_memory_db_session_id):
     """Test that in_memory_db_session_id fixture creates a valid session."""
     session = await in_memory_db_store.get_session(in_memory_db_session_id)
     assert session is not None
@@ -54,7 +55,7 @@ async def in_memory_db_session_id_creates_valid_session(in_memory_db_store, in_m
 
 
 @pytest.mark.asyncio
-async def in_memory_db_connection_provides_direct_access(in_memory_db_connection):
+async def test_in_memory_db_connection_provides_direct_access(in_memory_db_connection):
     """Test that in_memory_db_connection provides direct database access."""
     # Create a session using direct SQL
     import uuid
@@ -79,10 +80,10 @@ async def in_memory_db_connection_provides_direct_access(in_memory_db_connection
 
 
 @pytest.mark.asyncio
-async def in_memory_database_has_full_schema(in_memory_db_store):
+async def test_in_memory_database_has_full_schema(in_memory_db_store):
     """Test that in-memory database has the full schema including migrations."""
     # Check that all expected tables exist
-    async with in_memory_db_store.db_path as conn:
+    async with aiosqlite.connect(in_memory_db_store.db_path, uri=True) as conn:
         cursor = await conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
         )
@@ -100,7 +101,7 @@ async def in_memory_database_has_full_schema(in_memory_db_store):
 
 
 @pytest.mark.asyncio
-async def in_memory_database_supports_all_operations(in_memory_db_store):
+async def test_in_memory_database_supports_all_operations(in_memory_db_store):
     """Test that in-memory database supports all store operations."""
     # Create a session
     session_id = await in_memory_db_store.create_session()
@@ -148,7 +149,7 @@ async def in_memory_database_supports_all_operations(in_memory_db_store):
 
 
 @pytest.mark.asyncio
-async def in_memory_database_isolation_between_stores(in_memory_db_store):
+async def test_in_memory_database_isolation_between_stores(in_memory_db_store, tmp_path):
     """Test that different in-memory stores are isolated from each other."""
     # This test verifies the isolation property of in-memory databases
 
@@ -156,7 +157,11 @@ async def in_memory_database_isolation_between_stores(in_memory_db_store):
     session_id = await in_memory_db_store.create_session()
 
     # Create a separate in-memory store
-    separate_store = SessionStore(":memory:")
+    # SessionStore opens a fresh connection for each operation, so a plain
+    # ':memory:' path would destroy the schema between calls.  A unique
+    # temporary file gives the second store independent state while retaining
+    # the production connection lifecycle.
+    separate_store = SessionStore(str(tmp_path / "separate.db"))
     await separate_store.initialize()
 
     # The separate store should NOT have the session from the fixture

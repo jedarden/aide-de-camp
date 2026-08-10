@@ -22,8 +22,6 @@ from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 # --- fixtures ---------------------------------------------------------------
 
 
-@pytest.fixture
-
 # --- test data ---------------------------------------------------------------
 
 VERIFICATION_TEST_PAYLOAD = {

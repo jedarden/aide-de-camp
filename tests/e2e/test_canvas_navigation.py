@@ -6,7 +6,14 @@ connection status, and basic UI elements.
 """
 
 import pytest
-from playwright.async_api import Page, TimeoutError
+
+try:
+    from playwright.async_api import Page, TimeoutError
+except Exception:
+    pytest.skip(
+        "playwright is optional; install it and Chromium to run browser tests",
+        allow_module_level=True,
+    )
 
 
 class TestCanvasNavigation:
