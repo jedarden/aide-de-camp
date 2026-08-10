@@ -22,8 +22,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.components.hot_reload import HotReloadManager
-from src.intent.router import IntentRouter, _ROUTER_PROMPT_FALLBACK
+from src.components.hot_reload import HotReloadManager, get_reload_manager
+from src.intent.router import IntentRouter, IntentType, _ROUTER_PROMPT_FALLBACK
 
 
 # --- fixtures ---------------------------------------------------------------
@@ -657,3 +657,87 @@ Classify "check logs" as status.
             # Verify all 5 versions were detected
             assert results == intent_type_sequence
             assert call_count[0] == 5
+
+
+@pytest.fixture
+def production_router_prompt():
+    """Back up the repository prompt and restore its manager snapshot."""
+    prompt_path = Path(__file__).resolve().parents[1] / "prompts" / "router.md"
+    original_bytes = prompt_path.read_bytes()
+    reload_manager = get_reload_manager()
+    reload_manager.force_reload("router")
+
+    try:
+        yield prompt_path, reload_manager
+    finally:
+        prompt_path.write_bytes(original_bytes)
+        reload_manager.force_reload("router")
+
+
+class TestProductionRouterDispatchHotReload:
+    """Verify a real router dispatch observes an edited repository prompt."""
+
+    @pytest.mark.asyncio
+    async def test_same_utterance_uses_modified_prompt_without_restart(
+        self, production_router_prompt, mock_zai_client
+    ):
+        prompt_path, reload_manager = production_router_prompt
+        original_prompt = prompt_path.read_text()
+        test_marker = "ADC_ROUTER_PROMPT_HOT_RELOAD_TEST_INSTRUCTION"
+        test_instruction = (
+            "\n\n# Test instruction (removed after this test)\n"
+            f"When this marker is present, classify the utterance as action: {test_marker}\n"
+        )
+
+        store = MagicMock()
+        store.update_utterance_router_timing = AsyncMock()
+        router = IntentRouter(store=store)
+        router._reload_manager = reload_manager
+
+        captured_prompts = []
+
+        async def mock_llm_call(system_prompt, user_message, **kwargs):
+            captured_prompts.append(system_prompt)
+            intent_type = "action" if test_marker in system_prompt else "status"
+            return {
+                "content": json.dumps([{
+                    "intent_type": intent_type,
+                    "project_slug": None,
+                    "urgency": "normal",
+                    "utterance_fragment": "check the pods",
+                    "confidence": 0.9,
+                    "reasoning": "The mocked LLM follows the router prompt.",
+                }]),
+                "timing_network_ms": 0,
+                "timing_inference_ms": 0,
+            }
+
+        mock_zai_client.call_simple = mock_llm_call
+        router._router_zai_client = mock_zai_client
+        utterance = "check the pods"
+        session_id = "router-prompt-hot-reload-session"
+
+        with patch_deterministic_router():
+            # Establish the pre-edit response with the running router instance.
+            first_dispatch = await router.route_utterance(
+                utterance, "router-prompt-before", session_id
+            )
+            assert first_dispatch[0].classification.intent_type == IntentType.STATUS
+            assert test_marker not in captured_prompts[0]
+
+            # Simulate the self-modification agent appending an instruction to
+            # the real repository prompt while the server keeps running.
+            prompt_path.write_text(original_prompt + test_instruction)
+            reload_manager.force_reload("router")
+
+            # The router cache is unrelated to prompt loading. Clear only that
+            # entry so this second dispatch reaches the LLM with the same
+            # utterance and the same live router/server instance.
+            router._clear_cache()
+            second_dispatch = await router.route_utterance(
+                utterance, "router-prompt-after", session_id
+            )
+
+        assert len(captured_prompts) == 2
+        assert test_marker in captured_prompts[1]
+        assert second_dispatch[0].classification.intent_type == IntentType.ACTION

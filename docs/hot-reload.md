@@ -61,6 +61,18 @@ the file mtime and updates the configured ambient-monitor tick interval after a
 successful reload. It does not share the registry cache or the prompt manager's
 throttle state.
 
+### Router dispatch regression
+
+`tests/test_router_prompt_hotreload.py::TestProductionRouterDispatchHotReload`
+backs up the real `prompts/router.md`, performs one dispatch, appends a disposable
+test instruction, and dispatches the same utterance again through the same live
+`IntentRouter` instance. The mocked LLM returns a different intent only when it
+sees that instruction in its system prompt, proving the edit reached the next
+LLM call without a server restart. The test clears only the router's
+utterance-result cache so the second dispatch exercises prompt loading; teardown
+restores the original bytes and refreshes the manager snapshot, making repeated
+runs safe.
+
 The router deliberately loads only `prompts/router.md` on its latency-sensitive
 classification path. `prompts/urgency.md` is still registered and hot-reloaded
 for synthesis, but an urgency-only edit does not change the router system
