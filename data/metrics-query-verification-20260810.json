@@ -1,0 +1,1566 @@
+{
+  "availability": {
+    "days_requested": 30,
+    "prometheus": {
+      "pbx-web": {
+        "backend": "prometheus",
+        "coverage_days": 10.667,
+        "data_available": true,
+        "detail": "Prometheus retention is reported by /api/v1/status/flags.",
+        "expected_points": 721,
+        "first_sample": "2026-07-30T18:31:16.515000Z",
+        "full_requested_window": false,
+        "internal_gaps": 0,
+        "last_sample": "2026-08-10T10:31:16.515000Z",
+        "namespace": "pbx-web",
+        "requested_end": "2026-08-10T10:31:16.515000Z",
+        "requested_start": "2026-07-11T10:31:16.515000Z",
+        "sample_points": 257
+      },
+      "whisper-stt": {
+        "backend": "prometheus",
+        "coverage_days": 10.667,
+        "data_available": true,
+        "detail": "Prometheus retention is reported by /api/v1/status/flags.",
+        "expected_points": 721,
+        "first_sample": "2026-07-30T18:31:17.669000Z",
+        "full_requested_window": false,
+        "internal_gaps": 0,
+        "last_sample": "2026-08-10T10:31:17.669000Z",
+        "namespace": "whisper-stt",
+        "requested_end": "2026-08-10T10:31:17.669000Z",
+        "requested_start": "2026-07-11T10:31:17.669000Z",
+        "sample_points": 257
+      }
+    },
+    "step_seconds": 3600,
+    "victorialogs": {
+      "pbx-web": {
+        "backend": "victorialogs",
+        "coverage_days": 28.438,
+        "data_available": true,
+        "detail": "VictoriaLogs returns log records, not typed Prometheus metric families.",
+        "first_sample": "2026-07-13T00:00:03.426469981Z",
+        "full_requested_window": false,
+        "last_sample": "2026-08-10T10:31:13.103530769Z",
+        "log_count": 1001363,
+        "namespace": "pbx-web",
+        "requested_end": "2026-08-10T10:31:16.386000Z",
+        "requested_start": "2026-07-11T10:31:16.386000Z"
+      },
+      "whisper-stt": {
+        "backend": "victorialogs",
+        "coverage_days": 28.438,
+        "data_available": true,
+        "detail": "VictoriaLogs returns log records, not typed Prometheus metric families.",
+        "first_sample": "2026-07-13T00:00:03.767828058Z",
+        "full_requested_window": false,
+        "last_sample": "2026-08-10T10:31:14.14657268Z",
+        "log_count": 108155,
+        "namespace": "whisper-stt",
+        "requested_end": "2026-08-10T10:31:16.386000Z",
+        "requested_start": "2026-07-11T10:31:16.386000Z"
+      }
+    }
+  },
+  "config": {
+    "cluster": "ardenone-cluster",
+    "prometheus_url": "http://127.0.0.1:19090",
+    "victorialogs_url": "http://127.0.0.1:19428"
+  },
+  "generated_at": "2026-08-10T10:31:13.499877Z",
+  "health": {
+    "cluster": "ardenone-cluster",
+    "prometheus": {
+      "backend": "prometheus",
+      "base_url": "http://127.0.0.1:19090",
+      "health": "Prometheus Server is Healthy.",
+      "ok": true,
+      "retention_time": "10d",
+      "version": "3.10.0"
+    },
+    "victorialogs": {
+      "backend": "victorialogs",
+      "base_url": "http://127.0.0.1:19428",
+      "health": "OK",
+      "ok": true
+    }
+  },
+  "validation": {
+    "prometheus": {
+      "pbx-web": {
+        "all_expected_metrics_available": true,
+        "all_required_labels_available": true,
+        "expected_metrics": [
+          {
+            "available": true,
+            "expected_type": "counter",
+            "metadata": [
+              {
+                "help": "Cumulative cpu time consumed in seconds.",
+                "type": "counter",
+                "unit": ""
+              }
+            ],
+            "name": "container_cpu_usage_seconds_total",
+            "observed_type": "counter",
+            "series_count": 10
+          },
+          {
+            "available": true,
+            "expected_type": "gauge",
+            "metadata": [
+              {
+                "help": "Current working set in bytes.",
+                "type": "gauge",
+                "unit": ""
+              }
+            ],
+            "name": "container_memory_working_set_bytes",
+            "observed_type": "gauge",
+            "series_count": 10
+          },
+          {
+            "available": true,
+            "expected_type": "counter",
+            "metadata": [
+              {
+                "help": "[STABLE] The number of container restarts per container.",
+                "type": "counter",
+                "unit": ""
+              }
+            ],
+            "name": "kube_pod_container_status_restarts_total",
+            "observed_type": "counter",
+            "series_count": 4
+          },
+          {
+            "available": true,
+            "expected_type": "gauge",
+            "metadata": [
+              {
+                "help": "[STABLE] Information about pod.",
+                "type": "gauge",
+                "unit": ""
+              }
+            ],
+            "name": "kube_pod_info",
+            "observed_type": "gauge",
+            "series_count": 3
+          },
+          {
+            "available": true,
+            "expected_type": "histogram",
+            "metadata": [],
+            "name": "prober_probe_duration_seconds_bucket",
+            "observed_type": "histogram (bucket series; metadata is on the base family)",
+            "series_count": 96
+          }
+        ],
+        "label_names": [
+          "__name__",
+          "address",
+          "addresstype",
+          "alertname",
+          "alertstate",
+          "cluster_ip",
+          "condition",
+          "configmap",
+          "container",
+          "container_id",
+          "cpu",
+          "created_by_kind",
+          "created_by_name",
+          "deployment",
+          "device",
+          "effect",
+          "endpoint",
+          "endpoint_nodename",
+          "endpoint_zone",
+          "endpointslice",
+          "external_name",
+          "external_traffic_policy",
+          "failure_type",
+          "host_ip",
+          "host_network",
+          "id",
+          "image",
+          "image_id",
+          "image_spec",
+          "instance",
+          "interface",
+          "ip",
+          "ip_family",
+          "job",
+          "key",
+          "le",
+          "major",
+          "metrics_path",
+          "minor",
+          "name",
+          "namespace",
+          "networkpolicy",
+          "node",
+          "operation",
+          "operator",
+          "owner_is_controller",
+          "owner_kind",
+          "owner_name",
+          "phase",
+          "pod",
+          "pod_ip",
+          "pod_uid",
+          "port_name",
+          "port_number",
+          "port_protocol",
+          "probe_type",
+          "qos_class",
+          "ready",
+          "reason",
+          "replicaset",
+          "resource",
+          "result",
+          "scope",
+          "secret",
+          "service",
+          "service_account",
+          "serving",
+          "severity",
+          "status",
+          "targetref_kind",
+          "targetref_name",
+          "targetref_namespace",
+          "toleration_seconds",
+          "type",
+          "uid",
+          "ulimit",
+          "unit",
+          "workload",
+          "workload_type"
+        ],
+        "metric_family_count": 130,
+        "metrics": [
+          {
+            "name": "cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits",
+            "series_count": 4
+          },
+          {
+            "name": "cluster:namespace:pod_cpu:active:kube_pod_container_resource_requests",
+            "series_count": 4
+          },
+          {
+            "name": "cluster:namespace:pod_memory:active:kube_pod_container_resource_limits",
+            "series_count": 4
+          },
+          {
+            "name": "cluster:namespace:pod_memory:active:kube_pod_container_resource_requests",
+            "series_count": 4
+          },
+          {
+            "name": "container_blkio_device_usage_total",
+            "series_count": 14
+          },
+          {
+            "name": "container_cpu_cfs_periods_total",
+            "series_count": 7
+          },
+          {
+            "name": "container_cpu_cfs_throttled_periods_total",
+            "series_count": 7
+          },
+          {
+            "name": "container_cpu_load_d_average_10s",
+            "series_count": 10
+          },
+          {
+            "name": "container_cpu_usage_seconds_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_fs_reads_bytes_total",
+            "series_count": 7
+          },
+          {
+            "name": "container_fs_reads_total",
+            "series_count": 7
+          },
+          {
+            "name": "container_fs_writes_bytes_total",
+            "series_count": 7
+          },
+          {
+            "name": "container_fs_writes_total",
+            "series_count": 7
+          },
+          {
+            "name": "container_last_seen",
+            "series_count": 10
+          },
+          {
+            "name": "container_memory_cache",
+            "series_count": 10
+          },
+          {
+            "name": "container_memory_failcnt",
+            "series_count": 10
+          },
+          {
+            "name": "container_memory_failures_total",
+            "series_count": 20
+          },
+          {
+            "name": "container_memory_kernel_usage",
+            "series_count": 10
+          },
+          {
+            "name": "container_memory_max_usage_bytes",
+            "series_count": 10
+          },
+          {
+            "name": "container_memory_rss",
+            "series_count": 10
+          },
+          {
+            "name": "container_memory_total_active_file_bytes",
+            "series_count": 10
+          },
+          {
+            "name": "container_memory_total_inactive_file_bytes",
+            "series_count": 10
+          },
+          {
+            "name": "container_memory_usage_bytes",
+            "series_count": 10
+          },
+          {
+            "name": "container_memory_working_set_bytes",
+            "series_count": 10
+          },
+          {
+            "name": "container_network_receive_bytes_total",
+            "series_count": 3
+          },
+          {
+            "name": "container_network_receive_errors_total",
+            "series_count": 3
+          },
+          {
+            "name": "container_network_receive_packets_dropped_total",
+            "series_count": 3
+          },
+          {
+            "name": "container_network_receive_packets_total",
+            "series_count": 3
+          },
+          {
+            "name": "container_network_transmit_bytes_total",
+            "series_count": 3
+          },
+          {
+            "name": "container_network_transmit_errors_total",
+            "series_count": 3
+          },
+          {
+            "name": "container_network_transmit_packets_dropped_total",
+            "series_count": 3
+          },
+          {
+            "name": "container_network_transmit_packets_total",
+            "series_count": 3
+          },
+          {
+            "name": "container_oom_events_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_pressure_cpu_stalled_seconds_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_pressure_cpu_waiting_seconds_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_pressure_io_stalled_seconds_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_pressure_io_waiting_seconds_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_pressure_memory_stalled_seconds_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_pressure_memory_waiting_seconds_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_processes",
+            "series_count": 10
+          },
+          {
+            "name": "container_sockets",
+            "series_count": 10
+          },
+          {
+            "name": "container_start_time_seconds",
+            "series_count": 10
+          },
+          {
+            "name": "container_threads",
+            "series_count": 10
+          },
+          {
+            "name": "container_ulimits_soft",
+            "series_count": 7
+          },
+          {
+            "name": "kube_configmap_created",
+            "series_count": 3
+          },
+          {
+            "name": "kube_configmap_info",
+            "series_count": 3
+          },
+          {
+            "name": "kube_configmap_metadata_resource_version",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_created",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_metadata_generation",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_owner",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_spec_paused",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_spec_replicas",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_spec_strategy_rollingupdate_max_surge",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_spec_strategy_rollingupdate_max_unavailable",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_status_condition",
+            "series_count": 18
+          },
+          {
+            "name": "kube_deployment_status_observed_generation",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_status_replicas",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_status_replicas_available",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_status_replicas_ready",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_status_replicas_unavailable",
+            "series_count": 3
+          },
+          {
+            "name": "kube_deployment_status_replicas_updated",
+            "series_count": 3
+          },
+          {
+            "name": "kube_endpointslice_created",
+            "series_count": 3
+          },
+          {
+            "name": "kube_endpointslice_endpoints",
+            "series_count": 3
+          },
+          {
+            "name": "kube_endpointslice_info",
+            "series_count": 3
+          },
+          {
+            "name": "kube_endpointslice_ports",
+            "series_count": 4
+          },
+          {
+            "name": "kube_namespace_created",
+            "series_count": 1
+          },
+          {
+            "name": "kube_namespace_status_phase",
+            "series_count": 2
+          },
+          {
+            "name": "kube_networkpolicy_created",
+            "series_count": 3
+          },
+          {
+            "name": "kube_networkpolicy_spec_egress_rules",
+            "series_count": 3
+          },
+          {
+            "name": "kube_networkpolicy_spec_ingress_rules",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_container_info",
+            "series_count": 4
+          },
+          {
+            "name": "kube_pod_container_resource_limits",
+            "series_count": 8
+          },
+          {
+            "name": "kube_pod_container_resource_requests",
+            "series_count": 8
+          },
+          {
+            "name": "kube_pod_container_state_started",
+            "series_count": 4
+          },
+          {
+            "name": "kube_pod_container_status_ready",
+            "series_count": 4
+          },
+          {
+            "name": "kube_pod_container_status_restarts_total",
+            "series_count": 4
+          },
+          {
+            "name": "kube_pod_container_status_running",
+            "series_count": 4
+          },
+          {
+            "name": "kube_pod_container_status_terminated",
+            "series_count": 4
+          },
+          {
+            "name": "kube_pod_container_status_waiting",
+            "series_count": 4
+          },
+          {
+            "name": "kube_pod_created",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_info",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_ips",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_owner",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_restart_policy",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_scheduler",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_service_account",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_start_time",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_status_container_ready_time",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_status_initialized_time",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_status_phase",
+            "series_count": 15
+          },
+          {
+            "name": "kube_pod_status_qos_class",
+            "series_count": 9
+          },
+          {
+            "name": "kube_pod_status_ready",
+            "series_count": 9
+          },
+          {
+            "name": "kube_pod_status_ready_time",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_status_reason",
+            "series_count": 15
+          },
+          {
+            "name": "kube_pod_status_scheduled",
+            "series_count": 9
+          },
+          {
+            "name": "kube_pod_status_scheduled_time",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_tolerations",
+            "series_count": 6
+          },
+          {
+            "name": "kube_replicaset_created",
+            "series_count": 17
+          },
+          {
+            "name": "kube_replicaset_metadata_generation",
+            "series_count": 17
+          },
+          {
+            "name": "kube_replicaset_owner",
+            "series_count": 17
+          },
+          {
+            "name": "kube_replicaset_spec_replicas",
+            "series_count": 17
+          },
+          {
+            "name": "kube_replicaset_status_fully_labeled_replicas",
+            "series_count": 17
+          },
+          {
+            "name": "kube_replicaset_status_observed_generation",
+            "series_count": 17
+          },
+          {
+            "name": "kube_replicaset_status_ready_replicas",
+            "series_count": 17
+          },
+          {
+            "name": "kube_replicaset_status_replicas",
+            "series_count": 17
+          },
+          {
+            "name": "kube_secret_created",
+            "series_count": 37
+          },
+          {
+            "name": "kube_secret_info",
+            "series_count": 37
+          },
+          {
+            "name": "kube_secret_metadata_resource_version",
+            "series_count": 37
+          },
+          {
+            "name": "kube_secret_owner",
+            "series_count": 37
+          },
+          {
+            "name": "kube_secret_type",
+            "series_count": 37
+          },
+          {
+            "name": "kube_service_created",
+            "series_count": 5
+          },
+          {
+            "name": "kube_service_info",
+            "series_count": 5
+          },
+          {
+            "name": "kube_service_spec_type",
+            "series_count": 5
+          },
+          {
+            "name": "kube_service_status_load_balancer_ingress",
+            "series_count": 1
+          },
+          {
+            "name": "kubelet_container_log_filesystem_used_bytes",
+            "series_count": 4
+          },
+          {
+            "name": "namespace_cpu:kube_pod_container_resource_limits:sum",
+            "series_count": 1
+          },
+          {
+            "name": "namespace_cpu:kube_pod_container_resource_requests:sum",
+            "series_count": 1
+          },
+          {
+            "name": "namespace_memory:kube_pod_container_resource_limits:sum",
+            "series_count": 1
+          },
+          {
+            "name": "namespace_memory:kube_pod_container_resource_requests:sum",
+            "series_count": 1
+          },
+          {
+            "name": "namespace_workload_pod:kube_pod_owner:relabel",
+            "series_count": 3
+          },
+          {
+            "name": "node_namespace_pod:kube_pod_info:",
+            "series_count": 3
+          },
+          {
+            "name": "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate",
+            "series_count": 7
+          },
+          {
+            "name": "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate5m",
+            "series_count": 7
+          },
+          {
+            "name": "node_namespace_pod_container:container_memory_cache",
+            "series_count": 7
+          },
+          {
+            "name": "node_namespace_pod_container:container_memory_rss",
+            "series_count": 7
+          },
+          {
+            "name": "node_namespace_pod_container:container_memory_working_set_bytes",
+            "series_count": 7
+          },
+          {
+            "name": "prober_probe_duration_seconds_bucket",
+            "series_count": 96
+          },
+          {
+            "name": "prober_probe_duration_seconds_count",
+            "series_count": 8
+          },
+          {
+            "name": "prober_probe_duration_seconds_sum",
+            "series_count": 8
+          },
+          {
+            "name": "prober_probe_total",
+            "series_count": 10
+          }
+        ],
+        "namespace": "pbx-web",
+        "required_labels": {
+          "container": {
+            "available": true,
+            "observed": true
+          },
+          "job": {
+            "available": true,
+            "observed": true
+          },
+          "namespace": {
+            "available": true,
+            "observed": true
+          },
+          "pod": {
+            "available": true,
+            "observed": true
+          }
+        },
+        "selector": "{namespace=\"pbx-web\"}"
+      },
+      "whisper-stt": {
+        "all_expected_metrics_available": true,
+        "all_required_labels_available": true,
+        "expected_metrics": [
+          {
+            "available": true,
+            "expected_type": "counter",
+            "metadata": [
+              {
+                "help": "Cumulative cpu time consumed in seconds.",
+                "type": "counter",
+                "unit": ""
+              }
+            ],
+            "name": "container_cpu_usage_seconds_total",
+            "observed_type": "counter",
+            "series_count": 6
+          },
+          {
+            "available": true,
+            "expected_type": "gauge",
+            "metadata": [
+              {
+                "help": "Current working set in bytes.",
+                "type": "gauge",
+                "unit": ""
+              }
+            ],
+            "name": "container_memory_working_set_bytes",
+            "observed_type": "gauge",
+            "series_count": 6
+          },
+          {
+            "available": true,
+            "expected_type": "counter",
+            "metadata": [
+              {
+                "help": "[STABLE] The number of container restarts per container.",
+                "type": "counter",
+                "unit": ""
+              }
+            ],
+            "name": "kube_pod_container_status_restarts_total",
+            "observed_type": "counter",
+            "series_count": 2
+          },
+          {
+            "available": true,
+            "expected_type": "gauge",
+            "metadata": [
+              {
+                "help": "[STABLE] Information about pod.",
+                "type": "gauge",
+                "unit": ""
+              }
+            ],
+            "name": "kube_pod_info",
+            "observed_type": "gauge",
+            "series_count": 2
+          },
+          {
+            "available": true,
+            "expected_type": "histogram",
+            "metadata": [],
+            "name": "prober_probe_duration_seconds_bucket",
+            "observed_type": "histogram (bucket series; metadata is on the base family)",
+            "series_count": 60
+          }
+        ],
+        "label_names": [
+          "__name__",
+          "access_mode",
+          "address",
+          "addresstype",
+          "alertname",
+          "alertstate",
+          "cluster_ip",
+          "condition",
+          "configmap",
+          "container",
+          "container_id",
+          "cpu",
+          "created_by_kind",
+          "created_by_name",
+          "deployment",
+          "device",
+          "effect",
+          "endpoint",
+          "endpoint_nodename",
+          "endpoint_zone",
+          "endpointslice",
+          "external_traffic_policy",
+          "failure_type",
+          "host_ip",
+          "host_network",
+          "id",
+          "image",
+          "image_id",
+          "image_spec",
+          "instance",
+          "interface",
+          "ip",
+          "ip_family",
+          "job",
+          "key",
+          "le",
+          "major",
+          "metrics_path",
+          "minor",
+          "name",
+          "namespace",
+          "node",
+          "operation",
+          "operator",
+          "owner_is_controller",
+          "owner_kind",
+          "owner_name",
+          "persistentvolumeclaim",
+          "phase",
+          "pod",
+          "pod_ip",
+          "pod_uid",
+          "port_name",
+          "port_number",
+          "port_protocol",
+          "probe_type",
+          "qos_class",
+          "ready",
+          "reason",
+          "replicaset",
+          "resource",
+          "result",
+          "scope",
+          "secret",
+          "service",
+          "service_account",
+          "serving",
+          "severity",
+          "status",
+          "storage_class",
+          "storageclass",
+          "targetref_kind",
+          "targetref_name",
+          "targetref_namespace",
+          "toleration_seconds",
+          "type",
+          "uid",
+          "ulimit",
+          "unit",
+          "volume",
+          "volumemode",
+          "volumename",
+          "workload",
+          "workload_type"
+        ],
+        "metric_family_count": 150,
+        "metrics": [
+          {
+            "name": "cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits",
+            "series_count": 2
+          },
+          {
+            "name": "cluster:namespace:pod_cpu:active:kube_pod_container_resource_requests",
+            "series_count": 2
+          },
+          {
+            "name": "cluster:namespace:pod_memory:active:kube_pod_container_resource_limits",
+            "series_count": 2
+          },
+          {
+            "name": "cluster:namespace:pod_memory:active:kube_pod_container_resource_requests",
+            "series_count": 2
+          },
+          {
+            "name": "container_blkio_device_usage_total",
+            "series_count": 20
+          },
+          {
+            "name": "container_cpu_cfs_periods_total",
+            "series_count": 4
+          },
+          {
+            "name": "container_cpu_cfs_throttled_periods_total",
+            "series_count": 4
+          },
+          {
+            "name": "container_cpu_load_d_average_10s",
+            "series_count": 6
+          },
+          {
+            "name": "container_cpu_usage_seconds_total",
+            "series_count": 6
+          },
+          {
+            "name": "container_fs_reads_bytes_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_fs_reads_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_fs_writes_bytes_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_fs_writes_total",
+            "series_count": 10
+          },
+          {
+            "name": "container_last_seen",
+            "series_count": 6
+          },
+          {
+            "name": "container_memory_cache",
+            "series_count": 6
+          },
+          {
+            "name": "container_memory_failcnt",
+            "series_count": 6
+          },
+          {
+            "name": "container_memory_failures_total",
+            "series_count": 12
+          },
+          {
+            "name": "container_memory_kernel_usage",
+            "series_count": 6
+          },
+          {
+            "name": "container_memory_max_usage_bytes",
+            "series_count": 6
+          },
+          {
+            "name": "container_memory_rss",
+            "series_count": 6
+          },
+          {
+            "name": "container_memory_total_active_file_bytes",
+            "series_count": 6
+          },
+          {
+            "name": "container_memory_total_inactive_file_bytes",
+            "series_count": 6
+          },
+          {
+            "name": "container_memory_usage_bytes",
+            "series_count": 6
+          },
+          {
+            "name": "container_memory_working_set_bytes",
+            "series_count": 6
+          },
+          {
+            "name": "container_network_receive_bytes_total",
+            "series_count": 2
+          },
+          {
+            "name": "container_network_receive_errors_total",
+            "series_count": 2
+          },
+          {
+            "name": "container_network_receive_packets_dropped_total",
+            "series_count": 2
+          },
+          {
+            "name": "container_network_receive_packets_total",
+            "series_count": 2
+          },
+          {
+            "name": "container_network_transmit_bytes_total",
+            "series_count": 2
+          },
+          {
+            "name": "container_network_transmit_errors_total",
+            "series_count": 2
+          },
+          {
+            "name": "container_network_transmit_packets_dropped_total",
+            "series_count": 2
+          },
+          {
+            "name": "container_network_transmit_packets_total",
+            "series_count": 2
+          },
+          {
+            "name": "container_oom_events_total",
+            "series_count": 6
+          },
+          {
+            "name": "container_pressure_cpu_stalled_seconds_total",
+            "series_count": 6
+          },
+          {
+            "name": "container_pressure_cpu_waiting_seconds_total",
+            "series_count": 6
+          },
+          {
+            "name": "container_pressure_io_stalled_seconds_total",
+            "series_count": 6
+          },
+          {
+            "name": "container_pressure_io_waiting_seconds_total",
+            "series_count": 6
+          },
+          {
+            "name": "container_pressure_memory_stalled_seconds_total",
+            "series_count": 6
+          },
+          {
+            "name": "container_pressure_memory_waiting_seconds_total",
+            "series_count": 6
+          },
+          {
+            "name": "container_processes",
+            "series_count": 6
+          },
+          {
+            "name": "container_sockets",
+            "series_count": 6
+          },
+          {
+            "name": "container_start_time_seconds",
+            "series_count": 6
+          },
+          {
+            "name": "container_threads",
+            "series_count": 6
+          },
+          {
+            "name": "container_ulimits_soft",
+            "series_count": 4
+          },
+          {
+            "name": "kube_configmap_created",
+            "series_count": 1
+          },
+          {
+            "name": "kube_configmap_info",
+            "series_count": 1
+          },
+          {
+            "name": "kube_configmap_metadata_resource_version",
+            "series_count": 1
+          },
+          {
+            "name": "kube_deployment_created",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_metadata_generation",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_owner",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_spec_paused",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_spec_replicas",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_spec_strategy_rollingupdate_max_surge",
+            "series_count": 1
+          },
+          {
+            "name": "kube_deployment_spec_strategy_rollingupdate_max_unavailable",
+            "series_count": 1
+          },
+          {
+            "name": "kube_deployment_status_condition",
+            "series_count": 12
+          },
+          {
+            "name": "kube_deployment_status_observed_generation",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_status_replicas",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_status_replicas_available",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_status_replicas_ready",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_status_replicas_unavailable",
+            "series_count": 2
+          },
+          {
+            "name": "kube_deployment_status_replicas_updated",
+            "series_count": 2
+          },
+          {
+            "name": "kube_endpointslice_created",
+            "series_count": 2
+          },
+          {
+            "name": "kube_endpointslice_endpoints",
+            "series_count": 2
+          },
+          {
+            "name": "kube_endpointslice_info",
+            "series_count": 2
+          },
+          {
+            "name": "kube_endpointslice_ports",
+            "series_count": 2
+          },
+          {
+            "name": "kube_namespace_created",
+            "series_count": 1
+          },
+          {
+            "name": "kube_namespace_status_phase",
+            "series_count": 2
+          },
+          {
+            "name": "kube_persistentvolumeclaim_access_mode",
+            "series_count": 3
+          },
+          {
+            "name": "kube_persistentvolumeclaim_created",
+            "series_count": 3
+          },
+          {
+            "name": "kube_persistentvolumeclaim_info",
+            "series_count": 3
+          },
+          {
+            "name": "kube_persistentvolumeclaim_resource_requests_storage_bytes",
+            "series_count": 3
+          },
+          {
+            "name": "kube_persistentvolumeclaim_status_phase",
+            "series_count": 9
+          },
+          {
+            "name": "kube_pod_container_info",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_container_resource_limits",
+            "series_count": 4
+          },
+          {
+            "name": "kube_pod_container_resource_requests",
+            "series_count": 4
+          },
+          {
+            "name": "kube_pod_container_state_started",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_container_status_ready",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_container_status_restarts_total",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_container_status_running",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_container_status_terminated",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_container_status_waiting",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_created",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_info",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_init_container_info",
+            "series_count": 1
+          },
+          {
+            "name": "kube_pod_init_container_resource_limits",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_init_container_resource_requests",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_init_container_status_ready",
+            "series_count": 1
+          },
+          {
+            "name": "kube_pod_init_container_status_restarts_total",
+            "series_count": 1
+          },
+          {
+            "name": "kube_pod_init_container_status_running",
+            "series_count": 1
+          },
+          {
+            "name": "kube_pod_init_container_status_terminated",
+            "series_count": 1
+          },
+          {
+            "name": "kube_pod_init_container_status_terminated_reason",
+            "series_count": 1
+          },
+          {
+            "name": "kube_pod_init_container_status_waiting",
+            "series_count": 1
+          },
+          {
+            "name": "kube_pod_ips",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_owner",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_restart_policy",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_scheduler",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_service_account",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_spec_volumes_persistentvolumeclaims_info",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_spec_volumes_persistentvolumeclaims_readonly",
+            "series_count": 3
+          },
+          {
+            "name": "kube_pod_start_time",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_status_container_ready_time",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_status_initialized_time",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_status_phase",
+            "series_count": 10
+          },
+          {
+            "name": "kube_pod_status_qos_class",
+            "series_count": 6
+          },
+          {
+            "name": "kube_pod_status_ready",
+            "series_count": 6
+          },
+          {
+            "name": "kube_pod_status_ready_time",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_status_reason",
+            "series_count": 10
+          },
+          {
+            "name": "kube_pod_status_scheduled",
+            "series_count": 6
+          },
+          {
+            "name": "kube_pod_status_scheduled_time",
+            "series_count": 2
+          },
+          {
+            "name": "kube_pod_tolerations",
+            "series_count": 4
+          },
+          {
+            "name": "kube_replicaset_created",
+            "series_count": 22
+          },
+          {
+            "name": "kube_replicaset_metadata_generation",
+            "series_count": 22
+          },
+          {
+            "name": "kube_replicaset_owner",
+            "series_count": 22
+          },
+          {
+            "name": "kube_replicaset_spec_replicas",
+            "series_count": 22
+          },
+          {
+            "name": "kube_replicaset_status_fully_labeled_replicas",
+            "series_count": 22
+          },
+          {
+            "name": "kube_replicaset_status_observed_generation",
+            "series_count": 22
+          },
+          {
+            "name": "kube_replicaset_status_ready_replicas",
+            "series_count": 22
+          },
+          {
+            "name": "kube_replicaset_status_replicas",
+            "series_count": 22
+          },
+          {
+            "name": "kube_secret_created",
+            "series_count": 35
+          },
+          {
+            "name": "kube_secret_info",
+            "series_count": 35
+          },
+          {
+            "name": "kube_secret_metadata_resource_version",
+            "series_count": 35
+          },
+          {
+            "name": "kube_secret_owner",
+            "series_count": 35
+          },
+          {
+            "name": "kube_secret_type",
+            "series_count": 35
+          },
+          {
+            "name": "kube_service_created",
+            "series_count": 2
+          },
+          {
+            "name": "kube_service_info",
+            "series_count": 2
+          },
+          {
+            "name": "kube_service_spec_type",
+            "series_count": 2
+          },
+          {
+            "name": "kube_service_status_load_balancer_ingress",
+            "series_count": 1
+          },
+          {
+            "name": "kubelet_container_log_filesystem_used_bytes",
+            "series_count": 2
+          },
+          {
+            "name": "kubelet_volume_stats_available_bytes",
+            "series_count": 3
+          },
+          {
+            "name": "kubelet_volume_stats_capacity_bytes",
+            "series_count": 3
+          },
+          {
+            "name": "kubelet_volume_stats_inodes",
+            "series_count": 3
+          },
+          {
+            "name": "kubelet_volume_stats_inodes_free",
+            "series_count": 3
+          },
+          {
+            "name": "kubelet_volume_stats_inodes_used",
+            "series_count": 3
+          },
+          {
+            "name": "kubelet_volume_stats_used_bytes",
+            "series_count": 3
+          },
+          {
+            "name": "namespace_cpu:kube_pod_container_resource_limits:sum",
+            "series_count": 1
+          },
+          {
+            "name": "namespace_cpu:kube_pod_container_resource_requests:sum",
+            "series_count": 1
+          },
+          {
+            "name": "namespace_memory:kube_pod_container_resource_limits:sum",
+            "series_count": 1
+          },
+          {
+            "name": "namespace_memory:kube_pod_container_resource_requests:sum",
+            "series_count": 1
+          },
+          {
+            "name": "namespace_workload_pod:kube_pod_owner:relabel",
+            "series_count": 2
+          },
+          {
+            "name": "node_namespace_pod:kube_pod_info:",
+            "series_count": 2
+          },
+          {
+            "name": "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate",
+            "series_count": 4
+          },
+          {
+            "name": "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate5m",
+            "series_count": 4
+          },
+          {
+            "name": "node_namespace_pod_container:container_memory_cache",
+            "series_count": 4
+          },
+          {
+            "name": "node_namespace_pod_container:container_memory_rss",
+            "series_count": 4
+          },
+          {
+            "name": "node_namespace_pod_container:container_memory_working_set_bytes",
+            "series_count": 4
+          },
+          {
+            "name": "prober_probe_duration_seconds_bucket",
+            "series_count": 60
+          },
+          {
+            "name": "prober_probe_duration_seconds_count",
+            "series_count": 5
+          },
+          {
+            "name": "prober_probe_duration_seconds_sum",
+            "series_count": 5
+          },
+          {
+            "name": "prober_probe_total",
+            "series_count": 7
+          },
+          {
+            "name": "pv_collector_bound_pvc_count",
+            "series_count": 1
+          }
+        ],
+        "namespace": "whisper-stt",
+        "required_labels": {
+          "container": {
+            "available": true,
+            "observed": true
+          },
+          "job": {
+            "available": true,
+            "observed": true
+          },
+          "namespace": {
+            "available": true,
+            "observed": true
+          },
+          "pod": {
+            "available": true,
+            "observed": true
+          }
+        },
+        "selector": "{namespace=\"whisper-stt\"}"
+      }
+    }
+  }
+}

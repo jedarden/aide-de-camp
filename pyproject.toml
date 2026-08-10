@@ -29,6 +29,9 @@ dev = [
     "pandas>=2.0.0",
 ]
 
+[project.scripts]
+metrics-query = "src.metrics_query_client:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
