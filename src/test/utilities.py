@@ -13,6 +13,14 @@ from uuid import uuid4
 
 import httpx
 
+from .topic_injection import (
+    IntentRoutingError,
+    SynthesisError,
+    TestTopicClient,
+    TopicCreationError,
+    TopicInjector,
+)
+
 logger = logging.getLogger(__name__)
 
 
