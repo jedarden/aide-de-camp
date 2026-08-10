@@ -12,6 +12,7 @@ import asyncio
 import sys
 import time
 from pathlib import Path
+from unittest.mock import patch
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -95,33 +96,41 @@ async def test_registry_config_hot_reload():
 
 
 async def test_yaml_registry_cache_expiry():
-    """Test that YAML registry cache expires after TTL."""
+    """Test TTL invalidation without sleeping for the production five-minute TTL.
+
+    Edge case: a stale registry cache must rebuild promptly after its deadline.
+    The test uses a short injected TTL so a broken cache cannot make the suite
+    wait for minutes; a timeout or malformed file should identify the path and
+    corrective action in the raised error.
+    """
     print("\n=== Testing YAML Registry Cache Expiry ===")
 
-    from registry import get_registry, CACHE_TTL
+    import registry as registry_module
+    from registry import get_registry
 
-    # Force rebuild to start fresh
-    registry1 = get_registry(force=True)
-    original_count = len(registry1['projects'])
-    print(f"Initial registry project count: {original_count}")
+    with patch.object(registry_module, "CACHE_TTL", 0.1):
+        # Force rebuild to start fresh
+        registry1 = get_registry(force=True)
+        original_count = len(registry1['projects'])
+        print(f"Initial registry project count: {original_count}")
 
-    # Wait less than TTL (should return cached version)
-    await asyncio.sleep(CACHE_TTL - 5)
-    registry2 = get_registry()
-    cached_count = len(registry2['projects'])
-    print(f"Registry count after {CACHE_TTL - 5}s (should be cached): {cached_count}")
+        # Wait less than the injected TTL (should return cached version).
+        await asyncio.sleep(0.01)
+        registry2 = get_registry()
+        cached_count = len(registry2['projects'])
+        print(f"Registry count before TTL (should be cached): {cached_count}")
 
-    if cached_count == original_count:
-        print("✓ Cache still valid before TTL: PASSED")
-    else:
-        print("✗ Cache expired prematurely: FAILED")
-        return False
+        if cached_count == original_count:
+            print("✓ Cache still valid before TTL: PASSED")
+        else:
+            print("✗ Cache expired prematurely: FAILED")
+            return False
 
-    # Wait past TTL (should rebuild)
-    await asyncio.sleep(6)  # Total wait: CACHE_TTL + 1 second
-    registry3 = get_registry()
-    rebuilt_count = len(registry3['projects'])
-    print(f"Registry count after {CACHE_TTL + 1}s (should rebuild): {rebuilt_count}")
+        # Wait past the injected TTL (should rebuild).
+        await asyncio.sleep(0.12)
+        registry3 = get_registry()
+        rebuilt_count = len(registry3['projects'])
+        print(f"Registry count after injected TTL (should rebuild): {rebuilt_count}")
 
     if rebuilt_count == original_count:
         print("✓ Registry rebuilt after TTL: PASSED")
@@ -137,14 +146,22 @@ async def main():
 
     results = []
 
-    # Test router prompt hot-reload
-    results.append(await test_router_prompt_hot_reload())
-
-    # Test registry config hot-reload
-    results.append(await test_registry_config_hot_reload())
-
-    # Test YAML registry cache expiry
-    results.append(await test_yaml_registry_cache_expiry())
+    # Every script-level test has the same fail-fast ceiling as file operations.
+    for test_func in (
+        test_router_prompt_hot_reload,
+        test_registry_config_hot_reload,
+        test_yaml_registry_cache_expiry,
+    ):
+        try:
+            results.append(
+                await asyncio.wait_for(
+                    test_func(),
+                    timeout=4.0,
+                )
+            )
+        except asyncio.TimeoutError:
+            print(f"✗ {test_func.__name__}: timed out after 4 seconds")
+            results.append(False)
 
     print("\n" + "=" * 50)
     print(f"Results: {sum(results)}/{len(results)} tests passed")

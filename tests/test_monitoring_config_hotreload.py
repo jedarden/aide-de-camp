@@ -501,7 +501,9 @@ class TestErrorHandling:
 
         # Simulate concurrent modifications
         async def modify_config():
-            while True:
+            # A bounded writer models repeated edits without leaving an
+            # uncancellable background task if a reload operation regresses.
+            for _ in range(10):
                 await asyncio.sleep(0.05)
                 with open(temp_config_file, 'w') as f:
                     yaml.dump({'tick_interval_seconds': 300}, f)
@@ -517,6 +519,10 @@ class TestErrorHandling:
 
         # Stop modification task
         modify_task.cancel()
+        try:
+            await modify_task
+        except asyncio.CancelledError:
+            pass
 
         # Final read should still work
         config = await loader.get_config()
