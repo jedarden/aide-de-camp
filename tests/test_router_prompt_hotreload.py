@@ -246,6 +246,7 @@ class TestBuildSystemPrompt:
     """The assembled system prompt contains router.md *and* urgency.md."""
 
     def test_build_includes_router_md_content(self, router):
+        """Verify prompt assembly includes the currently loaded router text."""
         prompt = router._build_system_prompt()
         assert "TEST CONTENT A" in prompt
 
@@ -255,6 +256,7 @@ class TestBuildSystemPrompt:
         assert "TEST CONTENT A" in prompt
 
     def test_build_reflects_router_md_edit(self, router, temp_router_md):
+        """Verify assembled system prompts change after an on-disk edit."""
         Path(temp_router_md).write_text(ROUTER_MD_EDITED)
 
         # Force reload to bypass throttle interval
@@ -276,6 +278,7 @@ class TestRouterMdReachesLLM:
 
     @pytest.mark.asyncio
     async def test_router_md_content_sent_to_llm(self, router, mock_zai_client):
+        """Verify the first classification sends router.md-derived text to the LLM."""
         captured = {}
 
         async def capture(system_prompt, user_message, **kwargs):
@@ -285,7 +288,8 @@ class TestRouterMdReachesLLM:
         mock_zai_client.call_simple = capture
         router._router_zai_client = mock_zai_client
 
-        await router.classify_utterance("test utterance", "session-123")
+        with patch_deterministic_router():
+            await router.classify_utterance("test utterance", "session-123")
 
         assert "TEST CONTENT A" in captured.get("system_prompt", "")
 
@@ -293,6 +297,7 @@ class TestRouterMdReachesLLM:
     async def test_router_md_edit_reaches_llm_without_restart(
         self, router, mock_zai_client, temp_router_md
     ):
+        """Verify a prompt edit reaches a later LLM call in the same router."""
         captured = []
 
         async def capture(system_prompt, user_message, **kwargs):
@@ -302,20 +307,21 @@ class TestRouterMdReachesLLM:
         mock_zai_client.call_simple = capture
         router._router_zai_client = mock_zai_client
 
-        # First call: on-disk router.md is the initial version.
-        await router.classify_utterance("test utterance", "session-123")
+        with patch_deterministic_router():
+            # First call: on-disk router.md is the initial version.
+            await router.classify_utterance("test utterance", "session-123")
 
-        # Self-mod agent edits router.md while the server keeps running.
-        Path(temp_router_md).write_text(ROUTER_MD_EDITED)
+            # Self-mod agent edits router.md while the server keeps running.
+            Path(temp_router_md).write_text(ROUTER_MD_EDITED)
 
-        # Force reload to bypass throttle interval
-        router._reload_manager.force_reload("router")
+            # Force reload to bypass throttle interval
+            router._reload_manager.force_reload("router")
 
-        # Clear the router cache to allow re-classification of same utterance
-        router._clear_cache()
+            # Clear the router cache to allow re-classification of same utterance
+            router._clear_cache()
 
-        # Second call: must pick up the edit -- no restart, no reload flag.
-        await router.classify_utterance("test utterance", "session-123")
+            # Second call: must pick up the edit -- no restart, no reload flag.
+            await router.classify_utterance("test utterance", "session-123")
 
         assert len(captured) == 2
         first, second = captured

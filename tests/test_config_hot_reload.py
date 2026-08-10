@@ -769,7 +769,7 @@ async def test_registry_hot_load_routing_change(backup_registry):
 
     # Patch deterministic router to return failure, forcing LLM path
     # This ensures we test the hot-loaded registry in the LLM classification
-    with patch('src.intent.router.get_deterministic_router') as mock_det_router:
+    with patch('src.intent.deterministic_router.get_deterministic_router') as mock_det_router:
         from src.intent.deterministic_router import FastPathResult
         mock_router_instance = mock_det_router.return_value
         mock_router_instance.route_utterance.return_value = FastPathResult(
@@ -779,17 +779,21 @@ async def test_registry_hot_load_routing_change(backup_registry):
             reasoning="LLM path forced for test"
         )
 
-        with patch.object(router, '_get_zai_client') as mock_client:
+        with patch.object(router, '_get_router_zai_client') as mock_client:
             mock_zai = AsyncMock()
             # Mock the LLM response to classify our test utterance as aide-de-camp
-            mock_zai.call_simple.return_value = json.dumps([{
-                "intent_type": "status",
-                "project_slug": "aide-de-camp",
-                "utterance_fragment": f"check {test_alias} status",
-                "confidence": 0.9,
-                "reasoning": f"User asking for status using test alias {test_alias}",
-                "urgency": "normal"
-            }])
+            mock_zai.call_simple.return_value = {
+                "content": json.dumps([{
+                    "intent_type": "status",
+                    "project_slug": "aide-de-camp",
+                    "utterance_fragment": f"check {test_alias} status",
+                    "confidence": 0.9,
+                    "reasoning": f"User asking for status using test alias {test_alias}",
+                    "urgency": "normal"
+                }]),
+                "timing_network_ms": 0,
+                "timing_inference_ms": 0,
+            }
             mock_client.return_value = mock_zai
 
             # Classify utterance using the new hot-loaded alias
