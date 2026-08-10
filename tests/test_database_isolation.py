@@ -15,10 +15,31 @@ Acceptance criteria for bead adc-2gwlq:
 - Database uses temporary files to guarantee isolation ✓
 """
 
+import hashlib
+from pathlib import Path
+
 import aiosqlite
 import pytest
 
-from src.session.store import SessionStore
+
+def _snapshot_database_files(db_path: Path) -> dict[str, tuple | None]:
+    """Return read-only snapshots of a SQLite database and its sidecars."""
+    snapshot = {}
+    for path in (db_path, Path(f"{db_path}-wal"), Path(f"{db_path}-shm")):
+        if not path.exists():
+            snapshot[str(path)] = None
+            continue
+
+        stat = path.stat()
+        snapshot[str(path)] = (
+            stat.st_ino,
+            stat.st_mode,
+            stat.st_size,
+            stat.st_mtime_ns,
+            stat.st_ctime_ns,
+            hashlib.sha256(path.read_bytes()).digest(),
+        )
+    return snapshot
 
 
 class TestDatabaseIsolationFixtures:
@@ -143,6 +164,35 @@ class TestDatabaseIsolationFixtures:
 
         # Should start empty regardless of production data
         assert len(sessions) == 0, "Test database should not contain production data"
+
+    @pytest.mark.asyncio
+    async def test_test_database_writes_leave_production_unchanged(
+        self, test_db_store, test_db_path
+    ):
+        """Test writes to a temporary store do not change production SQLite files."""
+        from src.session.store import DEFAULT_DB_PATH
+
+        production_before = _snapshot_database_files(DEFAULT_DB_PATH)
+        marker = "test-database-only-marker"
+
+        session_id = await test_db_store.create_session()
+        topic_id = await test_db_store.create_topic(
+            label=marker,
+            topic_type="project",
+            project_slugs=["test-only"],
+            scope="session",
+            session_id=session_id,
+        )
+
+        async with aiosqlite.connect(test_db_path) as db:
+            async with db.execute(
+                "SELECT label FROM topics WHERE id = ?", (topic_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        assert row[0] == marker, "The marker must be stored in the test database"
+        assert test_db_path.resolve() != DEFAULT_DB_PATH.resolve()
+        assert _snapshot_database_files(DEFAULT_DB_PATH) == production_before
 
     @pytest.mark.asyncio
     async def test_full_store_functionality(self, test_db_store, test_session_id):
