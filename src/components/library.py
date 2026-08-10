@@ -9,6 +9,7 @@ import logging
 import sqlite3
 import json
 import time
+import threading
 from typing import Optional, Dict, List, Any, Tuple
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,6 +73,7 @@ class ComponentLibrary:
         """
         self.db_path = Path(db_path)
         self._conn: Optional[sqlite3.Connection] = None
+        self._cache_lock = threading.RLock()
         self._ensure_schema()
 
     def _get_conn(self) -> sqlite3.Connection:
@@ -382,6 +384,16 @@ class ComponentLibrary:
         self,
         component_id: str,
         html_template: str,
+        change_note: str,
+    ) -> Optional[Component]:
+        """Update a component and invalidate its cache as one generation."""
+        with self._cache_lock:
+            return self._update_component(component_id, html_template, change_note)
+
+    def _update_component(
+        self,
+        component_id: str,
+        html_template: str,
         change_note: str
     ) -> Optional[Component]:
         """
@@ -461,27 +473,28 @@ class ComponentLibrary:
         if layout_bucket not in self.LAYOUT_BUCKETS:
             raise ValueError(f"Invalid layout bucket: {layout_bucket}")
 
-        conn = self._get_conn()
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO card_cache
-            (result_id, component_id, component_version, layout_bucket, rendered_html, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (result_id, component_id, component_version, layout_bucket, rendered_html, int(time.time()))
-        )
-        conn.commit()
-
-        # Update component usage stats
-        conn.execute(
-            """
-            UPDATE components
-            SET usage_count = usage_count + 1, last_used = ?
-            WHERE id = ?
-            """,
-            (int(time.time()), component_id)
-        )
-        conn.commit()
+        with self._cache_lock:
+            conn = self._get_conn()
+            # Cache insertion and usage accounting publish together; result
+            # invalidation takes this same lock and cannot delete half of a
+            # renderer generation.
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO card_cache
+                (result_id, component_id, component_version, layout_bucket, rendered_html, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (result_id, component_id, component_version, layout_bucket, rendered_html, int(time.time()))
+            )
+            conn.execute(
+                """
+                UPDATE components
+                SET usage_count = usage_count + 1, last_used = ?
+                WHERE id = ?
+                """,
+                (int(time.time()), component_id)
+            )
+            conn.commit()
 
     def get_cached_card(
         self,
@@ -513,12 +526,13 @@ class ComponentLibrary:
 
     def invalidate_result(self, result_id: str):
         """Invalidate all cached cards for a result."""
-        conn = self._get_conn()
-        conn.execute(
-            "DELETE FROM card_cache WHERE result_id = ?",
-            (result_id,)
-        )
-        conn.commit()
+        with self._cache_lock:
+            conn = self._get_conn()
+            conn.execute(
+                "DELETE FROM card_cache WHERE result_id = ?",
+                (result_id,)
+            )
+            conn.commit()
 
     def record_usage_pattern(
         self,

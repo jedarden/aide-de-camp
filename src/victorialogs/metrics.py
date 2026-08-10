@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +28,16 @@ class LatencyMetricsCalculator:
 
     def __init__(self):
         """Initialize metrics calculator."""
+        self._state_lock = threading.RLock()
         self.reset()
 
     def reset(self):
         """Reset internal state."""
-        self.latency_values = []
-        self.timestamps = []
-        self.errors = []
+        with self._state_lock:
+            # Publish all samples as one fresh measurement-window generation.
+            self.latency_values = []
+            self.timestamps = []
+            self.errors = []
 
     def add_value(self, timestamp: str, latency: float) -> None:
         """
@@ -44,15 +48,18 @@ class LatencyMetricsCalculator:
             latency: Latency value in seconds
         """
         try:
-            self.latency_values.append(float(latency))
-            self.timestamps.append(timestamp)
+            value = float(latency)
+            with self._state_lock:
+                self.latency_values.append(value)
+                self.timestamps.append(timestamp)
         except (ValueError, TypeError) as e:
             logger.error(f"Invalid latency value: {latency} - {e}")
-            self.errors.append({
-                "timestamp": timestamp,
-                "value": latency,
-                "error": str(e)
-            })
+            with self._state_lock:
+                self.errors.append({
+                    "timestamp": timestamp,
+                    "value": latency,
+                    "error": str(e)
+                })
 
     def calculate_percentiles(self) -> Dict[str, float]:
         """
@@ -61,7 +68,9 @@ class LatencyMetricsCalculator:
         Returns:
             Dictionary with p50, p75, p90, p95, p99, min, max, count
         """
-        if not self.latency_values:
+        with self._state_lock:
+            values = list(self.latency_values)
+        if not values:
             return {
                 "count": 0,
                 "p50_seconds": 0.0,
@@ -73,7 +82,7 @@ class LatencyMetricsCalculator:
                 "max_seconds": 0.0
             }
 
-        sorted_data = sorted(self.latency_values)
+        sorted_data = sorted(values)
         n = len(sorted_data)
 
         try:
@@ -118,7 +127,9 @@ class LatencyMetricsCalculator:
         Returns:
             Dictionary with mean, median, sum, stddev
         """
-        if not self.latency_values:
+        with self._state_lock:
+            values = list(self.latency_values)
+        if not values:
             return {
                 "mean_seconds": 0.0,
                 "median_seconds": 0.0,
@@ -127,11 +138,11 @@ class LatencyMetricsCalculator:
             }
 
         return {
-            "mean_seconds": round(statistics.mean(self.latency_values), 3),
-            "median_seconds": round(statistics.median(self.latency_values), 3),
-            "sum_seconds": round(sum(self.latency_values), 3),
+            "mean_seconds": round(statistics.mean(values), 3),
+            "median_seconds": round(statistics.median(values), 3),
+            "sum_seconds": round(sum(values), 3),
             "stddev_seconds": round(
-                statistics.stdev(self.latency_values) if len(self.latency_values) > 1 else 0.0,
+                statistics.stdev(values) if len(values) > 1 else 0.0,
                 3
             )
         }
@@ -149,13 +160,16 @@ class LatencyMetricsCalculator:
         Returns:
             List of time-bucketed metrics
         """
-        if not self.timestamps or not self.latency_values:
+        with self._state_lock:
+            timestamps = list(self.timestamps)
+            values = list(self.latency_values)
+        if not timestamps or not values:
             return []
 
         # Parse timestamps and group by interval
         time_groups = defaultdict(list)
 
-        for ts, latency in zip(self.timestamps, self.latency_values):
+        for ts, latency in zip(timestamps, values):
             try:
                 dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
 
@@ -206,6 +220,10 @@ class LatencyMetricsCalculator:
         stats = self.calculate_stats()
         time_series = self.calculate_time_series_aggregates()
 
+        with self._state_lock:
+            values = list(self.latency_values)
+            errors = list(self.errors)
+
         return {
             "percentile_metrics": percentiles,
             "additional_stats": stats,
@@ -215,12 +233,12 @@ class LatencyMetricsCalculator:
                 "aggregates": time_series
             },
             "data_quality": {
-                "total_records": len(self.latency_values),
-                "error_count": len(self.errors),
+                "total_records": len(values),
+                "error_count": len(errors),
                 "success_rate": round(
-                    (1 - len(self.errors) / max(len(self.latency_values), 1)) * 100,
+                    (1 - len(errors) / max(len(values), 1)) * 100,
                     2
-                ) if self.latency_values else 0.0
+                ) if values else 0.0
             },
             "generated_at": datetime.now().isoformat()
         }

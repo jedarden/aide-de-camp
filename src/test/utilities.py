@@ -36,6 +36,8 @@ class TestSessionClient:
         self.client = None
         self._created_session_ids: List[str] = []
         self._created_surface_ids: List[str] = []
+        self._created_surface_by_session: Dict[str, List[str]] = {}
+        self._cleanup_lock = asyncio.Lock()
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -84,9 +86,12 @@ class TestSessionClient:
         surface_response.raise_for_status()
         surface_data = surface_response.json()
 
-        self._created_session_ids.append(session_id)
-        if "surface_id" in surface_data:
-            self._created_surface_ids.append(surface_data["surface_id"])
+        async with self._cleanup_lock:
+            self._created_session_ids.append(session_id)
+            if "surface_id" in surface_data:
+                surface_id = surface_data["surface_id"]
+                self._created_surface_ids.append(surface_id)
+                self._created_surface_by_session.setdefault(session_id, []).append(surface_id)
 
         logger.info(f"[TEST] Created session: {session_id}, surface: {surface_data.get('surface_id')}")
         return {
@@ -234,6 +239,7 @@ class TestSessionClient:
             cards = topics_response.get("cards", [])
 
             # Delete each result (this cascades to intents and topics)
+            failures = False
             for card in cards:
                 result_id = card.get("result_id")
                 if result_id:
@@ -241,7 +247,11 @@ class TestSessionClient:
                         await self.delete_result(session_id, result_id)
                     except Exception as e:
                         logger.warning(f"[TEST] Failed to delete result {result_id}: {e}")
+                        failures = True
 
+            if failures:
+                logger.warning(f"[TEST] Session remains queued for cleanup: {session_id}")
+                return False
             logger.info(f"[TEST] Cleaned up session: {session_id}")
             return True
 
@@ -251,12 +261,32 @@ class TestSessionClient:
 
     async def cleanup_all(self) -> None:
         """Clean up all created sessions and data."""
-        for session_id in self._created_session_ids:
-            await self.cleanup_session(session_id)
+        async with self._cleanup_lock:
+            session_ids = list(dict.fromkeys(self._created_session_ids))
+            cleaned_sessions = set()
+            for session_id in session_ids:
+                if await self.cleanup_session(session_id):
+                    cleaned_sessions.add(session_id)
 
-        self._created_session_ids.clear()
-        self._created_surface_ids.clear()
-        logger.info("[TEST] Cleaned up all test data")
+            # Bookkeeping is the local commit point: only confirmed cleanups
+            # leave the registry. Failed IDs remain retryable. IDs registered
+            # after the snapshot are preserved for the next cleanup pass.
+            self._created_session_ids = [
+                session_id for session_id in self._created_session_ids
+                if session_id not in cleaned_sessions
+            ]
+            for session_id in cleaned_sessions:
+                self._created_surface_by_session.pop(session_id, None)
+            self._created_surface_ids = [
+                surface_id
+                for surfaces in self._created_surface_by_session.values()
+                for surface_id in surfaces
+            ]
+            failed_sessions = [sid for sid in session_ids if sid not in cleaned_sessions]
+            if failed_sessions:
+                logger.error("[TEST] Retaining failed session cleanup IDs: %s", failed_sessions)
+        if not failed_sessions:
+            logger.info("[TEST] Cleaned up all test data")
 
 
 class TestDataBuilder:

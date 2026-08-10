@@ -180,8 +180,14 @@ class ConnectionMonitor:
 
         # Connection tracking
         self._connections: dict[int, ConnectionStats] = {}
+        # Claimed closes remain discoverable until the external close
+        # completes. Failed claims are retained for a later retry instead of
+        # being silently forgotten.
+        self._closing: dict[int, ConnectionStats] = {}
+        self._failed_closes: dict[int, tuple[ConnectionStats, Exception]] = {}
         self._connection_id = 0
         self._lock = asyncio.Lock()
+        self._total_duration_seconds = 0.0
 
         # Statistics
         self._stats = MonitorStats()
@@ -254,38 +260,52 @@ class ConnectionMonitor:
             yield conn
 
         finally:
-            # Record connection closure
+            # Claim the record exactly once. This is the atomic commit point
+            # for active tracking; the potentially blocking close happens
+            # outside the owner lock.
             closed_at = time.time()
             duration = closed_at - created_at
 
             async with self._lock:
-                if conn_id in self._connections:
-                    conn_stats = self._connections[conn_id]
+                conn_stats = self._connections.pop(conn_id, None)
+                if conn_stats is None:
+                    # A repeated finalizer is already terminal and must not
+                    # decrement counters or close the handle a second time.
+                    logger.debug("Connection %s finalizer already claimed", conn_id)
+                else:
+                    self._closing[conn_id] = conn_stats
+                    self._stats.active_connections = max(0, self._stats.active_connections - 1)
+                    self._counter.decrement()
+
+            if conn_stats is not None:
+                try:
+                    if conn is not None:
+                        await conn.close()
+                except BaseException as close_error:
+                    async with self._lock:
+                        self._closing.pop(conn_id, None)
+                        if isinstance(close_error, Exception):
+                            self._failed_closes[conn_id] = (conn_stats, close_error)
+                    logger.error(
+                        "Connection %s close failed; retained for retry: %s",
+                        conn_id,
+                        close_error,
+                    )
+                    # Cancellation must retain its original semantics. A normal
+                    # close failure is also surfaced so callers can report it.
+                    raise
+
+                async with self._lock:
+                    # Finalize only after external close succeeds. Readers never
+                    # observe a closed count for a handle that was not closed.
+                    self._closing.pop(conn_id, None)
                     conn_stats.closed_at = closed_at
                     conn_stats.duration_seconds = duration
-
-                    self._stats.active_connections -= 1
                     self._stats.closed_connections += 1
-
-                    # Update average duration
-                    if self._stats.closed_connections > 0:
-                        total_duration = sum(
-                            c.duration_seconds
-                            for c in self._connections.values()
-                            if c.closed_at is not None
-                        )
-                        self._stats.avg_connection_duration = (
-                            total_duration / self._stats.closed_connections
-                        )
-
-                    # Remove from active tracking
-                    del self._connections[conn_id]
-
-            self._counter.decrement()
-
-            # Close the actual connection if it was created
-            if conn is not None:
-                await conn.close()
+                    self._total_duration_seconds += duration
+                    self._stats.avg_connection_duration = (
+                        self._total_duration_seconds / self._stats.closed_connections
+                    )
 
     def _capture_stack(self) -> str:
         """Capture current stack trace for connection creation debugging."""
@@ -394,10 +414,21 @@ class ConnectionMonitor:
         """Reset monitor state (for test isolation)."""
         async with self._lock:
             self._connections.clear()
+            self._closing.clear()
+            self._failed_closes.clear()
             self._stats = MonitorStats()
             self._counter.reset()
             self._activity_history.clear()
             self._exhaustion_alerted = False
+            self._total_duration_seconds = 0.0
+
+    async def get_failed_closes(self) -> list[tuple[int, ConnectionStats, Exception]]:
+        """Return close failures that remain available for a retry worker."""
+        async with self._lock:
+            return [
+                (conn_id, stats, error)
+                for conn_id, (stats, error) in self._failed_closes.items()
+            ]
 
     def get_connection_count(self) -> int:
         """Get current active connection count (synchronous)."""
@@ -435,17 +466,22 @@ class ConnectionMonitor:
 
 # Global monitor instance (can be swapped for testing)
 _global_monitor: Optional[ConnectionMonitor] = None
+_global_monitor_lock = threading.RLock()
 
 
 def get_global_monitor() -> ConnectionMonitor:
     """Get or create global connection monitor."""
     global _global_monitor
-    if _global_monitor is None:
-        _global_monitor = ConnectionMonitor()
-    return _global_monitor
+    with _global_monitor_lock:
+        if _global_monitor is None:
+            _global_monitor = ConnectionMonitor()
+        return _global_monitor
 
 
 def reset_global_monitor() -> None:
     """Reset global monitor (for test isolation)."""
     global _global_monitor
-    _global_monitor = None
+    with _global_monitor_lock:
+        # Existing callers retain their isolated monitor generation; new
+        # callers get a fresh one without clearing state another task owns.
+        _global_monitor = None

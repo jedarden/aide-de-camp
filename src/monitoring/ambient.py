@@ -103,6 +103,10 @@ class AmbientMonitor:
         self._config_loader = ConfigLoader(config_path=config_path, default_tick_interval_seconds=300)
         self._ticker_task: Optional[asyncio.Task] = None
         self._last_tick_config_hash: Optional[int] = None
+        self._lifecycle_lock = asyncio.Lock()
+        self._reload_lock = asyncio.Lock()
+        self._stop_task: Optional[asyncio.Task] = None
+        self._lifecycle_state = "STOPPED"
 
     async def _get_http_client(self) -> ClientSession:
         """Get or create HTTP client."""
@@ -644,22 +648,32 @@ class AmbientMonitor:
 
     async def start(self) -> None:
         """Start ambient monitoring."""
-        logger.info("Starting ambient monitoring service")
-
-        # Load config
-        config = await self.load_config()
-
-        self.running = True
-
-        # Start a monitor task for each active topic
-        for rule in config.active_topics:
-            task = asyncio.create_task(self.monitor_topic(rule))
-            self.tasks.append(task)
-
-        # Start the ticker task for config hot-reload
-        self._ticker_task = asyncio.create_task(self._config_ticker())
-        self.tasks.append(self._ticker_task)
-
+        async with self._lifecycle_lock:
+            if self.running:
+                return
+            # Build and validate the complete new generation before publishing
+            # any task handles. A failed load leaves the stopped state intact.
+            config = await self.load_config()
+            async with self._reload_lock:
+                new_tasks = []
+                try:
+                    new_tasks = [
+                        asyncio.create_task(self.monitor_topic(rule))
+                        for rule in config.active_topics
+                    ]
+                    ticker = asyncio.create_task(self._config_ticker())
+                    new_tasks.append(ticker)
+                except BaseException:
+                    for task in new_tasks:
+                        task.cancel()
+                    if new_tasks:
+                        await asyncio.gather(*new_tasks, return_exceptions=True)
+                    raise
+                self.running = True
+                self._lifecycle_state = "RUNNING"
+                self._ticker_task = ticker
+                self.tasks = new_tasks
+        logger.info("Ambient monitoring service started")
         logger.info(f"Started {len(self.tasks)} topic monitors (including config ticker)")
 
     async def _config_ticker(self) -> None:
@@ -704,44 +718,92 @@ class AmbientMonitor:
 
     async def stop(self) -> None:
         """Stop ambient monitoring."""
+        # Single-flight stop prevents concurrent shutdown callers from
+        # cancelling/clearing the same task set twice.
+        async with self._lifecycle_lock:
+            if self._stop_task is None or self._stop_task.done():
+                self._lifecycle_state = "STOPPING"
+                self._stop_task = asyncio.create_task(self._stop_impl())
+            stop_task = self._stop_task
+        await stop_task
+
+    async def _stop_impl(self) -> None:
         logger.info("Stopping ambient monitoring service")
-        self.running = False
+        async with self._reload_lock:
+            self.running = False
+            tasks = list(dict.fromkeys(self.tasks))
+            client = self._http_client
 
-        # Cancel all monitor tasks
-        for task in self.tasks:
-            task.cancel()
+        cancel_errors = []
+        for task in tasks:
+            try:
+                if not task.done():
+                    task.cancel()
+            except BaseException as error:  # pragma: no cover - task API defensive
+                cancel_errors.append(error)
 
-        # Wait for tasks to complete
-        await asyncio.gather(*self.tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True) if tasks else []
+        failures = [error for error in cancel_errors]
+        failures.extend(
+            error for error in results
+            if isinstance(error, Exception) and not isinstance(error, asyncio.CancelledError)
+        )
 
-        self.tasks.clear()
-        self._ticker_task = None
+        try:
+            if client is not None and not client.closed:
+                await client.close()
+        except Exception as error:
+            failures.append(error)
+        finally:
+            # Clear only terminal handles. An unfinished task/client remains
+            # discoverable so a later stop can retry rather than claim success.
+            async with self._reload_lock:
+                self.tasks = [task for task in self.tasks if not task.done()]
+                if self._ticker_task is not None and self._ticker_task.done():
+                    self._ticker_task = None
+                if client is not None and client.closed:
+                    self._http_client = None
 
-        # Close HTTP client
-        if self._http_client:
-            await self._http_client.close()
+        if failures or self.tasks or (self._http_client is not None and not self._http_client.closed):
+            self._lifecycle_state = "FAILED_STOP"
+            logger.error("Ambient monitoring stopped with %d cleanup failure(s)", len(failures))
+            raise RuntimeError("Ambient monitoring cleanup incomplete")
 
+        self._lifecycle_state = "STOPPED"
         logger.info("Ambient monitoring stopped")
 
     async def reload_config(self) -> None:
         """Reload monitoring configuration and restart topic monitors."""
         logger.info("Reloading monitoring configuration")
-
-        # Separate ticker task from monitor tasks
-        monitor_tasks = [t for t in self.tasks if t != self._ticker_task]
-        self.tasks = [self._ticker_task] if self._ticker_task else []
-
-        # Cancel old monitor tasks (but not the ticker)
-        for task in monitor_tasks:
-            task.cancel()
-        await asyncio.gather(*monitor_tasks, return_exceptions=True)
-
-        # Load new config and restart monitors
+        # Load and validate first. If this fails, the old generation keeps
+        # running and remains the published monitor set.
         config = await self.load_config()
 
-        for rule in config.active_topics:
-            task = asyncio.create_task(self.monitor_topic(rule))
-            self.tasks.append(task)
+        new_tasks = []
+        try:
+            new_tasks = [
+                asyncio.create_task(self.monitor_topic(rule))
+                for rule in config.active_topics
+            ]
+        except BaseException:
+            # Do not publish a partial task generation. Any tasks created
+            # before the failure are explicitly cancelled and drained.
+            for task in new_tasks:
+                task.cancel()
+            if new_tasks:
+                await asyncio.gather(*new_tasks, return_exceptions=True)
+            raise
+        async with self._reload_lock:
+            old_tasks = [task for task in self.tasks if task != self._ticker_task]
+            ticker = self._ticker_task
+            self.tasks = ([ticker] if ticker else []) + new_tasks
+
+            # Swap is the publication point; drain the old generation after
+            # the new complete set is visible so reload failure cannot leave
+            # monitoring with an empty registry.
+            for task in old_tasks:
+                task.cancel()
+        await asyncio.gather(*old_tasks, return_exceptions=True)
 
         logger.info(f"Reloaded monitoring config, started {len(self.tasks)} topic monitors")
 

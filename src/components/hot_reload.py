@@ -450,26 +450,28 @@ class HotReloadManager:
                     f"_check_and_reload('{name}')"
                 )
 
-                # Update artifact
-                artifact.content = new_content
-                artifact.mtime = current_mtime
-                artifact.last_check = now
-                artifact.load_error = None
-
-                # Parse and cache
+                # Parse completely before publishing artifact metadata. A
+                # malformed replacement keeps the old content/mtime/cache.
                 suffix = artifact.path.suffix.lower()
                 parser = self._parsers.get(suffix)
                 if parser:
                     try:
-                        self._cache[name] = parser(new_content)
+                        parsed_content = parser(new_content)
                     except Exception as e:
-                        # On parse error, keep old cache but log error
                         artifact.load_error = e
                         logger.error(f"Parse error reloading '{name}': {e}")
                         self._error_count[name] = self._error_count.get(name, 0) + 1
                         return False
                 else:
-                    self._cache[name] = new_content
+                    parsed_content = new_content
+
+                # Publish the complete artifact/cache snapshot at one commit
+                # point after validation succeeds.
+                artifact.content = new_content
+                artifact.mtime = current_mtime
+                artifact.last_check = now
+                artifact.load_error = None
+                self._cache[name] = parsed_content
 
                 logger.debug(f"Reloaded artifact '{name}' from {artifact.path}")
                 return True
@@ -525,8 +527,11 @@ class HotReloadManager:
         Returns:
             The parsed config (dict for YAML)
         """
-        self._check_and_reload(name)
-        return self._cache[name]
+        with self._lock:
+            self._check_and_reload(name)
+            # Read the parsed value from the same owner snapshot that the
+            # reload path publishes, never from an unlocked cache pointer.
+            return self._cache[name]
 
     def force_reload(self, name: str):
         """
@@ -539,46 +544,52 @@ class HotReloadManager:
             PermissionDeniedError: If file cannot be read
             RegistryParseError: If file parsing fails
         """
-        if name not in self._artifacts:
-            raise KeyError(f"Unknown artifact: {name}")
+        with self._lock:
+            if name not in self._artifacts:
+                raise KeyError(f"Unknown artifact: {name}")
 
-        artifact = self._artifacts[name]
-
-        try:
-            with open(artifact.path) as f:
-                new_content = f.read()
-        except PermissionError as e:
-            logger.error(f"Permission denied during force reload of {artifact.path}")
-            raise PermissionDeniedError(artifact.path, f"force_reload('{name}')") from e
-
-        artifact.content = new_content
-        artifact.mtime = artifact.path.stat().st_mtime
-        artifact.last_check = time.time()
-
-        # Parse and cache
-        suffix = artifact.path.suffix.lower()
-        parser = self._parsers.get(suffix)
-        if parser:
+            artifact = self._artifacts[name]
             try:
-                self._cache[name] = parser(new_content)
-            except (ValueError, yaml.YAMLError, json.JSONDecodeError) as e:
-                logger.error(f"Parse error during force reload of {artifact.path}: {e}")
-                raise RegistryParseError(artifact.path, e, new_content) from e
-        else:
-            self._cache[name] = new_content
+                with open(artifact.path) as f:
+                    new_content = f.read()
+                new_mtime = artifact.path.stat().st_mtime
+            except PermissionError as e:
+                logger.error(f"Permission denied during force reload of {artifact.path}")
+                raise PermissionDeniedError(artifact.path, f"force_reload('{name}')") from e
+
+            suffix = artifact.path.suffix.lower()
+            parser = self._parsers.get(suffix)
+            if parser:
+                try:
+                    parsed_content = parser(new_content)
+                except (ValueError, yaml.YAMLError, json.JSONDecodeError) as e:
+                    logger.error(f"Parse error during force reload of {artifact.path}: {e}")
+                    raise RegistryParseError(artifact.path, e, new_content) from e
+            else:
+                parsed_content = new_content
+
+            # Atomic publication: readers see either the old artifact snapshot
+            # or the fully parsed new one, never mixed metadata and content.
+            artifact.content = new_content
+            artifact.mtime = new_mtime
+            artifact.last_check = time.time()
+            artifact.load_error = None
+            self._cache[name] = parsed_content
 
     def get_mtime(self, name: str) -> Optional[float]:
         """Get the current mtime of an artifact."""
-        if name in self._artifacts:
-            return self._artifacts[name].mtime
+        with self._lock:
+            if name in self._artifacts:
+                return self._artifacts[name].mtime
         return None
 
     def list_artifacts(self) -> Dict[str, str]:
         """List all registered artifacts and their paths."""
-        return {
-            name: str(artifact.path)
-            for name, artifact in self._artifacts.items()
-        }
+        with self._lock:
+            return {
+                name: str(artifact.path)
+                for name, artifact in self._artifacts.items()
+            }
 
 
 # Singleton instance for the application

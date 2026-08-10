@@ -15,8 +15,29 @@ from pathlib import Path
 from typing import Union, Optional, Callable, Any
 from contextlib import contextmanager
 import uuid
+import threading
 
 logger = logging.getLogger(__name__)
+
+_write_locks: dict[str, threading.RLock] = {}
+_write_locks_guard = threading.Lock()
+
+
+def _path_lock(path: Union[str, Path], locks: dict[str, threading.RLock], guard: threading.Lock) -> threading.RLock:
+    """Return the process-local lock for one filesystem path."""
+    key = str(Path(path).absolute())
+    with guard:
+        return locks.setdefault(key, threading.RLock())
+
+
+def _write_all(fd: int, data: bytes) -> None:
+    """Write all bytes, handling a valid short ``os.write`` result."""
+    view = memoryview(data)
+    while view:
+        written = os.write(fd, view)
+        if written <= 0:
+            raise OSError("short write while publishing atomic file content")
+        view = view[written:]
 
 
 class AtomicWriteError(Exception):
@@ -29,7 +50,7 @@ class AtomicWriteRollbackError(AtomicWriteError):
     pass
 
 
-def atomic_write(
+def _atomic_write_with_retries(
     filepath: Union[str, Path],
     content: Union[str, bytes],
     mode: str = 'w',
@@ -136,6 +157,37 @@ def atomic_write(
     raise RuntimeError(f"Unexpected error in atomic write for {filepath}")
 
 
+def atomic_write(
+    filepath: Union[str, Path],
+    content: Union[str, bytes],
+    mode: str = 'w',
+    *,
+    create_backup: bool = False,
+    validate_fn: Optional[Callable[[Union[str, bytes]], bool]] = None,
+    cleanup_verify: bool = True,
+    max_retries: int = 0,
+    initial_delay: float = 0.1,
+) -> Optional[Path]:
+    """Serialize same-path writers, then publish with P1 temp-file replace.
+
+    ``os.replace`` prevents partial readers, while this owner lock prevents a
+    slower writer from replacing a newer complete file after both writers have
+    read the same old generation.
+    """
+    lock = _path_lock(filepath, _write_locks, _write_locks_guard)
+    with lock:
+        return _atomic_write_with_retries(
+            filepath,
+            content,
+            mode,
+            create_backup=create_backup,
+            validate_fn=validate_fn,
+            cleanup_verify=cleanup_verify,
+            max_retries=max_retries,
+            initial_delay=initial_delay,
+        )
+
+
 def _atomic_write_impl(
     filepath: Path,
     content: Union[str, bytes],
@@ -218,10 +270,10 @@ def _atomic_write_impl(
             # Write content to temp file
             try:
                 if mode == 'wb':
-                    os.write(fd, content)
+                    _write_all(fd, content)
                 else:
                     # Text mode: encode to UTF-8
-                    os.write(fd, content.encode('utf-8'))
+                    _write_all(fd, content.encode('utf-8'))
                 logger.debug(f"[{operation_id}] Content written to temp file")
             except OSError as e:
                 error_msg = f"Failed to write to temp file {temp_path}: {e}"
@@ -262,6 +314,14 @@ def _atomic_write_impl(
             # Atomic replace - replaces target if it exists
             try:
                 os.replace(temp_path, filepath)
+                try:
+                    directory_fd = os.open(filepath.parent, os.O_RDONLY)
+                    try:
+                        os.fsync(directory_fd)
+                    finally:
+                        os.close(directory_fd)
+                except OSError as sync_error:
+                    logger.warning(f"[{operation_id}] directory fsync failed (non-critical): {sync_error}")
                 logger.info(
                     f"[{operation_id}] Atomic replace successful: {temp_path} -> {filepath}",
                     extra={"backup_created": backup_path is not None}
@@ -306,8 +366,13 @@ def _atomic_write_impl(
             )
             return backup_path
 
-        except Exception as e:
+        except Exception:
             # Clean up temp file on any error with enhanced atomic write failure handling
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
             if temp_path_obj.exists():
                 try:
                     temp_path_obj.unlink()
@@ -598,6 +663,31 @@ def atomic_append(
     *,
     validate_fn: Optional[Callable[[Union[str, bytes]], bool]] = None,
     max_retries: int = 0,
+    initial_delay: float = 0.1,
+) -> None:
+    """Append one complete record under a per-path writer lock."""
+    lock = _path_lock(filepath, _write_locks, _write_locks_guard)
+    # The read/merge/replace sequence in the implementation is one logical
+    # append transaction. Serializing it prevents two writers from losing one
+    # another's records between the read and atomic replacement.
+    with lock:
+        return _atomic_append_impl(
+            filepath,
+            content,
+            mode,
+            validate_fn=validate_fn,
+            max_retries=max_retries,
+            initial_delay=initial_delay,
+        )
+
+
+def _atomic_append_impl(
+    filepath: Union[str, Path],
+    content: Union[str, bytes],
+    mode: str = 'a',
+    *,
+    validate_fn: Optional[Callable[[Union[str, bytes]], bool]] = None,
+    max_retries: int = 0,
     initial_delay: float = 0.1
 ) -> None:
     """
@@ -670,9 +760,9 @@ def atomic_append(
             try:
                 # Write content to temp file
                 if mode == 'a':
-                    os.write(temp_fd, content.encode('utf-8'))
+                    _write_all(temp_fd, content.encode('utf-8'))
                 else:  # 'ab'
-                    os.write(temp_fd, content)
+                    _write_all(temp_fd, content)
 
                 # Sync to disk
                 os.fsync(temp_fd)
@@ -700,15 +790,20 @@ def atomic_append(
                     )
                 else:
                     # File doesn't exist, just rename temp file
-                    os.rename(temp_path, filepath)
+                    os.replace(temp_path, filepath)
+
+                # If the target already existed, the combined snapshot was
+                # published by _atomic_write_impl and this staging file is no
+                # longer needed. Cleanup is scoped to this operation's path.
+                Path(temp_path).unlink(missing_ok=True)
 
                 logger.info(f"[{operation_id}] Atomic append successful to {filepath}")
 
-            except OSError as e:
+            except BaseException:
                 # Cleanup temp file on error with enhanced atomic append failure handling
                 try:
                     os.close(temp_fd)
-                except:
+                except OSError:
                     pass
                 try:
                     Path(temp_path).unlink(missing_ok=True)

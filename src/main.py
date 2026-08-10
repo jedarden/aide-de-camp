@@ -5,6 +5,7 @@ Voice mode server using OpenAI Realtime API.
 Replaces text input with voice session.
 """
 import asyncio
+import inspect
 import json
 import logging
 import os
@@ -198,24 +199,46 @@ async def lifespan(app: FastAPI):
     logger.info("aide-de-camp ready")
     yield
 
-    # Shutdown
+    # Shutdown is a cleanup barrier: every independent owner gets a chance to
+    # reach its terminal state, even when another stop/close fails. A single
+    # exception must never skip the store or component-library cleanup.
     logger.info("Shutting down aide-de-camp...")
-    stop_background_refresh()
+
+    async def run_cleanup_step(name: str, callback) -> Optional[str]:
+        try:
+            result = callback()
+            if inspect.isawaitable(result):
+                await asyncio.wait_for(result, timeout=30)
+            return None
+        except Exception as error:  # noqa: BLE001 - aggregate all shutdown failures
+            logger.error("Shutdown step %s failed: %s", name, error, exc_info=True)
+            return f"{name}: {error}"
+
+    cleanup_steps = [("background environment refresh", stop_background_refresh)]
     if _bead_watcher:
-        await _bead_watcher.stop()
+        cleanup_steps.append(("bead watcher", _bead_watcher.stop))
     if _background_processor:
-        await _background_processor.stop()
+        cleanup_steps.append(("background processor", _background_processor.stop))
     if _context_warmer:
-        await _context_warmer.stop()
+        cleanup_steps.append(("context warmer", _context_warmer.stop))
     if _ambient_monitor:
-        await _ambient_monitor.stop()
+        cleanup_steps.append(("ambient monitor", _ambient_monitor.stop))
     if _broadcaster:
-        await _broadcaster.stop()
+        cleanup_steps.append(("SSE broadcaster", _broadcaster.stop))
     if _component_library:
-        _component_library.close()
+        cleanup_steps.append(("component library", _component_library.close))
     if _store:
-        await _store.close()
-    logger.info("aide-de-camp shutdown complete")
+        cleanup_steps.append(("session store", _store.close))
+
+    shutdown_errors = await asyncio.gather(
+        *(run_cleanup_step(name, callback) for name, callback in cleanup_steps),
+        return_exceptions=False,
+    )
+    failures = [error for error in shutdown_errors if error is not None]
+    if failures:
+        logger.error("aide-de-camp shutdown degraded; unfinished steps: %s", failures)
+    else:
+        logger.info("aide-de-camp shutdown complete")
 
 
 app = FastAPI(title="ADC (aide-de-camp)", version=read_version(), lifespan=lifespan)
@@ -1138,6 +1161,7 @@ async def dispatch_intent(request: DispatchRequest) -> DispatchResponse:
                         try:
                             await store.record_dispatch_timings(
                                 intent_id,
+                                session_id=session_id,
                                 sse_emit_ms=int((time.monotonic() - emit_start) * 1000),
                             )
                         except Exception as te:
@@ -1212,7 +1236,11 @@ async def report_client_timings(request: dict):
         # Upserts into the existing server-written row (created_at unchanged);
         # if no server row exists yet this still creates one keyed by the
         # client-reported intent_id so the timing is never lost.
-        await store.record_dispatch_timings(intent_id, **fields)
+        await store.record_dispatch_timings(
+            intent_id,
+            session_id=request.get("session_id"),
+            **fields,
+        )
     except Exception as e:
         logger.warning(f"client timings not recorded for {intent_id}: {e}")
         return JSONResponse(

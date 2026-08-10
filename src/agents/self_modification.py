@@ -8,6 +8,7 @@ based on user feedback.
 import time
 import json
 import subprocess
+import threading
 from logging import getLogger
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
@@ -472,6 +473,8 @@ class SelfModificationAgent:
         self.reload_mgr = get_reload_manager()
         self.component_library = get_library()
         self._pending_diffs: List[ArtifactDiff] = []
+        self._pending_lock = threading.RLock()
+        self._artifact_write_lock = threading.RLock()
         self.parse_prompt_path = parse_prompt_path or SELF_MOD_PARSE_PROMPT_PATH
         self.generate_prompt_path = generate_prompt_path or SELF_MOD_GENERATE_PROMPT_PATH
         self._zai_client = None
@@ -539,7 +542,8 @@ class SelfModificationAgent:
             confidence=self._estimate_confidence(request, change_summary)
         )
 
-        self._pending_diffs.append(diff)
+        with self._pending_lock:
+            self._pending_diffs.append(diff)
         return diff
 
     async def _parse_instruction(self, instruction: str) -> ModificationRequest:
@@ -717,13 +721,21 @@ class SelfModificationAgent:
             # Check freeze protection before writing
             ensure_unfrozen()
 
-            if diff.artifact_type == ArtifactType.PROMPT:
-                return self._write_prompt(diff)
-            elif diff.artifact_type == ArtifactType.CONFIG:
-                return self._write_config(diff)
-            elif diff.artifact_type == ArtifactType.COMPONENT:
-                return self._write_component(diff)
-            return False
+            with self._artifact_write_lock:
+                if diff.artifact_type in (ArtifactType.PROMPT, ArtifactType.CONFIG):
+                    artifact = self.reload_mgr._artifacts.get(diff.artifact_name)
+                    if not artifact or artifact.path.read_text() != diff.before:
+                        # Expected-version check: do not overwrite an edit made
+                        # after this proposal was generated.
+                        logger.warning("Refusing stale self-modification diff for %s", diff.artifact_name)
+                        return False
+                if diff.artifact_type == ArtifactType.PROMPT:
+                    return self._write_prompt(diff)
+                elif diff.artifact_type == ArtifactType.CONFIG:
+                    return self._write_config(diff)
+                elif diff.artifact_type == ArtifactType.COMPONENT:
+                    return self._write_component(diff)
+                return False
         except RuntimeError as e:
             # Clear error for freeze protection
             print(f"Cannot apply diff: {e}")
@@ -858,8 +870,11 @@ class SelfModificationAgent:
 
     def reject_diff(self, diff: ArtifactDiff):
         """Discard a diff without applying it."""
-        if diff in self._pending_diffs:
-            self._pending_diffs.remove(diff)
+        with self._pending_lock:
+            try:
+                self._pending_diffs.remove(diff)
+            except ValueError:
+                pass
 
     def rollback(self, artifact_name: str, artifact_type: ArtifactType) -> bool:
         """
@@ -868,30 +883,33 @@ class SelfModificationAgent:
         For prompts/configs: read from git history
         For components: use component version history
         """
-        if artifact_type == ArtifactType.COMPONENT:
-            return self._rollback_component(artifact_name)
+        with self._artifact_write_lock:
+            if artifact_type == ArtifactType.COMPONENT:
+                return self._rollback_component(artifact_name)
 
-        # For prompts/configs, use git to get previous version
-        import subprocess
-        try:
-            artifact = self.reload_mgr._artifacts.get(artifact_name)
-            if not artifact:
-                return False
+            # For prompts/configs, use git to get previous version
+            import subprocess
+            try:
+                artifact = self.reload_mgr._artifacts.get(artifact_name)
+                if not artifact:
+                    return False
 
-            # Get previous version from git
-            result = subprocess.run(
-                ['git', 'show', f'HEAD:{artifact.path.name}'],
-                capture_output=True,
-                text=True,
-                cwd=artifact.path.parent
-            )
+                # Get previous version from git
+                result = subprocess.run(
+                    ['git', 'show', f'HEAD:{artifact.path.name}'],
+                    capture_output=True,
+                    text=True,
+                    cwd=artifact.path.parent
+                )
 
-            if result.returncode == 0:
-                atomic_write(artifact.path, result.stdout)
-                self.reload_mgr.force_reload(artifact_name)
-                return True
-        except Exception as e:
-            print(f"Rollback failed: {e}")
+                if result.returncode == 0:
+                    # P1 compare-and-swap boundary: the write lock prevents a
+                    # concurrent apply/rollback from replacing this artifact.
+                    atomic_write(artifact.path, result.stdout)
+                    self.reload_mgr.force_reload(artifact_name)
+                    return True
+            except Exception as e:
+                print(f"Rollback failed: {e}")
 
         return False
 
@@ -907,11 +925,15 @@ class SelfModificationAgent:
 
     def list_pending_diffs(self) -> List[ArtifactDiff]:
         """Get all pending diffs awaiting approval."""
-        return self._pending_diffs.copy()
+        with self._pending_lock:
+            return list(self._pending_diffs)
 
     def clear_pending_diffs(self):
         """Clear all pending diffs."""
-        self._pending_diffs.clear()
+        with self._pending_lock:
+            # Swap to a fresh generation so proposals created concurrently are
+            # not removed by a bulk clear.
+            self._pending_diffs = []
 
 
 # Singleton instance

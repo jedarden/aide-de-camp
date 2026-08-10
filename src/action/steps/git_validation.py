@@ -11,7 +11,9 @@ when validation fails, making it clear what needs to be fixed.
 
 import logging
 import os
+import shutil
 import subprocess
+import uuid
 from pathlib import Path
 from typing import Literal
 
@@ -354,7 +356,8 @@ def check_file_permissions(
         # Test write permission by creating a temp file
         test_file = repo_path / ".write_test_temp"
         test_file.touch()
-        test_file.unlink()
+        # Atomic unlink with idempotent cleanup (safe if file already deleted)
+        test_file.unlink(missing_ok=True)
     except PermissionError:
         raise GitStateError(f"No write permission for repository: {repo_path}")
     except Exception as e:
@@ -499,11 +502,28 @@ def check_and_clean_git_locks(
         if lock_file.exists():
             locks_found.append(lock_file.name)
             try:
-                if lock_file.is_dir():
-                    shutil.rmtree(lock_file) if (shutil := __import__("shutil")) else None
+                # Rename the exact, repository-owned path into a unique
+                # quarantine first. The rename is the claim/commit point: a
+                # concurrent git operation that replaces the lock after the
+                # scan cannot have its new lock recursively deleted.
+                quarantine = git_dir / f".adc-cleanup-{uuid.uuid4().hex}"
+                try:
+                    lock_file.replace(quarantine)
+                except FileNotFoundError:
+                    # Another owner completed this exact cleanup.
+                    logger.debug(f"Git lock file already removed: {lock_file}")
+                    continue
+                if quarantine.is_dir():
+                    shutil.rmtree(quarantine)
                 else:
-                    lock_file.unlink()
+                    quarantine.unlink(missing_ok=True)
                 logger.warning(f"Cleaned up git lock file: {lock_file}")
+            except FileNotFoundError:
+                # Idempotent: file already removed by another process, not an error
+                logger.debug(f"Git lock file already removed: {lock_file}")
+            except PermissionError as e:
+                logger.error(f"Permission denied cleaning up git lock file {lock_file}: {e}")
+                raise GitStateError(f"Cannot clean up git lock file {lock_file}: {e}")
             except Exception as e:
                 logger.error(f"Failed to clean up git lock file {lock_file}: {e}")
                 raise GitStateError(f"Cannot clean up git lock file {lock_file}: {e}")

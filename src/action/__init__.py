@@ -69,9 +69,14 @@ __all__ = [
 # Import-time validation: ensure all exported symbols are available
 _imported_symbols = set(globals().keys()) - {"__all__", "_imported_symbols"}
 _missing_symbols = set(__all__) - _imported_symbols
-if _missing_symbols:
-    raise ImportError(
-        f"Action module is missing exported symbols: {_missing_symbols}. "
-        "This indicates a circular import or missing dependency."
-    )
-del _imported_symbols, _missing_symbols
+try:
+    if _missing_symbols:
+        raise ImportError(
+            f"Action module is missing exported symbols: {_missing_symbols}. "
+            "This indicates a circular import or missing dependency."
+        )
+finally:
+    # Import validation owns these temporary names; even a failed validation
+    # must not leave stale module globals for a later reload.
+    globals().pop("_imported_symbols", None)
+    globals().pop("_missing_symbols", None)

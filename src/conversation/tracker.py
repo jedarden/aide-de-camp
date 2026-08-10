@@ -6,6 +6,7 @@ Implements topic focus tracking and disambiguation for ambiguous utterances.
 """
 
 import json
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from logging import getLogger
@@ -80,6 +81,7 @@ class ConversationTracker:
         self._history: dict[str, list[ConversationTurn]] = {}
         # session_id -> list[str] (recent topic IDs for disambiguation)
         self._recent_topics: dict[str, list[str]] = {}
+        self._state_lock = threading.RLock()
 
     async def record_turn(
         self,
@@ -110,33 +112,29 @@ class ConversationTracker:
             was_follow_up=is_follow_up,
         )
 
-        # Update focus
-        if primary_topic_id:
-            if session_id not in self._focus or self._focus[session_id].primary_topic_id != primary_topic_id:
-                # New or changed focus
-                self._focus[session_id] = TopicFocus(
-                    session_id=session_id,
-                    primary_topic_id=primary_topic_id,
-                    primary_topic_label=await self._get_topic_label(primary_topic_id),
-                    last_activity=now,
-                    turn_count=1,
-                )
-            else:
-                # Same focus, update activity
-                self._focus[session_id].last_activity = now
-                self._focus[session_id].turn_count += 1
+        topic_label = await self._get_topic_label(primary_topic_id) if primary_topic_id else None
+        with self._state_lock:
+            # Publish focus, history, and recent topics under one owner lock;
+            # the awaited label lookup happens before this commit boundary.
+            if primary_topic_id:
+                current_focus = self._focus.get(session_id)
+                if current_focus is None or current_focus.primary_topic_id != primary_topic_id:
+                    self._focus[session_id] = TopicFocus(
+                        session_id=session_id,
+                        primary_topic_id=primary_topic_id,
+                        primary_topic_label=topic_label,
+                        last_activity=now,
+                        turn_count=1,
+                    )
+                else:
+                    current_focus.last_activity = now
+                    current_focus.turn_count += 1
 
-        # Add to history
-        if session_id not in self._history:
-            self._history[session_id] = []
-        self._history[session_id].append(turn)
-
-        # Keep only last 20 turns
-        if len(self._history[session_id]) > 20:
-            self._history[session_id] = self._history[session_id][-20:]
-
-        # Update recent topics
-        self._update_recent_topics(session_id, primary_topic_id, related_topic_ids)
+            history = self._history.setdefault(session_id, [])
+            history.append(turn)
+            if len(history) > 20:
+                self._history[session_id] = history[-20:]
+            self._update_recent_topics_locked(session_id, primary_topic_id, related_topic_ids)
 
         logger.debug(
             f"Recorded turn {turn_id} for session {session_id}, "
@@ -157,7 +155,8 @@ class ConversationTracker:
         Returns (is_follow_up, suggested_topic_id).
         """
         # Check if we have an active focus
-        focus = self._focus.get(session_id)
+        with self._state_lock:
+            focus = self._focus.get(session_id)
         if not focus or not focus.is_valid():
             return False, None
 
@@ -191,15 +190,17 @@ class ConversationTracker:
 
     def get_focus(self, session_id: str) -> Optional[TopicFocus]:
         """Get the current topic focus for a session."""
-        focus = self._focus.get(session_id)
+        with self._state_lock:
+            focus = self._focus.get(session_id)
         if focus and focus.is_valid():
             return focus
         return None
 
     def get_history(self, session_id: str, limit: int = 10) -> list[ConversationTurn]:
         """Get recent conversation turns for a session."""
-        history = self._history.get(session_id, [])
-        return history[-limit:] if history else []
+        with self._state_lock:
+            history = self._history.get(session_id, [])
+            return list(history[-limit:]) if history else []
 
     def _update_recent_topics(
         self,
@@ -208,6 +209,16 @@ class ConversationTracker:
         related_topic_ids: list[str],
     ) -> None:
         """Update the list of recent topics for a session."""
+        with self._state_lock:
+            self._update_recent_topics_locked(session_id, primary_topic_id, related_topic_ids)
+
+    def _update_recent_topics_locked(
+        self,
+        session_id: str,
+        primary_topic_id: Optional[str],
+        related_topic_ids: list[str],
+    ) -> None:
+        """Update recent topics; caller holds ``_state_lock``."""
         if session_id not in self._recent_topics:
             self._recent_topics[session_id] = []
 
@@ -259,7 +270,8 @@ class ConversationTracker:
             return focus.primary_topic_id
 
         # Prefer most recently mentioned topic
-        recent = self._recent_topics.get(session_id, [])
+        with self._state_lock:
+            recent = list(self._recent_topics.get(session_id, []))
         for topic_id in recent:
             if topic_id in detected_topics:
                 return topic_id
@@ -269,9 +281,12 @@ class ConversationTracker:
 
     def clear_session(self, session_id: str) -> None:
         """Clear conversation state for a session."""
-        self._focus.pop(session_id, None)
-        self._history.pop(session_id, None)
-        self._recent_topics.pop(session_id, None)
+        with self._state_lock:
+            # Swap all related fields under one owner lock so a new turn cannot
+            # observe a partially cleared conversation generation.
+            self._focus.pop(session_id, None)
+            self._history.pop(session_id, None)
+            self._recent_topics.pop(session_id, None)
         logger.debug(f"Cleared conversation state for session {session_id}")
 
     def get_stats(self, session_id: str) -> dict:
