@@ -15,14 +15,16 @@ Key security constraints:
 
 import asyncio
 import logging
+import random
 import subprocess
 import time
 import tempfile
 import shutil
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
+from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Literal
 
 import yaml
 
@@ -42,48 +44,135 @@ from src.utils.atomic_write import atomic_write
 
 logger = logging.getLogger(__name__)
 
+GitOperationStatus = Literal["success", "failed", "partial"]
 
-def retry_on_network_failure(max_retries: int = 3, backoff_factor: float = 1.5):
+
+def retry_with_exponential_backoff(
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    jitter_factor: float = 0.25,
+    log_retries: bool = True,
+):
     """
-    Decorator to retry functions that fail with network errors.
+    Decorator to retry functions that fail with transient network errors using exponential backoff.
+
+    Implements exponential backoff with jitter to prevent thundering herd:
+    delay = min(base_delay * 2^attempt, max_delay)
+    jitter = delay * (random value in [-jitter_factor, +jitter_factor])
+    final_delay = delay + jitter
 
     Args:
-        max_retries: Maximum number of retry attempts
-        backoff_factor: Multiplier for exponential backoff between retries
+        max_retries: Maximum number of retry attempts (default: 3)
+        base_delay: Base delay before first retry in seconds (default: 1.0)
+        max_delay: Maximum delay cap in seconds (default: 60.0)
+        jitter_factor: Jitter as fraction of delay, ±25% by default (default: 0.25)
+        log_retries: Whether to log retry attempts (default: True)
 
-    Retries on GitNetworkError with exponential backoff.
+    Returns:
+        Decorated function that retries on transient errors with exponential backoff
     """
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            last_error = None
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
             for attempt in range(max_retries + 1):
                 try:
                     return func(*args, **kwargs)
                 except GitNetworkError as e:
-                    last_error = e
-                    if attempt < max_retries:
-                        wait_time = backoff_factor ** attempt
-                        logger.warning(
-                            f"Network failure on attempt {attempt + 1}/{max_retries + 1}, "
-                            f"retrying in {wait_time:.1f}s: {e}"
+                    # Network errors are transient - retry with backoff
+                    if attempt >= max_retries:
+                        logger.error(
+                            f"Max retries ({max_retries}) exceeded for {func.__name__}. "
+                            f"Last error: {type(e).__name__}: {e}"
                         )
-                        time.sleep(wait_time)
-                    else:
-                        logger.error(f"Max retries ({max_retries}) exceeded for network operation")
                         raise
-                except Exception as e:
-                    # Don't retry on non-network errors
+
+                    # Calculate exponential backoff delay
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+
+                    # Add jitter: ±jitter_factor of the delay
+                    jitter = delay * random.uniform(-jitter_factor, jitter_factor)
+                    final_delay = delay + jitter
+
+                    if log_retries:
+                        logger.warning(
+                            f"Transient network error in {func.__name__} on attempt "
+                            f"{attempt + 1}/{max_retries + 1}, "
+                            f"retrying in {final_delay:.2f}s "
+                            f"(base: {delay:.2f}s, jitter: {jitter:+.2f}s): "
+                            f"{type(e).__name__}: {e}"
+                        )
+
+                    time.sleep(final_delay)
+                except (GitAuthenticationError, GitConflictError) as e:
+                    # These are permanent errors - don't retry
+                    logger.error(
+                        f"Non-transient error in {func.__name__} (no retry): "
+                        f"{type(e).__name__}: {e}"
+                    )
                     raise
-            # Shouldn't reach here, but just in case
-            if last_error:
-                raise last_error
+                except Exception as e:
+                    # Unknown error - don't retry to be safe
+                    logger.error(
+                        f"Unexpected error in {func.__name__} (no retry): "
+                        f"{type(e).__name__}: {e}"
+                    )
+                    raise
+
         return wrapper
     return decorator
 
 
 @dataclass
+class GitOperationResult:
+    """Structured outcome of a GitOps operation.
+
+    ``partial`` is used when the local commit succeeded but a later operation,
+    normally the push, did not.  Keeping the commit SHA in that case lets a
+    caller recover or retry without losing track of the local change.
+
+    The ``success``, ``data``, and ``error`` accessors intentionally retain the
+    old step-result interface while callers migrate to the explicit fields.
+    """
+
+    commit_sha: str | None = None
+    branch: str | None = None
+    manifest_path: str | None = None
+    status: GitOperationStatus = "failed"
+    error: str | None = None
+    details: dict[str, Any] = dataclass_field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.status not in {"success", "failed", "partial"}:
+            raise ValueError(f"Unsupported Git operation status: {self.status}")
+
+    @property
+    def success(self) -> bool:
+        """Return whether the complete operation succeeded."""
+        return self.status == "success"
+
+    @property
+    def data(self) -> dict[str, Any]:
+        """Expose structured fields through the legacy result payload."""
+        return {
+            **self.details,
+            "commit_sha": self.commit_sha,
+            "branch": self.branch,
+            "manifest_path": self.manifest_path,
+            "status": self.status,
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the result for action/executor boundaries."""
+        return {
+            **self.data,
+            "error": self.error,
+        }
+
+
+@dataclass
 class StepResult:
-    """Standardized result from step execution."""
+    """Deprecated generic step result retained for non-GitOps imports."""
     success: bool
     data: dict[str, Any]
     error: str | None = None
@@ -129,7 +218,7 @@ class GitOpsCommitStep:
     a whitelist of allowed patterns.
 
     Returns:
-        StepResult with commit SHA, branch, and manifest path on success
+        GitOperationResult with commit SHA, branch, manifest path, and status
     """
 
     # Allowed field path prefixes for security
@@ -139,6 +228,7 @@ class GitOpsCommitStep:
         "/spec/replicas",                    # replica counts
         "/spec/template/spec/",             # other template spec fields
     ]
+    TARGET_BRANCH = "main"
 
     def __init__(
         self,
@@ -161,6 +251,25 @@ class GitOpsCommitStep:
         self.git_name = git_name
         self.timeout = timeout
 
+    def _operation_result(
+        self,
+        manifest_path: str | None,
+        status: GitOperationStatus,
+        *,
+        commit_sha: str | None = None,
+        error: str | None = None,
+        **details: Any,
+    ) -> GitOperationResult:
+        """Build a result with the common GitOps operation metadata."""
+        return GitOperationResult(
+            commit_sha=commit_sha,
+            branch=self.TARGET_BRANCH,
+            manifest_path=manifest_path or None,
+            status=status,
+            error=error,
+            details=details,
+        )
+
     async def execute(
         self,
         manifest_path: str,
@@ -168,7 +277,7 @@ class GitOpsCommitStep:
         project_cfg: dict[str, Any],
         dry_run: bool = False,
         **kwargs,
-    ) -> StepResult:
+    ) -> GitOperationResult:
         """
         Execute GitOps commit with templated field substitutions.
 
@@ -180,31 +289,31 @@ class GitOpsCommitStep:
             dry_run: If True, skip actual commit and push
 
         Returns:
-            StepResult with commit information
+            GitOperationResult with commit, branch, manifest, and status information
         """
         logger.info(f"Executing gitops_commit step for manifest '{manifest_path}'")
 
         # Validate inputs
         if not manifest_path:
-            return StepResult(
-                success=False,
-                data={},
+            return self._operation_result(
+                None,
+                "failed",
                 error="manifest_path is required",
             )
 
         if not template_fields:
-            return StepResult(
-                success=False,
-                data={"manifest_path": manifest_path},
+            return self._operation_result(
+                manifest_path,
+                "failed",
                 error="template_fields is required",
             )
 
         # Build full path to manifest
         full_manifest_path = self.declarative_config_path / manifest_path
         if not full_manifest_path.exists():
-            return StepResult(
-                success=False,
-                data={"manifest_path": manifest_path},
+            return self._operation_result(
+                manifest_path,
+                "failed",
                 error=f"Manifest file not found: {full_manifest_path}",
             )
 
@@ -213,9 +322,9 @@ class GitOpsCommitStep:
             try:
                 self._validate_declarative_config_repo()
             except (GitStateError, GitAuthenticationError, GitNetworkError, GitError) as e:
-                return StepResult(
-                    success=False,
-                    data={"manifest_path": manifest_path},
+                return self._operation_result(
+                    manifest_path,
+                    "failed",
                     error=str(e),
                 )
 
@@ -223,9 +332,10 @@ class GitOpsCommitStep:
         try:
             validated_fields = self._parse_and_validate_fields(template_fields)
         except (ValueError, RuntimeError) as e:
-            return StepResult(
-                success=False,
-                data={"manifest_path": manifest_path, "template_fields": template_fields},
+            return self._operation_result(
+                manifest_path,
+                "failed",
+                template_fields=template_fields,
                 error=f"Invalid template fields: {e}",
             )
 
@@ -233,9 +343,9 @@ class GitOpsCommitStep:
         try:
             manifest_data = self._read_manifest(full_manifest_path)
         except Exception as e:
-            return StepResult(
-                success=False,
-                data={"manifest_path": manifest_path},
+            return self._operation_result(
+                manifest_path,
+                "failed",
                 error=f"Failed to read manifest: {e}",
             )
 
@@ -243,9 +353,10 @@ class GitOpsCommitStep:
         try:
             modified_manifest = self._apply_substitutions(manifest_data, validated_fields)
         except Exception as e:
-            return StepResult(
-                success=False,
-                data={"manifest_path": manifest_path, "fields": validated_fields},
+            return self._operation_result(
+                manifest_path,
+                "failed",
+                fields=[{"path": field.path, "value": field.value} for field in validated_fields],
                 error=f"Failed to apply substitutions: {e}",
             )
 
@@ -255,23 +366,21 @@ class GitOpsCommitStep:
 
         if dry_run:
             logger.info("Dry run: skipping commit and push")
-            return StepResult(
-                success=True,
-                data={
-                    "dry_run": True,
-                    "manifest_path": manifest_path,
-                    "modifications": len(validated_fields),
-                    "preview": self._diff_manifests(manifest_data, modified_manifest),
-                },
+            return self._operation_result(
+                manifest_path,
+                "success",
+                dry_run=True,
+                modifications=len(validated_fields),
+                preview=self._diff_manifests(manifest_data, modified_manifest),
             )
 
         # Write modified manifest
         try:
             self._write_manifest(full_manifest_path, modified_manifest)
         except Exception as e:
-            return StepResult(
-                success=False,
-                data={"manifest_path": manifest_path},
+            return self._operation_result(
+                manifest_path,
+                "failed",
                 error=f"Failed to write manifest: {e}",
             )
 
@@ -281,11 +390,12 @@ class GitOpsCommitStep:
             # Backup original manifest for potential rollback
             original_manifest_backup = manifest_data
 
-            commit_sha = self._commit_changes(
+            commit_result = self._commit_changes(
                 manifest_path,
                 validated_fields,
                 project_cfg,
             )
+            commit_sha = commit_result.commit_sha
         except (GitConflictError, GitAuthenticationError, GitStateError) as e:
             # Rollback on commit failure for git-specific errors
             try:
@@ -294,9 +404,9 @@ class GitOpsCommitStep:
             except Exception as rollback_error:
                 logger.error(f"Failed to rollback changes: {rollback_error}")
 
-            return StepResult(
-                success=False,
-                data={"manifest_path": manifest_path},
+            return self._operation_result(
+                manifest_path,
+                "failed",
                 error=f"Failed to commit changes: {e}",
             )
         except Exception as e:
@@ -307,58 +417,49 @@ class GitOpsCommitStep:
             except Exception as rollback_error:
                 logger.error(f"Failed to rollback changes: {rollback_error}")
 
-            return StepResult(
-                success=False,
-                data={"manifest_path": manifest_path},
+            return self._operation_result(
+                manifest_path,
+                "failed",
                 error=f"Failed to commit changes: {e}",
             )
 
         # Push to origin
         try:
-            self._push_changes()
+            self._push_changes(manifest_path=manifest_path, commit_sha=commit_sha)
         except (GitConflictError, GitAuthenticationError) as e:
             # Don't rollback on push failures - commit is local and valid
             # User can resolve conflicts or auth issues and retry
-            return StepResult(
-                success=False,
-                data={
-                    "manifest_path": manifest_path,
-                    "commit_sha": commit_sha,
-                    "commit_locally": True,
-                },
+            return self._operation_result(
+                manifest_path,
+                "partial",
+                commit_sha=commit_sha,
+                commit_locally=True,
                 error=f"Failed to push changes: {e}",
             )
         except GitNetworkError as e:
             # Network failures might be transient
-            return StepResult(
-                success=False,
-                data={
-                    "manifest_path": manifest_path,
-                    "commit_sha": commit_sha,
-                    "commit_locally": True,
-                },
+            return self._operation_result(
+                manifest_path,
+                "partial",
+                commit_sha=commit_sha,
+                commit_locally=True,
                 error=f"Failed to push changes (network): {e}",
             )
         except Exception as e:
-            return StepResult(
-                success=False,
-                data={
-                    "manifest_path": manifest_path,
-                    "commit_sha": commit_sha,
-                },
+            return self._operation_result(
+                manifest_path,
+                "partial",
+                commit_sha=commit_sha,
                 error=f"Failed to push changes: {e}",
             )
 
         logger.info(f"gitops_commit completed: commit={commit_sha}, manifest={manifest_path}")
 
-        return StepResult(
-            success=True,
-            data={
-                "commit_sha": commit_sha,
-                "branch": "main",
-                "manifest_path": manifest_path,
-                "modifications": len(validated_fields),
-            },
+        return self._operation_result(
+            manifest_path,
+            "success",
+            commit_sha=commit_sha,
+            modifications=len(validated_fields),
         )
 
     def _validate_declarative_config_repo(self) -> None:
@@ -520,7 +621,7 @@ class GitOpsCommitStep:
         manifest_path: str,
         fields: list[TemplateField],
         project_cfg: dict[str, Any],
-    ) -> str:
+    ) -> GitOperationResult:
         """Commit changes with standard git identity."""
         try:
             # Configure git identity
@@ -607,7 +708,16 @@ class GitOpsCommitStep:
                 check=True,
             )
 
-            return result.stdout.strip()
+            commit_sha = result.stdout.strip()
+            if not commit_sha:
+                raise GitStateError("Git commit succeeded but returned no commit SHA")
+
+            return GitOperationResult(
+                commit_sha=commit_sha,
+                branch=self.TARGET_BRANCH,
+                manifest_path=manifest_path,
+                status="success",
+            )
 
         except subprocess.TimeoutExpired:
             raise GitNetworkError("Git operation timed out during commit")
@@ -640,12 +750,22 @@ class GitOpsCommitStep:
 
         return "\n".join(lines)
 
-    @retry_on_network_failure(max_retries=3, backoff_factor=1.5)
-    def _push_changes(self) -> None:
+    @retry_with_exponential_backoff(
+        max_retries=3,
+        base_delay=1.0,
+        max_delay=60.0,
+        jitter_factor=0.25,
+        log_retries=True
+    )
+    def _push_changes(
+        self,
+        manifest_path: str | None = None,
+        commit_sha: str | None = None,
+    ) -> GitOperationResult:
         """Push changes to origin main with retry logic for network failures."""
         # Push to origin
         result = subprocess.run(
-            ["git", "-C", str(self.declarative_config_path), "push", "origin", "main"],
+            ["git", "-C", str(self.declarative_config_path), "push", "origin", self.TARGET_BRANCH],
             capture_output=True,
             text=True,
             timeout=30,
@@ -697,7 +817,14 @@ class GitOpsCommitStep:
             else:
                 raise GitError(f"git push failed: {result.stderr.strip()}")
 
-    async def rollback(self, manifest_path: str, commit_sha: str) -> StepResult:
+        return GitOperationResult(
+            commit_sha=commit_sha,
+            branch=self.TARGET_BRANCH,
+            manifest_path=manifest_path,
+            status="success",
+        )
+
+    async def rollback(self, manifest_path: str, commit_sha: str) -> GitOperationResult:
         """
         Rollback a commit by atomically restoring its parent manifest.
 
@@ -706,7 +833,7 @@ class GitOpsCommitStep:
             commit_sha: Commit SHA to revert
 
         Returns:
-            StepResult with rollback information
+            GitOperationResult with rollback information
         """
         logger.info(f"Rolling back commit {commit_sha} for {manifest_path}")
 
@@ -730,6 +857,8 @@ class GitOpsCommitStep:
             )
             atomic_write(manifest_file, original_content)
 
+        revert_committed = False
+
         try:
             if original_exists:
                 original_content = manifest_file.read_text()
@@ -752,9 +881,10 @@ class GitOpsCommitStep:
             )
 
             if result.returncode != 0:
-                return StepResult(
-                    success=False,
-                    data={"commit_sha": commit_sha},
+                return self._operation_result(
+                    manifest_path,
+                    "failed",
+                    commit_sha=commit_sha,
                     error=f"git revert failed while reading parent: {result.stderr}",
                 )
 
@@ -784,9 +914,10 @@ class GitOpsCommitStep:
                         manifest_file,
                         restore_error,
                     )
-                return StepResult(
-                    success=False,
-                    data={"commit_sha": commit_sha},
+                return self._operation_result(
+                    manifest_path,
+                    "failed",
+                    commit_sha=commit_sha,
                     error=f"Rollback staging failed: {result.stderr}",
                 )
 
@@ -826,26 +957,29 @@ class GitOpsCommitStep:
                         manifest_file,
                         restore_error,
                     )
-                return StepResult(
-                    success=False,
-                    data={"commit_sha": commit_sha},
+                return self._operation_result(
+                    manifest_path,
+                    "failed",
+                    commit_sha=commit_sha,
                     error=f"Revert commit failed: {result.stderr}",
                 )
 
-            # Push the revert
-            self._push_changes()
+            revert_committed = True
 
-            return StepResult(
-                success=True,
-                data={
-                    "reverted_commit": commit_sha,
-                    "manifest_path": manifest_path,
-                },
+            # Push the revert
+            self._push_changes(manifest_path=manifest_path, commit_sha=commit_sha)
+
+            return self._operation_result(
+                manifest_path,
+                "success",
+                commit_sha=commit_sha,
+                reverted_commit=commit_sha,
             )
 
         except Exception as e:
-            return StepResult(
-                success=False,
-                data={"commit_sha": commit_sha},
+            return self._operation_result(
+                manifest_path,
+                "partial" if revert_committed else "failed",
+                commit_sha=commit_sha,
                 error=f"Rollback failed: {e}",
             )

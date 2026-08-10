@@ -21,7 +21,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
-from .gitops import GitOpsCommitStep, StepResult
+from .gitops import GitOperationResult, GitOperationStatus, GitOpsCommitStep, StepResult
 from .read import CIStatusStep, ImageTagStep, PodStatusStep
 
 __all__ = [
@@ -29,6 +29,8 @@ __all__ = [
     "ImageTagStep",
     "PodStatusStep",
     "GitOpsCommitStep",
+    "GitOperationResult",
+    "GitOperationStatus",
     "StepResult",
 ]
 
@@ -475,15 +477,9 @@ async def execute_gitops_commit_step(
         dry_run: If True, skip actual commit and push
 
     Returns:
-        Dict with commit information
+        Serialized GitOperationResult with commit, branch, manifest, and status
     """
     logger.info(f"Executing gitops_commit step for project '{project_slug}'")
-
-    if not manifest_path:
-        raise ValueError("manifest_path is required for gitops_commit step")
-
-    if not template_fields:
-        raise ValueError("template_fields is required for gitops_commit step")
 
     # Initialize the GitOps commit step
     step = GitOpsCommitStep()
@@ -496,12 +492,8 @@ async def execute_gitops_commit_step(
         dry_run=dry_run,
     )
 
-    # Convert StepResult to dict format
-    return {
-        "success": result.success,
-        "data": result.data,
-        "error": result.error,
-    }
+    # Return the structured GitOperationResult at the executor boundary.
+    return result.to_dict()
 
 
 async def execute_argocd_sync_status_step(
