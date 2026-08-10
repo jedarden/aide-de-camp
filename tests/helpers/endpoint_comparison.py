@@ -18,10 +18,11 @@ Usage:
               f"test returned {len(test_result['classifications'])} classifications")
 """
 import asyncio
-import uuid
-from typing import Dict, Any, Tuple, Optional, List
-from httpx import AsyncClient, ASGITransport, HTTPError
 import logging
+import uuid
+from typing import Any, Dict, Optional, Tuple
+
+from httpx import ASGITransport, AsyncClient, HTTPError
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +154,10 @@ async def _call_test_endpoint(
     """
     try:
         response = await client.post(
-            "/api/v1/test/intent-classify",
+            # The test router is mounted at /api/v1/test and the route itself
+            # is /test/intent-classify, so the fully mounted path contains
+            # both segments.
+            "/api/v1/test/test/intent-classify",
             json={"utterance": utterance},
             timeout=timeout
         )
@@ -214,7 +218,17 @@ async def _call_dispatch_endpoint(
                 f"Dispatch endpoint returned status {response.status_code}: {response.text}"
             )
 
-        data = response.json()
+        response_data = response.json()
+        # DispatchResponse wraps the dispatch details in ``data``.  Older
+        # callers of this helper consume the details directly, so normalize
+        # the envelope at the utility boundary.
+        data = response_data.get("data", response_data)
+        if isinstance(data, dict) and data is not response_data:
+            data = dict(data)
+            if "message" not in data and response_data.get("message") is not None:
+                data["message"] = response_data["message"]
+            if "success" not in data and response_data.get("success") is not None:
+                data["success"] = response_data["success"]
         logger.info(f"[DISPATCH ENDPOINT] Dispatched '{utterance[:50]}...' -> "
                     f"{data.get('intent_count', 0)} intent(s)")
 
@@ -283,6 +297,7 @@ def compare_intent_types(
         }
     """
     import aiosqlite
+
     from src.session.store import get_store
 
     # Get test intent types from response
@@ -375,7 +390,7 @@ def format_comparison_summary(
     if count_comparison["match"]:
         lines.append(f"✅ Count Match: {count_comparison['dispatch_count']} intents/classifications")
     else:
-        lines.append(f"❌ Count Mismatch:")
+        lines.append("❌ Count Mismatch:")
         lines.append(f"   Dispatch: {count_comparison['dispatch_count']}")
         lines.append(f"   Test: {count_comparison['test_count']}")
         lines.append(f"   Difference: {count_comparison['difference']}")
@@ -385,7 +400,7 @@ def format_comparison_summary(
         if intent_comparison["match"]:
             lines.append(f"✅ Intent Types Match: {intent_comparison['test_intent_types']}")
         else:
-            lines.append(f"❌ Intent Types Differ:")
+            lines.append("❌ Intent Types Differ:")
             lines.append(f"   Dispatch: {intent_comparison['dispatch_intent_types']}")
             lines.append(f"   Test: {intent_comparison['test_intent_types']}")
             for diff in intent_comparison.get("differences", []):
