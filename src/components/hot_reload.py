@@ -12,17 +12,15 @@ Enhanced with robust edge case handling:
 - Graceful degradation under error conditions
 """
 
-import os
-import time
-import logging
-from pathlib import Path
-from typing import Dict, Any, Optional, Callable
-from dataclasses import dataclass
-import yaml
-import threading
 import json
+import logging
+import threading
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
 
-from ..utils.atomic_write import atomic_write
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +121,8 @@ class HotReloadManager:
     """
 
     CHECK_INTERVAL = 1.0  # Seconds between mtime checks
-    MAX_RETRIES = 3  # Maximum retry attempts for transient failures
-    RETRY_DELAY = 0.1  # Seconds between retries
+    MAX_RETRIES = 3  # Retries after the initial attempt (four attempts total)
+    RETRY_DELAY = 0.1  # Initial exponential-backoff delay in seconds
     FILE_OPERATION_TIMEOUT = 5.0  # Seconds timeout for file operations
 
     def __init__(self):
@@ -182,7 +180,7 @@ class HotReloadManager:
         """
         last_error = None
 
-        for attempt in range(self.MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES + 1):
             try:
                 with open(path, 'r') as f:
                     content = f.read()
@@ -192,33 +190,38 @@ class HotReloadManager:
                     return content
             except PermissionError as e:
                 last_error = e
-                if attempt < self.MAX_RETRIES - 1:
+                if attempt < self.MAX_RETRIES:
                     logger.warning(
-                        f"Transient permission error during {operation} (attempt {attempt + 1}/{self.MAX_RETRIES}): {e}"
+                        f"Transient permission error during {operation} "
+                        f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (attempt + 1))
+                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
                 else:
                     # Raise custom permission error with actionable guidance
-                    logger.error(f"Permission denied after {self.MAX_RETRIES} retries for {path}")
+                    logger.error(
+                        f"Permission denied after {self.MAX_RETRIES} retries for {path}"
+                    )
                     raise PermissionDeniedError(path, operation) from e
             except FileNotFoundError as e:
                 last_error = e
-                if attempt < self.MAX_RETRIES - 1:
+                if attempt < self.MAX_RETRIES:
                     logger.warning(
-                        f"Transient not found error during {operation} (attempt {attempt + 1}/{self.MAX_RETRIES}): {e}"
+                        f"Transient not found error during {operation} "
+                        f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (attempt + 1))
+                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
                 else:
                     # Raise custom not found error with actionable guidance
                     logger.error(f"File not found after {self.MAX_RETRIES} retries for {path}")
                     raise RegistryNotFoundError(path) from e
             except OSError as e:
                 last_error = e
-                if attempt < self.MAX_RETRIES - 1:
+                if attempt < self.MAX_RETRIES:
                     logger.warning(
-                        f"Transient OS error during {operation} (attempt {attempt + 1}/{self.MAX_RETRIES}): {e}"
+                        f"Transient OS error during {operation} "
+                        f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (attempt + 1))
+                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
                 else:
                     # Final attempt failed - enhance error message
                     error_type = type(e).__name__
@@ -247,36 +250,39 @@ class HotReloadManager:
             OSError: For other OS-level errors after retries
         """
         last_error = None
-        for attempt in range(self.MAX_RETRIES):
+        for attempt in range(self.MAX_RETRIES + 1):
             try:
                 return path.stat().st_mtime
             except PermissionError as e:
                 last_error = e
-                if attempt < self.MAX_RETRIES - 1:
+                if attempt < self.MAX_RETRIES:
                     logger.warning(
-                        f"Transient permission error getting mtime (attempt {attempt + 1}/{self.MAX_RETRIES}): {e}"
+                        f"Transient permission error getting mtime "
+                        f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (attempt + 1))
+                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
                 else:
                     logger.error(f"Permission denied getting mtime for {path}")
                     raise PermissionDeniedError(path, "get file modification time") from e
             except FileNotFoundError as e:
                 last_error = e
-                if attempt < self.MAX_RETRIES - 1:
+                if attempt < self.MAX_RETRIES:
                     logger.warning(
-                        f"Transient not found error getting mtime (attempt {attempt + 1}/{self.MAX_RETRIES}): {e}"
+                        f"Transient not found error getting mtime "
+                        f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (attempt + 1))
+                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
                 else:
                     logger.error(f"File not found getting mtime for {path}")
                     raise RegistryNotFoundError(path) from e
             except OSError as e:
                 last_error = e
-                if attempt < self.MAX_RETRIES - 1:
+                if attempt < self.MAX_RETRIES:
                     logger.warning(
-                        f"Transient OS error getting mtime (attempt {attempt + 1}/{self.MAX_RETRIES}): {e}"
+                        f"Transient OS error getting mtime "
+                        f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (attempt + 1))
+                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
                 else:
                     raise
 
@@ -550,12 +556,20 @@ class HotReloadManager:
 
             artifact = self._artifacts[name]
             try:
-                with open(artifact.path) as f:
-                    new_content = f.read()
-                new_mtime = artifact.path.stat().st_mtime
-            except PermissionError as e:
-                logger.error(f"Permission denied during force reload of {artifact.path}")
-                raise PermissionDeniedError(artifact.path, f"force_reload('{name}')") from e
+                # Force reload uses the same retrying primitives as the
+                # throttled path.  Atomic writers may briefly replace a file,
+                # so a transient read/stat failure must not publish a partial
+                # artifact or discard the last known-good snapshot.
+                new_content = self._read_file_with_retry(
+                    artifact.path,
+                    f"force_reload('{name}')",
+                )
+                new_mtime = self._get_mtime_with_retry(artifact.path)
+            except (PermissionDeniedError, RegistryNotFoundError):
+                raise
+            except OSError as e:
+                logger.error(f"File error during force reload of {artifact.path}: {e}")
+                raise
 
             suffix = artifact.path.suffix.lower()
             parser = self._parsers.get(suffix)
@@ -594,20 +608,30 @@ class HotReloadManager:
 
 # Singleton instance for the application
 _reload_manager: Optional[HotReloadManager] = None
+_reload_manager_lock = threading.Lock()
 
 
 def get_reload_manager() -> HotReloadManager:
-    """Get or create the hot-reload manager singleton."""
+    """Get or create the hot-reload manager singleton.
+
+    Initialization is serialized because application startup, test fixtures,
+    and worker threads can request the singleton concurrently.  The manager's
+    own RLock protects artifact reads after construction.
+    """
     global _reload_manager
-    if _reload_manager is None:
-        _reload_manager = HotReloadManager()
-        _reload_manager.register_prompt('router', 'prompts/router.md')
-        _reload_manager.register_prompt('synthesize', 'prompts/synthesize.md')
-        _reload_manager.register_prompt('voice', 'prompts/voice.md')
-        _reload_manager.register_prompt('urgency', 'prompts/urgency.md')
-        _reload_manager.register_prompt('fetch_status', 'prompts/fetch/status.md')
-        _reload_manager.register_prompt('fetch_action', 'prompts/fetch/action.md')
-        _reload_manager.register_config('registry', 'config/registry.yaml')
-        _reload_manager.register_config('monitoring', 'config/monitoring.yaml')
-        _reload_manager.register_config('exceptions', 'config/exceptions.yaml')
-    return _reload_manager
+    with _reload_manager_lock:
+        if _reload_manager is None:
+            manager = HotReloadManager()
+            manager.register_prompt('router', 'prompts/router.md')
+            manager.register_prompt('synthesize', 'prompts/synthesize.md')
+            manager.register_prompt('voice', 'prompts/voice.md')
+            manager.register_prompt('urgency', 'prompts/urgency.md')
+            manager.register_prompt('fetch_status', 'prompts/fetch/status.md')
+            manager.register_prompt('fetch_action', 'prompts/fetch/action.md')
+            manager.register_config('registry', 'config/registry.yaml')
+            manager.register_config('monitoring', 'config/monitoring.yaml')
+            manager.register_config('exceptions', 'config/exceptions.yaml')
+            # Publish only after every built-in artifact is registered.  A
+            # failed initialization cannot expose a half-populated manager.
+            _reload_manager = manager
+        return _reload_manager

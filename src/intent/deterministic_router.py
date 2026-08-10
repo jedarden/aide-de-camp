@@ -14,13 +14,11 @@ Performance: <5ms for fast-path hits vs ~2,600ms for LLM calls (500× faster).
 """
 import re
 from dataclasses import dataclass
-from enum import Enum
 from logging import getLogger
 from typing import Optional
 
 from ..fetch.commands import IntentType as FetchIntentType
 from ..registry import get_registry
-
 
 logger = getLogger(__name__)
 
@@ -138,15 +136,16 @@ class DeterministicRouter:
         self._total_calls = 0
         self._fast_path_hits = 0
 
-    async def _get_registry(self):
+    def _get_registry(self):
         """
         Get or load the project registry.
 
-        ASYNCIO LOCKING: Protected by async lock in get_registry() to ensure safe
-        concurrent access to registry cache.
+        CONCURRENT ACCESS: The registry owns a process-wide reentrant lock, so
+        synchronous fast-path routing can safely share its snapshot with async
+        callers and worker threads.
         """
         if self.registry is None:
-            self.registry = await get_registry()
+            self.registry = get_registry()
         return self.registry
 
     def _detect_intent_type(self, utterance: str, lookup_kind: str | None = None) -> FetchIntentType:

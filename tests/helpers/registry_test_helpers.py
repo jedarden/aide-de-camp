@@ -8,6 +8,8 @@ ENHANCED WITH ATOMIC OPERATIONS: All file operations use centralized atomic writ
 to prevent corruption during concurrent test execution.
 """
 
+import threading
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -18,6 +20,7 @@ from src.utils.atomic_write import atomic_write
 # Registry path is defined in src/registry.py but we import it here
 # to avoid circular dependencies in test code
 REGISTRY_PATH = Path(__file__).parent.parent.parent / "config" / "registry.yaml"
+_registry_cleanup_lock = threading.RLock()
 
 
 def backup_registry() -> Path:
@@ -35,9 +38,9 @@ def backup_registry() -> Path:
     if not REGISTRY_PATH.exists():
         raise FileNotFoundError(f"Registry file not found: {REGISTRY_PATH}")
 
-    # Create backup with timestamp to avoid collisions
-    import time
-    backup_path = REGISTRY_PATH.parent / f"registry.yaml.backup.{int(time.time())}"
+    # Include a UUID rather than a timestamp so simultaneous test owners never
+    # publish to the same backup path.
+    backup_path = REGISTRY_PATH.parent / f"registry.yaml.backup.{uuid.uuid4().hex}"
 
     # Publish the complete backup atomically so cleanup never reads a partial copy.
     original_content = REGISTRY_PATH.read_text()
@@ -61,17 +64,19 @@ def restore_registry(backup_path: Path) -> None:
         >>> # ... modify registry.yaml ...
         >>> restore_registry(backup_path)
     """
-    if not backup_path.exists():
-        raise FileNotFoundError(f"Backup file not found: {backup_path}")
-
     if not backup_path.name.startswith("registry.yaml.backup."):
         raise ValueError(
             f"Invalid backup file: {backup_path.name}. "
             "Only files created by backup_registry() should be used."
         )
 
-    # Use atomic write for safe restoration
-    backup_content = backup_path.read_text()
+    # Read the complete backup and publish restoration with os.replace via
+    # atomic_write.  Avoid an exists-then-read check: another cleanup owner can
+    # remove the backup between those two operations.
+    try:
+        backup_content = backup_path.read_text()
+    except FileNotFoundError as error:
+        raise FileNotFoundError(f"Backup file not found: {backup_path}") from error
     atomic_write(REGISTRY_PATH, backup_content)
 
 
@@ -90,8 +95,9 @@ def cleanup_backup(backup_path: Path) -> None:
         >>>     restore_registry(backup_path)
         >>>     cleanup_backup(backup_path)
     """
-    if backup_path.exists():
-        backup_path.unlink()
+    # missing_ok makes cleanup idempotent when another owner wins the unlink
+    # race.  The unlink itself is the atomic cleanup operation.
+    backup_path.unlink(missing_ok=True)
 
 
 class RegistryModificationContext:
@@ -265,15 +271,13 @@ def setup_test_registry() -> None:
     if not REGISTRY_PATH.exists():
         raise FileNotFoundError(f"Registry file not found: {REGISTRY_PATH}")
 
-    # Create backup using an atomic write operation
-    import time
-    backup_path = REGISTRY_PATH.parent / f"registry.yaml.backup.{int(time.time())}"
-
-    # Publish the complete backup before exposing it to cleanup. If this write
-    # fails, a later cleanup call will not treat a missing backup as valid state.
-    original_content = REGISTRY_PATH.read_text()
-    atomic_write(backup_path, original_content)
-    _test_registry_backup_path = backup_path
+    with _registry_cleanup_lock:
+        # Create backup using an atomic write operation.  Publish the complete
+        # backup before exposing it to cleanup.
+        backup_path = REGISTRY_PATH.parent / f"registry.yaml.backup.{uuid.uuid4().hex}"
+        original_content = REGISTRY_PATH.read_text()
+        atomic_write(backup_path, original_content)
+        _test_registry_backup_path = backup_path
 
 
 def cleanup_test_registry() -> None:
@@ -299,17 +303,23 @@ def cleanup_test_registry() -> None:
     """
     global _test_registry_backup_path
 
-    if _test_registry_backup_path is None:
-        # No backup was created, nothing to cleanup
-        return
+    with _registry_cleanup_lock:
+        if _test_registry_backup_path is None:
+            # No backup was created, nothing to cleanup
+            return
 
-    if not _test_registry_backup_path.exists():
-        raise FileNotFoundError(f"Backup file not found: {_test_registry_backup_path}")
+        backup_path = _test_registry_backup_path
+        try:
+            backup_content = backup_path.read_text()
+        except FileNotFoundError as error:
+            raise FileNotFoundError(f"Backup file not found: {backup_path}") from error
 
-    # Restore original registry using atomic write
-    backup_content = _test_registry_backup_path.read_text()
-    atomic_write(REGISTRY_PATH, backup_content)
+        # Restore original registry using atomic write.  If publishing fails,
+        # ownership remains recorded so cleanup can be retried safely.
+        atomic_write(REGISTRY_PATH, backup_content)
 
-    # Clean up backup file
-    _test_registry_backup_path.unlink()
-    _test_registry_backup_path = None
+        # Cleanup is idempotent if another owner removed the backup.  A real
+        # permission/filesystem error still leaves ownership recorded for a
+        # later retry, preserving the existing failure semantics.
+        backup_path.unlink(missing_ok=True)
+        _test_registry_backup_path = None
