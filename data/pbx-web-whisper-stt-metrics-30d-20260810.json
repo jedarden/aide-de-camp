@@ -1,0 +1,1508 @@
+{
+  "schema_version": "1.0",
+  "dataset_type": "pbx_web_whisper_stt_observability_metrics",
+  "collection_metadata": {
+    "generated_at": "2026-08-10T14:15:57.400Z",
+    "observability_backends": {
+      "prometheus": "http://127.0.0.1:19090",
+      "victorialogs": "http://127.0.0.1:19428"
+    },
+    "requested_window": {
+      "start": "2026-07-11T14:15:36.435Z",
+      "end": "2026-08-10T14:15:36.435Z",
+      "duration_days": 30,
+      "step_seconds": 3600
+    },
+    "prometheus_server_time": "2026-08-10T14:15:36.435Z",
+    "prometheus_retention_time": "10d",
+    "services": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "availability_summary": {
+    "error_rates": "available from VictoriaLogs aggregate queries and Prometheus restart/OOM/readiness metrics, with backend retention gaps",
+    "latency": "pbx-web application processing samples and Kubernetes health-probe latency available; whisper-stt transcription latency unavailable",
+    "cpu_memory_disk_network": "Prometheus metrics available only for the retained approximately 10-day portion of the requested 30-day window",
+    "deployment_alignment": "deployment events loaded and compared with requested and observed metric windows; causal joins are limited by retention"
+  },
+  "services": {
+    "pbx-web": {
+      "error_rates": {
+        "victorialogs": {
+          "total_log_lines": {
+            "query": "{namespace=\"pbx-web\"} | stats count() as total",
+            "field": "total",
+            "value": 1006771
+          },
+          "error_log_lines": {
+            "query": "{namespace=\"pbx-web\"} | filter _msg:~\"(?i)(error|exception|traceback|failed|panic|oom|killed)\" | stats count() as errors",
+            "field": "errors",
+            "value": 272
+          },
+          "http_requests": {
+            "query": "{namespace=\"pbx-web\",kubernetes.container_name=\"nginx\"} | filter _msg:~\"HTTP/1.1\" | stats count() as http_requests",
+            "field": "http_requests",
+            "value": 340521
+          },
+          "http_2xx": {
+            "query": "{namespace=\"pbx-web\",kubernetes.container_name=\"nginx\"} | filter _msg:~\"HTTP/1.1\\\" 2[0-9][0-9]\" | stats count() as http_2xx",
+            "field": "http_2xx",
+            "value": 340042
+          },
+          "http_4xx": {
+            "query": "{namespace=\"pbx-web\",kubernetes.container_name=\"nginx\"} | filter _msg:~\"HTTP/1.1\\\" 4[0-9][0-9]\" | stats count() as http_4xx",
+            "field": "http_4xx",
+            "value": 312
+          },
+          "http_5xx": {
+            "query": "{namespace=\"pbx-web\",kubernetes.container_name=\"nginx\"} | filter _msg:~\"HTTP/1.1\\\" 5[0-9][0-9]\" | stats count() as http_5xx",
+            "field": "http_5xx",
+            "value": 1
+          },
+          "explicit_latency_fields": {
+            "query": "{namespace=\"pbx-web\"} | filter _msg:~\"(?i)(request_time|upstream_response_time|duration[=:]|latency[=:]|elapsed[=:])\" | stats count() as matches",
+            "field": "matches",
+            "value": 0
+          },
+          "finished_in_lines": {
+            "query": "{namespace=\"pbx-web\"} | filter _msg:~\"Finished in\" | stats count() as total",
+            "field": "total",
+            "value": 175
+          },
+          "coverage": {
+            "query": "{namespace=\"pbx-web\"} | stats min(_time) as first, max(_time) as last, count() as total",
+            "field": "total",
+            "value": 1006771
+          }
+        },
+        "http_error_rate_denominator": "HTTP request log lines for nginx (pbx-web) or the service access log (whisper-stt)",
+        "http_4xx_rate": 0.0009162430510893601,
+        "http_5xx_rate": 2.9366764457992313e-06,
+        "error_log_line_rate": 0.00027017067436388214,
+        "prometheus": {
+          "container_restart_hourly_increase": {
+            "query": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"pbx-web\",container!=\"POD\"}[1h]))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 0,
+            "sum_of_hourly_values": 0.0,
+            "max_hourly_value": 0.0,
+            "min_value": 0.0
+          },
+          "oom_event_hourly_increase": {
+            "query": "sum(increase(container_oom_events_total{namespace=\"pbx-web\",container!=\"\",image!=\"\"}[1h]))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 0,
+            "sum_of_hourly_values": 0.0,
+            "max_hourly_value": 0.0,
+            "min_value": 0.0
+          },
+          "not_ready_pod_count": {
+            "query": "sum(kube_pod_status_ready{namespace=\"pbx-web\",condition=\"false\"})",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 0,
+            "sum_of_hourly_values": 0.0,
+            "max_hourly_value": 0.0,
+            "min_value": 0.0
+          }
+        }
+      },
+      "latency": {
+        "application_processing": {
+          "source": "VictoriaLogs _msg matching 'Finished in N seconds'",
+          "statistics": {
+            "count": 175,
+            "unit": "seconds",
+            "min": 1.384,
+            "p50": 1.758,
+            "p95": 3.5635,
+            "p99": 5.941519999999994,
+            "max": 10.17,
+            "mean": 1.9575028571428572
+          },
+          "first_sample": "2026-07-13T16:47:09.444831401Z",
+          "last_sample": "2026-08-08T20:13:16.346121501Z",
+          "observed_calendar_days": [
+            "2026-07-13",
+            "2026-07-14",
+            "2026-07-15",
+            "2026-07-17",
+            "2026-07-28",
+            "2026-07-29",
+            "2026-07-30",
+            "2026-07-31",
+            "2026-08-04",
+            "2026-08-05",
+            "2026-08-06",
+            "2026-08-07",
+            "2026-08-08"
+          ],
+          "coverage_days_with_samples": 13
+        },
+        "health_probe": {
+          "p50": {
+            "query": "histogram_quantile(0.5, sum by (le) (rate(prober_probe_duration_seconds_bucket{namespace=\"pbx-web\"}[5m])))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 243,
+            "sum_of_hourly_values": 0.608372228,
+            "max_hourly_value": 0.0026164817338657233,
+            "min_value": 0.0025,
+            "hourly_quantile_statistics": {
+              "count": 243,
+              "unit": "seconds",
+              "min": 0.0025,
+              "p50": 0.0025,
+              "p95": 0.002517482517482517,
+              "p99": 0.002545639796224153,
+              "max": 0.0026164817338657233,
+              "mean": 0.002503589416010664
+            }
+          },
+          "p95": {
+            "query": "histogram_quantile(0.95, sum by (le) (rate(prober_probe_duration_seconds_bucket{namespace=\"pbx-web\"}[5m])))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 243,
+            "sum_of_hourly_values": 1.155907233,
+            "max_hourly_value": 0.0049713152943448745,
+            "min_value": 0.004749999999999999,
+            "hourly_quantile_statistics": {
+              "count": 243,
+              "unit": "seconds",
+              "min": 0.004749999999999999,
+              "p50": 0.004749999999999999,
+              "p95": 0.004783216783216782,
+              "p99": 0.004836715612825891,
+              "max": 0.0049713152943448745,
+              "mean": 0.00475681989042026
+            }
+          },
+          "p99": {
+            "query": "histogram_quantile(0.99, sum by (le) (rate(prober_probe_duration_seconds_bucket{namespace=\"pbx-web\"}[5m])))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 243,
+            "sum_of_hourly_values": 1.244839134,
+            "max_hourly_value": 0.018400000000000034,
+            "min_value": 0.00495,
+            "hourly_quantile_statistics": {
+              "count": 243,
+              "unit": "seconds",
+              "min": 0.00495,
+              "p50": 0.00495,
+              "p95": 0.004984615384615385,
+              "p99": 0.012387820714857379,
+              "max": 0.018400000000000034,
+              "mean": 0.005122794788354624
+            }
+          }
+        },
+        "log_latency_field_availability": {
+          "explicit_request_or_processing_fields": 0,
+          "finished_in_lines": 175
+        }
+      },
+      "resources": {
+        "cpu_memory": {
+          "path": "data/resource_metrics/resource-metrics-30d-20260810T140755Z.json",
+          "status": "loaded",
+          "source_window": {
+            "requested_window_start": "2026-07-11T14:07:53.151000Z",
+            "requested_window_end": "2026-08-10T14:07:53.151000Z",
+            "requested_window_days": 30,
+            "step_seconds": 3600,
+            "prometheus_server_time": "2026-08-10T14:07:53.151000Z",
+            "prometheus_retention_time": "10d"
+          },
+          "metrics": {
+            "cpu_usage": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:53.151000Z",
+              "last_sample": "2026-08-10T14:07:53.151000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:53.151000Z",
+                  "start": "2026-07-11T14:07:53.151000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "memory_working_set": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:53.151000Z",
+              "last_sample": "2026-08-10T14:07:53.151000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:53.151000Z",
+                  "start": "2026-07-11T14:07:53.151000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            }
+          }
+        },
+        "disk_network": {
+          "path": "data/resource_metrics/disk-network-storage-metrics-30d-20260810T140808Z.json",
+          "status": "loaded",
+          "source_window": {
+            "requested_window_start": "2026-07-11T14:07:55.737000Z",
+            "requested_window_end": "2026-08-10T14:07:55.737000Z",
+            "requested_window_days": 30,
+            "step_seconds": 3600,
+            "prometheus_server_time": "2026-08-10T14:07:55.737000Z",
+            "prometheus_retention_time": "10d"
+          },
+          "metrics": {
+            "disk_read_bytes_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "disk_read_operations_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "disk_write_bytes_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "disk_write_operations_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "network_receive_bytes_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "network_receive_bytes_total": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "network_transmit_bytes_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "network_transmit_bytes_total": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 5,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "storage_available_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 0,
+              "series_count": 0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_coverage_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                },
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "trailing_query_gap"
+                }
+              ]
+            },
+            "storage_capacity_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 0,
+              "series_count": 0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_coverage_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                },
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "trailing_query_gap"
+                }
+              ]
+            },
+            "storage_filesystem_limit_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 0,
+              "series_count": 0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_coverage_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                },
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "trailing_query_gap"
+                }
+              ]
+            },
+            "storage_filesystem_usage_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 0,
+              "series_count": 0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_coverage_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                },
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "trailing_query_gap"
+                }
+              ]
+            },
+            "storage_pvc_info": {
+              "status": "incomplete",
+              "observed_timestamp_points": 0,
+              "series_count": 0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_coverage_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                },
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "trailing_query_gap"
+                }
+              ]
+            },
+            "storage_requested_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 0,
+              "series_count": 0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_coverage_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                },
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "trailing_query_gap"
+                }
+              ]
+            },
+            "storage_used_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 0,
+              "series_count": 0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_coverage_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                },
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "trailing_query_gap"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "log_observed_window": {
+        "start": "2026-07-13T00:00:03.426Z",
+        "end": "2026-08-10T14:15:33.102Z"
+      }
+    },
+    "whisper-stt": {
+      "error_rates": {
+        "victorialogs": {
+          "total_log_lines": {
+            "query": "{namespace=\"whisper-stt\"} | stats count() as total",
+            "field": "total",
+            "value": 109949
+          },
+          "error_log_lines": {
+            "query": "{namespace=\"whisper-stt\"} | filter _msg:~\"(?i)(error|exception|traceback|failed|panic|oom|killed)\" | stats count() as errors",
+            "field": "errors",
+            "value": 0
+          },
+          "http_requests": {
+            "query": "{namespace=\"whisper-stt\"} | filter _msg:~\"HTTP/1.1\" | stats count() as http_requests",
+            "field": "http_requests",
+            "value": 109949
+          },
+          "http_2xx": {
+            "query": "{namespace=\"whisper-stt\"} | filter _msg:~\"HTTP/1.1\\\" 2[0-9][0-9]\" | stats count() as http_2xx",
+            "field": "http_2xx",
+            "value": 109949
+          },
+          "http_4xx": {
+            "query": "{namespace=\"whisper-stt\"} | filter _msg:~\"HTTP/1.1\\\" 4[0-9][0-9]\" | stats count() as http_4xx",
+            "field": "http_4xx",
+            "value": 0
+          },
+          "http_5xx": {
+            "query": "{namespace=\"whisper-stt\"} | filter _msg:~\"HTTP/1.1\\\" 5[0-9][0-9]\" | stats count() as http_5xx",
+            "field": "http_5xx",
+            "value": 0
+          },
+          "explicit_latency_fields": {
+            "query": "{namespace=\"whisper-stt\"} | filter _msg:~\"(?i)(request_time|upstream_response_time|duration[=:]|latency[=:]|elapsed[=:])\" | stats count() as matches",
+            "field": "matches",
+            "value": 0
+          },
+          "finished_in_lines": {
+            "query": "{namespace=\"whisper-stt\"} | filter _msg:~\"Finished in\" | stats count() as total",
+            "field": "total",
+            "value": 0
+          },
+          "coverage": {
+            "query": "{namespace=\"whisper-stt\"} | stats min(_time) as first, max(_time) as last, count() as total",
+            "field": "total",
+            "value": 109949
+          }
+        },
+        "http_error_rate_denominator": "HTTP request log lines for nginx (pbx-web) or the service access log (whisper-stt)",
+        "http_4xx_rate": 0.0,
+        "http_5xx_rate": 0.0,
+        "error_log_line_rate": 0.0,
+        "prometheus": {
+          "container_restart_hourly_increase": {
+            "query": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"whisper-stt\",container!=\"POD\"}[1h]))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 1,
+            "sum_of_hourly_values": 1.006493506,
+            "max_hourly_value": 1.0064935064935066,
+            "min_value": 0.0
+          },
+          "oom_event_hourly_increase": {
+            "query": "sum(increase(container_oom_events_total{namespace=\"whisper-stt\",container!=\"\",image!=\"\"}[1h]))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 0,
+            "sum_of_hourly_values": 0.0,
+            "max_hourly_value": 0.0,
+            "min_value": 0.0
+          },
+          "not_ready_pod_count": {
+            "query": "sum(kube_pod_status_ready{namespace=\"whisper-stt\",condition=\"false\"})",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 132,
+            "sum_of_hourly_values": 132.0,
+            "max_hourly_value": 1.0,
+            "min_value": 0.0
+          }
+        }
+      },
+      "latency": {
+        "application_processing": {
+          "source": "VictoriaLogs _msg matching 'Finished in N seconds'",
+          "statistics": {
+            "count": 0,
+            "unit": "seconds",
+            "min": null,
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "max": null,
+            "mean": null
+          },
+          "first_sample": null,
+          "last_sample": null,
+          "observed_calendar_days": [],
+          "coverage_days_with_samples": 0
+        },
+        "health_probe": {
+          "p50": {
+            "query": "histogram_quantile(0.5, sum by (le) (rate(prober_probe_duration_seconds_bucket{namespace=\"whisper-stt\"}[5m])))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 243,
+            "sum_of_hourly_values": 0.607747485,
+            "max_hourly_value": 0.0025714285714285717,
+            "min_value": 0.0025,
+            "hourly_quantile_statistics": {
+              "count": 243,
+              "unit": "seconds",
+              "min": 0.0025,
+              "p50": 0.0025,
+              "p95": 0.0025,
+              "p99": 0.0025352112676056337,
+              "max": 0.0025714285714285717,
+              "mean": 0.0025010184564175173
+            }
+          },
+          "p95": {
+            "query": "histogram_quantile(0.95, sum by (le) (rate(prober_probe_duration_seconds_bucket{namespace=\"whisper-stt\"}[5m])))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 243,
+            "sum_of_hourly_values": 1.154720221,
+            "max_hourly_value": 0.004885714285714286,
+            "min_value": 0.004749999999999999,
+            "hourly_quantile_statistics": {
+              "count": 243,
+              "unit": "seconds",
+              "min": 0.004749999999999999,
+              "p50": 0.004749999999999999,
+              "p95": 0.004749999999999999,
+              "p99": 0.004816901408450704,
+              "max": 0.004885714285714286,
+              "mean": 0.004751935067193282
+            }
+          },
+          "p99": {
+            "query": "histogram_quantile(0.99, sum by (le) (rate(prober_probe_duration_seconds_bucket{namespace=\"whisper-stt\"}[5m])))",
+            "result_series": 1,
+            "observed_points": 243,
+            "first_sample": "2026-07-31T12:15:36.435Z",
+            "last_sample": "2026-08-10T14:15:36.435Z",
+            "observed_coverage_days": 10.083333,
+            "nonzero_points": 243,
+            "sum_of_hourly_values": 1.22895,
+            "max_hourly_value": 0.01420000000000008,
+            "min_value": 0.00495,
+            "hourly_quantile_statistics": {
+              "count": 243,
+              "unit": "seconds",
+              "min": 0.00495,
+              "p50": 0.00495,
+              "p95": 0.00495,
+              "p99": 0.0074439999999999906,
+              "max": 0.01420000000000008,
+              "mean": 0.005057407407407409
+            }
+          }
+        },
+        "log_latency_field_availability": {
+          "explicit_request_or_processing_fields": 0,
+          "finished_in_lines": 0
+        }
+      },
+      "resources": {
+        "cpu_memory": {
+          "path": "data/resource_metrics/resource-metrics-30d-20260810T140755Z.json",
+          "status": "loaded",
+          "source_window": {
+            "requested_window_start": "2026-07-11T14:07:53.151000Z",
+            "requested_window_end": "2026-08-10T14:07:53.151000Z",
+            "requested_window_days": 30,
+            "step_seconds": 3600,
+            "prometheus_server_time": "2026-08-10T14:07:53.151000Z",
+            "prometheus_retention_time": "10d"
+          },
+          "metrics": {
+            "cpu_usage": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:53.151000Z",
+              "last_sample": "2026-08-10T14:07:53.151000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:53.151000Z",
+                  "start": "2026-07-11T14:07:53.151000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "memory_working_set": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:53.151000Z",
+              "last_sample": "2026-08-10T14:07:53.151000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:53.151000Z",
+                  "start": "2026-07-11T14:07:53.151000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            }
+          }
+        },
+        "disk_network": {
+          "path": "data/resource_metrics/disk-network-storage-metrics-30d-20260810T140808Z.json",
+          "status": "loaded",
+          "source_window": {
+            "requested_window_start": "2026-07-11T14:07:55.737000Z",
+            "requested_window_end": "2026-08-10T14:07:55.737000Z",
+            "requested_window_days": 30,
+            "step_seconds": 3600,
+            "prometheus_server_time": "2026-08-10T14:07:55.737000Z",
+            "prometheus_retention_time": "10d"
+          },
+          "metrics": {
+            "disk_read_bytes_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "disk_read_operations_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "disk_write_bytes_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "disk_write_operations_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "network_receive_bytes_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "network_receive_bytes_total": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "network_transmit_bytes_per_second": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "network_transmit_bytes_total": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 4,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "storage_available_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 3,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "storage_capacity_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 3,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "storage_filesystem_limit_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 0,
+              "series_count": 0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_coverage_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                },
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "trailing_query_gap"
+                }
+              ]
+            },
+            "storage_filesystem_usage_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 0,
+              "series_count": 0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_coverage_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                },
+                {
+                  "duration_days": 30.0,
+                  "end": "2026-08-10T14:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "trailing_query_gap"
+                }
+              ]
+            },
+            "storage_pvc_info": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 3,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "storage_requested_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 3,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            },
+            "storage_used_bytes": {
+              "status": "incomplete",
+              "observed_timestamp_points": 243,
+              "series_count": 3,
+              "first_sample": "2026-07-31T12:07:55.737000Z",
+              "last_sample": "2026-08-10T14:07:55.737000Z",
+              "returned_coverage_days": 10.083333,
+              "leading_gap_days": 19.916667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "significant_gaps": [
+                {
+                  "duration_days": 19.916667,
+                  "end": "2026-07-31T12:07:55.737000Z",
+                  "start": "2026-07-11T14:07:55.737000Z",
+                  "type": "leading_retention_or_no_data_gap"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "log_observed_window": {
+        "start": "2026-07-13T00:00:03.767Z",
+        "end": "2026-08-10T14:15:34.147Z"
+      }
+    }
+  },
+  "deployment_alignment": {
+    "source": "deployment-events-30days.json",
+    "source_window": {
+      "start": "2026-07-07T00:00:00.000Z",
+      "end": "2026-08-06T23:59:59.000Z",
+      "declared_days": 30
+    },
+    "requested_metric_window": {
+      "start": "2026-07-11T14:15:36.435Z",
+      "end": "2026-08-10T14:15:36.435Z",
+      "duration_days": 30
+    },
+    "events": [
+      {
+        "service": "whisper-stt",
+        "date": "2026-07-08",
+        "timestamp": "2026-07-08T03:09:35.000Z",
+        "event_type": "deployment_rollout",
+        "deployment": "whisper-stt",
+        "revision": 29,
+        "replicaSet": "whisper-stt-5dbff75cbd",
+        "image": "ronaldraygun/whisper-stt:1.8.2",
+        "outcome": "success",
+        "notes": "Initial deployment in rapid sequence"
+      },
+      {
+        "service": "whisper-stt",
+        "date": "2026-07-08",
+        "timestamp": "2026-07-08T03:16:13.000Z",
+        "event_type": "deployment_rollout",
+        "deployment": "whisper-stt",
+        "revision": 30,
+        "replicaSet": "whisper-stt-5b8558f478",
+        "image": "ronaldraygun/whisper-stt:1.8.4",
+        "outcome": "success",
+        "notes": "Second deployment in rapid sequence (6m 38s after previous)"
+      },
+      {
+        "service": "whisper-stt",
+        "date": "2026-07-08",
+        "timestamp": "2026-07-08T03:26:44.000Z",
+        "event_type": "deployment_rollout",
+        "deployment": "whisper-stt",
+        "revision": 31,
+        "replicaSet": "whisper-stt-6c497489fb",
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "outcome": "success",
+        "notes": "Third deployment in rapid sequence (10m 31s after previous)"
+      },
+      {
+        "service": "whisper-stt",
+        "date": "2026-07-12",
+        "timestamp": "2026-07-12T16:53:42.000Z",
+        "event_type": "deployment_rollout",
+        "deployment": "whisper-stt",
+        "revision": 32,
+        "replicaSet": "whisper-stt-847fd8d7b9",
+        "image": "ronaldraygun/whisper-stt:1.8.6",
+        "outcome": "success",
+        "notes": "Current active deployment - same image as revision 31, possible config change"
+      },
+      {
+        "service": "pbx-web",
+        "date": "2026-07-13",
+        "timestamp": "2026-07-13T18:07:55.000Z",
+        "event_type": "deployment_rollback",
+        "deployment": "pbx-web",
+        "revision": 11,
+        "replicaSet": "pbx-web-754f4cfdf7",
+        "image": "ronaldraygun/pbx-web:1.0.8",
+        "outcome": "rolled_back",
+        "notes": "Rolled back from 1.0.9 to 1.0.8 on same day"
+      },
+      {
+        "service": "pbx-web",
+        "date": "2026-07-13",
+        "timestamp": "2026-07-13T18:18:07.000Z",
+        "event_type": "deployment_rollout",
+        "deployment": "pbx-web",
+        "revision": 14,
+        "replicaSet": "pbx-web-5ff68464d",
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "outcome": "success",
+        "notes": "Re-deployment of 1.0.9 after rollback - 10m 12s after rollback"
+      },
+      {
+        "service": "pbx-web",
+        "date": "2026-07-15",
+        "timestamp": "2026-07-15T03:24:40.000Z",
+        "event_type": "deployment_rollout",
+        "deployment": "pbx-rebuild-relay",
+        "revision": 5,
+        "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+        "image": "python:3-slim",
+        "outcome": "success",
+        "notes": "PBX rebuild relay deployment - supporting infrastructure"
+      },
+      {
+        "service": "pbx-web",
+        "date": "2026-07-27",
+        "timestamp": "2026-07-27T17:56:07.000Z",
+        "event_type": "deployment_rollout",
+        "deployment": "lab-rebuild-relay",
+        "revision": 2,
+        "replicaSet": "lab-rebuild-relay-79957dbd4",
+        "image": "python:3-slim",
+        "outcome": "success",
+        "notes": "Lab rebuild relay deployment - supporting infrastructure"
+      },
+      {
+        "service": "pbx-web",
+        "date": "2026-07-28",
+        "timestamp": "2026-07-28T17:26:12.000Z",
+        "event_type": "deployment_rollout",
+        "deployment": "pbx-web",
+        "revision": 14,
+        "replicaSet": "pbx-web-5ff68464d",
+        "image": "ronaldraygun/pbx-web:1.0.9",
+        "outcome": "success",
+        "notes": "Current active deployment - same image, possible config restart"
+      }
+    ],
+    "per_service": {
+      "pbx-web": {
+        "event_count": 5,
+        "rows": [
+          {
+            "timestamp": "2026-07-13T18:07:55.000Z",
+            "event_type": "deployment_rollback",
+            "deployment": "pbx-web",
+            "revision": 11,
+            "in_requested_window": true,
+            "within_observed_resource_window": false,
+            "within_observed_log_window": true
+          },
+          {
+            "timestamp": "2026-07-13T18:18:07.000Z",
+            "event_type": "deployment_rollout",
+            "deployment": "pbx-web",
+            "revision": 14,
+            "in_requested_window": true,
+            "within_observed_resource_window": false,
+            "within_observed_log_window": true
+          },
+          {
+            "timestamp": "2026-07-15T03:24:40.000Z",
+            "event_type": "deployment_rollout",
+            "deployment": "pbx-rebuild-relay",
+            "revision": 5,
+            "in_requested_window": true,
+            "within_observed_resource_window": false,
+            "within_observed_log_window": true
+          },
+          {
+            "timestamp": "2026-07-27T17:56:07.000Z",
+            "event_type": "deployment_rollout",
+            "deployment": "lab-rebuild-relay",
+            "revision": 2,
+            "in_requested_window": true,
+            "within_observed_resource_window": false,
+            "within_observed_log_window": true
+          },
+          {
+            "timestamp": "2026-07-28T17:26:12.000Z",
+            "event_type": "deployment_rollout",
+            "deployment": "pbx-web",
+            "revision": 14,
+            "in_requested_window": true,
+            "within_observed_resource_window": false,
+            "within_observed_log_window": true
+          }
+        ],
+        "events_in_requested_window": 5,
+        "events_with_resource_samples": 0,
+        "events_with_log_samples": 5,
+        "resource_observed_window": {
+          "start": "2026-07-31T12:07:53.151000Z",
+          "end": "2026-08-10T14:07:55.737000Z"
+        },
+        "log_observed_window": {
+          "start": "2026-07-13T00:00:03.426Z",
+          "end": "2026-08-10T14:15:33.102Z"
+        }
+      },
+      "whisper-stt": {
+        "event_count": 4,
+        "rows": [
+          {
+            "timestamp": "2026-07-08T03:09:35.000Z",
+            "event_type": "deployment_rollout",
+            "deployment": "whisper-stt",
+            "revision": 29,
+            "in_requested_window": false,
+            "within_observed_resource_window": false,
+            "within_observed_log_window": false
+          },
+          {
+            "timestamp": "2026-07-08T03:16:13.000Z",
+            "event_type": "deployment_rollout",
+            "deployment": "whisper-stt",
+            "revision": 30,
+            "in_requested_window": false,
+            "within_observed_resource_window": false,
+            "within_observed_log_window": false
+          },
+          {
+            "timestamp": "2026-07-08T03:26:44.000Z",
+            "event_type": "deployment_rollout",
+            "deployment": "whisper-stt",
+            "revision": 31,
+            "in_requested_window": false,
+            "within_observed_resource_window": false,
+            "within_observed_log_window": false
+          },
+          {
+            "timestamp": "2026-07-12T16:53:42.000Z",
+            "event_type": "deployment_rollout",
+            "deployment": "whisper-stt",
+            "revision": 32,
+            "in_requested_window": true,
+            "within_observed_resource_window": false,
+            "within_observed_log_window": false
+          }
+        ],
+        "events_in_requested_window": 1,
+        "events_with_resource_samples": 0,
+        "events_with_log_samples": 0,
+        "resource_observed_window": {
+          "start": "2026-07-31T12:07:53.151000Z",
+          "end": "2026-08-10T14:07:55.737000Z"
+        },
+        "log_observed_window": {
+          "start": "2026-07-13T00:00:03.767Z",
+          "end": "2026-08-10T14:15:34.147Z"
+        }
+      }
+    },
+    "window_mismatch": {
+      "deployment_source_starts_before_requested_metrics_by_days": 4.594172,
+      "deployment_source_ends_before_requested_metrics_by_days": 3.594183
+    }
+  },
+  "coverage_gaps": [
+    {
+      "severity": "high",
+      "type": "prometheus_retention_gap",
+      "services": [
+        "pbx-web",
+        "whisper-stt"
+      ],
+      "duration_days": 19.911305,
+      "description": "CPU, memory, disk, and network range queries returned no samples before the first retained Prometheus sample; missing periods are not treated as zero.",
+      "retention_setting": "10d"
+    },
+    {
+      "severity": "high",
+      "type": "whisper_transcription_latency_missing",
+      "services": [
+        "whisper-stt"
+      ],
+      "description": "VictoriaLogs contains health-check access logs but no transcription duration, request_time, latency, or elapsed fields."
+    },
+    {
+      "severity": "medium",
+      "type": "victorialogs_leading_gap",
+      "services": [
+        "pbx-web",
+        "whisper-stt"
+      ],
+      "description": "VictoriaLogs starts after the requested metric window because the backend retained logs from approximately 2026-07-13 onward."
+    },
+    {
+      "severity": "medium",
+      "type": "deployment_source_window_mismatch",
+      "services": [
+        "pbx-web",
+        "whisper-stt"
+      ],
+      "description": "The canonical deployment export covers 2026-07-07 through 2026-08-06, while live metrics were requested through the Prometheus server time on 2026-08-10."
+    }
+  ],
+  "anomalies": [
+    {
+      "severity": "medium",
+      "type": "http_5xx_observed",
+      "service": "pbx-web",
+      "count": 1,
+      "rate": 2.9366764457992313e-06
+    },
+    {
+      "severity": "info",
+      "type": "http_4xx_observed",
+      "service": "pbx-web",
+      "count": 312,
+      "rate": 0.0009162430510893601
+    },
+    {
+      "severity": "info",
+      "type": "container_restart_signal",
+      "service": "whisper-stt",
+      "nonzero_hourly_points": 1,
+      "max_hourly_increase": 1.0064935064935066,
+      "description": "Prometheus reports a non-zero hourly increase in the retained observation window; inspect pod-level series before attributing it to a single deployment."
+    }
+  ],
+  "source_artifacts": {
+    "cpu_memory_metrics": {
+      "path": "data/resource_metrics/resource-metrics-30d-20260810T140755Z.json",
+      "sha256": "4aabe6eeabd4e65f428368559d96ad3320219015a8cee02be2a5aede278f372c",
+      "bytes": 298417
+    },
+    "disk_network_metrics": {
+      "path": "data/resource_metrics/disk-network-storage-metrics-30d-20260810T140808Z.json",
+      "sha256": "76713245a87e657ae5657d2c28e12e1f16d467c8c305f886277cdafdc7e1226b",
+      "bytes": 1510714
+    },
+    "deployment_events": {
+      "path": "deployment-events-30days.json",
+      "sha256": "82e0ef402bfd2db7bc68ae2830560ba6012ab3a91ead002562e79a3cf67897f6",
+      "bytes": 7269
+    },
+    "deployment_alignment_report": {
+      "path": "data/metrics_deployment_alignment_report.json",
+      "sha256": "f80c2b5524ae4bd1004faf6553e6a58a6f9cc9565fc8a26d3dbc1fd1c04da221",
+      "bytes": 87299
+    }
+  }
+}
