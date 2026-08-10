@@ -2,20 +2,19 @@
 Unit tests for atomic_write utility.
 """
 
-import os
-import tempfile
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from src.utils.atomic_write import (
+    AtomicWriteError,
+    AtomicWriteRollbackError,
+    atomic_append,
     atomic_write,
     atomic_write_rollback,
     cleanup_orphaned_temp_files,
-    AtomicWriteRollbackError,
-    AtomicWriteError
 )
 
 
@@ -294,6 +293,43 @@ class TestAtomicWriteRollback:
         # Original content should be intact
         assert filepath.read_text() == original_content
 
+    def test_rollback_tolerates_temp_file_removed_by_another_cleanup(self, tmp_path):
+        """A repeated/concurrent rollback is successful once the temp is absent."""
+        filepath = tmp_path / "rollback_race.txt"
+
+        with pytest.raises(ValueError, match="original failure"):
+            with atomic_write_rollback(filepath) as temp_path:
+                temp_path.write_text("discarded")
+                # Simulate another cleanup owner winning the unlink race.
+                temp_path.unlink()
+                raise ValueError("original failure")
+
+        assert not filepath.exists()
+        assert list(tmp_path.glob("*.tmp")) == []
+
+    def test_rollback_cleanup_failure_is_logged_and_reported(self, tmp_path, caplog):
+        """A locked staging file is reported as an incomplete rollback."""
+        filepath = tmp_path / "rollback_locked.txt"
+        real_unlink = Path.unlink
+
+        def fail_temp_unlink(path, missing_ok=False):
+            if path.name.startswith(f".{filepath.name}.tmp_"):
+                raise PermissionError("resource is locked")
+            return real_unlink(path, missing_ok=missing_ok)
+
+        with patch.object(Path, "unlink", new=fail_temp_unlink):
+            with caplog.at_level("ERROR", logger="src.utils.atomic_write"):
+                with pytest.raises(AtomicWriteRollbackError, match="resource is locked"):
+                    with atomic_write_rollback(filepath) as temp_path:
+                        temp_path.write_text("discarded")
+                        raise ValueError("operation failed")
+
+        assert any(
+            "Permission denied cleaning up temp file" in record.message
+            and str(filepath.name) in record.message
+            for record in caplog.records
+        )
+
 
 class TestAtomicWriteErrors:
     """Test error handling scenarios."""
@@ -390,6 +426,60 @@ class TestOrphanedTempFileCleanup:
         count = cleanup_orphaned_temp_files("/nonexistent/path", "*.tmp")
         assert count == 0
 
+    def test_cleanup_is_idempotent(self, tmp_path):
+        """Calling orphan cleanup repeatedly is safe and has no residual state."""
+        for index in range(2):
+            (tmp_path / f"repeat_{index}.tmp").write_text("orphan")
+
+        assert cleanup_orphaned_temp_files(tmp_path, "*.tmp") == 2
+        assert cleanup_orphaned_temp_files(tmp_path, "*.tmp") == 0
+        assert list(tmp_path.glob("*.tmp")) == []
+
+    def test_cleanup_treats_concurrent_missing_file_as_success(self, tmp_path):
+        """A file removed between discovery and unlink is not a failure."""
+        temp_file = tmp_path / "raced.tmp"
+        temp_file.write_text("orphan")
+        real_unlink = Path.unlink
+
+        def report_missing(path, missing_ok=False):
+            if path == temp_file:
+                raise FileNotFoundError(path)
+            return real_unlink(path, missing_ok=missing_ok)
+
+        with patch.object(Path, "unlink", new=report_missing):
+            result = cleanup_orphaned_temp_files(tmp_path, "*.tmp", return_details=True)
+
+        assert result["cleaned"] == 0
+        assert result["failed"] == 0
+        assert result["errors"] == []
+        temp_file.unlink()
+
+
+class TestAtomicAppendCleanup:
+    """The append commit must not be retried because staging cleanup failed."""
+
+    def test_successful_append_survives_locked_staging_cleanup(self, tmp_path, caplog):
+        filepath = tmp_path / "append.log"
+        real_unlink = Path.unlink
+
+        def fail_temp_unlink(path, missing_ok=False):
+            if path.name.startswith(".tmp_append_"):
+                raise PermissionError("staging resource is locked")
+            return real_unlink(path, missing_ok=missing_ok)
+
+        with patch.object(Path, "unlink", new=fail_temp_unlink):
+            with caplog.at_level("ERROR", logger="src.utils.atomic_write"):
+                atomic_append(filepath, "one\n")
+
+        # The replace is the append commit point.  A cleanup failure must not
+        # cause a caller retry that duplicates this record.
+        assert filepath.read_text() == "one\n"
+        assert any(
+            "successful atomic append" in record.message
+            and "staging resource is locked" in record.message
+            for record in caplog.records
+        )
+
 
 class TestAtomicWriteErrorTypes:
     """Test custom error types."""
@@ -414,7 +504,6 @@ class TestAtomicWriteLogging:
     def test_successful_operation_logs(self, tmp_path, caplog):
         """Test that successful operations are logged."""
         import logging
-        from src.utils.atomic_write import logger
 
         filepath = tmp_path / "log_test.txt"
 
@@ -428,9 +517,6 @@ class TestAtomicWriteLogging:
     def test_failed_operation_logs_errors(self, tmp_path, caplog):
         """Test that failed operations log errors."""
         import logging
-        from src.utils.atomic_write import logger
-
-        filepath = tmp_path / "error_log_test.txt"
 
         # Force a permission error
         readonly_dir = tmp_path / "readonly"
