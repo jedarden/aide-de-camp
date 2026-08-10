@@ -3219,3 +3219,50 @@ tests/test_memory_extraction.py::test_api_key_requirement_documented PASSED
 **Test artifacts:** 58 tests in tests/test_memory_store.py + tests/test_memory_extraction.py
 **Manual verification:** 11 session files in data/memory/ directory
 
+## Text path
+
+**Verification date:** 2026-08-10
+**Bead:** adc-3rt
+**Status:** BLOCKED before `/dispatch`; the text-path E2E and store assertions could not run.
+
+### Proxy preflight
+
+The endpoint used by `src/escalate/llm.py` was probed first with a minimal POST:
+
+```text
+POST https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages
+HTTP/1.1 200 OK
+model: glm-4.7
+content: OK
+time_total: 2.529933s
+```
+
+The known ZAI outage is not present on this run.
+
+### Server startup
+
+Command: `python3 -m uvicorn src.main:app --host 127.0.0.1 --port 8000`
+
+Startup reached environment discovery, then exited during FastAPI lifespan initialization:
+
+```text
+File "/home/coding/aide-de-camp/src/main.py", line 126, in lifespan
+  await _store.initialize()
+AttributeError: 'coroutine' object has no attribute 'initialize'
+RuntimeWarning: coroutine 'get_store' was never awaited
+Application startup failed. Exiting.
+```
+
+`src/session/store.py:get_store()` is currently declared `async def`, while `src/main.py:125-126` assigns its coroutine directly and then calls `.initialize()`. This is a startup/store initialization failure, before the server binds port 8000; no LLM router, fetch, synthesize, SSE broadcast, or result store write was reached.
+
+### E2E and assertions
+
+`python3 test_e2e.py "what is the status of aide-de-camp"` exited 1. The harness generated IDs, attempted its SSE listener and dispatch, then reported:
+
+```text
+Dispatch failed: All connection attempts failed
+```
+
+The required assertions for non-empty SSE `summary` and `data`, `intents.status = 'resolved'`, and a matching `results` row were not runnable because the application was not listening. Existing rows in `data/session.db` were not treated as evidence for this run. The hot-reload touch/modify → re-dispatch check was likewise not run; source inspection confirms the prompt manager uses mtime-based reloads and the YAML registry uses TTL/forced rebuilds, but runtime routing pickup remains unverified.
+
+**Finding:** the precise failure point is application startup at session-store initialization, not the ZAI proxy or any downstream text-path strand. A subsequent run should fix or otherwise resolve this startup contract, restart with the smoke-bead command, then rerun the harness, strict SSE/store assertions, and hot-reload dispatch check.
