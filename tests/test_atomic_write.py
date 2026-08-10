@@ -3,6 +3,7 @@ Unit tests for atomic_write utility.
 """
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -189,6 +190,28 @@ class TestAtomicWriteBackup:
         assert backup_path.exists()
         # Permissions should be preserved (rough check)
         assert backup_path.stat().st_mode & 0o777 == 0o644
+
+    def test_backup_publication_failure_preserves_existing_backup(self, tmp_path):
+        """A failed backup replace must not corrupt the previous backup."""
+        filepath = tmp_path / "original.txt"
+        backup_path = tmp_path / "original.txt.bak"
+        filepath.write_text("Original content")
+        backup_path.write_text("Previous backup")
+
+        real_replace = os.replace
+
+        def fail_backup_replace(source, destination):
+            if Path(destination) == backup_path:
+                raise OSError("simulated backup publication failure")
+            return real_replace(source, destination)
+
+        with patch("src.utils.atomic_write.os.replace", side_effect=fail_backup_replace):
+            with pytest.raises(OSError, match="simulated backup publication failure"):
+                atomic_write(filepath, "New content", create_backup=True)
+
+        assert filepath.read_text() == "Original content"
+        assert backup_path.read_text() == "Previous backup"
+        assert not list(tmp_path.glob(".original.txt.bak.tmp_*.bak"))
 
 
 class TestAtomicWriteValidation:
