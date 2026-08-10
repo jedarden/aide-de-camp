@@ -4,6 +4,7 @@ Unit tests for atomic_write utility.
 
 import json
 import os
+import threading
 from pathlib import Path
 from unittest.mock import patch
 
@@ -212,6 +213,58 @@ class TestAtomicWriteBackup:
         assert filepath.read_text() == "Original content"
         assert backup_path.read_text() == "Previous backup"
         assert not list(tmp_path.glob(".original.txt.bak.tmp_*.bak"))
+
+
+class TestAtomicWriteRollbackSerialization:
+    """Test rollback-context publication and ownership semantics."""
+
+    def test_rollback_serializes_same_target_transactions(self, tmp_path):
+        """A second transaction cannot enter while the first owns the target."""
+        filepath = tmp_path / "serialized.txt"
+        first_ready = threading.Event()
+        second_attempted = threading.Event()
+        second_entered = threading.Event()
+        allow_first_to_commit = threading.Event()
+        errors = []
+
+        def first_writer():
+            try:
+                with atomic_write_rollback(filepath) as temp_path:
+                    temp_path.write_text("first")
+                    first_ready.set()
+                    allow_first_to_commit.wait(timeout=2)
+            except BaseException as error:  # pragma: no cover - assertion below reports it
+                errors.append(error)
+
+        def second_writer():
+            try:
+                first_ready.wait(timeout=2)
+                second_attempted.set()
+                with atomic_write_rollback(filepath) as temp_path:
+                    second_entered.set()
+                    temp_path.write_text("second")
+            except BaseException as error:  # pragma: no cover - assertion below reports it
+                errors.append(error)
+
+        first_thread = threading.Thread(target=first_writer)
+        second_thread = threading.Thread(target=second_writer)
+        first_thread.start()
+        assert first_ready.wait(timeout=2)
+        second_thread.start()
+        assert second_attempted.wait(timeout=2)
+
+        # The first context still owns the per-path lock, so the second
+        # transaction cannot even allocate its staging file yet.
+        assert not second_entered.is_set()
+
+        allow_first_to_commit.set()
+        first_thread.join(timeout=2)
+        second_thread.join(timeout=2)
+
+        assert not first_thread.is_alive()
+        assert not second_thread.is_alive()
+        assert errors == []
+        assert filepath.read_text() == "second"
 
 
 class TestAtomicWriteValidation:

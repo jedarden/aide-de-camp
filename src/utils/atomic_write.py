@@ -482,6 +482,20 @@ def _atomic_write_impl(
 
 @contextmanager
 def atomic_write_rollback(filepath: Union[str, Path], mode: str = 'w'):
+    """Serialize one rollback transaction per target path.
+
+    The lock spans the caller's context block and the final ``os.replace`` so
+    two read/modify/write users cannot publish stale snapshots out of order.
+    """
+    filepath = Path(filepath)
+    lock = _path_lock(filepath, _write_locks, _write_locks_guard)
+    with lock:
+        with _atomic_write_rollback_locked(filepath, mode) as temp_path:
+            yield temp_path
+
+
+@contextmanager
+def _atomic_write_rollback_locked(filepath: Union[str, Path], mode: str = 'w'):
     """
     Context manager for atomic write with automatic rollback on error.
 

@@ -27,12 +27,11 @@ Usage:
 """
 
 import json
-import os
+import logging
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, Union
 from pathlib import Path
-import logging
+from typing import Any, Dict, Optional, Union
 
 from src.utils.atomic_write import atomic_write
 
@@ -201,27 +200,46 @@ def cleanup_old_backups(backup_dir: Path, file_stem: str, keep_count: int) -> No
             reverse=True
         )
 
-        # Remove excess backups using atomic operations
+        # Remove excess backups using an atomic claim followed by deletion.
+        # The claim makes the original name disappear in one operation, so a
+        # concurrent writer cannot replace a file after it was selected.
         failed_deletions = []
         for old_backup in backup_files[keep_count:]:
+            temp_deletion_path = old_backup.parent / (
+                f".deleting_{old_backup.name}.{uuid.uuid4()}.tmp"
+            )
+            claimed = False
             try:
-                # Use atomic rename-to-temp pattern for safer deletion
-                # This prevents race conditions and provides rollback capability
-                temp_deletion_path = old_backup.parent / f".deleting_{old_backup.name}.{uuid.uuid4()}.tmp"
-
-                # First, rename to temp deletion marker
+                # Rename is the commit/claim point.  Only the owner of the
+                # unique quarantine name may delete the claimed backup.
                 old_backup.replace(temp_deletion_path)
+                claimed = True
 
-                # Then, delete the temp file
+                # Deleting the quarantined path cannot affect a newly-created
+                # backup at the original name.
                 temp_deletion_path.unlink()
 
                 logger.debug(f"Atomically removed old backup: {old_backup}")
 
             except FileNotFoundError:
-                # Already deleted - continue
+                # Another owner may have won either the claim or deletion race.
                 logger.debug(f"Backup already deleted: {old_backup}")
                 continue
             except Exception as e:
+                if claimed:
+                    try:
+                        # If deletion failed, restore the claimed backup so a
+                        # cleanup error does not turn into silent data loss or
+                        # leave a hidden .deleting temporary file behind.
+                        temp_deletion_path.replace(old_backup)
+                    except FileNotFoundError:
+                        # A concurrent cleanup owner completed the deletion.
+                        logger.debug(f"Backup already removed: {old_backup}")
+                    except OSError as restore_error:
+                        logger.error(
+                            f"Failed to restore quarantined backup {old_backup}: "
+                            f"{restore_error}"
+                        )
                 # Track failures but continue with other files
                 failed_deletions.append((old_backup, str(e)))
                 logger.warning(f"Failed to delete backup {old_backup}: {e}")
@@ -712,7 +730,7 @@ def main():
 
             # Verify file
             verification = verify_json_file(test_file)
-            print(f"\nFile Verification:")
+            print("\nFile Verification:")
             print(f"  Valid: {verification['valid']}")
             print(f"  Size: {verification['size_bytes']} bytes")
             print(f"  Structure OK: {verification['structure_ok']}")
@@ -726,7 +744,7 @@ def main():
 
             # Cleanup test file
             Path(test_file).unlink()
-            print(f"\n✓ Cleaned up test file")
+            print("\n✓ Cleaned up test file")
 
             return 0
         else:

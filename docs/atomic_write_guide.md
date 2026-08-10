@@ -2,6 +2,9 @@
 
 Comprehensive guide for using the enhanced `atomic_write` utility with error handling, rollback support, and cleanup verification.
 
+For the cross-codebase cleanup inventory, invariants, and verification checklist,
+see [Cleanup Operations Reference](cleanup-operations-reference.md).
+
 ## Overview
 
 The atomic write utility provides safe file operations that prevent data corruption by using temporary files and atomic renames. This ensures readers always see either the complete old content or the complete new content — never a partial write.
