@@ -24,6 +24,12 @@ Edge Case Behavior:
 - No hanging or indefinite waits
 - Clear error messages for debugging
 - Proper cleanup even after failures
+
+Failure examples covered by this module include a blocked network mount during
+``open()``/``read()``, a missing registry path, malformed YAML, and a worker
+thread that cannot release a lock. Each scenario documents whether the test
+expects a contextual exception, a last-known-good value, or best-effort
+cleanup.
 """
 
 import asyncio
@@ -43,7 +49,19 @@ import tracemalloc
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.components.hot_reload import get_reload_manager, HotReloadManager, Artifact
+from src.components.hot_reload import (
+    Artifact,
+    EmptyRegistryError,
+    HotReloadManager,
+    HotReloadTimeoutError,
+    PermissionDeniedError,
+    RegistryNotFoundError,
+    RegistryParseError,
+    get_reload_manager,
+)
+
+
+TEST_TIMEOUT = min(HotReloadManager.FILE_OPERATION_TIMEOUT, 4.0)
 
 
 class HotReloadErrorTracker:
@@ -94,6 +112,7 @@ async def test_file_permission_error_on_read():
 
     Edge Case: Artifact file becomes unreadable due to permission changes.
     Expected Behavior: Clear error message, no crash, fail-fast.
+    Error Example: ``register_prompt('x')`` reports the path and permission fix.
     """
     print("\n=== Testing File Permission Error on Read ===")
 
@@ -129,7 +148,7 @@ async def test_file_permission_error_on_read():
             _ = reload_mgr.force_reload('test_readonly')
             print("✗ Should have raised PermissionError on force_reload")
             return False
-        except PermissionError as e:
+        except (PermissionDeniedError, PermissionError) as e:
             tracker.record_error(e, "Force reloading unreadable file")
             print(f"✓ PermissionError raised with clear message: {e}")
             return True
@@ -161,6 +180,7 @@ async def test_concurrent_access_safety():
 
     Edge Case: Multiple tasks accessing the same artifact simultaneously.
     Expected Behavior: No race conditions, consistent state, clear errors if any.
+    Error Example: A lock deadlock raises a timeout instead of waiting forever.
     """
     print("\n=== Testing Concurrent Access Safety ===")
 
@@ -239,7 +259,7 @@ async def test_concurrent_access_safety():
     try:
         results = await asyncio.wait_for(
             asyncio.gather(*tasks, return_exceptions=True),
-            timeout=30.0  # 30 second timeout
+            timeout=TEST_TIMEOUT,
         )
     except asyncio.TimeoutError:
         print("✗ Test timed out - possible deadlock or infinite wait")
@@ -281,6 +301,7 @@ async def test_missing_registry_file():
 
     Edge Case: Registry file doesn't exist at registration time.
     Expected Behavior: Clear FileNotFoundError, no crash, fail-fast.
+    Error Example: The message names the missing path and recommends checking it.
     """
     print("\n=== Testing Missing Registry File ===")
 
@@ -293,7 +314,7 @@ async def test_missing_registry_file():
         reload_mgr.register_config('missing_test', non_existent_path)
         print("✗ Should have raised FileNotFoundError")
         return False
-    except FileNotFoundError as e:
+    except RegistryNotFoundError as e:
         tracker.record_error(e, "Registering missing file")
         error_msg = str(e)
 
@@ -315,6 +336,7 @@ async def test_malformed_yaml_content():
 
     Edge Case: YAML file has invalid syntax.
     Expected Behavior: Clear parse error, fail-fast, no crash.
+    Error Example: The message includes the parse location and syntax fix.
     """
     print("\n=== Testing Malformed YAML Content ===")
 
@@ -338,7 +360,7 @@ invalid_yaml:
         print("✗ Should have raised YAML parse error")
         temp_path.unlink()
         return False
-    except (yaml.YAMLError, ValueError) as e:
+    except RegistryParseError as e:
         tracker.record_error(e, "Parsing malformed YAML")
         error_msg = str(e)
 
@@ -361,6 +383,7 @@ async def test_empty_file_handling():
 
     Edge Case: Artifact file is completely empty.
     Expected Behavior: Clear error or graceful handling, no crash.
+    Error Example: Empty configuration identifies the path and asks for data.
     """
     print("\n=== Testing Empty File Handling ===")
 
@@ -382,13 +405,16 @@ async def test_empty_file_handling():
         assert content == "", "Empty file should return empty string"
         print("✓ Empty markdown file handled correctly")
 
-        # Test empty YAML file
-        reload_mgr.register_config('empty_yaml', str(empty_yaml_path))
-        config = reload_mgr.get_config('empty_yaml')
-
-        # Empty YAML parses to None
-        assert config is None or config == {}, f"Empty YAML should parse to None or {{}}, got {config}"
-        print("✓ Empty YAML file handled correctly")
+        # Empty YAML is rejected because a hot-reloaded config must contain data.
+        try:
+            reload_mgr.register_config('empty_yaml', str(empty_yaml_path))
+        except EmptyRegistryError as raised:
+            error_msg = str(raised)
+            assert str(empty_yaml_path) in error_msg
+            assert "Action:" in error_msg
+            print("✓ Empty YAML file failed fast with actionable context")
+        else:
+            raise AssertionError("Empty YAML registration should fail fast")
 
         return True
 
@@ -407,6 +433,7 @@ async def test_race_condition_mtime_check():
 
     Edge Case: File is modified between mtime check and actual read.
     Expected Behavior: Consistent behavior, no corruption, clear errors if any.
+    Error Example: A blocked read returns a timeout with the file and operation.
     """
     print("\n=== Testing Race Condition: mtime Check vs File Modify ===")
 
@@ -456,7 +483,7 @@ async def test_race_condition_mtime_check():
                 contents_read.append(f"ERROR: {e}")
 
         # Wait for modifier to finish
-        modifier_thread.join(timeout=5.0)
+        modifier_thread.join(timeout=TEST_TIMEOUT)
 
         # Analyze results
         unique_contents = set(c for c in contents_read if not str(c).startswith("ERROR"))
@@ -486,6 +513,7 @@ async def test_temporary_file_cleanup():
 
     Edge Case: Temporary files cannot be cleaned up (permissions, etc.).
     Expected Behavior: Clear warnings, no crash, cleanup best-effort.
+    Error Example: A cleanup failure is recorded with the affected temporary path.
     """
     print("\n=== Testing Temporary File Cleanup ===")
 
@@ -534,6 +562,7 @@ async def test_large_file_handling():
 
     Edge Case: Artifact file is unusually large.
     Expected Behavior: No crashes, reasonable performance, clear errors if too large.
+    Error Example: A stalled large-file read fails within the operation budget.
     """
     print("\n=== Testing Large File Handling ===")
 
@@ -599,6 +628,7 @@ async def test_unauthorized_artifact_access():
 
     Edge Case: Trying to get an artifact that was never registered.
     Expected Behavior: Clear KeyError, fail-fast, no crash.
+    Error Example: The message names the artifact and explains that it must be registered.
     """
     print("\n=== Testing Unauthorized Artifact Access ===")
 
@@ -631,6 +661,7 @@ async def test_force_reload_error_handling():
 
     Edge Case: File becomes unreadable during force reload.
     Expected Behavior: Clear error, no crash, fail-fast.
+    Error Example: ``force_reload('x')`` identifies the path and permission fix.
     """
     print("\n=== Testing Force Reload Error Handling ===")
 
@@ -656,7 +687,7 @@ async def test_force_reload_error_handling():
             print("⚠ Force reload did not raise error on unreadable file")
             # Still pass - might be cached
             return True
-        except (PermissionError, OSError) as e:
+        except (PermissionDeniedError, PermissionError, OSError, HotReloadTimeoutError) as e:
             tracker.record_error(e, "Force reloading unreadable file")
             print(f"✓ Force reload error handled: {type(e).__name__}")
             return True
@@ -700,7 +731,7 @@ async def main():
     for test_name, test_func in tests:
         try:
             print(f"\n--- Running: {test_name} ---")
-            result = await asyncio.wait_for(test_func(), timeout=60.0)
+            result = await asyncio.wait_for(test_func(), timeout=TEST_TIMEOUT)
             results.append(result)
             test_names.append(test_name)
         except asyncio.TimeoutError:

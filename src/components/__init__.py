@@ -1,5 +1,5 @@
 from .library import ComponentLibrary, Component, ComponentVersion, CachedCard, get_library
-from .hot_reload import HotReloadManager, get_reload_manager
+from .hot_reload import HotReloadManager, HotReloadTimeoutError, get_reload_manager
 
 __all__ = [
     'ComponentLibrary',
@@ -8,5 +8,6 @@ __all__ = [
     'CachedCard',
     'get_library',
     'HotReloadManager',
+    'HotReloadTimeoutError',
     'get_reload_manager',
 ]

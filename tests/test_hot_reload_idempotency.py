@@ -268,21 +268,25 @@ async def main():
 
     results = []
 
-    # Run all tests
-    try:
-        results.append(await test_singleton_consistency())
-        results.append(await test_artifact_registry_consistency())
-        results.append(await test_content_consistency_across_cycles())
-        results.append(await test_no_resource_leaks())
-        results.append(await test_mtime_tracking_consistency())
-        results.append(await test_force_reload_idempotency())
-        results.append(await test_concurrent_access_safety())
-        results.append(await test_cache_consistency())
-    except Exception as e:
-        print(f"\n✗ Test failed with exception: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+    test_functions = (
+        test_singleton_consistency,
+        test_artifact_registry_consistency,
+        test_content_consistency_across_cycles,
+        test_no_resource_leaks,
+        test_mtime_tracking_consistency,
+        test_force_reload_idempotency,
+        test_concurrent_access_safety,
+        test_cache_consistency,
+    )
+    for test_func in test_functions:
+        try:
+            results.append(await asyncio.wait_for(test_func(), timeout=4.0))
+        except asyncio.TimeoutError:
+            print(f"\n✗ {test_func.__name__}: timed out after 4 seconds")
+            results.append(False)
+        except Exception as e:
+            print(f"\n✗ {test_func.__name__} failed: {type(e).__name__}: {e}")
+            results.append(False)
 
     print("\n" + "=" * 60)
     print(f"Results: {sum(results)}/{len(results)} tests passed")

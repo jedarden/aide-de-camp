@@ -19,7 +19,8 @@ from pathlib import Path
 # Test configuration
 SERVER_URL = "http://localhost:8000"
 TEST_SESSION_ID = "test-hot-reload-session"
-TEST_TIMEOUT = 30
+# Keep network-backed hot-reload checks fail-fast as well as filesystem checks.
+TEST_TIMEOUT = 4.0
 
 
 async def test_registry_alias_hot_reload():
@@ -254,7 +255,7 @@ async def main():
     # Check if server is running
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{SERVER_URL}/health", timeout=5)
+            response = await client.get(f"{SERVER_URL}/health", timeout=TEST_TIMEOUT)
             if response.status_code != 200:
                 print(f"✗ Server health check failed: {response.status_code}")
                 print("Please start the server with: systemctl --user start aide-de-camp")
@@ -267,17 +268,17 @@ async def main():
 
     results = []
 
-    # Test registry alias hot-reload
-    results.append(await test_registry_alias_hot_reload())
-
-    # Test router prompt hot-reload
-    results.append(await test_router_prompt_hot_reload())
-
-    # Test registry validation
-    results.append(await test_registry_yaml_validates())
-
-    # Test hot-reload throttle
-    results.append(await test_hot_reload_throttle())
+    for test_func in (
+        test_registry_alias_hot_reload,
+        test_router_prompt_hot_reload,
+        test_registry_yaml_validates,
+        test_hot_reload_throttle,
+    ):
+        try:
+            results.append(await asyncio.wait_for(test_func(), timeout=TEST_TIMEOUT))
+        except asyncio.TimeoutError:
+            print(f"✗ {test_func.__name__}: timed out after {TEST_TIMEOUT} seconds")
+            results.append(False)
 
     print("\n" + "=" * 60)
     print(f"Results: {sum(results)}/{len(results)} tests passed")
