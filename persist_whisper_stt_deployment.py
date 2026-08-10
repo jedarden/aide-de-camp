@@ -34,6 +34,8 @@ from typing import Dict, Any, Optional, Union
 from pathlib import Path
 import logging
 
+from src.utils.atomic_write import atomic_write
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -346,10 +348,10 @@ def persist_deployment_data(
         else:
             json_params['separators'] = (',', ':')
 
-        # Write to file
+        # Publish the complete serialized snapshot atomically. Readers see the
+        # previous file or the complete replacement, never a partial JSON file.
         target_path = Path(file_path)
-        with target_path.open('w', encoding='utf-8') as f:
-            json.dump(serialized_data, f, **json_params)
+        atomic_write(target_path, json.dumps(serialized_data, **json_params))
 
         # Verify write was successful
         if target_path.exists() and target_path.stat().st_size > 0:
