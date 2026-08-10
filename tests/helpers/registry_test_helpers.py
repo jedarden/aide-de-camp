@@ -4,65 +4,20 @@ Test helpers for safe registry modification and restoration.
 This module provides utilities for safely modifying config/registry.yaml
 during tests, with automatic cleanup and restoration capabilities.
 
-ENHANCED WITH ATOMIC OPERATIONS: All file operations use atomic writes
+ENHANCED WITH ATOMIC OPERATIONS: All file operations use centralized atomic writes
 to prevent corruption during concurrent test execution.
 """
 
-import os
-import shutil
-import tempfile
 from pathlib import Path
 from typing import Optional
 
 import yaml
 
+from src.utils.atomic_write import atomic_write
+
 # Registry path is defined in src/registry.py but we import it here
 # to avoid circular dependencies in test code
 REGISTRY_PATH = Path(__file__).parent.parent.parent / "config" / "registry.yaml"
-
-
-def _atomic_write(path: Path, content: str) -> None:
-    """
-    Write content to a file atomically to prevent corruption.
-
-    CONCURRENT ACCESS PROTECTION: Atomic file operations ensure that writes
-    are all-or-nothing, preventing partial file states during concurrent test
-    execution. This is critical for registry cleanup operations.
-
-    Implementation:
-    1. Write to temporary file in same directory (ensures same filesystem)
-    2. Flush and fsync to ensure data reaches disk
-    3. Atomic rename to replace target (POSIX-compliant, works on Linux)
-
-    Args:
-        path: Target file path to write
-        content: Content to write to the file
-
-    Raises:
-        OSError: If write operation fails
-    """
-    # Create temporary file in same directory as target
-    temp_fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix='.atomic_write_')
-
-    try:
-        # Write content to temporary file
-        with os.fdopen(temp_fd, 'w') as f:
-            f.write(content)
-            f.flush()
-            # Ensure data is written to physical disk
-            os.fsync(f.fileno())
-
-        # Atomic rename - replaces target file if it exists
-        os.rename(temp_path, path)
-
-    except Exception:
-        # Clean up temporary file on failure
-        try:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
-        except Exception:
-            pass
-        raise
 
 
 def backup_registry() -> Path:
@@ -84,7 +39,9 @@ def backup_registry() -> Path:
     import time
     backup_path = REGISTRY_PATH.parent / f"registry.yaml.backup.{int(time.time())}"
 
-    shutil.copy2(REGISTRY_PATH, backup_path)
+    # Publish the complete backup atomically so cleanup never reads a partial copy.
+    original_content = REGISTRY_PATH.read_text()
+    atomic_write(backup_path, original_content)
     return backup_path
 
 
@@ -115,7 +72,7 @@ def restore_registry(backup_path: Path) -> None:
 
     # Use atomic write for safe restoration
     backup_content = backup_path.read_text()
-    _atomic_write(REGISTRY_PATH, backup_content)
+    atomic_write(REGISTRY_PATH, backup_content)
 
 
 def cleanup_backup(backup_path: Path) -> None:
@@ -236,7 +193,7 @@ class RegistryModificationContext:
             raise RuntimeError("Context manager not entered")
 
         modified_yaml = yaml.dump(self._parsed, default_flow_style=False)
-        _atomic_write(REGISTRY_PATH, modified_yaml)
+        atomic_write(REGISTRY_PATH, modified_yaml)
 
         # Update cached content
         self._yaml_content = modified_yaml
@@ -277,4 +234,82 @@ def set_registry_content(content: dict) -> None:
         >>>     set_registry_content(original)
     """
     modified_yaml = yaml.dump(content, default_flow_style=False)
-    _atomic_write(REGISTRY_PATH, modified_yaml)
+    atomic_write(REGISTRY_PATH, modified_yaml)
+
+
+# Global tracking for test registry setup/cleanup
+_test_registry_backup_path: Optional[Path] = None
+
+
+def setup_test_registry() -> None:
+    """
+    Set up a test registry by creating a backup of the current registry.
+
+    This function is called at the beginning of test contexts to ensure
+    the original registry can be restored after tests complete.
+
+    CONCURRENT ACCESS PROTECTION: Uses atomic file operations to ensure that
+    backup creation is all-or-nothing, preventing partial file states during
+    concurrent test execution.
+
+    Raises:
+        FileNotFoundError: If registry file doesn't exist
+
+    Example:
+        >>> setup_test_registry()
+        >>> # ... modify registry for tests ...
+        >>> cleanup_test_registry()
+    """
+    global _test_registry_backup_path
+
+    if not REGISTRY_PATH.exists():
+        raise FileNotFoundError(f"Registry file not found: {REGISTRY_PATH}")
+
+    # Create backup using an atomic write operation
+    import time
+    backup_path = REGISTRY_PATH.parent / f"registry.yaml.backup.{int(time.time())}"
+
+    # Publish the complete backup before exposing it to cleanup. If this write
+    # fails, a later cleanup call will not treat a missing backup as valid state.
+    original_content = REGISTRY_PATH.read_text()
+    atomic_write(backup_path, original_content)
+    _test_registry_backup_path = backup_path
+
+
+def cleanup_test_registry() -> None:
+    """
+    Clean up test registry by restoring from backup and removing backup file.
+
+    This function is called at the end of test contexts (usually in finally blocks)
+    to ensure the original registry is restored even if tests fail.
+
+    CONCURRENT ACCESS PROTECTION: Uses atomic file operations to ensure that
+    restoration is all-or-nothing, preventing partial file states during
+    concurrent test execution.
+
+    Raises:
+        FileNotFoundError: If backup file doesn't exist
+
+    Example:
+        >>> setup_test_registry()
+        >>> try:
+        >>>     # ... modify registry for tests ...
+        >>> finally:
+        >>>     cleanup_test_registry()
+    """
+    global _test_registry_backup_path
+
+    if _test_registry_backup_path is None:
+        # No backup was created, nothing to cleanup
+        return
+
+    if not _test_registry_backup_path.exists():
+        raise FileNotFoundError(f"Backup file not found: {_test_registry_backup_path}")
+
+    # Restore original registry using atomic write
+    backup_content = _test_registry_backup_path.read_text()
+    atomic_write(REGISTRY_PATH, backup_content)
+
+    # Clean up backup file
+    _test_registry_backup_path.unlink()
+    _test_registry_backup_path = None
