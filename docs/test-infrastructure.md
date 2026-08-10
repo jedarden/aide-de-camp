@@ -124,22 +124,32 @@ pass/fail history; do not infer isolation from a single green run.
 The database fixtures provide per-test state isolation, but they cannot make a
 timing-sensitive contention test deterministic when the host is under load.
 That distinction is important: a temporary database can be fresh while a
-concurrent test still times out waiting for an event-loop or SQLite lock.
+concurrent test still times out waiting for an event loop or SQLite lock.
 
-On 2026-08-10, ten focused runs of the database/concurrency isolation tests
-executed 76 tests per run (760 executions total). Nine runs passed 76/76; run
-2 timed out in
-`tests/test_concurrent_access_stress.py::test_lock_contention_detection`.
-The repeat report therefore classified one flaky test (9/10 passes) and 75
-tests as stable. Treat the suite as isolation-clean only after that contention
-failure is resolved or reproduced as an environment-specific load issue and
-the ten-run command is green.
+On 2026-08-10, the isolation gate was run ten consecutive times with:
 
-The same date's full-suite verification was not green: its first completed
-run reported 3,683 passed, 258 failed, 241 errors, and 40 skipped out of
-4,220 collected test results. Those failures must not be summarized as a
-database-isolation guarantee or as evidence that the fixture cleanup failed;
-inspect the individual error and failure reports first.
+```bash
+.venv/bin/python scripts/run_tests_repeatedly.py --count 10 \
+  tests/test_connection_leaks.py tests/test_session_isolation.py \
+  tests/test_database_isolation.py tests/test_in_memory_db_isolation.py \
+  tests/test_concurrent_access_protection.py \
+  tests/test_concurrent_access_stress.py
+```
+
+Each run executed the same 60 tests. All 10 runs passed 60/60 (600/600
+executions), with zero failures, errors, skips, or flaky tests. Run duration
+ranged from 11.22 to 11.86 seconds. This proves the documented fixture,
+session-filtering, connection-cleanup, and concurrency patterns are stable
+under this verification load; it is not a claim that every unrelated test
+module or the live production database is isolated automatically.
+
+The unscoped full-suite repeat command was also started from the shared
+checkout, but it was not a valid all-green baseline: the first run reached
+1,869 passed, 146 failed, 149 errors, and 40 skipped before interruption after
+an unrelated end-to-end fixture/API failure set and a long-running test. Those
+failures must not be summarized as a database-isolation failure or as evidence
+that fixture cleanup failed. Run the full command from a quiescent checkout
+after resolving those independent failures.
 
 ## Test Structure
 
