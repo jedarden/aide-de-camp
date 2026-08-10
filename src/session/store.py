@@ -1016,6 +1016,67 @@ class SessionStore:
 
         return {"session_removed": session_removed, "topics_removed": topics_removed}
 
+    async def delete_topic(self, topic_id: str) -> dict:
+        """Delete a topic and the data owned by that topic.
+
+        Topic deletion is intentionally separate from :meth:`delete_session` so
+        tests can remove one topic while retaining its session and other topics.
+        Foreign-key enforcement is not enabled consistently for legacy
+        databases, so dependent rows are deleted explicitly in one transaction
+        before deleting the topic itself.
+
+        Returns ``{"topic_removed": 0|1, "results_removed": <int>}``.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                "SELECT 1 FROM topics WHERE id = ?", (topic_id,)
+            ) as cur:
+                topic_removed = 1 if await cur.fetchone() else 0
+
+            async with db.execute(
+                "SELECT COUNT(*) FROM results WHERE topic_id = ?", (topic_id,)
+            ) as cur:
+                results_removed = (await cur.fetchone())[0]
+
+            # Remove rows that depend on results before removing the results.
+            await db.execute(
+                "DELETE FROM card_cache WHERE result_id IN "
+                "(SELECT id FROM results WHERE topic_id = ?)",
+                (topic_id,),
+            )
+            # Do not leave a dangling self-reference when foreign keys are
+            # enabled by a caller using a newer SQLite connection.
+            await db.execute(
+                "UPDATE results SET previous_result_id = NULL "
+                "WHERE previous_result_id IN "
+                "(SELECT id FROM results WHERE topic_id = ?)",
+                (topic_id,),
+            )
+            await db.execute(
+                "DELETE FROM results WHERE topic_id = ?", (topic_id,)
+            )
+            await db.execute(
+                "DELETE FROM feedback_signals WHERE topic_id = ?", (topic_id,)
+            )
+            await db.execute(
+                "DELETE FROM intent_topics WHERE topic_id = ?", (topic_id,)
+            )
+            # Intents belong to their session/utterance. Removing a topic must
+            # not remove that history, but its optional primary topic link must
+            # not point at the deleted row.
+            await db.execute(
+                "UPDATE intents SET topic_id = NULL WHERE topic_id = ?", (topic_id,)
+            )
+            await db.execute(
+                "DELETE FROM topic_context_cache WHERE topic_id = ?", (topic_id,)
+            )
+            await db.execute(
+                "DELETE FROM topics WHERE id = ?", (topic_id,)
+            )
+            await db.commit()
+
+        return {"topic_removed": topic_removed, "results_removed": results_removed}
+
     # Surface operations
     async def register_surface(
         self,

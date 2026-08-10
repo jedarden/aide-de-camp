@@ -648,3 +648,147 @@ async def create_synthetic_test_result(
             surface_id=surface_id,
             test_data=test_data,
         )
+# ---------------------------------------------------------------------------
+# Database cleanup helpers
+# ---------------------------------------------------------------------------
+
+
+def _unique_ids(ids: Optional[List[str]]) -> List[str]:
+    """Return non-empty IDs once, preserving their input order."""
+    if ids is None:
+        return []
+
+    unique: List[str] = []
+    seen = set()
+    for value in ids:
+        if not isinstance(value, str) or not value:
+            raise ValueError("cleanup IDs must be non-empty strings")
+        if value not in seen:
+            seen.add(value)
+            unique.append(value)
+    return unique
+
+
+async def _assert_no_rows(store: Any, table: str, column: str, value: str) -> None:
+    """Assert that a cleanup predicate no longer matches any database row."""
+    import aiosqlite
+
+    async with aiosqlite.connect(store.db_path) as db:
+        async with db.execute(
+            f"SELECT COUNT(*) FROM {table} WHERE {column} = ?",  # noqa: S608
+            (value,),
+        ) as cursor:
+            row = await cursor.fetchone()
+
+    count = int(row[0]) if row else 0
+    assert count == 0, (
+        f"cleanup left {count} rows in {table} for {column}={value!r}; "
+        "test data was not fully removed"
+    )
+
+
+async def cleanup_test_sessions(
+    store: Any,
+    session_ids: Optional[List[str]] = None,
+) -> Dict[str, Dict[str, int]]:
+    """Delete test sessions and verify their rows are gone.
+
+    The actual deletion is delegated to ``SessionStore.delete_session()``,
+    which uses explicit ``DELETE ... WHERE`` statements in a transaction. The
+    checks here intentionally query the database after each deletion so a
+    teardown cannot silently pass while leaving a session or its topics behind.
+    """
+    summaries: Dict[str, Dict[str, int]] = {}
+    for session_id in _unique_ids(session_ids):
+        summaries[session_id] = await store.delete_session(session_id)
+        await _assert_no_rows(store, "sessions", "id", session_id)
+        await _assert_no_rows(store, "surfaces", "session_id", session_id)
+        await _assert_no_rows(store, "utterances", "session_id", session_id)
+        await _assert_no_rows(store, "intents", "session_id", session_id)
+        await _assert_no_rows(store, "results", "session_id", session_id)
+        await _assert_no_rows(store, "topics", "session_id", session_id)
+    return summaries
+
+
+async def cleanup_test_topics(
+    store: Any,
+    topic_ids: Optional[List[str]] = None,
+) -> Dict[str, Dict[str, int]]:
+    """Delete test topics and verify their topic-owned rows are gone."""
+    summaries: Dict[str, Dict[str, int]] = {}
+    for topic_id in _unique_ids(topic_ids):
+        summaries[topic_id] = await store.delete_topic(topic_id)
+        await _assert_no_rows(store, "topics", "id", topic_id)
+        await _assert_no_rows(store, "results", "topic_id", topic_id)
+        await _assert_no_rows(store, "topic_context_cache", "topic_id", topic_id)
+        await _assert_no_rows(store, "intent_topics", "topic_id", topic_id)
+        await _assert_no_rows(store, "feedback_signals", "topic_id", topic_id)
+    return summaries
+
+
+async def cleanup_test_data(
+    store: Any,
+    session_ids: Optional[List[str]] = None,
+    topic_ids: Optional[List[str]] = None,
+) -> Dict[str, Dict[str, Dict[str, int]]]:
+    """Delete a batch of test sessions and topics.
+
+    Sessions are removed first, making the operation safe when ``topic_ids``
+    includes topics owned by one of the sessions. The subsequent topic cleanup
+    is idempotent for those already-removed IDs.
+    """
+    return {
+        "sessions": await cleanup_test_sessions(store, session_ids),
+        "topics": await cleanup_test_topics(store, topic_ids),
+    }
+
+
+class TestDataCleanup:
+    """ID registry used by the pytest teardown fixture.
+
+    Tests register IDs as they create data, for example::
+
+        cleanup.add_session(session_id)
+        cleanup.add_topic(topic_id)
+
+    The fixture calls :meth:`cleanup` after the test body, including when the
+    test fails. IDs may also be supplied to the constructor for indirect
+    parametrized fixtures.
+    """
+
+    __test__ = False
+
+    def __init__(
+        self,
+        store: Any,
+        session_ids: Optional[List[str]] = None,
+        topic_ids: Optional[List[str]] = None,
+    ) -> None:
+        self.store = store
+        self.session_ids = _unique_ids(session_ids)
+        self.topic_ids = _unique_ids(topic_ids)
+
+    def add_session(self, session_id: str) -> str:
+        """Register one session ID for teardown."""
+        self.session_ids = _unique_ids([*self.session_ids, session_id])
+        return session_id
+
+    track_session = add_session
+
+    def add_topic(self, topic_id: str) -> str:
+        """Register one topic ID for teardown."""
+        self.topic_ids = _unique_ids([*self.topic_ids, topic_id])
+        return topic_id
+
+    track_topic = add_topic
+
+    async def cleanup(self) -> Dict[str, Dict[str, Dict[str, int]]]:
+        """Delete all registered IDs and assert that no matching rows remain."""
+        result = await cleanup_test_data(
+            self.store,
+            session_ids=self.session_ids,
+            topic_ids=self.topic_ids,
+        )
+        self.session_ids.clear()
+        self.topic_ids.clear()
+        return result
