@@ -880,7 +880,7 @@ aide-de-camp/
 
 aide-de-camp is a **live web application**, not a static site. The FastAPI server is the intelligence layer — it handles SSE connections, maintains session state, runs the router and synthesize strands, and serves the frontend HTML. There is no CDN path (no CF Pages).
 
-*Naming note: deployment stages are **Deploy Stage A** (bare-metal) and **Deploy Stage B** (k8s) — deliberately not "Phase 0/1+", which collided with the Implementation Phases numbering (deployment "Phase 1+" had nothing to do with implementation Phase 1). References elsewhere to the "Phase 0 deployment" (e.g., ADR-1) mean Deploy Stage A. Stage A is the hosting model through the screen-capture demo and public launch; Stage B is post-launch hardening.*
+*Naming note: deployment stages are **Deploy Stage A** (bare-metal) and **Deploy Stage B** (k8s). The implementation phases below are separate; this section also labels Stage A as the implemented Phase 0 deployment and Stage B as future Phase 1+ deployment work to make their status explicit. References elsewhere to the "Phase 0 deployment" (e.g., ADR-1) mean Deploy Stage A. Stage A is the hosting model through the screen-capture demo and public launch; Stage B is post-launch hardening.*
 
 ### Why not static
 
@@ -889,11 +889,11 @@ aide-de-camp is a **live web application**, not a static site. The FastAPI serve
 - The session store (SQLite) and artifact store (prompts, registry) require a writable filesystem
 - Hot-reload depends on the running server reading updated files from disk on each invocation
 
-### Current Deployment: Deploy Stage A (bare-metal — Hetzner server directly)
+### Implemented: Deploy Stage A / Phase 0 (local process — Hetzner server directly)
 
-**Status: LIVE** ✅ — running server confirmed 2026-07-20 (ADR-1 audit)
+**Status: IMPLEMENTED** ✅ — running server confirmed 2026-07-20 (ADR-1 audit)
 
-**This is Phase 0: local-only deployment.** The server runs as a process on the Hetzner server itself, not in k8s:
+**Phase 0 is local-only.** The server runs as a process on the Hetzner server itself, not in k8s:
 - NEEDLE workers and the aide-de-camp server share the same filesystem
 - Self-modification agent writes directly to `prompts/` and `config/` — hot-reload works without any coordination
 - Exposed via Tailscale (the server is already on the mesh); no ingress config needed
@@ -911,7 +911,7 @@ Version is in `pyproject.toml` only. No CI build — runs from source.
 
 Release: `bump version in pyproject.toml` → `commit` → `git tag vX.Y.Z` → `push`.
 
-### Future: Deploy Stage B (containerized, ardenone-cluster)
+### Future: Deploy Stage B / Phase 1+ (containerized, ardenone-cluster)
 
 **Status: NOT BUILT** ❌
 
@@ -1265,8 +1265,6 @@ aide-de-camp adds a routing and rendering layer on top of existing infrastructur
 - **beads (bf CLI)** — task work items and HUMAN exceptions only. Conversational session state lives in a separate SQLite session store.
 - **kubectl proxies** — fetch strand uses existing kubectl proxy access per cluster.
 - **ArgoCD** — fetch strand reads ArgoCD application state via the endpoint mapped to the project's `cluster` in `config/clusters.yaml`: the no-auth read-only proxy `argocd-ro-ardenone-manager-ts.ardenone.com:8444` for ardenone-cluster apps (ArgoCD on ardenone-manager); apexalgo-iad and the other iad-* Spot clusters are managed by rs-manager's ArgoCD, which has no equivalent read-only proxy today (must-fix before the demo — see the Phase 5 known-issues register).
-
-Net-new code: the codebase measures approximately **37,000 lines** of Python across ~104 files under src/. That is a size figure, not a completeness figure — the count includes stubbed paths (ADR-1's Telegram fallback methods, which log a warning and return `False`, count the same as working code). For an honest completeness picture, use the per-phase statuses in Implementation Phases (verified-in-tests vs. verified-live) plus a stub sweep of `src/`, not line or module counts. See the File System Layout section for the module breakdown.
 
 ---
 
