@@ -76,6 +76,9 @@ All behavior-defining artifacts are plain files, re-read on every invocation:
 
 A spoken instruction like "the deploy card is too cluttered" triggers the `SelfModificationAgent`, which generates a diff, surfaces it for approval, and hot-reloads the artifact. No redeploy needed.
 
+See [hot-reload behavior](docs/hot-reload.md) for reload triggers, side effects,
+cleanup/idempotency guarantees, and the bounded test command.
+
 ### Project registry
 `config/registry.yaml` defines explicit project entries with cluster targets, namespaces, aliases, and workflow templates. aide-de-camp also auto-discovers git repos at startup. Refresh via `POST /api/v1/environment/refresh`.
 

@@ -505,9 +505,22 @@ class TestErrorHandling:
             # uncancellable background task if a reload operation regresses.
             for _ in range(10):
                 await asyncio.sleep(0.05)
-                with open(temp_config_file, 'w') as f:
-                    yaml.dump({'tick_interval_seconds': 300}, f)
-                os.utime(temp_config_file, None)
+                # Replace atomically so the reader never observes a truncated
+                # YAML document between open() and safe_load().
+                temporary_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        mode='w',
+                        dir=temp_config_file.parent,
+                        suffix='.yaml.tmp',
+                        delete=False,
+                    ) as temporary_file:
+                        yaml.dump({'tick_interval_seconds': 300}, temporary_file)
+                        temporary_path = Path(temporary_file.name)
+                    os.replace(temporary_path, temp_config_file)
+                finally:
+                    if temporary_path is not None:
+                        temporary_path.unlink(missing_ok=True)
 
         # Start modification task
         modify_task = asyncio.create_task(modify_config())

@@ -74,6 +74,7 @@ def mock_zai_client():
 def hot_reload_manager(temp_synthesize_md, temp_urgency_md):
     """Create a HotReloadManager with temp files."""
     manager = HotReloadManager()
+    manager.register_prompt('router', 'prompts/router.md')
     manager.register_prompt('synthesize', temp_synthesize_md)
     manager.register_prompt('urgency', temp_urgency_md)
     return manager
@@ -347,58 +348,81 @@ class TestUrgencyInRouter:
     async def test_urgency_rules_in_router_system_prompt(
         self, intent_router, mock_zai_client, temp_urgency_md, hot_reload_manager
     ):
-        """Test that urgency.md content is included in router's system prompt."""
+        """Document that the latency-optimized router excludes urgency.md.
+
+        Urgency rules are consumed by synthesis; the router intentionally loads
+        only router.md so an urgency edit cannot add tokens to every routing
+        request. This assertion protects that current production contract.
+        """
         captured_system_prompt = None
 
         async def capture_call_simple(system_prompt, user_message, **kwargs):
             nonlocal captured_system_prompt
             captured_system_prompt = system_prompt
-            return json.dumps([
-                {
-                    "intent_type": "status",
-                    "project_slug": None,
-                    "urgency": "normal",
-                    "utterance_fragment": "test utterance",
-                    "confidence": 0.9,
-                    "reasoning": "test"
-                }
-            ])
+            return {
+                "content": json.dumps([
+                    {
+                        "intent_type": "status",
+                        "project_slug": None,
+                        "urgency": "normal",
+                        "utterance_fragment": "test utterance",
+                        "confidence": 0.9,
+                        "reasoning": "test"
+                    }
+                ]),
+                "timing_network_ms": 0,
+                "timing_inference_ms": 0,
+            }
 
         mock_zai_client.call_simple = capture_call_simple
-        intent_router._zai_client = mock_zai_client
+        intent_router._router_zai_client = mock_zai_client
 
-        await intent_router.classify_utterance("test utterance", "session-123")
+        with patch('src.intent.deterministic_router.get_deterministic_router') as get_det_router:
+            get_det_router.return_value.route_utterance.return_value = MagicMock(success=False)
+            await intent_router.classify_utterance("test utterance", "session-123")
 
-        # Verify that urgency rules are in the system prompt
+        # The router intentionally does not splice urgency.md into its prompt.
         assert captured_system_prompt is not None
-        assert "Urgency Classifier Test" in captured_system_prompt
-        assert "Test content for critical urgency" in captured_system_prompt
+        assert "Urgency Classifier Test" not in captured_system_prompt
+        assert "Test content for critical urgency" not in captured_system_prompt
 
     @pytest.mark.asyncio
     async def test_urgency_hot_reload_in_router(
         self, intent_router, mock_zai_client, temp_urgency_md, hot_reload_manager
     ):
-        """Test that editing urgency.md changes router's system prompt without restart."""
+        """Verify urgency.md edits do not change the router-only system prompt.
+
+        This is the negative side of the hot-reload contract: the edit is still
+        hot-reloadable for synthesis, but router prompt construction remains
+        stable because the urgency rules were deliberately removed from that
+        latency-sensitive path.
+        """
         captured_prompts = []
 
         async def capture_first(system_prompt, user_message, **kwargs):
             nonlocal captured_prompts
             captured_prompts.append(system_prompt)
-            return json.dumps([
-                {
-                    "intent_type": "status",
-                    "project_slug": None,
-                    "urgency": "normal",
-                    "utterance_fragment": "test utterance",
-                    "confidence": 0.9,
-                    "reasoning": "test"
-                }
-            ])
+            return {
+                "content": json.dumps([
+                    {
+                        "intent_type": "status",
+                        "project_slug": None,
+                        "urgency": "normal",
+                        "utterance_fragment": "test utterance",
+                        "confidence": 0.9,
+                        "reasoning": "test"
+                    }
+                ]),
+                "timing_network_ms": 0,
+                "timing_inference_ms": 0,
+            }
 
         mock_zai_client.call_simple = capture_first
-        intent_router._zai_client = mock_zai_client
+        intent_router._router_zai_client = mock_zai_client
 
-        await intent_router.classify_utterance("test utterance", "session-123")
+        with patch('src.intent.deterministic_router.get_deterministic_router') as get_det_router:
+            get_det_router.return_value.route_utterance.return_value = MagicMock(success=False)
+            await intent_router.classify_utterance("test utterance", "session-123")
 
         # Modify the urgency file
         Path(temp_urgency_md).write_text("# Modified urgency content for router")
@@ -410,28 +434,30 @@ class TestUrgencyInRouter:
         async def capture_second(system_prompt, user_message, **kwargs):
             nonlocal captured_prompts
             captured_prompts.append(system_prompt)
-            return json.dumps([
-                {
-                    "intent_type": "status",
-                    "project_slug": None,
-                    "urgency": "normal",
-                    "utterance_fragment": "test utterance",
-                    "confidence": 0.9,
-                    "reasoning": "test"
-                }
-            ])
+            return {
+                "content": json.dumps([
+                    {
+                        "intent_type": "status",
+                        "project_slug": None,
+                        "urgency": "normal",
+                        "utterance_fragment": "test utterance",
+                        "confidence": 0.9,
+                        "reasoning": "test"
+                    }
+                ]),
+                "timing_network_ms": 0,
+                "timing_inference_ms": 0,
+            }
 
         mock_zai_client.call_simple = capture_second
+        intent_router._clear_cache()
 
-        await intent_router.classify_utterance("test utterance", "session-123")
+        with patch('src.intent.deterministic_router.get_deterministic_router') as get_det_router:
+            get_det_router.return_value.route_utterance.return_value = MagicMock(success=False)
+            await intent_router.classify_utterance("test utterance", "session-123")
 
-        # Verify that the prompts are different
+        # Verify that an urgency-only edit does not affect router prompt text.
         assert len(captured_prompts) == 2
         first_prompt, second_prompt = captured_prompts
-
-        # First prompt should have original content
-        assert "Urgency Classifier Test" in first_prompt
-
-        # Second prompt should have modified content
-        assert "Modified urgency content for router" in second_prompt
-        assert "Urgency Classifier Test" not in second_prompt
+        assert first_prompt == second_prompt
+        assert "Modified urgency content for router" not in second_prompt
