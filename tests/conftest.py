@@ -79,8 +79,10 @@ def registry_context():
                 ctx.add_alias("pbx-web", "test-alias")
                 # Registry is automatically restored on exit
     """
-    with RegistryModificationContext(auto_cleanup=False) as ctx:
-        yield ctx
+    # Return the context manager unentered.  Consumers use ``with
+    # registry_context`` themselves; entering it here as well would create a
+    # second backup, and ``auto_cleanup=False`` would leak both backups.
+    return RegistryModificationContext(auto_cleanup=True)
 
 
 @pytest.fixture(scope="function")
