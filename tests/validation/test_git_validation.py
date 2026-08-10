@@ -5,7 +5,6 @@ These tests verify the pre-flight git validation checks that ensure
 the repository is in a clean state before operations.
 """
 
-import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -14,18 +13,17 @@ from unittest import mock
 import pytest
 
 from src.action.steps.git_validation import (
-    GitStateError,
-    GitNetworkError,
     GitAuthenticationError,
-    GitValidationError,
-    check_git_repository,
+    GitNetworkError,
+    GitStateError,
+    PreflightGitValidation,
+    check_and_clean_git_locks,
     check_current_branch,
-    check_uncommitted_changes,
-    check_remote_configuration,
     check_disk_space,
     check_file_permissions,
-    check_and_clean_git_locks,
-    PreflightGitValidation,
+    check_git_repository,
+    check_remote_configuration,
+    check_uncommitted_changes,
     validate_git_state,
 )
 
@@ -315,13 +313,19 @@ class TestCheckFilePermissions:
 
     def test_no_write_permission(self, temp_repo, monkeypatch):
         """Should raise GitStateError when no write permission."""
-        def mock_touch(self):
+        def mock_mkstemp(*args, **kwargs):
             raise PermissionError("Permission denied")
 
-        monkeypatch.setattr(Path, "touch", mock_touch)
+        monkeypatch.setattr("src.action.steps.git_validation.tempfile.mkstemp", mock_mkstemp)
 
         with pytest.raises(GitStateError, match="No write permission"):
             check_file_permissions(temp_repo)
+
+    def test_permission_probe_is_unique_and_removed(self, temp_repo):
+        """The write probe does not leave a fixed-name file behind."""
+        check_file_permissions(temp_repo)
+
+        assert list(temp_repo.glob(".write_test_temp-*.tmp")) == []
 
 
 class TestCheckAndCleanGitLocks:

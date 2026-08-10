@@ -13,9 +13,9 @@ import logging
 import os
 import shutil
 import subprocess
+import tempfile
 import uuid
 from pathlib import Path
-from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -353,11 +353,18 @@ def check_file_permissions(
     repo_path = Path(repo_path)
 
     try:
-        # Test write permission by creating a temp file
-        test_file = repo_path / ".write_test_temp"
-        test_file.touch()
-        # Atomic unlink with idempotent cleanup (safe if file already deleted)
-        test_file.unlink(missing_ok=True)
+        # Use a unique staging file: a fixed probe name could collide with
+        # another validator and its cleanup could delete the other owner's
+        # file.  The probe is claimed by creation and removed idempotently.
+        fd, temp_path = tempfile.mkstemp(
+            dir=repo_path,
+            prefix=".write_test_temp-",
+            suffix=".tmp",
+        )
+        try:
+            os.close(fd)
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
     except PermissionError:
         raise GitStateError(f"No write permission for repository: {repo_path}")
     except Exception as e:
