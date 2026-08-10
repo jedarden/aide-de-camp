@@ -7,6 +7,7 @@ actually deployed, no config file required.
 """
 import asyncio
 import re
+import threading
 from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
@@ -334,6 +335,7 @@ _background_refresh_task: Optional[asyncio.Task] = None
 # to prevent race conditions during concurrent refreshes and background task management.
 # Uses asyncio.Lock() for proper async concurrent access protection in FastAPI context.
 _registry_lock = asyncio.Lock()
+_registry_state_lock = threading.RLock()
 
 
 def get_registry() -> Optional[EnvironmentRegistry]:
@@ -343,7 +345,8 @@ def get_registry() -> Optional[EnvironmentRegistry]:
     This is a simple read operation that returns a reference to the current registry.
     Reads are lock-free for performance - writes use the lock to ensure consistency.
     """
-    return _registry
+    with _registry_state_lock:
+        return _registry
 
 
 def set_registry(registry: EnvironmentRegistry) -> None:
@@ -355,12 +358,16 @@ def set_registry(registry: EnvironmentRegistry) -> None:
     The caller is responsible for ensuring proper synchronization if needed.
     """
     global _registry
-    _registry = registry
+    # Synchronous callers publish the pointer under the same owner boundary
+    # used by refresh_registry's final swap.
+    with _registry_state_lock:
+        _registry = registry
 
 
 def get_last_scan_at() -> Optional[str]:
     """Get the timestamp of the last environment scan (lock-free read)."""
-    return _last_scan_at
+    with _registry_state_lock:
+        return _last_scan_at
 
 
 async def refresh_registry() -> EnvironmentRegistry:
@@ -380,9 +387,13 @@ async def refresh_registry() -> EnvironmentRegistry:
     async with _registry_lock:
         logger.debug("Environment registry lock acquired for refresh")
 
-        # Double-check pattern: another task may have already refreshed
-        _last_scan_at = datetime.now().isoformat()
-        _registry = await scan_environment()
+        # Build the replacement off to the side. Keep the old registry and
+        # timestamp paired until the scan has completed successfully.
+        replacement = await scan_environment()
+        scanned_at = datetime.now().isoformat()
+        with _registry_state_lock:
+            _registry = replacement
+            _last_scan_at = scanned_at
 
         logger.debug("Environment registry refreshed, releasing lock")
         return _registry
@@ -416,14 +427,23 @@ async def start_background_refresh():
         logger.info("Background environment refresh started, releasing lock")
 
 
-def stop_background_refresh():
-    """Stop background environment refresh task (protected write)."""
+async def stop_background_refresh():
+    """Stop and await background environment refresh (idempotently)."""
     global _background_refresh_task
 
-    # Note: This is a synchronous function, but we're in an async context
-    # We need to run the lock acquisition in an async context
-    # For now, this is called during shutdown where contention is unlikely
-    if _background_refresh_task is not None:
-        _background_refresh_task.cancel()
-        _background_refresh_task = None
+    async with _registry_lock:
+        task = _background_refresh_task
+        if task is None:
+            return
+        if not task.done():
+            task.cancel()
+
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    finally:
+        async with _registry_lock:
+            if task.done() and _background_refresh_task is task:
+                _background_refresh_task = None
         logger.info("Background environment refresh stopped")

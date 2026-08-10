@@ -9,6 +9,7 @@ import asyncio
 import logging
 import random
 import subprocess
+import threading
 import time
 from functools import wraps
 from typing import Type, Tuple, Callable, Any, Optional, List
@@ -370,42 +371,45 @@ class RetryTracker:
         self.failed_operations: int = 0
         self.successful_operations: int = 0
         self.operation_history: List[dict] = []
+        self._stats_lock = threading.RLock()
 
     def record_attempt(self, operation: str, attempt: int, success: bool, error: Optional[str] = None):
         """Record a retry attempt."""
-        self.total_attempts += 1
-        if attempt > 0:
-            self.total_retries += 1
-
-        if success:
-            self.successful_operations += 1
-        else:
-            self.failed_operations += 1
-
-        self.operation_history.append({
-            "operation": operation,
-            "attempt": attempt,
-            "success": success,
-            "error": error,
-        })
+        with self._stats_lock:
+            self.total_attempts += 1
+            if attempt > 0:
+                self.total_retries += 1
+            if success:
+                self.successful_operations += 1
+            else:
+                self.failed_operations += 1
+            self.operation_history.append({
+                "operation": operation,
+                "attempt": attempt,
+                "success": success,
+                "error": error,
+            })
 
     def get_statistics(self) -> dict:
         """Get retry statistics."""
-        return {
-            "total_attempts": self.total_attempts,
-            "total_retries": self.total_retries,
-            "successful_operations": self.successful_operations,
-            "failed_operations": self.failed_operations,
-            "retry_rate": self.total_retries / self.total_attempts if self.total_attempts > 0 else 0,
-        }
+        with self._stats_lock:
+            return {
+                "total_attempts": self.total_attempts,
+                "total_retries": self.total_retries,
+                "successful_operations": self.successful_operations,
+                "failed_operations": self.failed_operations,
+                "retry_rate": self.total_retries / self.total_attempts if self.total_attempts > 0 else 0,
+            }
 
     def reset(self):
         """Reset all statistics."""
-        self.total_attempts = 0
-        self.total_retries = 0
-        self.failed_operations = 0
-        self.successful_operations = 0
-        self.operation_history = []
+        with self._stats_lock:
+            # Replace counters and history as one metrics generation.
+            self.total_attempts = 0
+            self.total_retries = 0
+            self.failed_operations = 0
+            self.successful_operations = 0
+            self.operation_history = []
 
 
 # Global retry tracker instance

@@ -11,6 +11,7 @@ import httpx
 import json
 import os
 import random
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -148,41 +149,47 @@ class MemoryStore:
         self.file_path = self.memory_dir / f"session_{self.user_hash}.json"
         self._data: dict = {}
         self._facts: list[Fact] = []
+        self._state_lock = threading.RLock()
 
     @retry_with_backoff(max_retries=3, initial_delay=0.1, backoff_factor=2.0, exceptions=(OSError, json.JSONDecodeError))
-    def _load_with_retry(self) -> None:
+    def _load_with_retry(self) -> dict:
         """Internal method to load memory from disk with retry logic."""
         if self.file_path.exists():
             with open(self.file_path, "r") as f:
-                self._data = json.load(f)
+                return json.load(f)
         else:
-            self._data = {"facts": [], "session_id": self.session_id}
+            return {"facts": [], "session_id": self.session_id}
 
     def load(self) -> None:
         """Load memory from disk. No-op if file doesn't exist."""
         try:
-            self._load_with_retry()
+            loaded_data = self._load_with_retry()
         except (json.JSONDecodeError, OSError) as e:
             self.logger.debug(f"Failed to load memory after retries: {e}")
-            self._data = {"facts": [], "session_id": self.session_id}
+            loaded_data = {"facts": [], "session_id": self.session_id}
 
         # Ensure session_id is present (handle missing/null/empty cases)
-        if not self._data.get("session_id"):
-            self._data["session_id"] = self.session_id
+        if not loaded_data.get("session_id"):
+            loaded_data["session_id"] = self.session_id
 
         # Ensure facts field exists and is a list
-        if not isinstance(self._data.get("facts"), list):
-            self._data["facts"] = []
+        if not isinstance(loaded_data.get("facts"), list):
+            loaded_data["facts"] = []
 
-        # Load facts with graceful error handling
-        self._facts = []
-        for f in self._data.get("facts", []):
+        # Parse the complete candidate before publishing either in-memory
+        # structure. A malformed entry cannot expose a partially rebuilt store.
+        candidate_facts = []
+        for f in loaded_data.get("facts", []):
             if isinstance(f, dict):
                 try:
-                    self._facts.append(Fact.from_dict(f))
+                    candidate_facts.append(Fact.from_dict(f))
                 except (KeyError, ValueError, TypeError) as e:
                     # Skip malformed fact entries
                     self.logger.debug(f"Skipping malformed fact: {e}")
+
+        with self._state_lock:
+            self._data = loaded_data
+            self._facts = candidate_facts
 
         self.logger.debug(f"Loaded {len(self._facts)} facts from memory")
 
@@ -195,12 +202,16 @@ class MemoryStore:
         If the process crashes during write, either the old file remains intact
         or the new file is completely written - never a partial/corrupted state.
         """
-        self.memory_dir.mkdir(parents=True, exist_ok=True)
-        self._data["facts"] = [f.to_dict() for f in self._facts]
-        self._data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        with self._state_lock:
+            candidate_data = dict(self._data)
+            candidate_data["facts"] = [f.to_dict() for f in self._facts]
+            candidate_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            content = json.dumps(candidate_data, indent=2)
 
-        # Use atomic_write utility for atomic persistence
-        atomic_write(self.file_path, json.dumps(self._data, indent=2))
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        # P1 commit point: the in-memory snapshot is already complete and the
+        # shared atomic writer publishes old-or-new file contents only.
+        atomic_write(self.file_path, content)
 
     def _normalize_text(self, text: str) -> str:
         """Normalize text for comparison."""
@@ -236,14 +247,6 @@ class MemoryStore:
         if not text:
             return False
 
-        # Deduplication: skip if exact or near-exact match exists
-        if self._is_duplicate(text, category):
-            return False
-
-        # Trim oldest facts if at limit
-        if len(self._facts) >= MAX_FACTS:
-            self._facts.pop(0)
-
         now = datetime.now(timezone.utc).isoformat()
         fact = Fact(
             text=text,
@@ -252,13 +255,30 @@ class MemoryStore:
             created_at=now,
             last_referenced=now,
         )
-        self._facts.append(fact)
+        with self._state_lock:
+            # Build an independent candidate. Eviction is not committed until
+            # the durable atomic file replacement succeeds. The owner lock is
+            # held through that commit so concurrent adders cannot overwrite a
+            # newer candidate with an older snapshot.
+            if self._is_duplicate(text, category):
+                return False
+            candidate_facts = list(self._facts)
+            if len(candidate_facts) >= MAX_FACTS:
+                candidate_facts.pop(0)
+            candidate_facts.append(fact)
 
-        # Save with error handling to maintain fire-and-forget behavior
-        try:
-            self.save()
-        except (OSError, json.JSONDecodeError) as e:
-            self.logger.warning(f"Failed to save memory after retries: {e}")
+            try:
+                candidate_data = dict(self._data)
+                candidate_data["facts"] = [item.to_dict() for item in candidate_facts]
+                candidate_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+                self.memory_dir.mkdir(parents=True, exist_ok=True)
+                atomic_write(self.file_path, json.dumps(candidate_data, indent=2))
+            except (OSError, json.JSONDecodeError) as e:
+                self.logger.warning(f"Failed to save memory after retries: {e}")
+                return False
+
+            self._facts = candidate_facts
+            self._data = candidate_data
 
         self.logger.info(f"Added fact: [{category.value}] {text[:50]}...")
         return True
@@ -266,9 +286,10 @@ class MemoryStore:
     def get_facts(self) -> list[Fact]:
         """Return all facts, updating last_referenced timestamps."""
         now = datetime.now(timezone.utc).isoformat()
-        for fact in self._facts:
-            fact.last_referenced = now
-        return self._facts.copy()
+        with self._state_lock:
+            for fact in self._facts:
+                fact.last_referenced = now
+            return self._facts.copy()
 
     def get_facts_by_topic(self, topic: str) -> list[str]:
         """Return facts relevant to topic using keyword matching."""

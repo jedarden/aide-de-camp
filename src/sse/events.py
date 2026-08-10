@@ -15,6 +15,7 @@ broadcaster so live canvases update in place whenever a component is versioned.
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Optional
@@ -64,17 +65,24 @@ class SSEManager:
 
     def __init__(self) -> None:
         self._subscribers: Dict[str, asyncio.Queue] = {}
+        # Register/unregister and broadcast snapshot creation share one owner
+        # lock. Broadcasting uses a detached snapshot, so queue I/O never
+        # holds the lock and a concurrent unregister cannot corrupt the map.
+        self._subscriber_lock = threading.RLock()
 
     async def register(self, queue: asyncio.Queue) -> str:
         """Register a subscriber queue and return its subscription id."""
         sub_id = str(uuid4())
-        self._subscribers[sub_id] = queue
+        with self._subscriber_lock:
+            self._subscribers[sub_id] = queue
         logger.info("Registered SSE subscriber %s", sub_id)
         return sub_id
 
     async def unregister(self, sub_id: str) -> None:
         """Remove a previously registered subscriber queue."""
-        if self._subscribers.pop(sub_id, None) is not None:
+        with self._subscriber_lock:
+            removed = self._subscribers.pop(sub_id, None)
+        if removed is not None:
             logger.info("Unregistered SSE subscriber %s", sub_id)
 
     async def broadcast(self, event: Event) -> int:
@@ -83,8 +91,11 @@ class SSEManager:
 
         Returns the number of queues the event was delivered to.
         """
+        with self._subscriber_lock:
+            queues = list(self._subscribers.values())
+
         sent = 0
-        for queue in list(self._subscribers.values()):
+        for queue in queues:
             try:
                 queue.put_nowait(event)
                 sent += 1

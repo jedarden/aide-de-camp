@@ -8,6 +8,7 @@ Provides test endpoints for:
 - Testing narration state transitions and urgency handling
 """
 import asyncio
+import threading
 import json
 import time
 import uuid
@@ -283,20 +284,23 @@ class NarrationSession:
 
 # Global session registry for testing
 _test_sessions: dict[str, NarrationSession] = {}
+_test_sessions_lock = threading.RLock()
 
 
 def get_test_session(session_id: str, voice: str = "alloy") -> NarrationSession:
     """Get or create a test narration session."""
-    if session_id not in _test_sessions:
-        _test_sessions[session_id] = NarrationSession(session_id, voice)
-        logger.info(f"[NARRATION_TEST] Created session: {session_id}")
-    return _test_sessions[session_id]
+    with _test_sessions_lock:
+        if session_id not in _test_sessions:
+            _test_sessions[session_id] = NarrationSession(session_id, voice)
+            logger.info(f"[NARRATION_TEST] Created session: {session_id}")
+        return _test_sessions[session_id]
 
 
 def cleanup_test_session(session_id: str) -> bool:
     """Clean up a test session."""
-    if session_id in _test_sessions:
-        del _test_sessions[session_id]
+    with _test_sessions_lock:
+        session = _test_sessions.pop(session_id, None)
+    if session is not None:
         logger.info(f"[NARRATION_TEST] Cleaned up session: {session_id}")
         return True
     return False
@@ -570,10 +574,9 @@ async def list_narration_sessions() -> dict:
         "total": 2
     }
     """
-    return {
-        "sessions": list(_test_sessions.keys()),
-        "total": len(_test_sessions),
-    }
+    with _test_sessions_lock:
+        sessions = list(_test_sessions.keys())
+    return {"sessions": sessions, "total": len(sessions)}
 
 
 @router.post("/test/narration/cleanup")
@@ -589,8 +592,12 @@ async def cleanup_all_sessions() -> dict:
         "deleted_count": 5
     }
     """
-    count = len(_test_sessions)
-    _test_sessions.clear()
+    global _test_sessions
+    with _test_sessions_lock:
+        # Swap the owned registry as the clear commit point. A concurrent
+        # creator publishes into the new generation instead of being deleted.
+        count = len(_test_sessions)
+        _test_sessions = {}
 
     return {
         "status": "cleaned",

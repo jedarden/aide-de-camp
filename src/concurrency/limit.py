@@ -6,6 +6,7 @@ the ZAI proxy when a single utterance fans out into many intent threads.
 """
 import asyncio
 import os
+import threading
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -74,14 +75,16 @@ class ConcurrencyLimiter:
 
 # Global singleton instance
 _limiter: ConcurrencyLimiter | None = None
+_limiter_lock = threading.RLock()
 
 
 def get_concurrency_limiter() -> ConcurrencyLimiter:
     """Get or create the global concurrency limiter instance."""
     global _limiter
-    if _limiter is None:
-        _limiter = ConcurrencyLimiter()
-    return _limiter
+    with _limiter_lock:
+        if _limiter is None:
+            _limiter = ConcurrencyLimiter()
+        return _limiter
 
 
 def reset_concurrency_limiter(limit: int | None = None) -> None:
@@ -94,5 +97,8 @@ def reset_concurrency_limiter(limit: int | None = None) -> None:
         limit: New limit (uses default if None)
     """
     global _limiter
-    _limiter = ConcurrencyLimiter(limit=limit)
-    logger.debug(f"Reset concurrency limiter with limit={_limiter.limit}")
+    with _limiter_lock:
+        # Publish a fresh generation. Existing holders retain the old
+        # semaphore, so reset cannot strand or over-release their leases.
+        _limiter = ConcurrencyLimiter(limit=limit)
+        logger.debug(f"Reset concurrency limiter with limit={_limiter.limit}")

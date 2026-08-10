@@ -6,6 +6,7 @@ CLI preferences. Configuration is stored in ~/.config/adc/config.
 """
 
 import os
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +21,7 @@ class Config:
         self.config_file = self.config_dir / "config"
         self._server_url: Optional[str] = None
         self._session_id: Optional[str] = None
+        self._config_lock = threading.RLock()
 
     def ensure_config_dir(self) -> None:
         """Ensure configuration directory exists."""
@@ -52,30 +54,9 @@ class Config:
 
     def set_server_url(self, url: str) -> None:
         """Set the server URL in config."""
-        self._server_url = url
-        self.ensure_config_dir()
-
-        # Read existing config
-        existing_lines = []
-        if self.config_file.exists():
-            with open(self.config_file, "r") as f:
-                existing_lines = f.readlines()
-
-        # Update or add server_url
-        updated = False
-        new_lines = []
-        for line in existing_lines:
-            if line.startswith("server_url"):
-                new_lines.append(f'server_url = "{url}"\n')
-                updated = True
-            else:
-                new_lines.append(line)
-
-        if not updated:
-            new_lines.append(f'server_url = "{url}"\n')
-
-        # Write back atomically
-        atomic_write(self.config_file, ''.join(new_lines))
+        with self._config_lock:
+            self._rewrite_value("server_url", url)
+            self._server_url = url
 
     def get_session_id(self) -> Optional[str]:
         """Get the session ID from config."""
@@ -95,29 +76,20 @@ class Config:
 
     def set_session_id(self, session_id: str) -> None:
         """Set the session ID in config."""
-        self._session_id = session_id
+        with self._config_lock:
+            self._rewrite_value("session_id", session_id)
+            self._session_id = session_id
+
+    def _rewrite_value(self, key: str, value: str) -> None:
+        """Replace one setting in a complete config snapshot (F-06/F-07)."""
         self.ensure_config_dir()
-
-        # Read existing config
-        existing_lines = []
-        if self.config_file.exists():
-            with open(self.config_file, "r") as f:
-                existing_lines = f.readlines()
-
-        # Update or add session_id
-        updated = False
-        new_lines = []
-        for line in existing_lines:
-            if line.startswith("session_id"):
-                new_lines.append(f'session_id = "{session_id}"\n')
-                updated = True
-            else:
-                new_lines.append(line)
-
-        if not updated:
-            new_lines.append(f'session_id = "{session_id}"\n')
-
-        # Write back atomically
+        existing_lines = self.config_file.read_text().splitlines(keepends=True) if self.config_file.exists() else []
+        replacement = f'{key} = "{value}"\n'
+        new_lines = [replacement if line.startswith(key) else line for line in existing_lines]
+        if not any(line.startswith(key) for line in existing_lines):
+            new_lines.append(replacement)
+        # Atomic replace is the commit point; in-memory state is published only
+        # after the complete config snapshot is durable.
         atomic_write(self.config_file, ''.join(new_lines))
 
 

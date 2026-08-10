@@ -7,12 +7,15 @@ The canvas shows one card per active topic, updated in place.
 
 import asyncio
 import json
+from logging import getLogger
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 from uuid import uuid4
 
 from ..session.store import SessionStore
+
+logger = getLogger(__name__)
 
 
 @dataclass
@@ -348,8 +351,12 @@ async def get_topic_registry() -> TopicRegistry:
         # Double-check pattern
         if _topic_registry is None:
             logger.debug("Initializing global topic registry")
-            _topic_registry = TopicRegistry()
-            await _topic_registry.add_common_aliases()
+            # Build the complete registry off to the side. Cancellation or an
+            # alias failure leaves the global pointer unset, so a later call
+            # can retry instead of observing a partial alias table.
+            replacement = TopicRegistry()
+            await replacement.add_common_aliases()
+            _topic_registry = replacement
             logger.debug("Global topic registry initialized with common aliases")
         else:
             logger.debug("Global topic registry already initialized")

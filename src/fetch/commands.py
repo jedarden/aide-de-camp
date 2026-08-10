@@ -8,6 +8,7 @@ corresponding commands and timeout settings.
 from __future__ import annotations
 
 import time
+import threading
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -81,6 +82,7 @@ FETCH_CONFIG_PATH = Path(__file__).parent.parent / "config" / "fetch.yaml"
 # Verified in test_registry_hot_reload (tests/test_config_hot_reload.py)
 _fetch_config_cache: dict | None = None
 _fetch_config_mtime: float = 0
+_fetch_config_lock = threading.RLock()
 
 
 class FetchConfigValidationError(Exception):
@@ -162,8 +164,9 @@ def _load_fetch_config() -> dict:
     # If they differ, reload from disk (cold path, new config loaded)
     try:
         current_mtime = FETCH_CONFIG_PATH.stat().st_mtime
-        if _fetch_config_cache is not None and current_mtime == _fetch_config_mtime:
-            return _fetch_config_cache
+        with _fetch_config_lock:
+            if _fetch_config_cache is not None and current_mtime == _fetch_config_mtime:
+                return _fetch_config_cache
     except OSError:
         # File doesn't exist or can't be accessed
         return {}
@@ -201,8 +204,13 @@ def _load_fetch_config() -> dict:
     # Cache the validated config
     # HOT-RELOAD: Store the parsed config and current mtime for next comparison
     # Next call will compare new mtime against this _fetch_config_mtime
-    _fetch_config_cache = config
-    _fetch_config_mtime = current_mtime
+    with _fetch_config_lock:
+        # The cache and generation are one publication. A slower parser must
+        # not overwrite a newer configuration observed by another caller.
+        if _fetch_config_cache is None or current_mtime >= _fetch_config_mtime:
+            _fetch_config_cache = config
+            _fetch_config_mtime = current_mtime
+        config = _fetch_config_cache
 
     return config
 

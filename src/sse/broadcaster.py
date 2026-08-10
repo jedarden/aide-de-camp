@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict
@@ -92,21 +93,48 @@ class SSEBroadcaster:
         self.connections: Dict[str, SSEConnection] = {}
         self._cleanup_task: asyncio.Task | None = None
         self._running = False
+        # The registry is also touched by synchronous heartbeat/register calls.
+        # One owner lock makes the claim/pop transition atomic for both those
+        # callers and the asynchronous cleanup loop.
+        self._registry_lock = threading.RLock()
+        self._lifecycle_lock = asyncio.Lock()
+        self._stop_task: asyncio.Task | None = None
+        self._lifecycle_state = "STOPPED"
 
     async def start(self) -> None:
         """Start the broadcaster and cleanup task."""
-        self._running = True
-        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+        async with self._lifecycle_lock:
+            if self._running and self._cleanup_task and not self._cleanup_task.done():
+                return
+            self._running = True
+            self._lifecycle_state = "RUNNING"
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def stop(self) -> None:
         """Stop the broadcaster and cleanup task."""
-        self._running = False
-        if self._cleanup_task:
-            self._cleanup_task.cancel()
+        # Single-flight shutdown: concurrent callers await the same stop task,
+        # so cancellation and final state publication happen only once.
+        async with self._lifecycle_lock:
+            if self._stop_task is None or self._stop_task.done():
+                self._running = False
+                self._lifecycle_state = "STOPPING"
+                self._stop_task = asyncio.create_task(self._stop_impl())
+            stop_task = self._stop_task
+        await stop_task
+
+    async def _stop_impl(self) -> None:
+        cleanup_task = self._cleanup_task
+        if cleanup_task and not cleanup_task.done():
+            cleanup_task.cancel()
             try:
-                await self._cleanup_task
+                await cleanup_task
             except asyncio.CancelledError:
                 pass
+        # A task handle is retired only after the task is terminal. If the
+        # await above fails, retaining it allows a later stop() to retry.
+        if cleanup_task is None or cleanup_task.done():
+            self._cleanup_task = None
+            self._lifecycle_state = "STOPPED"
 
     def register(
         self,
@@ -122,16 +150,20 @@ class SSEBroadcaster:
             session_id=session_id,
             surface_type=surface_type,
         )
-        self.connections[connection_id] = connection
+        with self._registry_lock:
+            self.connections[connection_id] = connection
         logger.info(f"Registered SSE connection {connection_id} for surface {surface_id}")
         return connection
 
     def unregister(self, connection_id: str) -> None:
         """Unregister an SSE connection."""
-        if connection_id in self.connections:
-            conn = self.connections[connection_id]
+        # pop is the linearization point. Missing entries are an idempotent
+        # success, which makes generator-finally and timeout cleanup safe to
+        # race without a check-then-delete window.
+        with self._registry_lock:
+            conn = self.connections.pop(connection_id, None)
+        if conn is not None:
             logger.info(f"Unregistered SSE connection {connection_id} for surface {conn.surface_id}")
-            del self.connections[connection_id]
 
     def drop_session(self, session_id: str) -> int:
         """Abruptly drop every live SSE stream for ``session_id``.
@@ -146,21 +178,32 @@ class SSEBroadcaster:
         (loopback connections are exempt from offline emulation — see
         tests/e2e/_probe_offline.py).
         """
+        with self._registry_lock:
+            connections = [
+                conn for conn in self.connections.values()
+                if conn.session_id == session_id
+            ]
+
         count = 0
-        for conn in self.connections.values():
+        for conn in connections:
             if conn.session_id == session_id:
-                conn.queue.put_nowait(_DROP)
-                count += 1
+                try:
+                    conn.queue.put_nowait(_DROP)
+                    count += 1
+                except asyncio.QueueFull:
+                    logger.warning("Queue full while dropping connection %s", conn.connection_id)
         if count:
             logger.info(f"Drop requested for session {session_id}: {count} stream(s)")
         return count
 
     def heartbeat(self, connection_id: str) -> bool:
         """Update heartbeat for a connection. Returns True if connection exists."""
-        if connection_id in self.connections:
-            self.connections[connection_id].last_heartbeat = datetime.now().timestamp()
+        with self._registry_lock:
+            conn = self.connections.get(connection_id)
+            if conn is None:
+                return False
+            conn.last_heartbeat = datetime.now().timestamp()
             return True
-        return False
 
     async def broadcast(self, event: SSEEvent) -> int:
         """
@@ -170,7 +213,10 @@ class SSEBroadcaster:
         """
         sent_count = 0
 
-        for conn in list(self.connections.values()):
+        with self._registry_lock:
+            connections = list(self.connections.values())
+
+        for conn in connections:
             # Filter by target
             if event.target_session_id and conn.session_id != event.target_session_id:
                 continue
@@ -227,7 +273,8 @@ class SSEBroadcaster:
                     logger.info(f"Drop sentinel on connection {connection.connection_id}")
                     return
 
-                connection.last_heartbeat = datetime.now().timestamp()
+                with self._registry_lock:
+                    connection.last_heartbeat = datetime.now().timestamp()
 
                 # Format and yield the event
                 payload = dict(event.data)
@@ -244,7 +291,12 @@ class SSEBroadcaster:
             logger.info(f"Connection {connection.connection_id} cancelled")
             raise
         finally:
-            self.unregister(connection.connection_id)
+            try:
+                # Idempotent pop preserves the original stream exception or
+                # cancellation even if timeout cleanup won the claim first.
+                self.unregister(connection.connection_id)
+            except Exception as cleanup_error:  # pragma: no cover - defensive
+                logger.error("SSE connection cleanup failed: %s", cleanup_error)
 
     def _format_sse(self, event_type: str, data: dict) -> str:
         """Format an event as SSE."""
@@ -259,27 +311,37 @@ class SSEBroadcaster:
                 now = datetime.now().timestamp()
                 timeout = 300  # 5 minutes
 
-                # Atomic cleanup: build list of dead connections first
-                dead_connections = [
-                    cid for cid, conn in self.connections.items()
-                    if (now - conn.last_heartbeat) > timeout
-                ]
+                # First take an immutable (id, heartbeat) snapshot. Claiming
+                # with the same heartbeat below prevents a stale scan from
+                # removing a connection that was renewed meanwhile.
+                with self._registry_lock:
+                    candidates = [
+                        (cid, conn, conn.last_heartbeat)
+                        for cid, conn in self.connections.items()
+                        if (now - conn.last_heartbeat) > timeout
+                    ]
 
-                # Process all dead connections in a single atomic batch
-                for cid in dead_connections:
+                for cid, expected_conn, expected_heartbeat in candidates:
+                    with self._registry_lock:
+                        current = self.connections.get(cid)
+                        if (
+                            current is not expected_conn
+                            or current.last_heartbeat != expected_heartbeat
+                        ):
+                            continue
+                        # Claim/removal is the commit point. Signal the
+                        # detached connection outside the lock; queue failure
+                        # cannot leak the registry entry.
+                        conn = self.connections.pop(cid)
+
                     logger.info(f"Cleaning up dead connection {cid}")
-                    # Send disconnect event before removing
                     try:
-                        conn = self.connections.get(cid)
-                        if conn:
-                            conn.queue.put_nowait(SSEEvent(
-                                event_type="disconnect",
-                                data={"reason": "timeout"},
-                            ))
+                        conn.queue.put_nowait(SSEEvent(
+                            event_type="disconnect",
+                            data={"reason": "timeout"},
+                        ))
                     except asyncio.QueueFull:
-                        pass
-                    # Atomic removal using unregister
-                    self.unregister(cid)
+                        logger.warning("Queue full while disconnecting %s", cid)
 
             except asyncio.CancelledError:
                 break

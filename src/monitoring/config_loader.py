@@ -11,6 +11,7 @@ This pattern is suitable for:
 """
 
 import asyncio
+import threading
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path
@@ -53,6 +54,7 @@ class ConfigLoader:
         self.default_tick_interval_seconds = default_tick_interval_seconds
         self._cache: Optional[CachedConfig] = None
         self._lock = asyncio.Lock()
+        self._state_lock = threading.RLock()
 
     def _get_file_mtime(self) -> float:
         """Get the modification time of the config file."""
@@ -75,7 +77,8 @@ class ConfigLoader:
         loaded_at = time.time()
 
         cached = CachedConfig(data=data, mtime=mtime, loaded_at=loaded_at)
-        self._cache = cached
+        with self._state_lock:
+            self._cache = cached
 
         logger.debug(
             f"Config loaded from {self.config_path} "
@@ -98,24 +101,27 @@ class ConfigLoader:
             FileNotFoundError: If config file doesn't exist
         """
         async with self._lock:
+            with self._state_lock:
+                cached = self._cache
+
             # First load - cache is empty
-            if self._cache is None or force_reload:
+            if cached is None or force_reload:
                 cached = await self._load_with_cache_update()
                 return cached.data
 
             # Check if file has been modified
             current_mtime = self._get_file_mtime()
 
-            if current_mtime != self._cache.mtime:
+            if current_mtime != cached.mtime:
                 logger.info(
-                    f"Config file modified (old mtime: {self._cache.mtime}, "
+                    f"Config file modified (old mtime: {cached.mtime}, "
                     f"new mtime: {current_mtime}), reloading..."
                 )
                 cached = await self._load_with_cache_update()
                 return cached.data
 
             # Cache is still valid
-            return self._cache.data
+            return cached.data
 
     async def get_tick_interval_seconds(self) -> int:
         """
@@ -136,12 +142,14 @@ class ConfigLoader:
     async def invalidate_cache(self) -> None:
         """Invalidate the cached configuration (force reload on next access)."""
         async with self._lock:
-            self._cache = None
+            with self._state_lock:
+                self._cache = None
             logger.debug("Config cache invalidated")
 
     def is_cached(self) -> bool:
         """Check if configuration is currently cached."""
-        return self._cache is not None
+        with self._state_lock:
+            return self._cache is not None
 
     @property
     def cache_age_seconds(self) -> Optional[float]:
@@ -151,11 +159,13 @@ class ConfigLoader:
         Returns:
             Age in seconds, or None if not cached
         """
-        if self._cache is None:
+        with self._state_lock:
+            cached = self._cache
+        if cached is None:
             return None
 
         import time
-        return time.time() - self._cache.loaded_at
+        return time.time() - cached.loaded_at
 
 
 # Global config loader instance for monitoring

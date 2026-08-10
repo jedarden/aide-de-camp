@@ -7,6 +7,7 @@ falling back to LLM for complex/ambiguous cases, then routes:
 - other intents → fetch + synthesize strands
 """
 import asyncio
+import threading
 import json
 import time
 import uuid
@@ -51,7 +52,8 @@ class IntentCache:
     - Expired entries are removed on get() when cache size > 1000
     - Oldest entry is evicted when cache reaches capacity
 
-    Thread-safety: Not thread-safe - assumes single-threaded async execution.
+    Thread-safety: all cache and counter generations are protected by one
+    owner lock.
     """
 
     def __init__(self, ttl_seconds: int = 900, max_size: int = 2000):
@@ -68,8 +70,14 @@ class IntentCache:
         self._cache_hits = 0
         self._cache_misses = 0
         self._stats_log_interval = 50  # Log stats every N operations
+        self._cache_lock = threading.RLock()
 
     def get(self, key: str) -> list | None:
+        """Read one cache generation under the owner lock."""
+        with self._cache_lock:
+            return self._get_locked(key)
+
+    def _get_locked(self, key: str) -> list | None:
         """
         Retrieve cached intent mapping if exists and not expired.
 
@@ -105,6 +113,11 @@ class IntentCache:
         return None
 
     def set(self, key: str, value: list) -> None:
+        """Publish a cache entry under the owner lock."""
+        with self._cache_lock:
+            self._set_locked(key, value)
+
+    def _set_locked(self, key: str, value: list) -> None:
         """
         Store intent mapping with expiry timestamp.
 
@@ -125,21 +138,35 @@ class IntentCache:
 
     def _cleanup_expired(self) -> int:
         """
-        Remove all expired entries from the cache.
+        Remove all expired entries from the cache atomically.
+
+        Uses atomic dict rebuild pattern to prevent partial state issues.
+        Builds expired list first, then creates new dict without expired keys.
 
         Returns:
             Number of entries removed
         """
+        with self._cache_lock:
+            return self._cleanup_expired_locked()
+
+    def _cleanup_expired_locked(self) -> int:
         current_time = time.time()
+
+        # Build expired keys list first (read-only operation)
         expired_keys = [
             key for key, (_, expiry) in self._cache.items()
             if expiry < current_time
         ]
 
-        for key in expired_keys:
-            del self._cache[key]
-
+        # Atomic dict rebuild - create new dict without expired keys
+        # This ensures the operation is atomic: either all expired keys are
+        # removed or none are, preventing partial state issues
         if expired_keys:
+            self._cache = {
+                key: value
+                for key, value in self._cache.items()
+                if key not in expired_keys
+            }
             logger.debug(f"Cache cleanup removed {len(expired_keys)} expired entries")
 
         return len(expired_keys)
@@ -151,21 +178,24 @@ class IntentCache:
         Returns:
             Dict with hits, misses, hit_rate, size
         """
-        total_requests = self._cache_hits + self._cache_misses
-        hit_rate = (self._cache_hits / total_requests * 100) if total_requests > 0 else 0.0
+        with self._cache_lock:
+            total_requests = self._cache_hits + self._cache_misses
+            hit_rate = (self._cache_hits / total_requests * 100) if total_requests > 0 else 0.0
 
-        return {
-            "hits": self._cache_hits,
-            "misses": self._cache_misses,
-            "hit_rate": hit_rate,
-            "size": len(self._cache),
-        }
+            return {
+                "hits": self._cache_hits,
+                "misses": self._cache_misses,
+                "hit_rate": hit_rate,
+                "size": len(self._cache),
+            }
 
     def clear(self) -> None:
         """Clear the cache and reset statistics."""
-        self._cache.clear()
-        self._cache_hits = 0
-        self._cache_misses = 0
+        with self._cache_lock:
+            # Replace the cache and counters as one logical generation.
+            self._cache = {}
+            self._cache_hits = 0
+            self._cache_misses = 0
         logger.debug("Cache cleared")
 
     def should_log_stats(self) -> bool:
@@ -175,8 +205,9 @@ class IntentCache:
         Returns:
             True if stats should be logged, False otherwise
         """
-        total_requests = self._cache_hits + self._cache_misses
-        return total_requests > 0 and total_requests % self._stats_log_interval == 0
+        with self._cache_lock:
+            total_requests = self._cache_hits + self._cache_misses
+            return total_requests > 0 and total_requests % self._stats_log_interval == 0
 
 
 # Router error types for degraded-state handling
@@ -934,21 +965,30 @@ class IntentRouter:
                 result = await self._fetch_and_synthesize(routed_intent, timings)
         except Exception:
             # Persist whatever was captured before the failure, then re-raise.
-            await self._persist_timings(routed_intent.intent_id, timings)
+            await self._persist_timings(
+                routed_intent.intent_id, routed_intent.session_id, timings
+            )
             raise
 
-        await self._persist_timings(routed_intent.intent_id, timings)
+        await self._persist_timings(
+            routed_intent.intent_id, routed_intent.session_id, timings
+        )
         return result
 
     async def _persist_timings(
         self,
         intent_id: str,
+        session_id: str,
         timings: DispatchTimings,
     ) -> None:
         """Persist the captured dispatch timings. Non-fatal on error."""
         try:
             store = await self._get_store()
-            await store.record_dispatch_timings(intent_id, **timings.to_fields())
+            await store.record_dispatch_timings(
+                intent_id,
+                session_id=session_id,
+                **timings.to_fields(),
+            )
         except Exception as e:
             logger.warning(f"dispatch timings not recorded for {intent_id}: {e}")
 
@@ -1616,14 +1656,16 @@ class IntentRouter:
 
 # Global router instance
 _router: Optional[IntentRouter] = None
+_router_lock = threading.RLock()
 
 
 def get_router(store=None) -> IntentRouter:
     """Get or create the global intent router instance."""
     global _router
-    if _router is None:
-        _router = IntentRouter(store=store)
-    return _router
+    with _router_lock:
+        if _router is None:
+            _router = IntentRouter(store=store)
+        return _router
 
 
 def clear_router_cache() -> None:
@@ -1640,5 +1682,6 @@ def clear_router_cache() -> None:
         >>> assert timing["cached"] is False  # Fresh call after cache clear
     """
     global _router
-    if _router is not None:
-        _router._cache.clear()
+    with _router_lock:
+        if _router is not None:
+            _router._cache.clear()

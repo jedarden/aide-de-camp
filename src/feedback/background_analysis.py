@@ -97,6 +97,9 @@ class BackgroundAnalysisProcessor:
         self.task: Optional[asyncio.Task] = None
         self.store = get_store()
         self.self_mod_agent = get_self_modification_agent()
+        self._lifecycle_lock = asyncio.Lock()
+        self._stop_task: Optional[asyncio.Task] = None
+        self._lifecycle_state = "STOPPED"
 
     async def analyze_signals(self, limit: int = 100) -> list[AnalysisProposal]:
         """
@@ -569,23 +572,39 @@ class BackgroundAnalysisProcessor:
 
     async def start(self) -> None:
         """Start the background analysis processor."""
-        if self.task is not None and not self.task.done():
-            logger.warning("Background analysis processor already running")
-            return
-
-        self.running = True
-        self.task = asyncio.create_task(self.run())
+        async with self._lifecycle_lock:
+            if self.task is not None and not self.task.done():
+                logger.warning("Background analysis processor already running")
+                return
+            self.running = True
+            self._lifecycle_state = "RUNNING"
+            self.task = asyncio.create_task(self.run())
         logger.info("Background analysis processor started")
 
     async def stop(self) -> None:
         """Stop the background analysis processor."""
+        async with self._lifecycle_lock:
+            if self._stop_task is None or self._stop_task.done():
+                self._lifecycle_state = "STOPPING"
+                self._stop_task = asyncio.create_task(self._stop_impl())
+            stop_task = self._stop_task
+        await stop_task
+
+    async def _stop_impl(self) -> None:
         self.running = False
-        if self.task:
-            self.task.cancel()
-            try:
-                await self.task
-            except asyncio.CancelledError:
-                pass
+        task = self.task
+        if task is not None and not task.done():
+            task.cancel()
+            result = await asyncio.gather(task, return_exceptions=True)
+            failures = [error for error in result if isinstance(error, Exception)]
+        else:
+            failures = []
+        if task is None or task.done():
+            self.task = None
+        if failures or self.task is not None:
+            self._lifecycle_state = "FAILED_STOP"
+            raise RuntimeError("Background analysis cleanup incomplete")
+        self._lifecycle_state = "STOPPED"
         logger.info("Background analysis processor stopped")
 
 

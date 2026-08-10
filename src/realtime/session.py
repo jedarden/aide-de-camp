@@ -6,6 +6,7 @@ Tool-as-trigger model: dispatch_intent() returns ack immediately; results arrive
 Based on DUCK-E scaffolding but adapted for ADC's async result delivery pattern.
 """
 import asyncio
+import threading
 import httpx
 import json
 import os
@@ -13,6 +14,7 @@ import time
 from logging import Logger, getLogger
 from pathlib import Path
 from typing import Any, Callable, Optional
+from uuid import uuid4
 
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL", "https://openai-proxy.ardenone.com:8444")
 
@@ -82,6 +84,8 @@ class VoiceSession:
         # Result queue for async delivery
         self.result_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         self.pending_results: list[dict[str, Any]] = []  # For canvas catch-up
+        self._pending_lock = threading.RLock()
+        self._pending_in_flight: dict[str, list[dict[str, Any]]] = {}
 
         # Narration state
         self.last_narration_time = 0.0
@@ -174,7 +178,8 @@ class VoiceSession:
         await self.result_queue.put(result)
 
         # Track for canvas catch-up
-        self.pending_results.append(result)
+        with self._pending_lock:
+            self.pending_results.append(result)
 
         self.logger.info(json.dumps({
             "event": "result_queued",
@@ -189,9 +194,34 @@ class VoiceSession:
         Return pending results for canvas catch-up.
         Clears the pending list after returning.
         """
-        results = self.pending_results.copy()
-        self.pending_results.clear()
+        with self._pending_lock:
+            results = list(self.pending_results)
+            if not results:
+                return []
+            # Claim before returning. The caller can acknowledge or requeue
+            # the same batch if processing/canvas delivery fails.
+            token = str(uuid4())
+            self.pending_results = []
+            self._pending_in_flight[token] = results
         return results
+
+    def ack_pending_results(self, results: list[dict[str, Any]]) -> None:
+        """Acknowledge a catch-up batch after the caller consumes it."""
+        with self._pending_lock:
+            for token, claimed in list(self._pending_in_flight.items()):
+                if claimed is results or claimed == results:
+                    self._pending_in_flight.pop(token, None)
+                    return
+
+    def nack_pending_results(self, results: list[dict[str, Any]]) -> None:
+        """Return an unconsumed catch-up batch to the ready queue."""
+        with self._pending_lock:
+            for token, claimed in list(self._pending_in_flight.items()):
+                if claimed is results or claimed == results:
+                    self._pending_in_flight.pop(token, None)
+                    # Requeue at the front so result order survives retry.
+                    self.pending_results[0:0] = claimed
+                    return
 
     def _should_narrate_now(self, result: dict[str, Any]) -> bool:
         """

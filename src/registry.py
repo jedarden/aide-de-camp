@@ -17,6 +17,7 @@ import logging
 import os
 import time
 import random
+import threading
 from pathlib import Path
 from typing import Any, Callable
 from functools import wraps
@@ -101,6 +102,7 @@ CACHE_TTL = 300  # 5 minutes
 # This ensures that multiple async tasks can safely access the registry without corruption
 # Uses asyncio.Lock() for proper async concurrent access protection in FastAPI context
 _cache_lock = asyncio.Lock()
+_cache_state_lock = threading.RLock()
 
 # HOT-RELOAD MECHANISM: TTL-based cache invalidation
 # _cache stores the merged registry (YAML + discovered projects)
@@ -404,32 +406,42 @@ async def get_registry(force: bool = False) -> dict:
     """
     global _cache, _cache_at
 
-    # ASYNCIO LOCKING: Double-checked locking pattern
-    # First check without lock for performance (fast path for cache hits)
-    cache_is_stale = force or _cache is None or (time.time() - _cache_at) > CACHE_TTL
+    # Read one cache/timestamp snapshot. The fast path is lock-protected too,
+    # so readers never pair values from different registry generations.
+    with _cache_state_lock:
+        cached_registry = _cache
+        cached_at = _cache_at
+    cache_is_stale = force or cached_registry is None or (time.time() - cached_at) > CACHE_TTL
 
     if not cache_is_stale:
-        # Fast path: return cached registry without lock contention
-        return _cache
+        return cached_registry
 
     # Slow path: need to rebuild cache - acquire lock for async safety
     logger.debug("Acquiring registry cache lock for rebuild")
     async with _cache_lock:
         logger.debug("Registry cache lock acquired, checking if rebuild still needed")
         # Double-check: another task may have rebuilt cache while we waited for lock
-        cache_is_stale = force or _cache is None or (time.time() - _cache_at) > CACHE_TTL
+        with _cache_state_lock:
+            cached_registry = _cache
+            cached_at = _cache_at
+        cache_is_stale = force or cached_registry is None or (time.time() - cached_at) > CACHE_TTL
 
         if cache_is_stale:
             logger.debug("Registry cache is stale, rebuilding")
             # Rebuild cache under lock protection
-            _cache = _build_registry()
-            _cache_at = time.time()
+            replacement = _build_registry()
+            replacement_at = time.time()
+            with _cache_state_lock:
+                # Publish the complete immutable pair at one commit point.
+                _cache = replacement
+                _cache_at = replacement_at
             logger.debug("Registry cache rebuilt successfully")
         else:
             logger.debug("Registry cache already rebuilt by another task, using cached version")
 
         logger.debug("Releasing registry cache lock")
-        return _cache
+        with _cache_state_lock:
+            return _cache
 
 
 async def get_project(slug: str) -> dict | None:
