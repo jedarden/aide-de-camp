@@ -140,6 +140,11 @@ One LLM call per utterance. Receives the full utterance text, the project regist
 
 Intent types: `status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`, `stuck`
 
+This is the canonical intent-type list. `task-profile` is the intent type for
+durable async work; bare `task` is not an intent type and is deprecated in
+router payloads. The escalate strand uses `task` only as the internal NEEDLE
+bead type created for a `task-profile` intent.
+
 - **status**: Query current state (pods, pipelines, deployments, beads)
 - **action**: Execute a command (deploy, restart, create) — executes only through the Action Execution Model (declarative-config Git operations + ArgoCD sync status, or reviewed escalation beads); never direct kubectl mutation
 - **brainstorm**: Explore options, design, architecture discussion

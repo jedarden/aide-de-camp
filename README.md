@@ -10,6 +10,10 @@ CLI alias: `adc`
 
 1. **Intent routing** — a single fast LLM call segments your utterance into typed intent threads, each tagged with a project, an intent type (`status`, `action`, `brainstorm`, `lookup`, `reminder`, `self-modification`, `monitoring-config`, `task-profile`, `clarification`, `stuck`), and an urgency level (`critical`, `high`, `normal`, `low`).
 
+This is the canonical intent-type list. Use `task-profile` for durable async
+work. Bare `task` is not an intent type and is deprecated in router payloads;
+it names the internal NEEDLE bead type created by the escalate strand.
+
 2. **Parallel dispatch** — all threads run concurrently. A compound utterance touching five projects takes as long as the slowest single agent, not their sum.
 
 3. **Fetch strand** — each agent runs deterministic commands against live data sources (kubectl, git, local repos, SSH targets) to gather raw context for its thread.
