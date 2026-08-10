@@ -699,7 +699,7 @@ class GitOpsCommitStep:
 
     async def rollback(self, manifest_path: str, commit_sha: str) -> StepResult:
         """
-        Rollback a commit by reverting the specified commit.
+        Rollback a commit by atomically restoring its parent manifest.
 
         Args:
             manifest_path: Path to manifest file
@@ -710,20 +710,84 @@ class GitOpsCommitStep:
         """
         logger.info(f"Rolling back commit {commit_sha} for {manifest_path}")
 
+        manifest_file = self.declarative_config_path / manifest_path
+        original_content: str | None = None
+        original_exists = manifest_file.exists()
+
+        def restore_original_manifest() -> None:
+            """Restore the pre-rollback worktree content without a direct write."""
+            if not original_exists or original_content is None:
+                logger.warning(
+                    "Rollback atomic restore skipped for %s because the original "
+                    "manifest was not present",
+                    manifest_file,
+                )
+                return
+
+            logger.info(
+                "Rollback atomic restore: restoring %s after failed rollback",
+                manifest_file,
+            )
+            atomic_write(manifest_file, original_content)
+
         try:
-            # Revert the commit
+            if original_exists:
+                original_content = manifest_file.read_text()
+
+            # Read the parent version without allowing git to mutate the
+            # worktree.  The generated GitOps commit stages only this manifest,
+            # so restoring this path is the complete rollback payload.
             result = subprocess.run(
-                ["git", "-C", str(self.declarative_config_path), "revert", "--no-commit", commit_sha],
+                [
+                    "git",
+                    "-C",
+                    str(self.declarative_config_path),
+                    "show",
+                    f"{commit_sha}^:{manifest_path}",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=30,
+                check=False,
             )
 
             if result.returncode != 0:
                 return StepResult(
                     success=False,
                     data={"commit_sha": commit_sha},
-                    error=f"git revert failed: {result.stderr}",
+                    error=f"git revert failed while reading parent: {result.stderr}",
+                )
+
+            logger.info(
+                "Rollback atomic write: publishing parent of %s to %s",
+                commit_sha,
+                manifest_file,
+            )
+            atomic_write(manifest_file, result.stdout)
+
+            # Stage only the atomically restored manifest.  This keeps the
+            # index operation separate from the file publication and ensures a
+            # failed commit can restore both worktree and index state.
+            result = subprocess.run(
+                ["git", "-C", str(self.declarative_config_path), "add", "--", manifest_path],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            if result.returncode != 0:
+                try:
+                    restore_original_manifest()
+                except Exception as restore_error:
+                    logger.error(
+                        "Rollback atomic restore failed for %s: %s",
+                        manifest_file,
+                        restore_error,
+                    )
+                return StepResult(
+                    success=False,
+                    data={"commit_sha": commit_sha},
+                    error=f"Rollback staging failed: {result.stderr}",
                 )
 
             # Commit the revert
@@ -732,9 +796,36 @@ class GitOpsCommitStep:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
 
             if result.returncode != 0:
+                # The staged rollback has not been committed.  Unstage it and
+                # restore the original worktree content atomically so a
+                # partially completed rollback cannot leave a truncated file.
+                try:
+                    subprocess.run(
+                        [
+                            "git",
+                            "-C",
+                            str(self.declarative_config_path),
+                            "reset",
+                            "HEAD",
+                            "--",
+                            manifest_path,
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                        check=False,
+                    )
+                    restore_original_manifest()
+                except Exception as restore_error:
+                    logger.error(
+                        "Rollback atomic restore failed for %s: %s",
+                        manifest_file,
+                        restore_error,
+                    )
                 return StepResult(
                     success=False,
                     data={"commit_sha": commit_sha},
