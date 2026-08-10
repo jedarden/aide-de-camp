@@ -1,0 +1,525 @@
+{
+  "report_schema_version": "1.0",
+  "report_type": "metric_availability_coverage_and_anomaly_report",
+  "dataset": {
+    "generated_at": "2026-08-10T11:44:51.128Z",
+    "services": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "metric_families": [
+      "error_rates",
+      "latency",
+      "resource_usage"
+    ],
+    "time_alignment": {
+      "alignment_method": "UTC timestamps with source windows preserved; cross-family comparison uses exact requested-window intersection",
+      "canonical_granularity": "source-native plus hourly resource samples",
+      "source_windows": {
+        "error_rates": {
+          "start": "2026-07-07T00:00:00Z",
+          "end": "2026-08-06T23:59:59Z",
+          "declared_days": 30,
+          "calendar_days_inclusive": 31,
+          "resolution": "aggregate_only"
+        },
+        "latency": {
+          "start": "2026-07-07T00:00:00Z",
+          "end": "2026-08-06T23:59:59Z",
+          "declared_days": 30,
+          "calendar_days_inclusive": 31,
+          "resolution": "event_and_sparse_day_aggregates"
+        },
+        "cpu_memory": {
+          "start": "2026-07-11T11:14:01.927000Z",
+          "end": "2026-08-10T11:14:01.927000Z",
+          "resolution": "1h_requested_step"
+        },
+        "disk_network_storage": {
+          "start": "2026-07-11T11:44:38.362000Z",
+          "end": "2026-08-10T11:44:38.362000Z",
+          "resolution": "1h_requested_step"
+        }
+      },
+      "common_requested_intersection": {
+        "start": "2026-07-11T11:44:38.362Z",
+        "end": "2026-08-06T23:59:59.000Z",
+        "duration_days": 26.510655532407405,
+        "partial_first_and_last_source_buckets": true
+      },
+      "alignment_status": "aligned_with_documented_window_mismatch_and_sparse_coverage",
+      "notes": [
+        "Error and latency collections end on 2026-08-06 while resource collections end on 2026-08-10.",
+        "Resource queries requested 30 days but Prometheus returned only the last 10.708 days because of a 19.292-day leading retention/no-data gap.",
+        "No synthetic samples were inserted for missing intervals; unavailable values remain null or are represented by coverage records."
+      ]
+    },
+    "deployment_context": {
+      "source": "data/metrics_deployment_aligned.json",
+      "events": [
+        {
+          "date": "2026-07-13",
+          "timestamp": "2026-07-13T18:07:55.000Z",
+          "event_type": "deployment_rollback",
+          "deployment": "pbx-web",
+          "revision": 11,
+          "replicaSet": "pbx-web-754f4cfdf7",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "outcome": "rolled_back",
+          "notes": "Rolled back from 1.0.9 to 1.0.8 on same day",
+          "service": "pbx-web",
+          "deployment_name": "pbx-web",
+          "event_id": "pbx-web:2026-07-13T18:07:55Z:deployment_rollback:11"
+        },
+        {
+          "date": "2026-07-13",
+          "timestamp": "2026-07-13T18:18:07.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "pbx-web",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "outcome": "success",
+          "notes": "Re-deployment of 1.0.9 after rollback - 10m 12s after rollback",
+          "service": "pbx-web",
+          "deployment_name": "pbx-web",
+          "event_id": "pbx-web:2026-07-13T18:18:07Z:deployment_rollout:14"
+        },
+        {
+          "date": "2026-07-15",
+          "timestamp": "2026-07-15T03:24:40.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "pbx-rebuild-relay",
+          "revision": 5,
+          "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+          "image": "python:3-slim",
+          "outcome": "success",
+          "notes": "PBX rebuild relay deployment - supporting infrastructure",
+          "service": "pbx-web",
+          "deployment_name": "pbx-rebuild-relay",
+          "event_id": "pbx-web:2026-07-15T03:24:40Z:deployment_rollout:5"
+        },
+        {
+          "date": "2026-07-27",
+          "timestamp": "2026-07-27T17:56:07.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "lab-rebuild-relay",
+          "revision": 2,
+          "replicaSet": "lab-rebuild-relay-79957dbd4",
+          "image": "python:3-slim",
+          "outcome": "success",
+          "notes": "Lab rebuild relay deployment - supporting infrastructure",
+          "service": "pbx-web",
+          "deployment_name": "lab-rebuild-relay",
+          "event_id": "pbx-web:2026-07-27T17:56:07Z:deployment_rollout:2"
+        },
+        {
+          "date": "2026-07-28",
+          "timestamp": "2026-07-28T17:26:12.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "pbx-web",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "outcome": "success",
+          "notes": "Current active deployment - same image, possible config restart",
+          "service": "pbx-web",
+          "deployment_name": "pbx-web",
+          "event_id": "pbx-web:2026-07-28T17:26:12Z:deployment_rollout:14"
+        },
+        {
+          "date": "2026-07-08",
+          "timestamp": "2026-07-08T03:09:35.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "whisper-stt",
+          "revision": 29,
+          "replicaSet": "whisper-stt-5dbff75cbd",
+          "image": "ronaldraygun/whisper-stt:1.8.2",
+          "outcome": "success",
+          "notes": "Initial deployment in rapid sequence",
+          "service": "whisper-stt",
+          "deployment_name": "whisper-stt",
+          "event_id": "whisper-stt:2026-07-08T03:09:35Z:deployment_rollout:29"
+        },
+        {
+          "date": "2026-07-08",
+          "timestamp": "2026-07-08T03:16:13.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "whisper-stt",
+          "revision": 30,
+          "replicaSet": "whisper-stt-5b8558f478",
+          "image": "ronaldraygun/whisper-stt:1.8.4",
+          "outcome": "success",
+          "notes": "Second deployment in rapid sequence (6m 38s after previous)",
+          "service": "whisper-stt",
+          "deployment_name": "whisper-stt",
+          "event_id": "whisper-stt:2026-07-08T03:16:13Z:deployment_rollout:30"
+        },
+        {
+          "date": "2026-07-08",
+          "timestamp": "2026-07-08T03:26:44.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "whisper-stt",
+          "revision": 31,
+          "replicaSet": "whisper-stt-6c497489fb",
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "outcome": "success",
+          "notes": "Third deployment in rapid sequence (10m 31s after previous)",
+          "service": "whisper-stt",
+          "deployment_name": "whisper-stt",
+          "event_id": "whisper-stt:2026-07-08T03:26:44Z:deployment_rollout:31"
+        },
+        {
+          "date": "2026-07-12",
+          "timestamp": "2026-07-12T16:53:42.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "whisper-stt",
+          "revision": 32,
+          "replicaSet": "whisper-stt-847fd8d7b9",
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "outcome": "success",
+          "notes": "Current active deployment - same image as revision 31, possible config change",
+          "service": "whisper-stt",
+          "deployment_name": "whisper-stt",
+          "event_id": "whisper-stt:2026-07-12T16:53:42Z:deployment_rollout:32"
+        }
+      ],
+      "per_service": {
+        "pbx-web": {
+          "event_count": 5,
+          "alignment_row_count": 20,
+          "rows_in_requested_metric_window": 20,
+          "rows_within_half_step": 0,
+          "rows_within_observed_metric_window": 0,
+          "status_counts": {
+            "outside_observed_metric_window": 20
+          }
+        },
+        "whisper-stt": {
+          "event_count": 4,
+          "alignment_row_count": 16,
+          "rows_in_requested_metric_window": 4,
+          "rows_within_half_step": 0,
+          "rows_within_observed_metric_window": 0,
+          "status_counts": {
+            "event_outside_metric_requested_window": 12,
+            "outside_observed_metric_window": 4
+          }
+        }
+      },
+      "interpretation": "Deployment events are preserved as context; no metric values are interpolated at event timestamps."
+    },
+    "source_artifacts": {
+      "error_rates_and_application_latency": "data/error_latency_metrics_30d_enhanced_20260806_211642.json",
+      "workflow_and_deployment_latency": "data/latency_metrics_30d_20260806_215749.json",
+      "resource_snapshot": "data/resource_usage_metrics_30d.json",
+      "cpu_and_memory_timeseries": "data/resource_metrics/resource-metrics-30d-20260810T111404Z.json",
+      "cpu_and_memory_coverage": "data/resource_metrics/resource-metrics-coverage-20260810T111404Z.json",
+      "disk_network_storage_timeseries": "data/resource_metrics/disk-network-storage-metrics-30d-20260810T114451Z.json",
+      "disk_network_storage_coverage": "data/resource_metrics/disk-network-storage-coverage-20260810T114451Z.json"
+    }
+  },
+  "overall_status": "degraded_but_structured",
+  "acceptance_criteria": {
+    "merged_error_latency_resource_metrics": true,
+    "temporal_alignment_documented": true,
+    "coverage_gaps_documented": true,
+    "anomalies_flagged": true,
+    "availability_and_data_quality_summarized": true,
+    "structured_json_outputs_created": true
+  },
+  "service_summaries": {
+    "pbx-web": {
+      "status": "degraded",
+      "family_status": {
+        "error_rates": {
+          "availability_percentage": 75.0,
+          "quality": "partial_aggregate",
+          "available_metric_count": 3,
+          "metric_count": 4
+        },
+        "latency": {
+          "availability_percentage": 100.0,
+          "quality": "partial",
+          "available_metric_count": 3,
+          "metric_count": 3
+        },
+        "resource_usage": {
+          "availability_percentage": 58.82352941176471,
+          "quality": "partial",
+          "available_metric_count": 10,
+          "metric_count": 17
+        }
+      },
+      "gap_count": 5,
+      "anomaly_count": 6,
+      "quality_notes": [
+        "Error rates are aggregate-only and do not include a complete daily series.",
+        "Latency sources are sparse event/workflow aggregates; application timing is log-derived where present.",
+        "Resource Prometheus data has a leading retention/no-data gap and no synthetic fill.",
+        "Counts follow the source collection scope; pod names in the log artifact include supporting and non-primary workload pods."
+      ]
+    },
+    "whisper-stt": {
+      "status": "degraded",
+      "family_status": {
+        "error_rates": {
+          "availability_percentage": 75.0,
+          "quality": "partial_aggregate",
+          "available_metric_count": 3,
+          "metric_count": 4
+        },
+        "latency": {
+          "availability_percentage": 66.66666666666666,
+          "quality": "partial",
+          "available_metric_count": 2,
+          "metric_count": 3
+        },
+        "resource_usage": {
+          "availability_percentage": 88.23529411764706,
+          "quality": "partial",
+          "available_metric_count": 15,
+          "metric_count": 17
+        }
+      },
+      "gap_count": 5,
+      "anomaly_count": 3,
+      "quality_notes": [
+        "Error rates are aggregate-only and do not include a complete daily series.",
+        "Latency sources are sparse event/workflow aggregates; application timing is log-derived where present.",
+        "Resource Prometheus data has a leading retention/no-data gap and no synthetic fill.",
+        "Counts follow the source collection scope; pod names in the log artifact include supporting and non-primary workload pods."
+      ]
+    }
+  },
+  "coverage_gaps": [
+    {
+      "id": "pbx-web-resource-retention-gap",
+      "service": "pbx-web",
+      "metric_family": "resource_usage",
+      "severity": "high",
+      "type": "leading_retention_or_no_data_gap",
+      "affected_metric_count": 17,
+      "duration_days": 30.0,
+      "description": "Prometheus returned no samples at the beginning of the requested 30-day resource window.",
+      "source": "resource coverage reports"
+    },
+    {
+      "id": "pbx-web-resource-unavailable-series",
+      "service": "pbx-web",
+      "metric_family": "resource_usage",
+      "severity": "high",
+      "type": "metric_series_unavailable",
+      "metrics": [
+        "storage_available_bytes",
+        "storage_capacity_bytes",
+        "storage_filesystem_limit_bytes",
+        "storage_filesystem_usage_bytes",
+        "storage_pvc_info",
+        "storage_requested_bytes",
+        "storage_used_bytes"
+      ],
+      "description": "The query succeeded but returned no time series; this is not equivalent to a measured zero.",
+      "source": "disk/network/storage raw query responses"
+    },
+    {
+      "id": "pbx-web-error-components-unavailable",
+      "service": "pbx-web",
+      "metric_family": "error_rates",
+      "severity": "high",
+      "type": "component_coverage_gap",
+      "components": [
+        "deployment_events"
+      ],
+      "description": "A missing log/event source is represented as unavailable rather than zero.",
+      "source": "error/latency collection artifact"
+    },
+    {
+      "id": "pbx-web-error-daily-breakdown-missing",
+      "service": "pbx-web",
+      "metric_family": "error_rates",
+      "severity": "medium",
+      "type": "aggregate_only",
+      "description": "Error counts cover the source analysis window but have no complete daily time series.",
+      "source": "error/latency collection artifact"
+    },
+    {
+      "id": "pbx-web-workflow-latency-sparse",
+      "service": "pbx-web",
+      "metric_family": "latency",
+      "severity": "medium",
+      "type": "sparse_temporal_coverage",
+      "description": "Workflow latency has samples on only one day of the source window.",
+      "source": "latency query artifact"
+    },
+    {
+      "id": "whisper-stt-resource-retention-gap",
+      "service": "whisper-stt",
+      "metric_family": "resource_usage",
+      "severity": "high",
+      "type": "leading_retention_or_no_data_gap",
+      "affected_metric_count": 17,
+      "duration_days": 30.0,
+      "description": "Prometheus returned no samples at the beginning of the requested 30-day resource window.",
+      "source": "resource coverage reports"
+    },
+    {
+      "id": "whisper-stt-resource-unavailable-series",
+      "service": "whisper-stt",
+      "metric_family": "resource_usage",
+      "severity": "high",
+      "type": "metric_series_unavailable",
+      "metrics": [
+        "storage_filesystem_limit_bytes",
+        "storage_filesystem_usage_bytes"
+      ],
+      "description": "The query succeeded but returned no time series; this is not equivalent to a measured zero.",
+      "source": "disk/network/storage raw query responses"
+    },
+    {
+      "id": "whisper-stt-error-components-unavailable",
+      "service": "whisper-stt",
+      "metric_family": "error_rates",
+      "severity": "high",
+      "type": "component_coverage_gap",
+      "components": [
+        "http_logs"
+      ],
+      "description": "A missing log/event source is represented as unavailable rather than zero.",
+      "source": "error/latency collection artifact"
+    },
+    {
+      "id": "whisper-stt-error-daily-breakdown-missing",
+      "service": "whisper-stt",
+      "metric_family": "error_rates",
+      "severity": "medium",
+      "type": "aggregate_only",
+      "description": "Error counts cover the source analysis window but have no complete daily time series.",
+      "source": "error/latency collection artifact"
+    },
+    {
+      "id": "whisper-stt-application-latency-missing",
+      "service": "whisper-stt",
+      "metric_family": "latency",
+      "severity": "high",
+      "type": "no_application_timing_samples",
+      "description": "No structured application timing lines were collected for whisper-stt.",
+      "source": "error/latency collection artifact"
+    }
+  ],
+  "anomalies": [
+    {
+      "id": "pbx-web-disk_read_bytes_per_second-all-zero",
+      "service": "pbx-web",
+      "metric_family": "resource_usage",
+      "metric": "disk_read_bytes_per_second",
+      "severity": "medium",
+      "type": "constant_zero_series",
+      "description": "Every returned sample is zero; this may indicate true idleness or an uninstrumented counter.",
+      "sample_count": 774,
+      "source": "raw Prometheus response"
+    },
+    {
+      "id": "pbx-web-disk_read_operations_per_second-all-zero",
+      "service": "pbx-web",
+      "metric_family": "resource_usage",
+      "metric": "disk_read_operations_per_second",
+      "severity": "medium",
+      "type": "constant_zero_series",
+      "description": "Every returned sample is zero; this may indicate true idleness or an uninstrumented counter.",
+      "sample_count": 774,
+      "source": "raw Prometheus response"
+    },
+    {
+      "id": "pbx-web-disk_write_bytes_per_second-all-zero",
+      "service": "pbx-web",
+      "metric_family": "resource_usage",
+      "metric": "disk_write_bytes_per_second",
+      "severity": "medium",
+      "type": "constant_zero_series",
+      "description": "Every returned sample is zero; this may indicate true idleness or an uninstrumented counter.",
+      "sample_count": 774,
+      "source": "raw Prometheus response"
+    },
+    {
+      "id": "pbx-web-disk_write_operations_per_second-all-zero",
+      "service": "pbx-web",
+      "metric_family": "resource_usage",
+      "metric": "disk_write_operations_per_second",
+      "severity": "medium",
+      "type": "constant_zero_series",
+      "description": "Every returned sample is zero; this may indicate true idleness or an uninstrumented counter.",
+      "sample_count": 774,
+      "source": "raw Prometheus response"
+    },
+    {
+      "id": "pbx-web-workflow-long-tail",
+      "service": "pbx-web",
+      "metric_family": "latency",
+      "metric": "workflow_execution_time",
+      "severity": "high",
+      "type": "long_tail_spike",
+      "description": "Maximum workflow duration is more than ten times the median.",
+      "max_seconds": 20310.0,
+      "p50_seconds": 1457.0,
+      "source": "latency query artifact"
+    },
+    {
+      "id": "pbx-web-memory-over-request",
+      "service": "pbx-web",
+      "metric_family": "resource_usage",
+      "metric": "memory_working_set",
+      "severity": "high",
+      "type": "memory_above_request",
+      "request_utilization_percent": 365.625,
+      "limit_utilization_percent": 91.40625,
+      "description": "Current memory exceeds the recorded request; verify request aggregation before capacity decisions.",
+      "source": "resource usage snapshot"
+    },
+    {
+      "id": "whisper-stt-deployment-interval-spread",
+      "service": "whisper-stt",
+      "metric_family": "latency",
+      "metric": "deployment_interval",
+      "severity": "medium",
+      "type": "rapid_sequence_and_long_gap",
+      "description": "Deployment intervals combine a rapid rollout sequence with a much longer gap.",
+      "max_hours": 109.45,
+      "median_hours": 0.18,
+      "source": "latency query artifact"
+    },
+    {
+      "id": "whisper-stt-memory-over-request",
+      "service": "whisper-stt",
+      "metric_family": "resource_usage",
+      "metric": "memory_working_set",
+      "severity": "high",
+      "type": "memory_above_request",
+      "request_utilization_percent": 212.5732421875,
+      "limit_utilization_percent": 106.28662109375,
+      "description": "Current memory exceeds the recorded request; verify request aggregation before capacity decisions.",
+      "source": "resource usage snapshot"
+    },
+    {
+      "id": "whisper-stt-memory-over-limit",
+      "service": "whisper-stt",
+      "metric_family": "resource_usage",
+      "metric": "memory_working_set",
+      "severity": "critical",
+      "type": "memory_above_limit",
+      "request_utilization_percent": 212.5732421875,
+      "limit_utilization_percent": 106.28662109375,
+      "description": "Current memory exceeds the recorded limit; verify the snapshot and container-level aggregation.",
+      "source": "resource usage snapshot"
+    }
+  ],
+  "interpretation_guidance": [
+    "null or unavailable means no trustworthy samples were returned; it is not a zero measurement",
+    "aggregate error rates and sparse event latency must not be interpreted as complete daily coverage",
+    "resource point coverage is based on returned hourly timestamp points, while series statistics use all returned values"
+  ],
+  "output_files": [
+    "data/unified_metrics_30d.json",
+    "data/unified_metrics_availability_report.json"
+  ]
+}
