@@ -119,6 +119,28 @@ reported separately and must be understood before treating the suite as
 complete. Inspect `test_repeat_report.json` for per-run counts and the
 pass/fail history; do not infer isolation from a single green run.
 
+#### Verification boundary
+
+The database fixtures provide per-test state isolation, but they cannot make a
+timing-sensitive contention test deterministic when the host is under load.
+That distinction is important: a temporary database can be fresh while a
+concurrent test still times out waiting for an event-loop or SQLite lock.
+
+On 2026-08-10, ten focused runs of the database/concurrency isolation tests
+executed 76 tests per run (760 executions total). Nine runs passed 76/76; run
+2 timed out in
+`tests/test_concurrent_access_stress.py::test_lock_contention_detection`.
+The repeat report therefore classified one flaky test (9/10 passes) and 75
+tests as stable. Treat the suite as isolation-clean only after that contention
+failure is resolved or reproduced as an environment-specific load issue and
+the ten-run command is green.
+
+The same date's full-suite verification was not green: its first completed
+run reported 3,683 passed, 258 failed, 241 errors, and 40 skipped out of
+4,220 collected test results. Those failures must not be summarized as a
+database-isolation guarantee or as evidence that the fixture cleanup failed;
+inspect the individual error and failure reports first.
+
 ## Test Structure
 
 The test infrastructure is organized into logical test classes:
