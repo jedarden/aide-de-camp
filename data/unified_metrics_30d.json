@@ -1,0 +1,3825 @@
+{
+  "schema_version": "1.0",
+  "dataset_type": "unified_service_metrics",
+  "metadata": {
+    "generated_at": "2026-08-10T11:44:51.128Z",
+    "services": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "metric_families": [
+      "error_rates",
+      "latency",
+      "resource_usage"
+    ],
+    "time_alignment": {
+      "alignment_method": "UTC timestamps with source windows preserved; cross-family comparison uses exact requested-window intersection",
+      "canonical_granularity": "source-native plus hourly resource samples",
+      "source_windows": {
+        "error_rates": {
+          "start": "2026-07-07T00:00:00Z",
+          "end": "2026-08-06T23:59:59Z",
+          "declared_days": 30,
+          "calendar_days_inclusive": 31,
+          "resolution": "aggregate_only"
+        },
+        "latency": {
+          "start": "2026-07-07T00:00:00Z",
+          "end": "2026-08-06T23:59:59Z",
+          "declared_days": 30,
+          "calendar_days_inclusive": 31,
+          "resolution": "event_and_sparse_day_aggregates"
+        },
+        "cpu_memory": {
+          "start": "2026-07-11T11:14:01.927000Z",
+          "end": "2026-08-10T11:14:01.927000Z",
+          "resolution": "1h_requested_step"
+        },
+        "disk_network_storage": {
+          "start": "2026-07-11T11:44:38.362000Z",
+          "end": "2026-08-10T11:44:38.362000Z",
+          "resolution": "1h_requested_step"
+        }
+      },
+      "common_requested_intersection": {
+        "start": "2026-07-11T11:44:38.362Z",
+        "end": "2026-08-06T23:59:59.000Z",
+        "duration_days": 26.510655532407405,
+        "partial_first_and_last_source_buckets": true
+      },
+      "alignment_status": "aligned_with_documented_window_mismatch_and_sparse_coverage",
+      "notes": [
+        "Error and latency collections end on 2026-08-06 while resource collections end on 2026-08-10.",
+        "Resource queries requested 30 days but Prometheus returned only the last 10.708 days because of a 19.292-day leading retention/no-data gap.",
+        "No synthetic samples were inserted for missing intervals; unavailable values remain null or are represented by coverage records."
+      ]
+    },
+    "deployment_context": {
+      "source": "data/metrics_deployment_aligned.json",
+      "events": [
+        {
+          "date": "2026-07-13",
+          "timestamp": "2026-07-13T18:07:55.000Z",
+          "event_type": "deployment_rollback",
+          "deployment": "pbx-web",
+          "revision": 11,
+          "replicaSet": "pbx-web-754f4cfdf7",
+          "image": "ronaldraygun/pbx-web:1.0.8",
+          "outcome": "rolled_back",
+          "notes": "Rolled back from 1.0.9 to 1.0.8 on same day",
+          "service": "pbx-web",
+          "deployment_name": "pbx-web",
+          "event_id": "pbx-web:2026-07-13T18:07:55Z:deployment_rollback:11"
+        },
+        {
+          "date": "2026-07-13",
+          "timestamp": "2026-07-13T18:18:07.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "pbx-web",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "outcome": "success",
+          "notes": "Re-deployment of 1.0.9 after rollback - 10m 12s after rollback",
+          "service": "pbx-web",
+          "deployment_name": "pbx-web",
+          "event_id": "pbx-web:2026-07-13T18:18:07Z:deployment_rollout:14"
+        },
+        {
+          "date": "2026-07-15",
+          "timestamp": "2026-07-15T03:24:40.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "pbx-rebuild-relay",
+          "revision": 5,
+          "replicaSet": "pbx-rebuild-relay-588d79c5b9",
+          "image": "python:3-slim",
+          "outcome": "success",
+          "notes": "PBX rebuild relay deployment - supporting infrastructure",
+          "service": "pbx-web",
+          "deployment_name": "pbx-rebuild-relay",
+          "event_id": "pbx-web:2026-07-15T03:24:40Z:deployment_rollout:5"
+        },
+        {
+          "date": "2026-07-27",
+          "timestamp": "2026-07-27T17:56:07.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "lab-rebuild-relay",
+          "revision": 2,
+          "replicaSet": "lab-rebuild-relay-79957dbd4",
+          "image": "python:3-slim",
+          "outcome": "success",
+          "notes": "Lab rebuild relay deployment - supporting infrastructure",
+          "service": "pbx-web",
+          "deployment_name": "lab-rebuild-relay",
+          "event_id": "pbx-web:2026-07-27T17:56:07Z:deployment_rollout:2"
+        },
+        {
+          "date": "2026-07-28",
+          "timestamp": "2026-07-28T17:26:12.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "pbx-web",
+          "revision": 14,
+          "replicaSet": "pbx-web-5ff68464d",
+          "image": "ronaldraygun/pbx-web:1.0.9",
+          "outcome": "success",
+          "notes": "Current active deployment - same image, possible config restart",
+          "service": "pbx-web",
+          "deployment_name": "pbx-web",
+          "event_id": "pbx-web:2026-07-28T17:26:12Z:deployment_rollout:14"
+        },
+        {
+          "date": "2026-07-08",
+          "timestamp": "2026-07-08T03:09:35.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "whisper-stt",
+          "revision": 29,
+          "replicaSet": "whisper-stt-5dbff75cbd",
+          "image": "ronaldraygun/whisper-stt:1.8.2",
+          "outcome": "success",
+          "notes": "Initial deployment in rapid sequence",
+          "service": "whisper-stt",
+          "deployment_name": "whisper-stt",
+          "event_id": "whisper-stt:2026-07-08T03:09:35Z:deployment_rollout:29"
+        },
+        {
+          "date": "2026-07-08",
+          "timestamp": "2026-07-08T03:16:13.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "whisper-stt",
+          "revision": 30,
+          "replicaSet": "whisper-stt-5b8558f478",
+          "image": "ronaldraygun/whisper-stt:1.8.4",
+          "outcome": "success",
+          "notes": "Second deployment in rapid sequence (6m 38s after previous)",
+          "service": "whisper-stt",
+          "deployment_name": "whisper-stt",
+          "event_id": "whisper-stt:2026-07-08T03:16:13Z:deployment_rollout:30"
+        },
+        {
+          "date": "2026-07-08",
+          "timestamp": "2026-07-08T03:26:44.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "whisper-stt",
+          "revision": 31,
+          "replicaSet": "whisper-stt-6c497489fb",
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "outcome": "success",
+          "notes": "Third deployment in rapid sequence (10m 31s after previous)",
+          "service": "whisper-stt",
+          "deployment_name": "whisper-stt",
+          "event_id": "whisper-stt:2026-07-08T03:26:44Z:deployment_rollout:31"
+        },
+        {
+          "date": "2026-07-12",
+          "timestamp": "2026-07-12T16:53:42.000Z",
+          "event_type": "deployment_rollout",
+          "deployment": "whisper-stt",
+          "revision": 32,
+          "replicaSet": "whisper-stt-847fd8d7b9",
+          "image": "ronaldraygun/whisper-stt:1.8.6",
+          "outcome": "success",
+          "notes": "Current active deployment - same image as revision 31, possible config change",
+          "service": "whisper-stt",
+          "deployment_name": "whisper-stt",
+          "event_id": "whisper-stt:2026-07-12T16:53:42Z:deployment_rollout:32"
+        }
+      ],
+      "per_service": {
+        "pbx-web": {
+          "event_count": 5,
+          "alignment_row_count": 20,
+          "rows_in_requested_metric_window": 20,
+          "rows_within_half_step": 0,
+          "rows_within_observed_metric_window": 0,
+          "status_counts": {
+            "outside_observed_metric_window": 20
+          }
+        },
+        "whisper-stt": {
+          "event_count": 4,
+          "alignment_row_count": 16,
+          "rows_in_requested_metric_window": 4,
+          "rows_within_half_step": 0,
+          "rows_within_observed_metric_window": 0,
+          "status_counts": {
+            "event_outside_metric_requested_window": 12,
+            "outside_observed_metric_window": 4
+          }
+        }
+      },
+      "interpretation": "Deployment events are preserved as context; no metric values are interpolated at event timestamps."
+    },
+    "source_artifacts": {
+      "error_rates_and_application_latency": "data/error_latency_metrics_30d_enhanced_20260806_211642.json",
+      "workflow_and_deployment_latency": "data/latency_metrics_30d_20260806_215749.json",
+      "resource_snapshot": "data/resource_usage_metrics_30d.json",
+      "cpu_and_memory_timeseries": "data/resource_metrics/resource-metrics-30d-20260810T111404Z.json",
+      "cpu_and_memory_coverage": "data/resource_metrics/resource-metrics-coverage-20260810T111404Z.json",
+      "disk_network_storage_timeseries": "data/resource_metrics/disk-network-storage-metrics-30d-20260810T114451Z.json",
+      "disk_network_storage_coverage": "data/resource_metrics/disk-network-storage-coverage-20260810T114451Z.json"
+    }
+  },
+  "services": {
+    "pbx-web": {
+      "service": "pbx-web",
+      "error_rates": {
+        "source_window": {
+          "start": "2026-07-07T00:00:00Z",
+          "end": "2026-08-06T23:59:59Z",
+          "days": 30,
+          "calendar_days_inclusive": 31
+        },
+        "temporal_resolution": "aggregate_only",
+        "daily_breakdown_available": false,
+        "components": {
+          "application_logs": {
+            "availability": "available",
+            "pods_analyzed": 8,
+            "pods_with_errors": 1,
+            "total_error_count": 5,
+            "error_count_per_pod": 0.625,
+            "error_samples": [
+              "[pbx-web] recording fetch error for 1785277704.476/20260728-222824_442046157786_1785277704.476.wav: [Errno 104] Connection reset by peer",
+              "Exception occurred during processing of request from ('127.0.0.1', 57008)"
+            ]
+          },
+          "http": {
+            "availability": "available",
+            "log_file_found": true,
+            "total_requests": 33129,
+            "http_2xx_errors": null,
+            "http_4xx_errors": 2,
+            "http_5xx_errors": 0,
+            "http_4xx_error_rate": 6.037006852002777e-05,
+            "http_5xx_error_rate": 0.0,
+            "log_lines_analyzed": 33137
+          },
+          "oom": {
+            "total_oom_kill_count": 0,
+            "pods_with_oom_kills": 0,
+            "oom_kill_rate_per_pod": 0.0,
+            "availability": "available"
+          },
+          "deployments": {
+            "availability": "unavailable",
+            "total_deployments": null,
+            "successful_deployments": null,
+            "failed_deployments": null,
+            "deployment_error_rate": null,
+            "event_count": 0
+          }
+        },
+        "overall": {
+          "total_errors": 7,
+          "errors_per_day": 0.23333333333333334,
+          "pod_errors_per_day": 0.16666666666666666,
+          "oom_kills_per_day": 0.0,
+          "http_4xx_per_day": 0.06666666666666667,
+          "http_5xx_per_day": 0.0,
+          "deployment_errors_per_day": 0.0,
+          "breakdown_counts": {
+            "application_errors": 5,
+            "oom_kills": 0,
+            "http_4xx_errors": 2,
+            "http_5xx_errors": 0,
+            "deployment_failures": null
+          },
+          "breakdown_percent": {
+            "application_errors": 71.42857142857143,
+            "oom_kills": 0.0,
+            "http_4xx_errors": 28.57142857142857,
+            "http_5xx_errors": 0.0,
+            "deployment_failures": null
+          }
+        },
+        "coverage": {
+          "component_count": 4,
+          "available_component_count": 3,
+          "availability_percentage": 75.0,
+          "component_statuses": {
+            "application_logs": "available",
+            "oom_kills": "available",
+            "http_logs": "available",
+            "deployment_events": "unavailable"
+          },
+          "quality": "partial_aggregate"
+        }
+      },
+      "latency": {
+        "source_windows": [
+          {
+            "source": "error_latency_collection",
+            "start": "2026-07-07T00:00:00Z",
+            "end": "2026-08-06T23:59:59Z",
+            "declared_days": 30,
+            "calendar_days_inclusive": 31
+          },
+          {
+            "source": "latency_query",
+            "start": "2026-07-07T00:00:00Z",
+            "end": "2026-08-06T23:59:59Z",
+            "declared_days": 30,
+            "calendar_days_inclusive": 31
+          }
+        ],
+        "metrics": {
+          "application_processing_time": {
+            "metric": "application_processing_time",
+            "availability": "available",
+            "unit": "seconds",
+            "sample_count": 300,
+            "log_files_analyzed": 11,
+            "calendar_days_with_timestamped_samples": [
+              "2026-07-28",
+              "2026-07-29",
+              "2026-07-30",
+              "2026-07-31",
+              "2026-08-04",
+              "2026-08-05"
+            ],
+            "statistics": {
+              "sample_count": 300,
+              "nonzero_sample_count": 300,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 1.414,
+              "p50": 1.755,
+              "p95": 2.1186,
+              "max": 2.215,
+              "mean": 1.7620500000000001,
+              "last_sample_value_sum": null
+            },
+            "source_note": "Parsed from 'Finished in N seconds' log lines; the source does not provide a complete structured latency series."
+          },
+          "workflow_execution_time": {
+            "metric": "workflow_execution_time",
+            "availability": "available",
+            "unit": "seconds",
+            "statistics": {
+              "count": 9,
+              "p50_seconds": 1457.0,
+              "p75_seconds": 3209.0,
+              "p90_seconds": 10773.2,
+              "p95_seconds": 15541.6,
+              "p99_seconds": 19356.32,
+              "min_seconds": 20.0,
+              "max_seconds": 20310.0,
+              "mean_seconds": 3886.556,
+              "median_seconds": 1457.0,
+              "stddev_seconds": 6723.986
+            },
+            "observed_dates": [
+              "2026-08-06"
+            ],
+            "sample_count": 9
+          },
+          "deployment_interval": {
+            "metric": "deployment_interval",
+            "availability": "available",
+            "unit": "seconds",
+            "statistics": {
+              "count": 4,
+              "mean_seconds": 323370.0,
+              "median_seconds": 101898.0,
+              "stddev_seconds": 512890.636,
+              "min_seconds": 612.0,
+              "max_seconds": 1089072.0
+            },
+            "sample_count": 4
+          }
+        },
+        "coverage": {
+          "metric_count": 3,
+          "available_metric_count": 3,
+          "availability_percentage": 100.0,
+          "temporal_resolution": "event_and_sparse_day_aggregates",
+          "sparse_coverage": {
+            "workflow": {
+              "expected_days": 31,
+              "days_with_data": 1,
+              "coverage_percentage": 3.2,
+              "daily_distribution": {
+                "2026-08-06": 9
+              }
+            }
+          }
+        }
+      },
+      "resource_usage": {
+        "requested_windows": {
+          "cpu_memory": {
+            "collected_at": "2026-08-10T11:14:04.098637Z",
+            "prometheus_base_url": "http://127.0.0.1:19090",
+            "prometheus_retention_time": "10d",
+            "prometheus_server_time": "2026-08-10T11:14:01.927000Z",
+            "queries": {
+              "cpu_usage": "5-minute rate of container_cpu_usage_seconds_total, aggregated by pod",
+              "memory_working_set": "container_memory_working_set_bytes, aggregated by pod"
+            },
+            "requested_window_days": 30,
+            "requested_window_end": "2026-08-10T11:14:01.927000Z",
+            "requested_window_start": "2026-07-11T11:14:01.927000Z",
+            "services": [
+              "pbx-web",
+              "whisper-stt"
+            ],
+            "step_seconds": 3600
+          },
+          "disk_network_storage": {
+            "collected_at": "2026-08-10T11:44:51.128083Z",
+            "prometheus_base_url": "http://127.0.0.1:19090",
+            "prometheus_retention_time": "10d",
+            "prometheus_server_time": "2026-08-10T11:44:38.362000Z",
+            "queries": {
+              "disk_read_bytes_per_second": {
+                "family": "disk_io",
+                "unit": "bytes_per_second"
+              },
+              "disk_read_operations_per_second": {
+                "family": "disk_io",
+                "unit": "operations_per_second"
+              },
+              "disk_write_bytes_per_second": {
+                "family": "disk_io",
+                "unit": "bytes_per_second"
+              },
+              "disk_write_operations_per_second": {
+                "family": "disk_io",
+                "unit": "operations_per_second"
+              },
+              "network_receive_bytes_per_second": {
+                "family": "network",
+                "unit": "bytes_per_second"
+              },
+              "network_receive_bytes_total": {
+                "family": "network",
+                "unit": "bytes_total"
+              },
+              "network_transmit_bytes_per_second": {
+                "family": "network",
+                "unit": "bytes_per_second"
+              },
+              "network_transmit_bytes_total": {
+                "family": "network",
+                "unit": "bytes_total"
+              },
+              "storage_available_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_capacity_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_filesystem_limit_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_filesystem_usage_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_pvc_info": {
+                "family": "storage",
+                "unit": "info_flag"
+              },
+              "storage_requested_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_used_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              }
+            },
+            "query_count_per_service": 15,
+            "requested_window_days": 30,
+            "requested_window_end": "2026-08-10T11:44:38.362000Z",
+            "requested_window_start": "2026-07-11T11:44:38.362000Z",
+            "services": [
+              "pbx-web",
+              "whisper-stt"
+            ],
+            "step_seconds": 3600
+          }
+        },
+        "metrics": {
+          "cpu_usage": {
+            "metric": "cpu_usage",
+            "family": "cpu",
+            "unit": "cores",
+            "query": "sum by (namespace,pod) (rate(container_cpu_usage_seconds_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:14:01.927000Z",
+              "requested_end": "2026-08-10T11:14:01.927000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:14:01.927000Z",
+              "last_sample": "2026-08-10T11:14:01.927000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 5
+            },
+            "statistics": {
+              "sample_count": 775,
+              "nonzero_sample_count": 775,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 0.0002163941311935239,
+              "p50": 0.0004316726523317796,
+              "p95": 0.001923187030912344,
+              "max": 0.0291800643591998,
+              "mean": 0.0008163068807740975,
+              "last_sample_value_sum": 0.003100644726619697
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 0.00023370744060486625,
+                "max": 0.000498518885975485
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 0.0002163941311935239,
+                "max": 0.00048301540200668293
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 218,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-08T19:14:01.927Z",
+                "min": 0.0008647412833535205,
+                "max": 0.0291800643591998
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 0.0017673948069464151,
+                "max": 0.02762838610668362
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-6d86477cdb-5wvwn"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T20:14:01.927Z",
+                "last_sample": "2026-08-08T20:14:01.927Z",
+                "min": 0.003159370835086166,
+                "max": 0.003159370835086166
+              }
+            ]
+          },
+          "memory_working_set": {
+            "metric": "memory_working_set",
+            "family": "memory",
+            "unit": "bytes",
+            "query": "sum by (namespace,pod) (container_memory_working_set_bytes{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"})",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:14:01.927000Z",
+              "requested_end": "2026-08-10T11:14:01.927000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:14:01.927000Z",
+              "last_sample": "2026-08-10T11:14:01.927000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 774,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 18894848.0,
+              "p50": 23363584.0,
+              "p95": 80879616.0,
+              "max": 82096128.0,
+              "mean": 40267987.67958657,
+              "last_sample_value_sum": 110419968.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 18894848.0,
+                "max": 21917696.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 23359488.0,
+                "max": 26042368.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 218,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-08T19:14:01.927Z",
+                "min": 78778368.0,
+                "max": 82096128.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 59764736.0,
+                "max": 62521344.0
+              }
+            ]
+          },
+          "disk_read_bytes_per_second": {
+            "metric": "disk_read_bytes_per_second",
+            "family": "disk_io",
+            "unit": "bytes_per_second",
+            "query": "sum by (namespace,pod) (rate(container_fs_reads_bytes_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 5
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 774,
+              "zero_fraction": 1.0,
+              "min": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "last_sample_value_sum": 0.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-6d86477cdb-5wvwn"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              }
+            ]
+          },
+          "disk_read_operations_per_second": {
+            "metric": "disk_read_operations_per_second",
+            "family": "disk_io",
+            "unit": "operations_per_second",
+            "query": "sum by (namespace,pod) (rate(container_fs_reads_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 5
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 774,
+              "zero_fraction": 1.0,
+              "min": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "last_sample_value_sum": 0.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-6d86477cdb-5wvwn"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              }
+            ]
+          },
+          "disk_write_bytes_per_second": {
+            "metric": "disk_write_bytes_per_second",
+            "family": "disk_io",
+            "unit": "bytes_per_second",
+            "query": "sum by (namespace,pod) (rate(container_fs_writes_bytes_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 5
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 774,
+              "zero_fraction": 1.0,
+              "min": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "last_sample_value_sum": 0.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-6d86477cdb-5wvwn"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              }
+            ]
+          },
+          "disk_write_operations_per_second": {
+            "metric": "disk_write_operations_per_second",
+            "family": "disk_io",
+            "unit": "operations_per_second",
+            "query": "sum by (namespace,pod) (rate(container_fs_writes_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 5
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 774,
+              "zero_fraction": 1.0,
+              "min": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "last_sample_value_sum": 0.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-6d86477cdb-5wvwn"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              }
+            ]
+          },
+          "network_receive_bytes_per_second": {
+            "metric": "network_receive_bytes_per_second",
+            "family": "network",
+            "unit": "bytes_per_second",
+            "query": "sum by (namespace,pod) (rate(container_network_receive_bytes_total{namespace=\"pbx-web\",pod!=\"\",interface!=\"lo\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 5
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 774,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 68.80298976441438,
+              "p50": 90.0668541439936,
+              "p95": 3077.3824201480256,
+              "max": 334776.95114756766,
+              "mean": 1437.6545309932267,
+              "last_sample_value_sum": 2712.9225616934636
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 68.80298976441438,
+                "max": 355.6794168989067
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 69.35142787543292,
+                "max": 110.86890603416327
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 2306.196053833672,
+                "max": 334776.95114756766
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 2475.5134171631494,
+                "max": 3229.5024101834388
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-6d86477cdb-5wvwn"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 3129.55925576997,
+                "max": 3129.55925576997
+              }
+            ]
+          },
+          "network_receive_bytes_total": {
+            "metric": "network_receive_bytes_total",
+            "family": "network",
+            "unit": "bytes_total",
+            "query": "sum by (namespace,pod) (container_network_receive_bytes_total{namespace=\"pbx-web\",pod!=\"\",interface!=\"lo\"})",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 5
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 774,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 3556575.0,
+              "p50": 153247905.0,
+              "p95": 2585825638.849999,
+              "max": 3068789930.0,
+              "mean": 599732397.1589147,
+              "last_sample_value_sum": 733764382.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 24524832.0,
+                "max": 114530898.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 116722967.0,
+                "max": 198333168.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 574128368.0,
+                "max": 3068789930.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 7818378.0,
+                "max": 420900316.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-6d86477cdb-5wvwn"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 3556575.0,
+                "max": 3556575.0
+              }
+            ]
+          },
+          "network_transmit_bytes_per_second": {
+            "metric": "network_transmit_bytes_per_second",
+            "family": "network",
+            "unit": "bytes_per_second",
+            "query": "sum by (namespace,pod) (rate(container_network_transmit_bytes_total{namespace=\"pbx-web\",pod!=\"\",interface!=\"lo\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 5
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 774,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 63.988235294117636,
+              "p50": 69.06690925244129,
+              "p95": 10663.957849160595,
+              "max": 341363.23332520836,
+              "mean": 3863.2903714007284,
+              "last_sample_value_sum": 10228.637298024601
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 63.988235294117636,
+                "max": 114.25188088894333
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 64.8645288676236,
+                "max": 71.43387539912378
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 9055.135253780061,
+                "max": 341363.23332520836
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 9981.6106708338,
+                "max": 11188.880709579174
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-6d86477cdb-5wvwn"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 10337.729837301125,
+                "max": 10337.729837301125
+              }
+            ]
+          },
+          "network_transmit_bytes_total": {
+            "metric": "network_transmit_bytes_total",
+            "family": "network",
+            "unit": "bytes_total",
+            "query": "sum by (namespace,pod) (container_network_transmit_bytes_total{namespace=\"pbx-web\",pod!=\"\",interface!=\"lo\"})",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 5
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 774,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 5087857.0,
+              "p50": 124325716.0,
+              "p95": 8281802415.249996,
+              "max": 9769662557.0,
+              "mean": 1711031566.6124032,
+              "last_sample_value_sum": 1760010061.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 18304014.0,
+                "max": 83567002.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 93362324.0,
+                "max": 157282559.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-mkn8n"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 1751915280.0,
+                "max": 9769662557.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-5ff68464d-qx45p"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 20598451.0,
+                "max": 1519160500.0
+              },
+              {
+                "labels": {
+                  "namespace": "pbx-web",
+                  "pod": "pbx-web-6d86477cdb-5wvwn"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 5087857.0,
+                "max": 5087857.0
+              }
+            ]
+          },
+          "storage_available_bytes": {
+            "metric": "storage_available_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "kubelet_volume_stats_available_bytes{namespace=\"pbx-web\"}",
+            "availability": "unavailable",
+            "status": "unavailable",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 0,
+              "coverage_percentage_by_timestamp_points": 0.0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_span_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 0
+            },
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "series": []
+          },
+          "storage_capacity_bytes": {
+            "metric": "storage_capacity_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "kubelet_volume_stats_capacity_bytes{namespace=\"pbx-web\"}",
+            "availability": "unavailable",
+            "status": "unavailable",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 0,
+              "coverage_percentage_by_timestamp_points": 0.0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_span_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 0
+            },
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "series": []
+          },
+          "storage_filesystem_limit_bytes": {
+            "metric": "storage_filesystem_limit_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "container_fs_limit_bytes{namespace=\"pbx-web\"}",
+            "availability": "unavailable",
+            "status": "unavailable",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 0,
+              "coverage_percentage_by_timestamp_points": 0.0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_span_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 0
+            },
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "series": []
+          },
+          "storage_filesystem_usage_bytes": {
+            "metric": "storage_filesystem_usage_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "container_fs_usage_bytes{namespace=\"pbx-web\"}",
+            "availability": "unavailable",
+            "status": "unavailable",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 0,
+              "coverage_percentage_by_timestamp_points": 0.0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_span_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 0
+            },
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "series": []
+          },
+          "storage_pvc_info": {
+            "metric": "storage_pvc_info",
+            "family": "storage",
+            "unit": "info_flag",
+            "query": "kube_persistentvolumeclaim_info{namespace=\"pbx-web\"}",
+            "availability": "unavailable",
+            "status": "unavailable",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 0,
+              "coverage_percentage_by_timestamp_points": 0.0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_span_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 0
+            },
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "series": []
+          },
+          "storage_requested_bytes": {
+            "metric": "storage_requested_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace=\"pbx-web\"}",
+            "availability": "unavailable",
+            "status": "unavailable",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 0,
+              "coverage_percentage_by_timestamp_points": 0.0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_span_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 0
+            },
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "series": []
+          },
+          "storage_used_bytes": {
+            "metric": "storage_used_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "kubelet_volume_stats_used_bytes{namespace=\"pbx-web\"}",
+            "availability": "unavailable",
+            "status": "unavailable",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 0,
+              "coverage_percentage_by_timestamp_points": 0.0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_span_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 0
+            },
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "series": []
+          }
+        },
+        "current_resource_snapshot": {
+          "collection_timestamp": "2026-08-07T08:12:15.340915",
+          "current_cpu_usage": [
+            {
+              "pod": "lab-rebuild-relay-79957dbd4-xsqhl",
+              "current_cpu_cores": 0.001,
+              "current_cpu_millicores": 1.0
+            },
+            {
+              "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+              "current_cpu_cores": 0.001,
+              "current_cpu_millicores": 1.0
+            },
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "current_cpu_cores": 0.001,
+              "current_cpu_millicores": 1.0
+            }
+          ],
+          "cpu_requests": [
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "container": "site-generator",
+              "request_cores": 0.01
+            },
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "container": "nginx",
+              "request_cores": 0.005
+            }
+          ],
+          "cpu_limits": [
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "container": "site-generator",
+              "limit_cores": 0.5
+            },
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "container": "nginx",
+              "limit_cores": 0.1
+            }
+          ],
+          "cpu_utilization": {
+            "current_usage_cores": 0.003,
+            "requests_cores": "0.005",
+            "limits_cores": "0.1",
+            "vs_request_percent": 60.0,
+            "vs_limit_percent": 3.0
+          },
+          "current_memory_usage": [
+            {
+              "pod": "lab-rebuild-relay-79957dbd4-xsqhl",
+              "current_memory_bytes": 18874368,
+              "current_memory_mib": 18.0
+            },
+            {
+              "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+              "current_memory_bytes": 24117248,
+              "current_memory_mib": 23.0
+            },
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "current_memory_bytes": 79691776,
+              "current_memory_mib": 76.0
+            }
+          ],
+          "memory_requests": [
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "container": "site-generator",
+              "request_bytes": 134217728
+            },
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "container": "nginx",
+              "request_bytes": 33554432
+            }
+          ],
+          "memory_limits": [
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "container": "site-generator",
+              "limit_bytes": 536870912
+            },
+            {
+              "pod": "pbx-web-5ff68464d-mkn8n",
+              "container": "nginx",
+              "limit_bytes": 134217728
+            }
+          ],
+          "memory_utilization": {
+            "current_usage_bytes": 122683392.0,
+            "requests_bytes": "33554432",
+            "limits_bytes": "134217728",
+            "vs_request_percent": 365.625,
+            "vs_limit_percent": 91.40625
+          },
+          "pvcs": [],
+          "volume_usage": [],
+          "network_stats": [
+            {
+              "note": "Detailed network metrics require Prometheus/monitoring integration",
+              "available_data": "pod-level network connectivity only",
+              "metrics_available": [
+                "pod_status",
+                "pod_ip",
+                "network_policy"
+              ]
+            }
+          ],
+          "metric_coverage": {
+            "current_usage": "available",
+            "resource_limits": "available",
+            "storage_info": "no_pvcs",
+            "resource_events": "none",
+            "deployment_alignment": "available"
+          },
+          "anomalies": [
+            "High memory utilization: 365.6% of requests"
+          ],
+          "data_gaps": [],
+          "temporal_alignment": {
+            "deployment_data_loaded": true,
+            "deployment_events_count": 3,
+            "resource_events_count": 0,
+            "alignment_status": "partial"
+          }
+        },
+        "coverage": {
+          "metric_count": 17,
+          "available_metric_count": 10,
+          "unavailable_metric_count": 7,
+          "availability_percentage": 58.82352941176471,
+          "internal_hourly_gaps": 0
+        }
+      },
+      "data_quality": {
+        "status": "degraded",
+        "notes": [
+          "Error rates are aggregate-only and do not include a complete daily series.",
+          "Latency sources are sparse event/workflow aggregates; application timing is log-derived where present.",
+          "Resource Prometheus data has a leading retention/no-data gap and no synthetic fill.",
+          "Counts follow the source collection scope; pod names in the log artifact include supporting and non-primary workload pods."
+        ],
+        "gap_count": 5,
+        "anomaly_count": 6
+      }
+    },
+    "whisper-stt": {
+      "service": "whisper-stt",
+      "error_rates": {
+        "source_window": {
+          "start": "2026-07-07T00:00:00Z",
+          "end": "2026-08-06T23:59:59Z",
+          "days": 30,
+          "calendar_days_inclusive": 31
+        },
+        "temporal_resolution": "aggregate_only",
+        "daily_breakdown_available": false,
+        "components": {
+          "application_logs": {
+            "availability": "available",
+            "pods_analyzed": 10,
+            "pods_with_errors": 2,
+            "total_error_count": 2,
+            "error_count_per_pod": 0.2,
+            "error_samples": [
+              "error: You must be logged in to the server (the server has asked for the client to provide credentials)",
+              "error: error from server (NotFound): namespaces \"whisper-stt\" not found in namespace \"whisper-stt\""
+            ]
+          },
+          "http": {
+            "availability": "unavailable",
+            "log_file_found": false,
+            "total_requests": null,
+            "http_2xx_errors": null,
+            "http_4xx_errors": null,
+            "http_5xx_errors": null,
+            "http_4xx_error_rate": null,
+            "http_5xx_error_rate": null,
+            "log_lines_analyzed": 0
+          },
+          "oom": {
+            "total_oom_kill_count": 0,
+            "pods_with_oom_kills": 0,
+            "oom_kill_rate_per_pod": 0.0,
+            "availability": "available"
+          },
+          "deployments": {
+            "availability": "available",
+            "total_deployments": 10,
+            "successful_deployments": 10,
+            "failed_deployments": 0,
+            "deployment_error_rate": 0.0,
+            "event_count": 10
+          }
+        },
+        "overall": {
+          "total_errors": 2,
+          "errors_per_day": 0.06666666666666667,
+          "pod_errors_per_day": 0.06666666666666667,
+          "oom_kills_per_day": 0.0,
+          "http_4xx_per_day": 0.0,
+          "http_5xx_per_day": 0.0,
+          "deployment_errors_per_day": 0.0,
+          "breakdown_counts": {
+            "application_errors": 2,
+            "oom_kills": 0,
+            "http_4xx_errors": null,
+            "http_5xx_errors": null,
+            "deployment_failures": 0
+          },
+          "breakdown_percent": {
+            "application_errors": 100.0,
+            "oom_kills": 0.0,
+            "http_4xx_errors": null,
+            "http_5xx_errors": null,
+            "deployment_failures": 0.0
+          }
+        },
+        "coverage": {
+          "component_count": 4,
+          "available_component_count": 3,
+          "availability_percentage": 75.0,
+          "component_statuses": {
+            "application_logs": "available",
+            "oom_kills": "available",
+            "http_logs": "unavailable",
+            "deployment_events": "available"
+          },
+          "quality": "partial_aggregate"
+        }
+      },
+      "latency": {
+        "source_windows": [
+          {
+            "source": "error_latency_collection",
+            "start": "2026-07-07T00:00:00Z",
+            "end": "2026-08-06T23:59:59Z",
+            "declared_days": 30,
+            "calendar_days_inclusive": 31
+          },
+          {
+            "source": "latency_query",
+            "start": "2026-07-07T00:00:00Z",
+            "end": "2026-08-06T23:59:59Z",
+            "declared_days": 30,
+            "calendar_days_inclusive": 31
+          }
+        ],
+        "metrics": {
+          "application_processing_time": {
+            "metric": "application_processing_time",
+            "availability": "unavailable",
+            "unit": "seconds",
+            "sample_count": 0,
+            "log_files_analyzed": 12,
+            "calendar_days_with_timestamped_samples": [],
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "source_note": "No application timing lines were collected."
+          },
+          "deployment_interval": {
+            "metric": "deployment_interval",
+            "availability": "available",
+            "unit": "hours",
+            "statistics": {
+              "count": 3,
+              "mean_hours": 36.58,
+              "median_hours": 0.18,
+              "min_hours": 0.11,
+              "max_hours": 109.45
+            },
+            "sample_count": 3
+          },
+          "pod_health": {
+            "metric": "pod_health",
+            "availability": "available",
+            "unit": "count",
+            "pods_analyzed": 10,
+            "restart_count": 0,
+            "startup_events": 0,
+            "error_count": 2
+          }
+        },
+        "coverage": {
+          "metric_count": 3,
+          "available_metric_count": 2,
+          "availability_percentage": 66.66666666666666,
+          "temporal_resolution": "event_and_sparse_day_aggregates",
+          "sparse_coverage": {
+            "deployment_events": {
+              "expected_days": 31,
+              "days_with_data": 2,
+              "coverage_percentage": 6.5,
+              "daily_distribution": {
+                "2026-07-12": 1,
+                "2026-07-08": 3
+              }
+            }
+          }
+        }
+      },
+      "resource_usage": {
+        "requested_windows": {
+          "cpu_memory": {
+            "collected_at": "2026-08-10T11:14:04.098637Z",
+            "prometheus_base_url": "http://127.0.0.1:19090",
+            "prometheus_retention_time": "10d",
+            "prometheus_server_time": "2026-08-10T11:14:01.927000Z",
+            "queries": {
+              "cpu_usage": "5-minute rate of container_cpu_usage_seconds_total, aggregated by pod",
+              "memory_working_set": "container_memory_working_set_bytes, aggregated by pod"
+            },
+            "requested_window_days": 30,
+            "requested_window_end": "2026-08-10T11:14:01.927000Z",
+            "requested_window_start": "2026-07-11T11:14:01.927000Z",
+            "services": [
+              "pbx-web",
+              "whisper-stt"
+            ],
+            "step_seconds": 3600
+          },
+          "disk_network_storage": {
+            "collected_at": "2026-08-10T11:44:51.128083Z",
+            "prometheus_base_url": "http://127.0.0.1:19090",
+            "prometheus_retention_time": "10d",
+            "prometheus_server_time": "2026-08-10T11:44:38.362000Z",
+            "queries": {
+              "disk_read_bytes_per_second": {
+                "family": "disk_io",
+                "unit": "bytes_per_second"
+              },
+              "disk_read_operations_per_second": {
+                "family": "disk_io",
+                "unit": "operations_per_second"
+              },
+              "disk_write_bytes_per_second": {
+                "family": "disk_io",
+                "unit": "bytes_per_second"
+              },
+              "disk_write_operations_per_second": {
+                "family": "disk_io",
+                "unit": "operations_per_second"
+              },
+              "network_receive_bytes_per_second": {
+                "family": "network",
+                "unit": "bytes_per_second"
+              },
+              "network_receive_bytes_total": {
+                "family": "network",
+                "unit": "bytes_total"
+              },
+              "network_transmit_bytes_per_second": {
+                "family": "network",
+                "unit": "bytes_per_second"
+              },
+              "network_transmit_bytes_total": {
+                "family": "network",
+                "unit": "bytes_total"
+              },
+              "storage_available_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_capacity_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_filesystem_limit_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_filesystem_usage_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_pvc_info": {
+                "family": "storage",
+                "unit": "info_flag"
+              },
+              "storage_requested_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              },
+              "storage_used_bytes": {
+                "family": "storage",
+                "unit": "bytes"
+              }
+            },
+            "query_count_per_service": 15,
+            "requested_window_days": 30,
+            "requested_window_end": "2026-08-10T11:44:38.362000Z",
+            "requested_window_start": "2026-07-11T11:44:38.362000Z",
+            "services": [
+              "pbx-web",
+              "whisper-stt"
+            ],
+            "step_seconds": 3600
+          }
+        },
+        "metrics": {
+          "cpu_usage": {
+            "metric": "cpu_usage",
+            "family": "cpu",
+            "unit": "cores",
+            "query": "sum by (namespace,pod) (rate(container_cpu_usage_seconds_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:14:01.927000Z",
+              "requested_end": "2026-08-10T11:14:01.927000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:14:01.927000Z",
+              "last_sample": "2026-08-10T11:14:01.927000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 517,
+              "nonzero_sample_count": 517,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 0.0001628743068284141,
+              "p50": 0.003981110519506185,
+              "p95": 0.004694476855298901,
+              "max": 4.090072245010544,
+              "mean": 0.03187653637855059,
+              "last_sample_value_sum": 0.005121337166445514
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 0.003912962561765698,
+                "max": 0.004820497156601959
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-5b884b75f4-hwczc"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T20:14:01.927Z",
+                "last_sample": "2026-08-08T20:14:01.927Z",
+                "min": 0.0001628743068284141,
+                "max": 0.0001628743068284141
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 0.0003658380450681488,
+                "max": 0.00699404740056356
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 218,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-08T19:14:01.927Z",
+                "min": 0.0004957415723504096,
+                "max": 4.090072245010544
+              }
+            ]
+          },
+          "memory_working_set": {
+            "metric": "memory_working_set",
+            "family": "memory",
+            "unit": "bytes",
+            "query": "sum by (namespace,pod) (container_memory_working_set_bytes{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"})",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:14:01.927000Z",
+              "requested_end": "2026-08-10T11:14:01.927000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:14:01.927000Z",
+              "last_sample": "2026-08-10T11:14:01.927000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 3
+            },
+            "statistics": {
+              "sample_count": 516,
+              "nonzero_sample_count": 516,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 1210699776.0,
+              "p50": 4892219392.0,
+              "p95": 5847956480.0,
+              "max": 5848395776.0,
+              "mean": 4488811932.775194,
+              "last_sample_value_sum": 8282124288.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 5836824576.0,
+                "max": 5848395776.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:14:01.927Z",
+                "last_sample": "2026-08-10T11:14:01.927Z",
+                "min": 1210699776.0,
+                "max": 2445541376.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 218,
+                "first_sample": "2026-07-30T18:14:01.927Z",
+                "last_sample": "2026-08-08T19:14:01.927Z",
+                "min": 3247243264.0,
+                "max": 3947614208.0
+              }
+            ]
+          },
+          "disk_read_bytes_per_second": {
+            "metric": "disk_read_bytes_per_second",
+            "family": "disk_io",
+            "unit": "bytes_per_second",
+            "query": "sum by (namespace,pod) (rate(container_fs_reads_bytes_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 516,
+              "nonzero_sample_count": 1,
+              "zero_sample_count": 515,
+              "zero_fraction": 0.998062015503876,
+              "min": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 10005.780286218524,
+              "mean": 19.391047066314968,
+              "last_sample_value_sum": 0.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 10005.780286218524
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-5b884b75f4-hwczc"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              }
+            ]
+          },
+          "disk_read_operations_per_second": {
+            "metric": "disk_read_operations_per_second",
+            "family": "disk_io",
+            "unit": "operations_per_second",
+            "query": "sum by (namespace,pod) (rate(container_fs_reads_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 516,
+              "nonzero_sample_count": 1,
+              "zero_sample_count": 515,
+              "zero_fraction": 0.998062015503876,
+              "min": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.4647993150325883,
+              "mean": 0.0009007738663422254,
+              "last_sample_value_sum": 0.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.4647993150325883
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-5b884b75f4-hwczc"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              }
+            ]
+          },
+          "disk_write_bytes_per_second": {
+            "metric": "disk_write_bytes_per_second",
+            "family": "disk_io",
+            "unit": "bytes_per_second",
+            "query": "sum by (namespace,pod) (rate(container_fs_writes_bytes_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 516,
+              "nonzero_sample_count": 2,
+              "zero_sample_count": 514,
+              "zero_fraction": 0.9961240310077519,
+              "min": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 39188.77252974282,
+              "mean": 139.46611823537037,
+              "last_sample_value_sum": 0.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-5b884b75f4-hwczc"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 0.0,
+                "max": 39188.77252974282
+              }
+            ]
+          },
+          "disk_write_operations_per_second": {
+            "metric": "disk_write_operations_per_second",
+            "family": "disk_io",
+            "unit": "operations_per_second",
+            "query": "sum by (namespace,pod) (rate(container_fs_writes_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 516,
+              "nonzero_sample_count": 2,
+              "zero_sample_count": 514,
+              "zero_fraction": 0.9961240310077519,
+              "min": 0.0,
+              "p50": 0.0,
+              "p95": 0.0,
+              "max": 0.12110849896701574,
+              "mean": 0.00043100437053553446,
+              "last_sample_value_sum": 0.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-5b884b75f4-hwczc"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 0.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 0.0,
+                "max": 0.12110849896701574
+              }
+            ]
+          },
+          "network_receive_bytes_per_second": {
+            "metric": "network_receive_bytes_per_second",
+            "family": "network",
+            "unit": "bytes_per_second",
+            "query": "sum by (namespace,pod) (rate(container_network_receive_bytes_total{namespace=\"whisper-stt\",pod!=\"\",interface!=\"lo\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 516,
+              "nonzero_sample_count": 516,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 37.99578584488987,
+              "p50": 96.80547186196921,
+              "p95": 138.19966197399395,
+              "max": 41133.69684731721,
+              "mean": 230.60248792458398,
+              "last_sample_value_sum": 230.44584833968446
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 37.99578584488987,
+                "max": 160.76411914235192
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-5b884b75f4-hwczc"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 120.5137084711794,
+                "max": 120.5137084711794
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 75.85668954904077,
+                "max": 116.26598671016247
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 87.15188975966521,
+                "max": 41133.69684731721
+              }
+            ]
+          },
+          "network_receive_bytes_total": {
+            "metric": "network_receive_bytes_total",
+            "family": "network",
+            "unit": "bytes_total",
+            "query": "sum by (namespace,pod) (container_network_receive_bytes_total{namespace=\"whisper-stt\",pod!=\"\",interface!=\"lo\"})",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 516,
+              "nonzero_sample_count": 516,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 88895.0,
+              "p50": 438180741.5,
+              "p95": 2548707793.0,
+              "max": 2588847988.0,
+              "mean": 1087639544.988372,
+              "last_sample_value_sum": 471717075.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 388049031.0,
+                "max": 458458211.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-5b884b75f4-hwczc"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 88895.0,
+                "max": 88895.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 266411.0,
+                "max": 13258864.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 1570561386.0,
+                "max": 2588847988.0
+              }
+            ]
+          },
+          "network_transmit_bytes_per_second": {
+            "metric": "network_transmit_bytes_per_second",
+            "family": "network",
+            "unit": "bytes_per_second",
+            "query": "sum by (namespace,pod) (rate(container_network_transmit_bytes_total{namespace=\"whisper-stt\",pod!=\"\",interface!=\"lo\"}[5m]))",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 516,
+              "nonzero_sample_count": 379,
+              "zero_sample_count": 137,
+              "zero_fraction": 0.2655038759689923,
+              "min": 0.0,
+              "p50": 70.29071372906476,
+              "p95": 85.73876845970183,
+              "max": 1002.2958777929146,
+              "mean": 58.49736601631335,
+              "last_sample_value_sum": 140.89448382791602
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 0.0,
+                "max": 62.377900039071996
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-5b884b75f4-hwczc"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 82.01504579314611,
+                "max": 82.01504579314611
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 78.55486999890927,
+                "max": 86.5160664604232
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 78.20352741905752,
+                "max": 1002.2958777929146
+              }
+            ]
+          },
+          "network_transmit_bytes_total": {
+            "metric": "network_transmit_bytes_total",
+            "family": "network",
+            "unit": "bytes_total",
+            "query": "sum by (namespace,pod) (container_network_transmit_bytes_total{namespace=\"whisper-stt\",pod!=\"\",interface!=\"lo\"})",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 4
+            },
+            "statistics": {
+              "sample_count": 516,
+              "nonzero_sample_count": 516,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 42889.0,
+              "p50": 175543713.5,
+              "p95": 225074230.5,
+              "max": 232993765.0,
+              "mean": 171389604.71124032,
+              "last_sample_value_sum": 210928319.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-openai-68966786fb-jsb5d"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 175528197.0,
+                "max": 199017171.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-5b884b75f4-hwczc"
+                },
+                "sample_count": 1,
+                "first_sample": "2026-08-08T19:44:38.362Z",
+                "last_sample": "2026-08-08T19:44:38.362Z",
+                "min": 42889.0,
+                "max": 42889.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-mp2kl"
+                },
+                "sample_count": 40,
+                "first_sample": "2026-08-08T20:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 154404.0,
+                "max": 11911148.0
+              },
+              {
+                "labels": {
+                  "namespace": "whisper-stt",
+                  "pod": "whisper-stt-847fd8d7b9-v2rs5"
+                },
+                "sample_count": 217,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-08T18:44:38.362Z",
+                "min": 149807882.0,
+                "max": 232993765.0
+              }
+            ]
+          },
+          "storage_available_bytes": {
+            "metric": "storage_available_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "kubelet_volume_stats_available_bytes{namespace=\"whisper-stt\"}",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 3
+            },
+            "statistics": {
+              "sample_count": 625,
+              "nonzero_sample_count": 625,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 1003622400.0,
+              "p50": 7207538688.0,
+              "p95": 8930570240.0,
+              "max": 8930570240.0,
+              "mean": 5357829468.9792,
+              "last_sample_value_sum": 17141731328.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "__name__": "kubelet_volume_stats_available_bytes",
+                  "endpoint": "https-metrics",
+                  "instance": "10.20.23.201:10250",
+                  "job": "kubelet",
+                  "metrics_path": "/metrics",
+                  "namespace": "whisper-stt",
+                  "node": "k3s-lenovo-tiny",
+                  "persistentvolumeclaim": "whisper-openai-model-cache",
+                  "service": "kube-prometheus-stack-arde-kubelet"
+                },
+                "sample_count": 109,
+                "first_sample": "2026-08-05T23:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 7207538688.0,
+                "max": 7207538688.0
+              },
+              {
+                "labels": {
+                  "__name__": "kubelet_volume_stats_available_bytes",
+                  "endpoint": "https-metrics",
+                  "instance": "10.20.23.203:10250",
+                  "job": "kubelet",
+                  "metrics_path": "/metrics",
+                  "namespace": "whisper-stt",
+                  "node": "k3s-agent-minisforum",
+                  "persistentvolumeclaim": "whisper-model-cache",
+                  "service": "kube-prometheus-stack-arde-kubelet"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 8930570240.0,
+                "max": 8930570240.0
+              },
+              {
+                "labels": {
+                  "__name__": "kubelet_volume_stats_available_bytes",
+                  "endpoint": "https-metrics",
+                  "instance": "10.20.23.203:10250",
+                  "job": "kubelet",
+                  "metrics_path": "/metrics",
+                  "namespace": "whisper-stt",
+                  "node": "k3s-agent-minisforum",
+                  "persistentvolumeclaim": "whisper-stt-jobs",
+                  "service": "kube-prometheus-stack-arde-kubelet"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 1003622400.0,
+                "max": 1003622400.0
+              }
+            ]
+          },
+          "storage_capacity_bytes": {
+            "metric": "storage_capacity_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "kubelet_volume_stats_capacity_bytes{namespace=\"whisper-stt\"}",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 3
+            },
+            "statistics": {
+              "sample_count": 625,
+              "nonzero_sample_count": 625,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 1020702720.0,
+              "p50": 10464022528.0,
+              "p95": 10464022528.0,
+              "max": 10464022528.0,
+              "mean": 6565820111.2576,
+              "last_sample_value_sum": 21948747776.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "__name__": "kubelet_volume_stats_capacity_bytes",
+                  "endpoint": "https-metrics",
+                  "instance": "10.20.23.201:10250",
+                  "job": "kubelet",
+                  "metrics_path": "/metrics",
+                  "namespace": "whisper-stt",
+                  "node": "k3s-lenovo-tiny",
+                  "persistentvolumeclaim": "whisper-openai-model-cache",
+                  "service": "kube-prometheus-stack-arde-kubelet"
+                },
+                "sample_count": 109,
+                "first_sample": "2026-08-05T23:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 10464022528.0,
+                "max": 10464022528.0
+              },
+              {
+                "labels": {
+                  "__name__": "kubelet_volume_stats_capacity_bytes",
+                  "endpoint": "https-metrics",
+                  "instance": "10.20.23.203:10250",
+                  "job": "kubelet",
+                  "metrics_path": "/metrics",
+                  "namespace": "whisper-stt",
+                  "node": "k3s-agent-minisforum",
+                  "persistentvolumeclaim": "whisper-model-cache",
+                  "service": "kube-prometheus-stack-arde-kubelet"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 10464022528.0,
+                "max": 10464022528.0
+              },
+              {
+                "labels": {
+                  "__name__": "kubelet_volume_stats_capacity_bytes",
+                  "endpoint": "https-metrics",
+                  "instance": "10.20.23.203:10250",
+                  "job": "kubelet",
+                  "metrics_path": "/metrics",
+                  "namespace": "whisper-stt",
+                  "node": "k3s-agent-minisforum",
+                  "persistentvolumeclaim": "whisper-stt-jobs",
+                  "service": "kube-prometheus-stack-arde-kubelet"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 1020702720.0,
+                "max": 1020702720.0
+              }
+            ]
+          },
+          "storage_filesystem_limit_bytes": {
+            "metric": "storage_filesystem_limit_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "container_fs_limit_bytes{namespace=\"whisper-stt\"}",
+            "availability": "unavailable",
+            "status": "unavailable",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 0,
+              "coverage_percentage_by_timestamp_points": 0.0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_span_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 0
+            },
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "series": []
+          },
+          "storage_filesystem_usage_bytes": {
+            "metric": "storage_filesystem_usage_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "container_fs_usage_bytes{namespace=\"whisper-stt\"}",
+            "availability": "unavailable",
+            "status": "unavailable",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 0,
+              "coverage_percentage_by_timestamp_points": 0.0,
+              "first_sample": null,
+              "last_sample": null,
+              "returned_span_days": 0.0,
+              "leading_gap_days": 30.0,
+              "trailing_gap_days": 30.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 0
+            },
+            "statistics": {
+              "sample_count": 0,
+              "nonzero_sample_count": 0,
+              "zero_sample_count": 0,
+              "zero_fraction": null,
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "mean": null,
+              "last_sample_value_sum": null
+            },
+            "series": []
+          },
+          "storage_pvc_info": {
+            "metric": "storage_pvc_info",
+            "family": "storage",
+            "unit": "info_flag",
+            "query": "kube_persistentvolumeclaim_info{namespace=\"whisper-stt\"}",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 3
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 774,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 1.0,
+              "p50": 1.0,
+              "p95": 1.0,
+              "max": 1.0,
+              "mean": 1.0,
+              "last_sample_value_sum": 3.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "__name__": "kube_persistentvolumeclaim_info",
+                  "container": "kube-state-metrics",
+                  "endpoint": "http",
+                  "instance": "10.42.2.88:8080",
+                  "job": "kube-state-metrics",
+                  "namespace": "whisper-stt",
+                  "persistentvolumeclaim": "whisper-model-cache",
+                  "pod": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics-nhhg7",
+                  "service": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics",
+                  "storageclass": "longhorn",
+                  "volumemode": "Filesystem",
+                  "volumename": "pvc-f77f7218-d3c7-4a19-8309-c45b1a5320cc"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 1.0,
+                "max": 1.0
+              },
+              {
+                "labels": {
+                  "__name__": "kube_persistentvolumeclaim_info",
+                  "container": "kube-state-metrics",
+                  "endpoint": "http",
+                  "instance": "10.42.2.88:8080",
+                  "job": "kube-state-metrics",
+                  "namespace": "whisper-stt",
+                  "persistentvolumeclaim": "whisper-openai-model-cache",
+                  "pod": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics-nhhg7",
+                  "service": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics",
+                  "storageclass": "longhorn",
+                  "volumemode": "Filesystem",
+                  "volumename": "pvc-d5891df2-b37f-4043-96a1-7098e218378c"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 1.0,
+                "max": 1.0
+              },
+              {
+                "labels": {
+                  "__name__": "kube_persistentvolumeclaim_info",
+                  "container": "kube-state-metrics",
+                  "endpoint": "http",
+                  "instance": "10.42.2.88:8080",
+                  "job": "kube-state-metrics",
+                  "namespace": "whisper-stt",
+                  "persistentvolumeclaim": "whisper-stt-jobs",
+                  "pod": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics-nhhg7",
+                  "service": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics",
+                  "storageclass": "longhorn",
+                  "volumemode": "Filesystem",
+                  "volumename": "pvc-0ea5e610-ab76-4576-84da-95ec5e25df61"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 1.0,
+                "max": 1.0
+              }
+            ]
+          },
+          "storage_requested_bytes": {
+            "metric": "storage_requested_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace=\"whisper-stt\"}",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 3
+            },
+            "statistics": {
+              "sample_count": 774,
+              "nonzero_sample_count": 774,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 1073741824.0,
+              "p50": 10737418240.0,
+              "p95": 10737418240.0,
+              "max": 10737418240.0,
+              "mean": 7516192768.0,
+              "last_sample_value_sum": 22548578304.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "__name__": "kube_persistentvolumeclaim_resource_requests_storage_bytes",
+                  "container": "kube-state-metrics",
+                  "endpoint": "http",
+                  "instance": "10.42.2.88:8080",
+                  "job": "kube-state-metrics",
+                  "namespace": "whisper-stt",
+                  "persistentvolumeclaim": "whisper-model-cache",
+                  "pod": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics-nhhg7",
+                  "service": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 10737418240.0,
+                "max": 10737418240.0
+              },
+              {
+                "labels": {
+                  "__name__": "kube_persistentvolumeclaim_resource_requests_storage_bytes",
+                  "container": "kube-state-metrics",
+                  "endpoint": "http",
+                  "instance": "10.42.2.88:8080",
+                  "job": "kube-state-metrics",
+                  "namespace": "whisper-stt",
+                  "persistentvolumeclaim": "whisper-openai-model-cache",
+                  "pod": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics-nhhg7",
+                  "service": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 10737418240.0,
+                "max": 10737418240.0
+              },
+              {
+                "labels": {
+                  "__name__": "kube_persistentvolumeclaim_resource_requests_storage_bytes",
+                  "container": "kube-state-metrics",
+                  "endpoint": "http",
+                  "instance": "10.42.2.88:8080",
+                  "job": "kube-state-metrics",
+                  "namespace": "whisper-stt",
+                  "persistentvolumeclaim": "whisper-stt-jobs",
+                  "pod": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics-nhhg7",
+                  "service": "kube-prometheus-stack-ardenone-cluster-kube-state-metrics"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 1073741824.0,
+                "max": 1073741824.0
+              }
+            ]
+          },
+          "storage_used_bytes": {
+            "metric": "storage_used_bytes",
+            "family": "storage",
+            "unit": "bytes",
+            "query": "kubelet_volume_stats_used_bytes{namespace=\"whisper-stt\"}",
+            "availability": "available",
+            "status": "partial",
+            "coverage": {
+              "requested_start": "2026-07-11T11:44:38.362000Z",
+              "requested_end": "2026-08-10T11:44:38.362000Z",
+              "requested_window_days": 30.0,
+              "expected_timestamp_points": 721,
+              "observed_timestamp_points": 258,
+              "coverage_percentage_by_timestamp_points": 35.784,
+              "first_sample": "2026-07-30T18:44:38.362000Z",
+              "last_sample": "2026-08-10T11:44:38.362000Z",
+              "returned_span_days": 10.708333,
+              "leading_gap_days": 19.291667,
+              "trailing_gap_days": 0.0,
+              "internal_gap_count": 0,
+              "internal_missing_intervals": 0,
+              "series_count": 3
+            },
+            "statistics": {
+              "sample_count": 625,
+              "nonzero_sample_count": 625,
+              "zero_sample_count": 0,
+              "zero_fraction": 0.0,
+              "min": 303104.0,
+              "p50": 1516675072.0,
+              "p95": 3239706624.0,
+              "max": 3239706624.0,
+              "mean": 1191213426.2784,
+              "last_sample_value_sum": 4756684800.0
+            },
+            "series": [
+              {
+                "labels": {
+                  "__name__": "kubelet_volume_stats_used_bytes",
+                  "endpoint": "https-metrics",
+                  "instance": "10.20.23.201:10250",
+                  "job": "kubelet",
+                  "metrics_path": "/metrics",
+                  "namespace": "whisper-stt",
+                  "node": "k3s-lenovo-tiny",
+                  "persistentvolumeclaim": "whisper-openai-model-cache",
+                  "service": "kube-prometheus-stack-arde-kubelet"
+                },
+                "sample_count": 109,
+                "first_sample": "2026-08-05T23:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 3239706624.0,
+                "max": 3239706624.0
+              },
+              {
+                "labels": {
+                  "__name__": "kubelet_volume_stats_used_bytes",
+                  "endpoint": "https-metrics",
+                  "instance": "10.20.23.203:10250",
+                  "job": "kubelet",
+                  "metrics_path": "/metrics",
+                  "namespace": "whisper-stt",
+                  "node": "k3s-agent-minisforum",
+                  "persistentvolumeclaim": "whisper-model-cache",
+                  "service": "kube-prometheus-stack-arde-kubelet"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 1516675072.0,
+                "max": 1516675072.0
+              },
+              {
+                "labels": {
+                  "__name__": "kubelet_volume_stats_used_bytes",
+                  "endpoint": "https-metrics",
+                  "instance": "10.20.23.203:10250",
+                  "job": "kubelet",
+                  "metrics_path": "/metrics",
+                  "namespace": "whisper-stt",
+                  "node": "k3s-agent-minisforum",
+                  "persistentvolumeclaim": "whisper-stt-jobs",
+                  "service": "kube-prometheus-stack-arde-kubelet"
+                },
+                "sample_count": 258,
+                "first_sample": "2026-07-30T18:44:38.362Z",
+                "last_sample": "2026-08-10T11:44:38.362Z",
+                "min": 303104.0,
+                "max": 303104.0
+              }
+            ]
+          }
+        },
+        "current_resource_snapshot": {
+          "collection_timestamp": "2026-08-07T08:12:15.340915",
+          "current_cpu_usage": [
+            {
+              "pod": "whisper-openai-68966786fb-jsb5d",
+              "current_cpu_cores": 0.005,
+              "current_cpu_millicores": 5.0
+            },
+            {
+              "pod": "whisper-stt-847fd8d7b9-v2rs5",
+              "current_cpu_cores": 0.001,
+              "current_cpu_millicores": 1.0
+            }
+          ],
+          "cpu_requests": [
+            {
+              "pod": "whisper-stt-847fd8d7b9-v2rs5",
+              "container": "whisper-stt",
+              "request_cores": 1.0
+            }
+          ],
+          "cpu_limits": [
+            {
+              "pod": "whisper-stt-847fd8d7b9-v2rs5",
+              "container": "whisper-stt",
+              "limit_cores": 8.0
+            }
+          ],
+          "cpu_utilization": {
+            "current_usage_cores": 0.006,
+            "requests_cores": "1.0",
+            "limits_cores": "8.0",
+            "vs_request_percent": 0.6,
+            "vs_limit_percent": 0.075
+          },
+          "current_memory_usage": [
+            {
+              "pod": "whisper-openai-68966786fb-jsb5d",
+              "current_memory_bytes": 5839519744,
+              "current_memory_mib": 5569.0
+            },
+            {
+              "pod": "whisper-stt-847fd8d7b9-v2rs5",
+              "current_memory_bytes": 3290431488,
+              "current_memory_mib": 3138.0
+            }
+          ],
+          "memory_requests": [
+            {
+              "pod": "whisper-stt-847fd8d7b9-v2rs5",
+              "container": "whisper-stt",
+              "request_bytes": 4294967296
+            }
+          ],
+          "memory_limits": [
+            {
+              "pod": "whisper-stt-847fd8d7b9-v2rs5",
+              "container": "whisper-stt",
+              "limit_bytes": 8589934592
+            }
+          ],
+          "memory_utilization": {
+            "current_usage_bytes": 9129951232.0,
+            "requests_bytes": "4294967296",
+            "limits_bytes": "8589934592",
+            "vs_request_percent": 212.5732421875,
+            "vs_limit_percent": 106.28662109375
+          },
+          "pvcs": [
+            {
+              "name": "whisper-model-cache",
+              "storage_class": "longhorn",
+              "request": "10Gi",
+              "capacity": "10Gi",
+              "status": "Bound",
+              "request_bytes": 10737418240,
+              "capacity_bytes": 10737418240
+            },
+            {
+              "name": "whisper-openai-model-cache",
+              "storage_class": "longhorn",
+              "request": "10Gi",
+              "capacity": "10Gi",
+              "status": "Bound",
+              "request_bytes": 10737418240,
+              "capacity_bytes": 10737418240
+            },
+            {
+              "name": "whisper-stt-jobs",
+              "storage_class": "longhorn",
+              "request": "1Gi",
+              "capacity": "1Gi",
+              "status": "Bound",
+              "request_bytes": 1073741824,
+              "capacity_bytes": 1073741824
+            }
+          ],
+          "volume_usage": [],
+          "network_stats": [
+            {
+              "note": "Detailed network metrics require Prometheus/monitoring integration",
+              "available_data": "pod-level network connectivity only",
+              "metrics_available": [
+                "pod_status",
+                "pod_ip",
+                "network_policy"
+              ]
+            }
+          ],
+          "metric_coverage": {
+            "current_usage": "available",
+            "resource_limits": "available",
+            "storage_info": "available",
+            "resource_events": "none",
+            "deployment_alignment": "available"
+          },
+          "anomalies": [
+            "High memory utilization: 212.6% of requests"
+          ],
+          "data_gaps": [],
+          "temporal_alignment": {
+            "deployment_data_loaded": true,
+            "deployment_events_count": 2,
+            "resource_events_count": 0,
+            "alignment_status": "partial"
+          }
+        },
+        "coverage": {
+          "metric_count": 17,
+          "available_metric_count": 15,
+          "unavailable_metric_count": 2,
+          "availability_percentage": 88.23529411764706,
+          "internal_hourly_gaps": 0
+        }
+      },
+      "data_quality": {
+        "status": "degraded",
+        "notes": [
+          "Error rates are aggregate-only and do not include a complete daily series.",
+          "Latency sources are sparse event/workflow aggregates; application timing is log-derived where present.",
+          "Resource Prometheus data has a leading retention/no-data gap and no synthetic fill.",
+          "Counts follow the source collection scope; pod names in the log artifact include supporting and non-primary workload pods."
+        ],
+        "gap_count": 5,
+        "anomaly_count": 3
+      }
+    }
+  },
+  "coverage_analysis": {
+    "gap_count": 10,
+    "anomaly_count": 9,
+    "gaps": [
+      {
+        "id": "pbx-web-resource-retention-gap",
+        "service": "pbx-web",
+        "metric_family": "resource_usage",
+        "severity": "high",
+        "type": "leading_retention_or_no_data_gap",
+        "affected_metric_count": 17,
+        "duration_days": 30.0,
+        "description": "Prometheus returned no samples at the beginning of the requested 30-day resource window.",
+        "source": "resource coverage reports"
+      },
+      {
+        "id": "pbx-web-resource-unavailable-series",
+        "service": "pbx-web",
+        "metric_family": "resource_usage",
+        "severity": "high",
+        "type": "metric_series_unavailable",
+        "metrics": [
+          "storage_available_bytes",
+          "storage_capacity_bytes",
+          "storage_filesystem_limit_bytes",
+          "storage_filesystem_usage_bytes",
+          "storage_pvc_info",
+          "storage_requested_bytes",
+          "storage_used_bytes"
+        ],
+        "description": "The query succeeded but returned no time series; this is not equivalent to a measured zero.",
+        "source": "disk/network/storage raw query responses"
+      },
+      {
+        "id": "pbx-web-error-components-unavailable",
+        "service": "pbx-web",
+        "metric_family": "error_rates",
+        "severity": "high",
+        "type": "component_coverage_gap",
+        "components": [
+          "deployment_events"
+        ],
+        "description": "A missing log/event source is represented as unavailable rather than zero.",
+        "source": "error/latency collection artifact"
+      },
+      {
+        "id": "pbx-web-error-daily-breakdown-missing",
+        "service": "pbx-web",
+        "metric_family": "error_rates",
+        "severity": "medium",
+        "type": "aggregate_only",
+        "description": "Error counts cover the source analysis window but have no complete daily time series.",
+        "source": "error/latency collection artifact"
+      },
+      {
+        "id": "pbx-web-workflow-latency-sparse",
+        "service": "pbx-web",
+        "metric_family": "latency",
+        "severity": "medium",
+        "type": "sparse_temporal_coverage",
+        "description": "Workflow latency has samples on only one day of the source window.",
+        "source": "latency query artifact"
+      },
+      {
+        "id": "whisper-stt-resource-retention-gap",
+        "service": "whisper-stt",
+        "metric_family": "resource_usage",
+        "severity": "high",
+        "type": "leading_retention_or_no_data_gap",
+        "affected_metric_count": 17,
+        "duration_days": 30.0,
+        "description": "Prometheus returned no samples at the beginning of the requested 30-day resource window.",
+        "source": "resource coverage reports"
+      },
+      {
+        "id": "whisper-stt-resource-unavailable-series",
+        "service": "whisper-stt",
+        "metric_family": "resource_usage",
+        "severity": "high",
+        "type": "metric_series_unavailable",
+        "metrics": [
+          "storage_filesystem_limit_bytes",
+          "storage_filesystem_usage_bytes"
+        ],
+        "description": "The query succeeded but returned no time series; this is not equivalent to a measured zero.",
+        "source": "disk/network/storage raw query responses"
+      },
+      {
+        "id": "whisper-stt-error-components-unavailable",
+        "service": "whisper-stt",
+        "metric_family": "error_rates",
+        "severity": "high",
+        "type": "component_coverage_gap",
+        "components": [
+          "http_logs"
+        ],
+        "description": "A missing log/event source is represented as unavailable rather than zero.",
+        "source": "error/latency collection artifact"
+      },
+      {
+        "id": "whisper-stt-error-daily-breakdown-missing",
+        "service": "whisper-stt",
+        "metric_family": "error_rates",
+        "severity": "medium",
+        "type": "aggregate_only",
+        "description": "Error counts cover the source analysis window but have no complete daily time series.",
+        "source": "error/latency collection artifact"
+      },
+      {
+        "id": "whisper-stt-application-latency-missing",
+        "service": "whisper-stt",
+        "metric_family": "latency",
+        "severity": "high",
+        "type": "no_application_timing_samples",
+        "description": "No structured application timing lines were collected for whisper-stt.",
+        "source": "error/latency collection artifact"
+      }
+    ],
+    "anomalies": [
+      {
+        "id": "pbx-web-disk_read_bytes_per_second-all-zero",
+        "service": "pbx-web",
+        "metric_family": "resource_usage",
+        "metric": "disk_read_bytes_per_second",
+        "severity": "medium",
+        "type": "constant_zero_series",
+        "description": "Every returned sample is zero; this may indicate true idleness or an uninstrumented counter.",
+        "sample_count": 774,
+        "source": "raw Prometheus response"
+      },
+      {
+        "id": "pbx-web-disk_read_operations_per_second-all-zero",
+        "service": "pbx-web",
+        "metric_family": "resource_usage",
+        "metric": "disk_read_operations_per_second",
+        "severity": "medium",
+        "type": "constant_zero_series",
+        "description": "Every returned sample is zero; this may indicate true idleness or an uninstrumented counter.",
+        "sample_count": 774,
+        "source": "raw Prometheus response"
+      },
+      {
+        "id": "pbx-web-disk_write_bytes_per_second-all-zero",
+        "service": "pbx-web",
+        "metric_family": "resource_usage",
+        "metric": "disk_write_bytes_per_second",
+        "severity": "medium",
+        "type": "constant_zero_series",
+        "description": "Every returned sample is zero; this may indicate true idleness or an uninstrumented counter.",
+        "sample_count": 774,
+        "source": "raw Prometheus response"
+      },
+      {
+        "id": "pbx-web-disk_write_operations_per_second-all-zero",
+        "service": "pbx-web",
+        "metric_family": "resource_usage",
+        "metric": "disk_write_operations_per_second",
+        "severity": "medium",
+        "type": "constant_zero_series",
+        "description": "Every returned sample is zero; this may indicate true idleness or an uninstrumented counter.",
+        "sample_count": 774,
+        "source": "raw Prometheus response"
+      },
+      {
+        "id": "pbx-web-workflow-long-tail",
+        "service": "pbx-web",
+        "metric_family": "latency",
+        "metric": "workflow_execution_time",
+        "severity": "high",
+        "type": "long_tail_spike",
+        "description": "Maximum workflow duration is more than ten times the median.",
+        "max_seconds": 20310.0,
+        "p50_seconds": 1457.0,
+        "source": "latency query artifact"
+      },
+      {
+        "id": "pbx-web-memory-over-request",
+        "service": "pbx-web",
+        "metric_family": "resource_usage",
+        "metric": "memory_working_set",
+        "severity": "high",
+        "type": "memory_above_request",
+        "request_utilization_percent": 365.625,
+        "limit_utilization_percent": 91.40625,
+        "description": "Current memory exceeds the recorded request; verify request aggregation before capacity decisions.",
+        "source": "resource usage snapshot"
+      },
+      {
+        "id": "whisper-stt-deployment-interval-spread",
+        "service": "whisper-stt",
+        "metric_family": "latency",
+        "metric": "deployment_interval",
+        "severity": "medium",
+        "type": "rapid_sequence_and_long_gap",
+        "description": "Deployment intervals combine a rapid rollout sequence with a much longer gap.",
+        "max_hours": 109.45,
+        "median_hours": 0.18,
+        "source": "latency query artifact"
+      },
+      {
+        "id": "whisper-stt-memory-over-request",
+        "service": "whisper-stt",
+        "metric_family": "resource_usage",
+        "metric": "memory_working_set",
+        "severity": "high",
+        "type": "memory_above_request",
+        "request_utilization_percent": 212.5732421875,
+        "limit_utilization_percent": 106.28662109375,
+        "description": "Current memory exceeds the recorded request; verify request aggregation before capacity decisions.",
+        "source": "resource usage snapshot"
+      },
+      {
+        "id": "whisper-stt-memory-over-limit",
+        "service": "whisper-stt",
+        "metric_family": "resource_usage",
+        "metric": "memory_working_set",
+        "severity": "critical",
+        "type": "memory_above_limit",
+        "request_utilization_percent": 212.5732421875,
+        "limit_utilization_percent": 106.28662109375,
+        "description": "Current memory exceeds the recorded limit; verify the snapshot and container-level aggregation.",
+        "source": "resource usage snapshot"
+      }
+    ]
+  }
+}
