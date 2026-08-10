@@ -24,6 +24,8 @@ from .registry import (
     WorkflowValidationError,
 )
 from .steps import (
+    GitOperationResult,
+    GitOperationStatus,
     execute_argocd_apps_step,
     execute_argocd_sync_status_step,
     execute_ci_status_step,
@@ -46,6 +48,8 @@ __all__ = [
     "Step",
     "StepResult",
     "StepStatus",
+    "GitOperationResult",
+    "GitOperationStatus",
     # Registry
     "get_workflow_definition",
     "list_workflows",
