@@ -107,6 +107,9 @@ curl -s http://localhost:8000/health
 
 Open `http://localhost:8000/` in your browser to use the canvas.
 
+For text-only intent-router checks, see the [intent classification test endpoint
+guide](docs/intent-classification-test-endpoint.md).
+
 For voice mode, an OpenAI API key with Realtime API access is required (set `OPENAI_API_KEY`).
 
 ---
