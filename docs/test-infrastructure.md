@@ -143,6 +143,13 @@ session-filtering, connection-cleanup, and concurrency patterns are stable
 under this verification load; it is not a claim that every unrelated test
 module or the live production database is isolated automatically.
 
+The final post-fix gate also included the hermetic canvas data-injection tests
+(`tests/e2e/test_inject.py`), which exercise temporary application-store setup,
+cleanup, and restoration of process-wide singletons. Those ten runs executed
+75 tests each (750/750 total) with zero failures, errors, skips, or flaky
+tests. The fixture was corrected to await the asynchronous store factory and
+to close the temporary store before restoring the saved singletons.
+
 The unscoped full-suite repeat command was also started from the shared
 checkout, but it was not a valid all-green baseline: the first run reached
 1,869 passed, 146 failed, 149 errors, and 40 skipped before interruption after
