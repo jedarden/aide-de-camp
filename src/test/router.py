@@ -12,6 +12,7 @@ support canvas test-data injection: creating sessions with predictable IDs and
 tearing them down cleanly after a test run.
 """
 import uuid
+from datetime import datetime, timezone
 from logging import getLogger
 from typing import Optional
 
@@ -25,6 +26,8 @@ logger = getLogger(__name__)
 
 # FastAPI router instance for test endpoints
 router = APIRouter()
+# The session endpoint is also exposed at /api/v1/sessions for test clients.
+session_router = APIRouter()
 
 # Import narration endpoints to register them
 
@@ -40,36 +43,47 @@ class SessionCreateRequest(BaseModel):
     )
 
 
+class SessionCreateResponse(BaseModel):
+    """Response returned after creating or retrieving a test session."""
+
+    session_id: str
+    created_at: str
+
+
+@session_router.post("/sessions", response_model=SessionCreateResponse)
 @router.post("/sessions")
-async def api_v1_create_session(request: SessionCreateRequest) -> dict:
+async def api_v1_create_session(request: SessionCreateRequest) -> SessionCreateResponse:
     """
     Create a test session with an explicit, predictable ID.
 
     Mounted at ``POST /api/v1/sessions``. Used by canvas test-data injection
     utilities to set up a known session before injecting topics. Idempotent:
-    if the session already exists it is returned with ``created: false``.
+    if the session already exists, its original creation timestamp is returned.
 
     Request body:
     ```
     {"session_id": "test-inject-my-scenario"}   # optional
     ```
 
-    Returns:
-    ```
-    {"session_id": "test-inject-my-scenario", "created": true}
-    ```
+    Returns a ``session_id`` and its ISO-8601 ``created_at`` timestamp.
     """
     from ..session.store import get_store
 
     store = await get_store()
     session_id = request.session_id or f"test-inject-{uuid.uuid4().hex[:12]}"
     existing = await store.get_session(session_id)
-    created = False
     if not existing:
         await store.create_session(session_id)
-        created = True
-    logger.info(f"[TEST] create_session id={session_id} created={created}")
-    return {"session_id": session_id, "created": created}
+        existing = await store.get_session(session_id)
+
+    if not existing or not isinstance(existing.get("created_at"), (int, float)):
+        raise RuntimeError(f"Session {session_id!r} was created without a timestamp")
+
+    created_at = datetime.fromtimestamp(
+        existing["created_at"], tz=timezone.utc
+    ).isoformat().replace("+00:00", "Z")
+    logger.info("[TEST] create_session id=%s", session_id)
+    return SessionCreateResponse(session_id=session_id, created_at=created_at)
 
 
 @router.delete("/sessions/{session_id}")
