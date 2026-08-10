@@ -158,3 +158,71 @@ class DispatchRequest(BaseModel):
                 }
             ]
         }
+
+
+class DispatchResponse(BaseModel):
+    """
+    Response model for POST /dispatch endpoint.
+
+    This model provides a structured response format for successful dispatches,
+    including success flag, message, and data fields. It ensures consistent API
+    responses and proper HTTP status codes.
+
+    Attributes:
+        success: Whether the dispatch was successful (True for successful dispatches)
+        message: Human-readable message describing the result
+        data: Dictionary containing dispatch details (utterance_id, intent_ids, etc.)
+
+    Example:
+        >>> response = DispatchResponse(
+        ...     success=True,
+        ...     message="Dispatched 2 intents for parallel processing",
+        ...     data={
+        ...         "utterance_id": "660e8400-e29b-41d4-a716-446655440000",
+        ...         "session_id": "550e8400-e29b-41d4-a716-446655440000",
+        ...         "intent_count": 2,
+        ...         "intent_ids": ["intent-1", "intent-2"],
+        ...         "status": "dispatched"
+        ...     }
+        ... )
+    """
+
+    success: bool = Field(
+        ...,
+        description="Whether the dispatch was successful",
+        example=True,
+    )
+    message: str = Field(
+        ...,
+        description="Human-readable message describing the result",
+        example="Dispatched 2 intents for parallel processing",
+    )
+    data: dict = Field(
+        ...,
+        description="Dictionary containing dispatch details",
+        example={
+            "utterance_id": "660e8400-e29b-41d4-a716-446655440000",
+            "session_id": "550e8400-e29b-41d4-a716-446655440000",
+            "intent_count": 2,
+            "intent_ids": ["intent-1", "intent-2"],
+            "status": "dispatched",
+        },
+    )
+
+    class Config:
+        """Pydantic model configuration for OpenAPI documentation."""
+        json_schema_extra = {
+            "examples": [
+                {
+                    "success": True,
+                    "message": "Dispatched 2 intents for parallel processing",
+                    "data": {
+                        "utterance_id": "660e8400-e29b-41d4-a716-446655440000",
+                        "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "intent_count": 2,
+                        "intent_ids": ["intent-1", "intent-2"],
+                        "status": "dispatched",
+                    },
+                }
+            ]
+        }
