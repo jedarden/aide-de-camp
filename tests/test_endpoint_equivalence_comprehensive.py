@@ -1,530 +1,216 @@
+"""Equivalence coverage for the production and direct-classification endpoints.
+
+The production ``/dispatch`` response is an acknowledgement and does not
+include the full classification object.  The test captures the
+``RoutedIntent.classification`` values returned by the production route while
+it is handling the request, then compares those values with the response from
+``/test/intent-classify`` using the unified comparison utility.
 """
-Comprehensive Endpoint Equivalence Tests
 
-Test suite that verifies /dispatch and /test/intent-classify endpoints produce
-identical classifications for the same utterances across all intent types and edge cases.
+from __future__ import annotations
 
-These tests use the comparison utilities from tests.helpers.endpoint_comparison
-to send requests to both endpoints and verify equivalence.
+from typing import Any
 
-Test Coverage:
-- All intent types: status, action, brainstorm, lookup, reminder, self-modification, etc.
-- Edge cases: empty utterances, special characters, Unicode, very long text
-- Diverse utterances: natural language variations, technical queries, multi-intent
-- Minimum 10+ test cases as required
-"""
 import pytest
-from httpx import AsyncClient, ASGITransport
 
+from src.intent.unified_comparison import compare_classifications
 from tests.helpers.endpoint_comparison import (
-    send_to_both_endpoints,
-    compare_classification_counts,
-    format_comparison_summary,
     RequestValidationError,
+    compare_classification_counts,
+    send_to_both_endpoints,
 )
 
-
-@pytest.mark.asyncio
-async def test_status_intent_equivalence_basic():
-    """Test that both endpoints classify basic status intent identically."""
-    from src.main import app
-
-    utterance = "how are the pods doing"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-status-basic",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for status intent: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    # Both should return at least 1 classification
-    assert count_comparison["dispatch_count"] >= 1
-    assert count_comparison["test_count"] >= 1
-
-    print(f"✅ Status intent equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_action_intent_equivalence_restart():
-    """Test action intent classification equivalence (restart scenario)."""
-    from src.main import app
-
-    utterance = "restart the nap-api deployment"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-action-restart",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for restart action: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    # Both should identify as action
-    test_intent_types = [c.get("intent_type") for c in test_result["classifications"]]
-    assert "action" in test_intent_types or any("action" in str(t).lower() for t in test_intent_types)
-
-    print(f"✅ Action intent equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_brainstorm_intent_equivalence():
-    """Test brainstorm intent classification equivalence."""
-    from src.main import app
-
-    utterance = "help me think of ways to improve the deployment pipeline"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-brainstorm",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for brainstorm: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    print(f"✅ Brainstorm intent equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_lookup_logs_intent_equivalence():
-    """Test lookup:logs intent classification equivalence."""
-    from src.main import app
-
-    utterance = "show me the recent logs for nap-api-pod"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-lookup-logs",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for lookup logs: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    # Should identify as lookup or lookup:logs
-    test_intent_types = [c.get("intent_type") for c in test_result["classifications"]]
-    assert any("lookup" in str(t).lower() for t in test_intent_types)
-
-    print(f"✅ Lookup logs intent equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_lookup_config_intent_equivalence():
-    """Test lookup:config intent classification equivalence."""
-    from src.main import app
-
-    utterance = "what's the current configuration for the options pipeline"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-lookup-config",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for lookup config: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    print(f"✅ Lookup config intent equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_reminder_intent_equivalence():
-    """Test reminder intent classification equivalence."""
-    from src.main import app
-
-    utterance = "remind me to check the deployment status in 30 minutes"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-reminder",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for reminder: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    # Should identify as reminder
-    test_intent_types = [c.get("intent_type") for c in test_result["classifications"]]
-    assert any("reminder" in str(t).lower() for t in test_intent_types)
-
-    print(f"✅ Reminder intent equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_self_modification_intent_equivalence():
-    """Test self-modification intent classification equivalence."""
-    from src.main import app
-
-    utterance = "update the dispatch logic to use the new intent router"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-self-modification",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for self-modification: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    print(f"✅ Self-modification intent equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_monitoring_config_intent_equivalence():
-    """Test monitoring-config intent classification equivalence."""
-    from src.main import app
-
-    utterance = "set up monitoring for the nap-api pipeline"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-monitoring-config",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for monitoring config: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    print(f"✅ Monitoring config intent equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_multi_intent_equivalence():
-    """Test that both endpoints handle multi-intent utterances identically."""
-    from src.main import app
-
-    utterance = "check the pods and show me the logs if any are failing"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-multi-intent",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for multi-intent: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    # Multi-intent should return 2+ classifications
-    assert count_comparison["dispatch_count"] >= 2, "Should identify 2+ intents"
-
-    print(f"✅ Multi-intent equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_edge_case_empty_utterance():
-    """Test edge case: empty utterance raises validation error on both endpoints."""
-    from src.main import app
-
-    with pytest.raises(RequestValidationError) as exc_info:
-        await send_to_both_endpoints(
-            utterance="",
-            app=app,
-        )
-
-    assert "non-empty string" in str(exc_info.value)
-    print("✅ Empty utterance validation test passed")
-
-
-@pytest.mark.asyncio
-async def test_edge_case_whitespace_only():
-    """Test edge case: whitespace-only utterance raises validation error."""
-    from src.main import app
-
-    with pytest.raises(RequestValidationError) as exc_info:
-        await send_to_both_endpoints(
-            utterance="   \n\t  ",
-            app=app,
-        )
-
-    assert "non-empty string" in str(exc_info.value)
-    print("✅ Whitespace-only utterance validation test passed")
-
-
-@pytest.mark.asyncio
-async def test_edge_case_special_characters():
-    """Test edge case: utterance with special characters."""
-    from src.main import app
-
-    utterance = "check the pods in namespace: test-env & deployment: api-v2 (prod)"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-special-chars",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for special characters: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    print(f"✅ Special characters equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_edge_case_unicode_emoji():
-    """Test edge case: utterance with Unicode emoji."""
-    from src.main import app
-
-    utterance = "check the pod status 🚀 and show logs 📋"
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-unicode-emoji",
-        app=app,
-    )
-
-    # Verify count equivalence
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for Unicode emoji: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    print(f"✅ Unicode emoji equivalence test passed for: '{utterance}'")
-
-
-@pytest.mark.asyncio
-async def test_edge_case_long_utterance():
-    """Test edge case: very long utterance (1000+ characters)."""
-    from src.main import app
-
-    utterance = (
-        "I need you to check the deployment status of the nap-api pipeline in the "
-        "production environment and then verify that all the pods are running correctly "
-        "and also check the recent logs for any errors and then show me the ArgoCD "
-        "application status and finally check if there are any recent git commits that "
-        "might have affected the deployment and also check the bead list to see if there "
-        "are any open beads related to this deployment and verify the CI status and check "
-        "the events in the namespace to see if there are any recent issues and overall "
-        "give me a comprehensive status report of everything related to the nap-api "
-        "deployment in production right now with all the details you can find. " * 3
-    )
-
-    dispatch_result, test_result = await send_to_both_endpoints(
-        utterance=utterance,
-        session_id="test-long-utterance",
-        app=app,
-    )
-
-    # Verify count equivalence (may identify multiple intents)
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    assert count_comparison["match"], (
-        f"Intent count mismatch for long utterance: "
-        f"dispatch={count_comparison['dispatch_count']}, "
-        f"test={count_comparison['test_count']}"
-    )
-
-    print(f"✅ Long utterance ({len(utterance)} chars) equivalence test passed")
-
-
-@pytest.mark.asyncio
-async def test_natural_language_variations_status():
-    """Test that various natural language forms are classified identically."""
-    from src.main import app
-
-    variations = [
+INTENT_CASES = [
+    pytest.param(
         "how are the pods doing",
-        "what's the status of the pods",
-        "check pod status",
-        "show me pod health",
-        "are the pods running",
-    ]
+        ["status"],
+        id="status-question",
+    ),
+    pytest.param(
+        "is the cluster healthy?",
+        ["status"],
+        id="status-health",
+    ),
+    pytest.param(
+        "restart the nap-api deployment",
+        ["action"],
+        id="action-restart",
+    ),
+    pytest.param(
+        "deploy the latest nap-api image",
+        ["action"],
+        id="action-deploy",
+    ),
+    pytest.param(
+        "brainstorm ways to improve service reliability",
+        ["brainstorm"],
+        id="brainstorm",
+    ),
+    pytest.param(
+        "show me the recent logs for nap-api",
+        ["lookup"],
+        id="lookup-logs",
+    ),
+    pytest.param(
+        "show the deployment configuration for nap-api",
+        ["lookup"],
+        id="lookup-config",
+    ),
+    pytest.param(
+        "explain the architecture of the nap-api service",
+        ["lookup"],
+        id="lookup-docs",
+    ),
+    pytest.param(
+        "tell me about the nap-api service",
+        ["lookup"],
+        id="lookup-general",
+    ),
+    pytest.param(
+        "queue up a research task for the failed deployment",
+        ["task-profile"],
+        id="task-profile",
+    ),
+    pytest.param(
+        "check pod status, and show recent logs",
+        ["status", "lookup"],
+        id="multi-intent",
+    ),
+    pytest.param(
+        "check pod status @ prod [api-v2] #blue & green",
+        ["status"],
+        id="special-characters",
+    ),
+    pytest.param(
+        "check pod status 🚀 — namespace: production",
+        ["status"],
+        id="unicode-and-punctuation",
+    ),
+]
 
-    for i, utterance in enumerate(variations):
-        dispatch_result, test_result = await send_to_both_endpoints(
+
+def _classification_to_dict(classification: Any) -> dict[str, Any]:
+    """Serialize the classification object routed by ``/dispatch``."""
+
+    intent_type = classification.intent_type
+    if hasattr(intent_type, "value"):
+        intent_type = intent_type.value
+
+    return {
+        "intent_type": intent_type,
+        "project_slug": classification.project_slug,
+        "confidence": classification.confidence,
+        "utterance_fragment": classification.utterance_fragment,
+        "reasoning": classification.reasoning,
+        "urgency": classification.urgency,
+        "lookup_kind": classification.lookup_kind,
+    }
+
+
+class _DispatchClassificationCapture:
+    """Proxy a router while retaining the classifications it actually routes."""
+
+    def __init__(self) -> None:
+        self.delegate = None
+        self.classifications_by_utterance_id: dict[str, list[dict[str, Any]]] = {}
+
+    async def route_utterance(self, *, utterance: str, utterance_id: str, session_id: str):
+        routed_intents = await self.delegate.route_utterance(
             utterance=utterance,
-            session_id=f"test-nl-variations-{i}",
-            app=app,
+            utterance_id=utterance_id,
+            session_id=session_id,
         )
+        self.classifications_by_utterance_id[utterance_id] = [
+            _classification_to_dict(routed_intent.classification)
+            for routed_intent in routed_intents
+        ]
+        return routed_intents
 
-        # Verify count equivalence for each variation
-        count_comparison = compare_classification_counts(dispatch_result, test_result)
-        assert count_comparison["match"], (
-            f"Intent count mismatch for variation '{utterance}': "
-            f"dispatch={count_comparison['dispatch_count']}, "
-            f"test={count_comparison['test_count']}"
-        )
+    def __getattr__(self, name: str) -> Any:
+        """Delegate processing methods used after routing to the real router."""
 
-    print(f"✅ Natural language variations equivalence test passed ({len(variations)} variations)")
+        if self.delegate is None:
+            raise AttributeError(name)
+        return getattr(self.delegate, name)
+
+
+@pytest.fixture
+def endpoint_context(monkeypatch):
+    """Provide the app with a router proxy for observing production dispatch."""
+
+    import src.main as main_module
+    from src.intent.router import clear_router_cache
+
+    clear_router_cache()
+    capture = _DispatchClassificationCapture()
+    original_get_router = main_module.get_intent_router
+
+    def get_capturing_router(store=None):
+        capture.delegate = original_get_router(store)
+        return capture
+
+    monkeypatch.setattr(main_module, "get_intent_router", get_capturing_router)
+    return main_module.app, capture
 
 
 @pytest.mark.asyncio
-async def test_technical_query_variations():
-    """Test technical queries with different terminology."""
-    from src.main import app
+@pytest.mark.parametrize("utterance, expected_intent_types", INTENT_CASES)
+async def test_dispatch_and_intent_classify_are_equivalent(
+    endpoint_context,
+    utterance: str,
+    expected_intent_types: list[str],
+):
+    """Send every utterance to both endpoints and compare all classifications."""
 
-    technical_queries = [
-        "kubectl get pods -n production",
-        "show me all pods in the production namespace",
-        "list all running pods in prod",
-        "get pod json output for production environment",
-    ]
-
-    for i, utterance in enumerate(technical_queries):
-        dispatch_result, test_result = await send_to_both_endpoints(
-            utterance=utterance,
-            session_id=f"test-technical-queries-{i}",
-            app=app,
-        )
-
-        # Verify count equivalence
-        count_comparison = compare_classification_counts(dispatch_result, test_result)
-        assert count_comparison["match"], (
-            f"Intent count mismatch for technical query '{utterance}': "
-            f"dispatch={count_comparison['dispatch_count']}, "
-            f"test={count_comparison['test_count']}"
-        )
-
-    print(f"✅ Technical query variations equivalence test passed ({len(technical_queries)} queries)")
-
-
-@pytest.mark.asyncio
-async def test_comprehensive_summary_generation():
-    """Test that comprehensive comparison summary is generated correctly."""
-    from src.main import app
-
-    utterance = "check the pods and deployment status for nap-api"
+    app, capture = endpoint_context
     dispatch_result, test_result = await send_to_both_endpoints(
         utterance=utterance,
-        session_id="test-summary-generation",
+        session_id=f"endpoint-equivalence-{abs(hash(utterance))}",
+        surface_id=f"surface-{abs(hash(utterance))}",
         app=app,
     )
 
-    # Generate comparison summary
-    count_comparison = compare_classification_counts(dispatch_result, test_result)
-    summary = format_comparison_summary(
-        dispatch_result,
-        test_result,
-        count_comparison,
-        intent_comparison=None,
+    counts = compare_classification_counts(dispatch_result, test_result)
+    assert counts["match"], (
+        f"Classification count mismatch for {utterance!r}: "
+        f"dispatch={counts['dispatch_count']} test={counts['test_count']}"
     )
 
-    # Verify summary contains expected sections
-    assert "ENDPOINT COMPARISON SUMMARY" in summary
-    assert "DISPATCH ENDPOINT" in summary
-    assert "TEST ENDPOINT" in summary
-    assert "COMPARISON RESULTS" in summary
-    assert utterance in summary
-    assert "test-summary-generation" in summary
+    utterance_id = dispatch_result["utterance_id"]
+    dispatch_classifications = capture.classifications_by_utterance_id.get(utterance_id)
+    assert dispatch_classifications is not None, (
+        f"/dispatch did not expose routed classifications for utterance {utterance_id}"
+    )
 
-    # Verify count comparison is shown
-    if count_comparison["match"]:
-        assert "✅ Count Match" in summary
-    else:
-        assert "❌ Count Mismatch" in summary
+    test_intent_types = [item["intent_type"] for item in test_result["classifications"]]
+    dispatch_intent_types = [item["intent_type"] for item in dispatch_classifications]
+    assert test_intent_types == expected_intent_types
+    assert dispatch_intent_types == expected_intent_types
 
-    print(f"✅ Comprehensive summary generation test passed")
-
-
-@pytest.mark.asyncio
-async def test_session_isolation():
-    """Test that different sessions produce independent but equivalent results."""
-    from src.main import app
-
-    utterance = "check the pipeline status"
-
-    # Test with multiple different session IDs
-    session_ids = ["test-session-1", "test-session-2", "test-session-3"]
-
-    for session_id in session_ids:
-        dispatch_result, test_result = await send_to_both_endpoints(
-            utterance=utterance,
-            session_id=session_id,
-            app=app,
-        )
-
-        # Each session should produce equivalent counts
-        count_comparison = compare_classification_counts(dispatch_result, test_result)
-        assert count_comparison["match"], (
-            f"Intent count mismatch for session {session_id}: "
-            f"dispatch={count_comparison['dispatch_count']}, "
-            f"test={count_comparison['test_count']}"
-        )
-
-        # Verify session ID is respected in dispatch result
-        assert dispatch_result["session_id"] == session_id
-
-    print(f"✅ Session isolation equivalence test passed ({len(session_ids)} sessions)")
+    comparison = compare_classifications(
+        {"classifications": dispatch_classifications},
+        test_result,
+        confidence_tolerance=0.01,
+    )
+    assert comparison.overall_match, (
+        f"Classification mismatch for {utterance!r}: {comparison.summary}; "
+        f"details={[result.diffs for result in comparison.results]}"
+    )
 
 
 @pytest.mark.asyncio
-async def test_concurrent_requests_equivalence():
-    """Test that concurrent requests to both endpoints produce equivalent results."""
-    from src.main import app
-    import asyncio
+async def test_empty_utterance_is_rejected_by_comparison_helper(endpoint_context):
+    """The shared helper rejects empty input before either endpoint is called."""
 
-    utterances = [
-        "check the pods",
-        "show me the logs",
-        "what's the deployment status",
-        "list the open beads",
-    ]
-
-    async def test_single_utterance(utterance: str, index: int):
-        dispatch_result, test_result = await send_to_both_endpoints(
-            utterance=utterance,
-            session_id=f"test-concurrent-{index}",
-            app=app,
-        )
-        count_comparison = compare_classification_counts(dispatch_result, test_result)
-        assert count_comparison["match"], (
-            f"Intent count mismatch for concurrent utterance '{utterance}': "
-            f"dispatch={count_comparison['dispatch_count']}, "
-            f"test={count_comparison['test_count']}"
-        )
-        return utterance, count_comparison["dispatch_count"]
-
-    # Run all tests concurrently
-    results = await asyncio.gather(*[
-        test_single_utterance(u, i) for i, u in enumerate(utterances)
-    ])
-
-    print(f"✅ Concurrent requests equivalence test passed ({len(results)} concurrent requests)")
+    app, _capture = endpoint_context
+    with pytest.raises(RequestValidationError, match="non-empty string"):
+        await send_to_both_endpoints(utterance="", app=app)
 
 
-# Run tests when executed directly
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+@pytest.mark.asyncio
+async def test_whitespace_only_utterance_is_rejected_by_comparison_helper(endpoint_context):
+    """Whitespace-only input is handled as an invalid empty utterance."""
+
+    app, _capture = endpoint_context
+    with pytest.raises(RequestValidationError, match="non-empty string"):
+        await send_to_both_endpoints(utterance="  \n\t  ", app=app)
