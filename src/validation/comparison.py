@@ -25,9 +25,10 @@ Usage:
     )
 """
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Optional, Dict, List, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -46,7 +47,7 @@ class FieldDiff:
 
     Matching Rules:
         - Exact match for non-None values
-        - None values never match (missing field is always a diff)
+        - Structured comparison treats None and a missing nested key as equal
         - String comparison is case-sensitive
         - Numeric comparison uses exact equality
 
@@ -129,6 +130,11 @@ class ComparisonResult:
             raise ValueError(
                 f"field_matches keys {match_fields} must match diffs field_names {diff_fields}"
             )
+
+    @property
+    def detailed_diffs(self) -> Tuple[FieldDiff, ...]:
+        """Expose the field comparisons under the report-oriented name."""
+        return self.diffs
 
 
 @dataclass
@@ -350,10 +356,333 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
         raise ValueError(f"Invalid ISO 8601 timestamp: {timestamp_str}") from e
 
 
+def _record_field_comparison(
+    expected: Any,
+    actual: Any,
+    field_path: str,
+    diffs: List[FieldDiff],
+    field_matches: Dict[str, bool],
+    is_match: bool,
+) -> bool:
+    """Record one comparison and keep ``field_matches`` aligned with ``diffs``."""
+    field_matches[field_path] = is_match
+    diffs.append(FieldDiff(
+        field_name=field_path,
+        expected_value=expected,
+        actual_value=actual,
+        is_match=is_match,
+    ))
+    return is_match
+
+
+def _atomic_values_match(expected: Any, actual: Any, confidence_tolerance: float) -> bool:
+    """Compare non-container values, including the structured numeric tolerance."""
+    # A missing mapping key is represented by None, so None and None match.
+    if expected is None or actual is None:
+        return expected is None and actual is None
+
+    # bool is an int subclass, but must remain a distinct structured value.
+    numeric_values = (
+        isinstance(expected, (int, float)) and not isinstance(expected, bool),
+        isinstance(actual, (int, float)) and not isinstance(actual, bool),
+    )
+    if any(numeric_values):
+        if not all(numeric_values):
+            return False
+        return math.isclose(float(expected), float(actual), abs_tol=confidence_tolerance)
+
+    # Do not let Python's permissive equality make unlike structured types match.
+    if type(expected) is not type(actual):
+        return False
+    return expected == actual
+
+
+def _compare_nested_structures(
+    expected: Any,
+    actual: Any,
+    field_path: str,
+    diffs: List[FieldDiff],
+    field_matches: Dict[str, bool],
+    confidence_tolerance: float = 0.01,
+) -> bool:
+    """Recursively compare dictionaries, lists, and scalar structured values.
+
+    Mapping keys are compared as a union, with a missing key represented by
+    ``None``. This deliberately makes a missing key equivalent to an explicit
+    ``None`` value. Dictionary children and lists containing nested containers
+    receive full paths such as ``result.found_entities[0].name``. Lists of
+    scalar values are represented by one field-level comparison at the list
+    path, which keeps the result useful for unordered/atomic array fields.
+    """
+    # None and missing mapping keys are intentionally equivalent.
+    if expected is None or actual is None:
+        return _record_field_comparison(
+            expected,
+            actual,
+            field_path,
+            diffs,
+            field_matches,
+            expected is None and actual is None,
+        )
+
+    # Containers need to be handled before the general type check so that
+    # nested values can produce leaf-level paths.
+    if isinstance(expected, dict) or isinstance(actual, dict):
+        if not isinstance(expected, dict) or not isinstance(actual, dict):
+            return _record_field_comparison(
+                expected, actual, field_path, diffs, field_matches, False
+            )
+
+        all_match = True
+        # Sort by a stable string representation for deterministic reports while
+        # still allowing non-string JSON-like keys in callers' dictionaries.
+        all_keys = sorted(set(expected) | set(actual), key=str)
+        for key in all_keys:
+            nested_path = f"{field_path}.{key}" if field_path else str(key)
+            nested_match = _compare_nested_structures(
+                expected.get(key),
+                actual.get(key),
+                nested_path,
+                diffs,
+                field_matches,
+                confidence_tolerance,
+            )
+            all_match = nested_match and all_match
+        return all_match
+
+    if isinstance(expected, list) or isinstance(actual, list):
+        if not isinstance(expected, list) or not isinstance(actual, list):
+            return _record_field_comparison(
+                expected, actual, field_path, diffs, field_matches, False
+            )
+
+        if len(expected) != len(actual):
+            # Keep the length mismatch at the list field; it is one structural
+            # difference and avoids inventing paths for absent list elements.
+            return _record_field_comparison(
+                f"list[{len(expected)}]",
+                f"list[{len(actual)}]",
+                field_path,
+                diffs,
+                field_matches,
+                False,
+            )
+
+        contains_nested_values = any(
+            isinstance(item, (dict, list)) for item in (*expected, *actual)
+        )
+        if not contains_nested_values:
+            return _record_field_comparison(
+                expected,
+                actual,
+                field_path,
+                diffs,
+                field_matches,
+                all(
+                    _atomic_values_match(exp_item, act_item, confidence_tolerance)
+                    for exp_item, act_item in zip(expected, actual)
+                ),
+            )
+
+        all_match = True
+        for index, (expected_item, actual_item) in enumerate(zip(expected, actual)):
+            item_match = _compare_nested_structures(
+                expected_item,
+                actual_item,
+                f"{field_path}[{index}]",
+                diffs,
+                field_matches,
+                confidence_tolerance,
+            )
+            all_match = item_match and all_match
+
+        # Keep an aggregate list result as well as indexed nested fields. This
+        # makes callers able to ask for either the list field or its leaf paths.
+        return _record_field_comparison(
+            expected,
+            actual,
+            field_path,
+            diffs,
+            field_matches,
+            all_match,
+        )
+
+    return _record_field_comparison(
+        expected,
+        actual,
+        field_path,
+        diffs,
+        field_matches,
+        _atomic_values_match(expected, actual, confidence_tolerance),
+    )
+
+
+def compare_classifications(
+    expected: Dict[str, Any],
+    actual: Dict[str, Any],
+    confidence_tolerance: float = 0.1,
+    early_return: bool = True
+) -> ComparisonResult:
+    """
+    Compare classification results for intent type, confidence, and structured result.
+
+    Performs field-by-field comparison between expected and actual classification
+    results, supporting both exact matching (intent_type), tolerance-based
+    matching (confidence), and recursive nested structure comparison (structured_result).
+
+    Args:
+        expected: Expected classification result with 'intent_type', 'confidence', and optional 'structured_result' fields
+        actual: Actual classification result to compare against expected
+        confidence_tolerance: Tolerance for confidence comparison (default: ±0.1)
+        early_return: If True, return early on first mismatch without checking remaining fields
+
+    Returns:
+        ComparisonResult containing match status and field differences
+
+    Raises:
+        ValueError: If expected or actual is not a dict, or if required fields are missing
+
+    Example:
+        >>> expected = {"intent_type": "research", "confidence": 0.8, "structured_result": {"project": "adc"}}
+        >>> actual = {"intent_type": "research", "confidence": 0.85, "structured_result": {"project": "adc"}}
+        >>> result = compare_classifications(expected, actual, confidence_tolerance=0.1)
+        >>> assert result.intent_match
+        >>> assert result.confidence_match
+    """
+    # Validate inputs
+    if not isinstance(expected, dict) or not isinstance(actual, dict):
+        raise ValueError(
+            f"Both expected and actual must be dicts, got "
+            f"{type(expected).__name__} and {type(actual).__name__}"
+        )
+
+    # Extract expected values
+    expected_intent = expected.get("intent_type")
+    expected_confidence = expected.get("confidence")
+    expected_structured = expected.get("structured_result")
+
+    # Extract actual values
+    actual_intent = actual.get("intent_type")
+    actual_confidence = actual.get("confidence")
+    actual_structured = actual.get("structured_result")
+
+    diffs = []
+    field_matches = {}
+    intent_match = False
+    confidence_match = False
+
+    # Compare intent_type (exact string match)
+    # Convert enum to string if necessary
+    expected_intent_str = str(expected_intent.value) if hasattr(expected_intent, 'value') else str(expected_intent)
+    actual_intent_str = str(actual_intent.value) if hasattr(actual_intent, 'value') else str(actual_intent)
+
+    intent_match = expected_intent_str == actual_intent_str
+    field_matches["intent_type"] = intent_match
+
+    intent_diff = FieldDiff(
+        field_name="intent_type",
+        expected_value=expected_intent_str,
+        actual_value=actual_intent_str,
+        is_match=intent_match
+    )
+    diffs.append(intent_diff)
+
+    # Early return if intent doesn't match
+    if not intent_match and early_return:
+        return ComparisonResult(
+            intent_match=False,
+            confidence_match=False,
+            field_matches=field_matches,
+            diffs=diffs
+        )
+
+    # Compare confidence (within tolerance)
+    try:
+        expected_conf = float(expected_confidence) if expected_confidence is not None else None
+        actual_conf = float(actual_confidence) if actual_confidence is not None else None
+
+        if expected_conf is None or actual_conf is None:
+            # One or both values are None - treat as mismatch
+            confidence_match = False
+        else:
+            # Check if values are within tolerance
+            confidence_diff = abs(expected_conf - actual_conf)
+            confidence_match = confidence_diff <= confidence_tolerance
+
+        field_matches["confidence"] = confidence_match
+
+        confidence_diff_obj = FieldDiff(
+            field_name="confidence",
+            expected_value=expected_conf,
+            actual_value=actual_conf,
+            is_match=confidence_match
+        )
+        diffs.append(confidence_diff_obj)
+
+        # Early return if confidence doesn't match
+        if not confidence_match and early_return:
+            return ComparisonResult(
+                intent_match=intent_match,
+                confidence_match=False,
+                field_matches=field_matches,
+                diffs=diffs
+            )
+
+    except (ValueError, TypeError):
+        # Handle case where confidence values cannot be converted to float
+        confidence_match = False
+        field_matches["confidence"] = False
+
+        confidence_diff_obj = FieldDiff(
+            field_name="confidence",
+            expected_value=expected_confidence,
+            actual_value=actual_confidence,
+            is_match=False
+        )
+        diffs.append(confidence_diff_obj)
+
+        if early_return:
+            return ComparisonResult(
+                intent_match=intent_match,
+                confidence_match=False,
+                field_matches=field_matches,
+                diffs=diffs
+            )
+
+    # Compare structured_result even when both values are None/missing. This
+    # records the consistent None/missing match and keeps the result complete.
+    structured_match = _compare_nested_structures(
+        expected_structured,
+        actual_structured,
+        "structured_result",
+        diffs,
+        field_matches,
+        confidence_tolerance=0.01,
+    )
+
+    # Early return if structured_result doesn't match
+    if not structured_match and early_return:
+        return ComparisonResult(
+            intent_match=intent_match,
+            confidence_match=confidence_match,
+            field_matches=field_matches,
+            diffs=diffs,
+        )
+
+    # Return final result with all comparisons
+    return ComparisonResult(
+        intent_match=intent_match,
+        confidence_match=confidence_match,
+        field_matches=field_matches,
+        diffs=diffs
+    )
+
+
 __all__ = [
     "FieldDiff",
     "ComparisonResult",
     "ComparisonReport",
     "detect_coverage_gaps",
     "_parse_timestamp",
+    "compare_classifications",
 ]
