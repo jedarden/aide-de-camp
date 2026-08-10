@@ -61,7 +61,7 @@ async def api_v1_create_session(request: SessionCreateRequest) -> dict:
     """
     from ..session.store import get_store
 
-    store = get_store()
+    store = await get_store()
     session_id = request.session_id or f"test-inject-{uuid.uuid4().hex[:12]}"
     existing = await store.get_session(session_id)
     created = False
@@ -89,7 +89,7 @@ async def api_v1_delete_session(session_id: str) -> dict:
     """
     from ..session.store import get_store
 
-    store = get_store()
+    store = await get_store()
     summary = await store.delete_session(session_id)
     logger.info(f"[TEST] delete_session {summary}")
     return {"status": "deleted", **summary}
@@ -319,7 +319,7 @@ async def test_create_topic(request: TestCreateTopicRequest) -> dict:
 
     try:
         # Get session store
-        store = get_store()
+        store = await get_store()
 
         # Create or get session (pass session_id so sessions.id PK matches the
         # topic/session_id below — otherwise create_session() mints an unrelated id).

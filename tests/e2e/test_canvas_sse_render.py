@@ -76,8 +76,7 @@ async def inj(tmp_path, monkeypatch):
     main_mod._store = None
     main_mod._topic_manager = None
 
-    store = store_mod.get_store()
-    await store.initialize()
+    store = await store_mod.get_store()
     main_mod._topic_manager = TopicManager(store)
 
     async with TestDataInjector(app=main_mod.app) as injector:

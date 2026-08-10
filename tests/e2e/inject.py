@@ -12,10 +12,10 @@ up afterwards. It is transport-agnostic:
 
 Endpoints exercised:
 
-- ``POST   /api/v1/sessions``                 — create a session w/ predictable ID
-- ``DELETE /api/v1/sessions/{session_id}``     — cascade-clean a session (teardown)
+- ``POST   /api/v1/test/sessions``             — create a session w/ predictable ID
+- ``DELETE /api/v1/test/sessions/{session_id}`` — cascade-clean a session (teardown)
 - ``GET    /api/v1/sessions/{session_id}/topics`` — read back injected topic cards
-- ``POST   /api/v1/test/create-topic``         — inject a topic + result directly (no LLM)
+- ``POST   /api/v1/test/test/create-topic``    — inject a topic + result directly (no LLM)
 - ``POST   /api/v1/test/dispatch``             — inject via the real dispatch pipeline (LLM)
 
 The direct ``create-topic`` path is deterministic and network-free; ``dispatch``
@@ -161,7 +161,9 @@ class TestDataInjector:
         the second time. The resolved session is tracked for teardown.
         """
         session_id = self._resolve_session_id(session_id)
-        resp = await self._client.post("/api/v1/sessions", json={"session_id": session_id})
+        resp = await self._client.post(
+            "/api/v1/test/sessions", json={"session_id": session_id}
+        )
         self._check(resp)
         data = resp.json()
         sid = data.get("session_id", session_id)
@@ -174,7 +176,9 @@ class TestDataInjector:
         # presence probe by checking the store directly through create-session
         # idempotency: a session that already exists reports created=false.
         session_id = self._resolve_session_id(session_id)
-        resp = await self._client.post("/api/v1/sessions", json={"session_id": session_id})
+        resp = await self._client.post(
+            "/api/v1/test/sessions", json={"session_id": session_id}
+        )
         self._check(resp)
         data = resp.json()
         return {"session_id": data["session_id"], "exists": not data["created"]}
@@ -182,7 +186,7 @@ class TestDataInjector:
     async def delete_session(self, session_id: str) -> dict:
         """Delete a session and all its data. Untracks it regardless of outcome."""
         session_id = self._resolve_session_id(session_id)
-        resp = await self._client.delete(f"/api/v1/sessions/{session_id}")
+        resp = await self._client.delete(f"/api/v1/test/sessions/{session_id}")
         self._check(resp)
         self._untrack(session_id)
         return resp.json()
@@ -207,7 +211,7 @@ class TestDataInjector:
         """Inject one topic into ``session_id``.
 
         ``via="direct"`` (default): writes a topic + result straight to the store
-        via ``POST /api/v1/test/create-topic`` — deterministic, no LLM. Best for
+        via ``POST /api/v1/test/test/create-topic`` — deterministic, no LLM. Best for
         hermetic tests.
 
         ``via="dispatch"``: runs the full router → fetch+synthesize pipeline via
@@ -227,7 +231,9 @@ class TestDataInjector:
                 "urgency": urgency,
                 "staleness_seconds": staleness_seconds,
             }
-            resp = await self._client.post("/api/v1/test/create-topic", json=payload)
+            resp = await self._client.post(
+                "/api/v1/test/test/create-topic", json=payload
+            )
             self._check(resp)
             return resp.json()
         elif via == "dispatch":
@@ -287,7 +293,7 @@ class TestDataInjector:
         """
         session_id = self._resolve_session_id(session_id)
         resp = await self._client.post(
-            "/api/v1/test/drop-sse", json={"session_id": session_id}
+            "/api/v1/test/test/drop-sse", json={"session_id": session_id}
         )
         self._check(resp)
         return resp.json()
