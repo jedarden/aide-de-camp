@@ -8,14 +8,14 @@ handling, rollback support, and logging.
 
 import logging
 import os
-import tempfile
-import time
 import random
-from pathlib import Path
-from typing import Union, Optional, Callable, Any
-from contextlib import contextmanager
-import uuid
+import tempfile
 import threading
+import time
+import uuid
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Callable, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,63 @@ class AtomicWriteError(Exception):
 class AtomicWriteRollbackError(AtomicWriteError):
     """Raised when rollback fails after a write error."""
     pass
+
+
+def _cleanup_temp_path(
+    path: Path,
+    operation_id: str,
+    reason: str,
+    *,
+    strict: bool = False,
+) -> bool:
+    """Remove a staging path without turning an idempotent race into a failure.
+
+    Cleanup runs after the publish/error decision has been made, so it must be
+    safe when another cleanup owner removed the path first.  A permission or
+    filesystem error is still recorded with the path and operation context.
+    Callers performing rollback can request ``strict`` handling to surface an
+    incomplete rollback as :class:`AtomicWriteRollbackError`; best-effort
+    cleanup callers leave the original operation result unchanged.
+    """
+    try:
+        path.unlink(missing_ok=True)
+    except FileNotFoundError:
+        # ``missing_ok`` handles the normal case; this branch also covers a
+        # mocked or platform-specific unlink implementation and is idempotent.
+        logger.debug(
+            "[%s] Temp cleanup already complete for %s (%s)",
+            operation_id,
+            path,
+            reason,
+        )
+        return True
+    except PermissionError as error:
+        message = (
+            f"[{operation_id}] Permission denied cleaning up temp file {path} "
+            f"after {reason}: {error}"
+        )
+        logger.error(message)
+        if strict:
+            raise AtomicWriteRollbackError(
+                f"Permission denied rolling back temp file {path}: {error}. "
+                "The temporary file may persist; correct its permissions and retry."
+            ) from error
+        return False
+    except OSError as error:
+        message = (
+            f"[{operation_id}] Failed to clean up temp file {path} after "
+            f"{reason}: {type(error).__name__}: {error}"
+        )
+        logger.error(message)
+        if strict:
+            raise AtomicWriteRollbackError(
+                f"Failed to rollback temp file {path}: {error}. "
+                "The temporary file may persist; retry cleanup when the resource is available."
+            ) from error
+        return False
+
+    logger.debug("[%s] Cleaned up temp file %s (%s)", operation_id, path, reason)
+    return True
 
 
 def _atomic_write_with_retries(
@@ -319,7 +376,16 @@ def _atomic_write_impl(
                     try:
                         os.fsync(directory_fd)
                     finally:
-                        os.close(directory_fd)
+                        try:
+                            os.close(directory_fd)
+                        except OSError as close_error:
+                            # Closing the directory descriptor is cleanup, not
+                            # the publication commit point.  Do not mask a
+                            # successful replace (or an earlier fsync error).
+                            logger.warning(
+                                f"[{operation_id}] directory descriptor cleanup failed "
+                                f"for {filepath.parent}: {close_error}"
+                            )
                 except OSError as sync_error:
                     logger.warning(f"[{operation_id}] directory fsync failed (non-critical): {sync_error}")
                 logger.info(
@@ -338,23 +404,14 @@ def _atomic_write_impl(
                     logger.warning(
                         f"[{operation_id}] Found orphaned temp files from atomic write operation: {orphaned_files}"
                     )
-                    # Clean them up with enhanced error handling for atomic write failures
+                    # Clean them up with idempotent, best-effort handling.  A
+                    # concurrent startup cleanup may have claimed one already.
                     for orphan in orphaned_files:
-                        try:
-                            # Atomic unlink with idempotent cleanup (safe if file already deleted)
-                            # This handles cases where atomic write failures may have left temp files
-                            orphan.unlink(missing_ok=True)
-                            logger.info(f"[{operation_id}] Cleaned up orphaned temp file from atomic write: {orphan}")
-                        except PermissionError as e:
-                            logger.error(
-                                f"[{operation_id}] Permission denied cleaning up orphaned temp file {orphan}: {e}. "
-                                f"File may persist from atomic write failure. Manual cleanup may be required."
-                            )
-                        except OSError as e:
-                            logger.error(
-                                f"[{operation_id}] Failed to cleanup orphaned temp file {orphan}: {e}. "
-                                f"File may persist from atomic write failure."
-                            )
+                        _cleanup_temp_path(
+                            orphan,
+                            operation_id,
+                            "orphaned temp-file cleanup",
+                        )
 
             logger.info(
                 f"[{operation_id}] Atomic write completed successfully",
@@ -366,27 +423,24 @@ def _atomic_write_impl(
             )
             return backup_path
 
-        except Exception:
+        except BaseException:
             # Clean up temp file on any error with enhanced atomic write failure handling
             if fd is not None:
                 try:
                     os.close(fd)
-                except OSError:
-                    pass
-            if temp_path_obj.exists():
-                try:
-                    temp_path_obj.unlink()
-                    logger.info(f"[{operation_id}] Cleaned up temp file after atomic write error: {temp_path}")
-                except PermissionError as cleanup_error:
-                    logger.error(
-                        f"[{operation_id}] Permission denied cleaning up temp file {temp_path} after atomic write error: {cleanup_error}. "
-                        f"Temp file may persist. Manual cleanup may be required: 'rm {temp_path}'"
+                except OSError as close_error:
+                    logger.warning(
+                        f"[{operation_id}] Failed to close temp file descriptor "
+                        f"after atomic write error: {close_error}"
                     )
-                except OSError as cleanup_error:
-                    logger.error(
-                        f"[{operation_id}] Failed to cleanup temp file {temp_path} after atomic write error: {cleanup_error}. "
-                        f"Temp file may persist from atomic write failure."
-                    )
+            # Do not use an ``exists()`` check before unlinking: another
+            # cleanup owner can remove the file between those two operations.
+            # Best-effort cleanup must never replace the original write error.
+            _cleanup_temp_path(
+                temp_path_obj,
+                operation_id,
+                "atomic write error",
+            )
             raise
 
     except Exception as e:
@@ -449,20 +503,29 @@ def atomic_write_rollback(filepath: Union[str, Path], mode: str = 'w'):
 
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create temporary file
+    # Create temporary file.  Keep creation and descriptor cleanup separate so
+    # a close failure cannot strand the staging file without a diagnostic.
     try:
         fd, temp_path = tempfile.mkstemp(
             dir=filepath.parent,
             prefix=f'.{filepath.name}.tmp_{operation_id}_',
             suffix='.tmp'
         )
-        os.close(fd)  # Close it, caller will write to it
     except OSError as e:
         error_msg = f"Cannot create temp file in {filepath.parent}: {e}"
         logger.error(f"[{operation_id}] {error_msg}")
         raise PermissionError(error_msg) from e
 
     temp_path_obj = Path(temp_path)
+    try:
+        os.close(fd)  # Close it, caller will write to it
+    except OSError as e:
+        logger.error(
+            f"[{operation_id}] Failed to close rollback temp descriptor for "
+            f"{temp_path}: {e}"
+        )
+        _cleanup_temp_path(temp_path_obj, operation_id, "rollback temp descriptor cleanup")
+        raise OSError(f"Failed to prepare rollback temp file {temp_path}: {e}") from e
 
     try:
         yield temp_path_obj
@@ -484,31 +547,24 @@ def atomic_write_rollback(filepath: Union[str, Path], mode: str = 'w'):
             logger.error(f"[{operation_id}] {error_msg}")
             raise
 
-    except Exception:
+    except BaseException as original_error:
         # Error in context block - rollback (cleanup temp file) with enhanced error handling
         logger.warning(
             f"[{operation_id}] Exception in context, rolling back atomic write operation",
             extra={"operation_id": operation_id}
         )
 
-        if temp_path_obj.exists():
-            try:
-                temp_path_obj.unlink()
-                logger.info(f"[{operation_id}] Rollback successful: cleaned up temp file from atomic write: {temp_path}")
-            except PermissionError as e:
-                rollback_error = AtomicWriteRollbackError(
-                    f"Permission denied rolling back temp file {temp_path}: {e}. "
-                    f"Temp file may persist from atomic write rollback failure. Manual cleanup may be required."
-                )
-                logger.error(f"[{operation_id}] {rollback_error}")
-                raise rollback_error from e
-            except OSError as e:
-                rollback_error = AtomicWriteRollbackError(
-                    f"Failed to rollback temp file {temp_path}: {e}. "
-                    f"Temp file may persist from atomic write rollback failure."
-                )
-                logger.error(f"[{operation_id}] {rollback_error}")
-                raise rollback_error from e
+        # Strict mode reports a real rollback failure, while a concurrent
+        # owner removing the temp file remains a successful/idempotent cleanup.
+        try:
+            _cleanup_temp_path(
+                temp_path_obj,
+                operation_id,
+                "atomic write rollback",
+                strict=True,
+            )
+        except AtomicWriteRollbackError as rollback_error:
+            raise rollback_error from original_error
 
         raise
 
@@ -610,6 +666,11 @@ def cleanup_orphaned_temp_files(
                 temp_file.unlink(missing_ok=True)
                 result['cleaned'] += 1
                 logger.debug(f"Cleaned up orphaned temp file: {temp_file}")
+
+            except FileNotFoundError:
+                # A concurrent cleanup owner won the race.  The requested
+                # post-condition (the file is absent) already holds.
+                logger.debug(f"Temp file already removed during cleanup: {temp_file}")
 
             except PermissionError as e:
                 result['failed'] += 1
@@ -756,6 +817,7 @@ def _atomic_append_impl(
                 dir=filepath.parent,
                 prefix='.tmp_append_'
             )
+            temp_path_obj = Path(temp_path)
 
             try:
                 # Write content to temp file
@@ -769,6 +831,7 @@ def _atomic_append_impl(
 
                 # Close temp file
                 os.close(temp_fd)
+                temp_fd = None
 
                 # Atomic rename: temp -> target (appends if target exists)
                 # Note: os.replace() overwrites, so we need a different approach
@@ -795,29 +858,33 @@ def _atomic_append_impl(
                 # If the target already existed, the combined snapshot was
                 # published by _atomic_write_impl and this staging file is no
                 # longer needed. Cleanup is scoped to this operation's path.
-                Path(temp_path).unlink(missing_ok=True)
+                # Publishing is the commit point.  If staging-file cleanup is
+                # blocked or races with another owner, retain the successful
+                # append result and log the actionable failure instead of
+                # retrying the append and duplicating the record.
+                _cleanup_temp_path(
+                    temp_path_obj,
+                    operation_id,
+                    "successful atomic append",
+                )
 
                 logger.info(f"[{operation_id}] Atomic append successful to {filepath}")
 
             except BaseException:
                 # Cleanup temp file on error with enhanced atomic append failure handling
-                try:
-                    os.close(temp_fd)
-                except OSError:
-                    pass
-                try:
-                    Path(temp_path).unlink(missing_ok=True)
-                    logger.debug(f"[{operation_id}] Cleaned up temp file after atomic append error: {temp_path}")
-                except PermissionError as cleanup_error:
-                    logger.warning(
-                        f"[{operation_id}] Permission denied cleaning up temp file {temp_path} after atomic append error: {cleanup_error}. "
-                        f"Temp file may persist from atomic append failure."
-                    )
-                except OSError as cleanup_error:
-                    logger.warning(
-                        f"[{operation_id}] Failed to cleanup temp file {temp_path} after atomic append error: {cleanup_error}. "
-                        f"Temp file may persist from atomic append failure."
-                    )
+                if temp_fd is not None:
+                    try:
+                        os.close(temp_fd)
+                    except OSError as close_error:
+                        logger.warning(
+                            f"[{operation_id}] Failed to close temp file descriptor "
+                            f"after atomic append error: {close_error}"
+                        )
+                _cleanup_temp_path(
+                    temp_path_obj,
+                    operation_id,
+                    "atomic append error",
+                )
                 raise
 
             return  # Success
