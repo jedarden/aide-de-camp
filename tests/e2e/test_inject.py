@@ -66,17 +66,23 @@ async def inj(tmp_path, monkeypatch):
     main_mod._store = None
     main_mod._topic_manager = None
 
-    store = store_mod.get_store()  # reads ADC_DB_PATH → tmp_db
-    await store.initialize()
+    store = await store_mod.get_store()  # reads ADC_DB_PATH → tmp_db
     main_mod._topic_manager = TopicManager(store)
 
-    async with TestDataInjector(app=main_mod.app) as injector:
-        yield injector, tmp_db
-
-    # Restore — never leak the tmp store into the rest of the process.
-    main_mod._topic_manager = saved_topic_manager
-    main_mod._store = saved_main_store
-    store_mod._store = saved_store_singleton
+    try:
+        async with TestDataInjector(app=main_mod.app) as injector:
+            yield injector, tmp_db
+    finally:
+        # Close the temporary store before restoring the process-wide
+        # singletons, so its connections and WAL state cannot leak into the
+        # next test.
+        try:
+            await store.close()
+        finally:
+            # Restore — never leak the tmp store into the rest of the process.
+            main_mod._topic_manager = saved_topic_manager
+            main_mod._store = saved_main_store
+            store_mod._store = saved_store_singleton
 
 
 async def _count(db_path, sql, args=()):
@@ -244,8 +250,7 @@ class TestCleanup:
         store_mod._store = None
         main_mod._store = None
         main_mod._topic_manager = None
-        store = store_mod.get_store()
-        await store.initialize()
+        store = await store_mod.get_store()
         main_mod._topic_manager = TopicManager(store)
         sid = "test-inject-raises"
         created = []
@@ -258,9 +263,12 @@ class TestCleanup:
         except RuntimeError:
             pass
         finally:
-            main_mod._topic_manager = saved_tm
-            main_mod._store = saved_main_store
-            store_mod._store = saved_store
+            try:
+                await store.close()
+            finally:
+                main_mod._topic_manager = saved_tm
+                main_mod._store = saved_main_store
+                store_mod._store = saved_store
 
         # The session created inside the failing body was cleaned up on exit.
         assert created == [sid]
