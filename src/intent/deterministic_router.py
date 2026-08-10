@@ -138,14 +138,19 @@ class DeterministicRouter:
 
     def _get_registry(self):
         """
-        Get or load the project registry.
+        Get the current project registry snapshot.
 
         CONCURRENT ACCESS: The registry owns a process-wide reentrant lock, so
         synchronous fast-path routing can safely share its snapshot with async
         callers and worker threads.
+
+        ``get_registry()`` already owns the TTL-based cache.  Ask it for the
+        current snapshot on every routing call instead of retaining the first
+        snapshot on this long-lived router instance; otherwise a running
+        server could never observe an alias added to ``registry.yaml`` after
+        the router was initialized.
         """
-        if self.registry is None:
-            self.registry = get_registry()
+        self.registry = get_registry()
         return self.registry
 
     def _detect_intent_type(self, utterance: str, lookup_kind: str | None = None) -> FetchIntentType:
