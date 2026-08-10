@@ -1,6 +1,6 @@
 # Metrics/deployment temporal alignment report
 
-Generated: `2026-08-10T13:48:40.031Z`<br>
+Generated: `2026-08-10T14:14:09.234Z`<br>
 Status: **validated_with_temporal_gaps**<br>
 Category presence: **8/8** service/category checks<br>
 Requested-window completeness: **0/8** categories<br>
@@ -11,21 +11,21 @@ The combined deployment event dataset is treated as canonical. CPU/memory and di
 
 | Source | Requested range | Step |
 | --- | --- | ---: |
-| CPU/memory | `2026-07-11T11:14:01.927Z` – `2026-08-10T11:14:01.927Z` | 3600 s |
-| Disk/network | `2026-07-11T11:44:38.362Z` – `2026-08-10T11:44:38.362Z` | 3600 s |
+| CPU/memory | `2026-07-11T14:07:53.151Z` – `2026-08-10T14:07:53.151Z` | 3600 s |
+| Disk/network | `2026-07-11T14:07:55.737Z` – `2026-08-10T14:07:55.737Z` | 3600 s |
 
 ## Coverage by service and category
 
 | Service | Category | Present | Status | First sample | Last sample | Metrics present |
 | --- | --- | :---: | --- | --- | --- | ---: |
-| pbx-web | cpu | yes | partial | `2026-07-30T18:14:01.927Z` | `2026-08-10T11:14:01.927Z` | 1/1 |
-| pbx-web | memory | yes | partial | `2026-07-30T18:14:01.927Z` | `2026-08-10T11:14:01.927Z` | 1/1 |
-| pbx-web | disk | yes | partial | `2026-07-30T18:44:38.362Z` | `2026-08-10T11:44:38.362Z` | 4/4 |
-| pbx-web | network | yes | partial | `2026-07-30T18:44:38.362Z` | `2026-08-10T11:44:38.362Z` | 4/4 |
-| whisper-stt | cpu | yes | partial | `2026-07-30T18:14:01.927Z` | `2026-08-10T11:14:01.927Z` | 1/1 |
-| whisper-stt | memory | yes | partial | `2026-07-30T18:14:01.927Z` | `2026-08-10T11:14:01.927Z` | 1/1 |
-| whisper-stt | disk | yes | partial | `2026-07-30T18:44:38.362Z` | `2026-08-10T11:44:38.362Z` | 4/4 |
-| whisper-stt | network | yes | partial | `2026-07-30T18:44:38.362Z` | `2026-08-10T11:44:38.362Z` | 4/4 |
+| pbx-web | cpu | yes | partial | `2026-07-31T12:07:53.151Z` | `2026-08-10T14:07:53.151Z` | 1/1 |
+| pbx-web | memory | yes | partial | `2026-07-31T12:07:53.151Z` | `2026-08-10T14:07:53.151Z` | 1/1 |
+| pbx-web | disk | yes | partial | `2026-07-31T12:07:55.737Z` | `2026-08-10T14:07:55.737Z` | 4/4 |
+| pbx-web | network | yes | partial | `2026-07-31T12:07:55.737Z` | `2026-08-10T14:07:55.737Z` | 4/4 |
+| whisper-stt | cpu | yes | partial | `2026-07-31T12:07:53.151Z` | `2026-08-10T14:07:53.151Z` | 1/1 |
+| whisper-stt | memory | yes | partial | `2026-07-31T12:07:53.151Z` | `2026-08-10T14:07:53.151Z` | 1/1 |
+| whisper-stt | disk | yes | partial | `2026-07-31T12:07:55.737Z` | `2026-08-10T14:07:55.737Z` | 4/4 |
+| whisper-stt | network | yes | partial | `2026-07-31T12:07:55.737Z` | `2026-08-10T14:07:55.737Z` | 4/4 |
 
 Every requested category is present for both services (8/8 checks). None has complete 30-day coverage: the first observed sample is about 19.3 days after the requested start. Within the observed span, the returned hourly grids have no internal gaps.
 
@@ -42,12 +42,12 @@ See `data/metrics_deployment_aligned.json` for one row per deployment event and 
 - **medium — deployment_source_window_gap:** The combined deployment source ends before the metric request window ends.
 - **medium — constant_zero_metric (pbx-web, disk):** All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.
 - **medium — constant_zero_metric (pbx-web, disk):** All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.
-- **medium — constant_zero_metric (pbx-web, disk):** All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.
-- **medium — constant_zero_metric (pbx-web, disk):** All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.
+- **info — mostly_zero_metric (pbx-web, disk):** At least 95% of returned disk samples are zero; treat isolated activity as sparse.
+- **info — mostly_zero_metric (pbx-web, disk):** At least 95% of returned disk samples are zero; treat isolated activity as sparse.
 - **info — high_rate_peak (pbx-web, network):** Maximum rate is at least 10x the median; inspect peak timestamps before interpreting as sustained behavior.
 - **info — high_rate_peak (pbx-web, network):** Maximum rate is at least 10x the median; inspect peak timestamps before interpreting as sustained behavior.
-- **info — mostly_zero_metric (whisper-stt, disk):** At least 95% of returned disk samples are zero; treat isolated activity as sparse.
-- **info — mostly_zero_metric (whisper-stt, disk):** At least 95% of returned disk samples are zero; treat isolated activity as sparse.
+- **medium — constant_zero_metric (whisper-stt, disk):** All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.
+- **medium — constant_zero_metric (whisper-stt, disk):** All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.
 - **info — mostly_zero_metric (whisper-stt, disk):** At least 95% of returned disk samples are zero; treat isolated activity as sparse.
 - **info — mostly_zero_metric (whisper-stt, disk):** At least 95% of returned disk samples are zero; treat isolated activity as sparse.
 - **info — high_rate_peak (whisper-stt, network):** Maximum rate is at least 10x the median; inspect peak timestamps before interpreting as sustained behavior.

@@ -1,12 +1,12 @@
 {
   "report_schema_version": "1.0",
   "report_type": "metrics_deployment_temporal_alignment",
-  "generated_at": "2026-08-10T13:48:40.031Z",
+  "generated_at": "2026-08-10T14:14:09.234Z",
   "analysis_window": {
-    "cpu_memory_requested_start": "2026-07-11T11:14:01.927Z",
-    "cpu_memory_requested_end": "2026-08-10T11:14:01.927Z",
-    "disk_network_requested_start": "2026-07-11T11:44:38.362Z",
-    "disk_network_requested_end": "2026-08-10T11:44:38.362Z",
+    "cpu_memory_requested_start": "2026-07-11T14:07:53.151Z",
+    "cpu_memory_requested_end": "2026-08-10T14:07:53.151Z",
+    "disk_network_requested_start": "2026-07-11T14:07:55.737Z",
+    "disk_network_requested_end": "2026-08-10T14:07:55.737Z",
     "requested_days": 30,
     "step_seconds": 3600
   },
@@ -17,24 +17,24 @@
       "bytes": 7269
     },
     "cpu_memory_metrics": {
-      "path": "data/resource_metrics/resource-metrics-30d-20260810T111404Z.json",
-      "sha256": "4f71155c654f8693cb660d0234a31f37517a2b01c8fb762bb1e6cbff9eec93b0",
-      "bytes": 314465
+      "path": "data/resource_metrics/resource-metrics-30d-20260810T140755Z.json",
+      "sha256": "4aabe6eeabd4e65f428368559d96ad3320219015a8cee02be2a5aede278f372c",
+      "bytes": 298417
     },
     "disk_network_metrics": {
-      "path": "data/resource_metrics/disk-network-storage-metrics-30d-20260810T114451Z.json",
-      "sha256": "d292a2e1ce0b0013337223a2af57d8a7dc7bd40fb22c6f92fda0a868805469bd",
-      "bytes": 1593263
+      "path": "data/resource_metrics/disk-network-storage-metrics-30d-20260810T140808Z.json",
+      "sha256": "76713245a87e657ae5657d2c28e12e1f16d467c8c305f886277cdafdc7e1226b",
+      "bytes": 1510714
     }
   },
   "deployment_source_window_assessment": {
     "deployment_source_start": "2026-07-07T00:00:00.000Z",
     "deployment_source_end": "2026-08-06T23:59:59.000Z",
-    "metric_window_start": "2026-07-11T11:14:01.927Z",
-    "metric_window_end": "2026-08-10T11:14:01.927Z",
+    "metric_window_start": "2026-07-11T14:07:53.151Z",
+    "metric_window_end": "2026-08-10T14:07:53.151Z",
     "metric_window_before_deployment_source_seconds": 0.0,
-    "metric_window_after_deployment_source_seconds": 299642.927,
-    "metric_window_after_deployment_source_days": 3.468089,
+    "metric_window_after_deployment_source_seconds": 310074.151,
+    "metric_window_after_deployment_source_days": 3.588821,
     "status": "different_windows"
   },
   "deployment_source_cross_checks": {
@@ -142,29 +142,29 @@
           "metrics_present": 1,
           "metrics_expected": 1,
           "status": "partial",
-          "first_sample": "2026-07-30T18:14:01.927Z",
-          "last_sample": "2026-08-10T11:14:01.927Z",
-          "requested_window_start": "2026-07-11T11:14:01.927Z",
-          "requested_window_end": "2026-08-10T11:14:01.927Z",
+          "first_sample": "2026-07-31T12:07:53.151Z",
+          "last_sample": "2026-08-10T14:07:53.151Z",
+          "requested_window_start": "2026-07-11T14:07:53.151Z",
+          "requested_window_end": "2026-08-10T14:07:53.151Z",
           "requested_window_days": 30.0,
-          "observed_timestamp_points": 258,
+          "observed_timestamp_points": 243,
           "metric_summaries": [
             {
               "metric": "cpu_usage",
               "query": "sum by (namespace,pod) (rate(container_cpu_usage_seconds_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 5,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:14:01.927Z",
-              "last_sample": "2026-08-10T11:14:01.927Z",
+              "first_sample": "2026-07-31T12:07:53.151Z",
+              "last_sample": "2026-08-10T14:07:53.151Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -172,13 +172,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 775,
-                "nonzero_points": 775,
+                "sample_points": 729,
+                "nonzero_points": 729,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 0.0002163941311935239,
-                "median": 0.0004316726523317796,
-                "max": 0.0291800643591998
+                "min": 0.00021261172496312865,
+                "median": 0.0004311140476051853,
+                "max": 0.01541322833698584
               },
               "series": [
                 {
@@ -186,9 +186,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -196,9 +196,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -206,9 +206,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 218,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-08T19:14:01.927Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-08T19:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -216,9 +216,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -227,8 +227,8 @@
                     "pod": "pbx-web-6d86477cdb-5wvwn"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T20:14:01.927Z",
-                  "last_sample": "2026-08-08T20:14:01.927Z",
+                  "first_sample": "2026-08-08T20:07:53.151Z",
+                  "last_sample": "2026-08-08T20:07:53.151Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -241,29 +241,29 @@
           "metrics_present": 1,
           "metrics_expected": 1,
           "status": "partial",
-          "first_sample": "2026-07-30T18:14:01.927Z",
-          "last_sample": "2026-08-10T11:14:01.927Z",
-          "requested_window_start": "2026-07-11T11:14:01.927Z",
-          "requested_window_end": "2026-08-10T11:14:01.927Z",
+          "first_sample": "2026-07-31T12:07:53.151Z",
+          "last_sample": "2026-08-10T14:07:53.151Z",
+          "requested_window_start": "2026-07-11T14:07:53.151Z",
+          "requested_window_end": "2026-08-10T14:07:53.151Z",
           "requested_window_days": 30.0,
-          "observed_timestamp_points": 258,
+          "observed_timestamp_points": 243,
           "metric_summaries": [
             {
               "metric": "memory_working_set",
               "query": "sum by (namespace,pod) (container_memory_working_set_bytes{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"})",
               "present": true,
-              "series_count": 4,
-              "observed_timestamp_points": 258,
+              "series_count": 5,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:14:01.927Z",
-              "last_sample": "2026-08-10T11:14:01.927Z",
+              "first_sample": "2026-07-31T12:07:53.151Z",
+              "last_sample": "2026-08-10T14:07:53.151Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -271,13 +271,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 774,
-                "nonzero_points": 774,
+                "sample_points": 729,
+                "nonzero_points": 729,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 18894848.0,
-                "median": 23363584.0,
-                "max": 82096128.0
+                "min": 18907136.0,
+                "median": 23703552.0,
+                "max": 82092032.0
               },
               "series": [
                 {
@@ -285,9 +285,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -295,9 +295,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -305,9 +305,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 218,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-08T19:14:01.927Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-08T19:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -315,9 +315,19 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
+                  "internal_gap_count": 0
+                },
+                {
+                  "labels": {
+                    "namespace": "pbx-web",
+                    "pod": "pbx-web-6d86477cdb-5wvwn"
+                  },
+                  "sample_points": 1,
+                  "first_sample": "2026-08-08T20:07:53.151Z",
+                  "last_sample": "2026-08-08T20:07:53.151Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -330,29 +340,29 @@
           "metrics_present": 4,
           "metrics_expected": 4,
           "status": "partial",
-          "first_sample": "2026-07-30T18:44:38.362Z",
-          "last_sample": "2026-08-10T11:44:38.362Z",
-          "requested_window_start": "2026-07-11T11:44:38.362Z",
-          "requested_window_end": "2026-08-10T11:44:38.362Z",
+          "first_sample": "2026-07-31T12:07:55.737Z",
+          "last_sample": "2026-08-10T14:07:55.737Z",
+          "requested_window_start": "2026-07-11T14:07:55.737Z",
+          "requested_window_end": "2026-08-10T14:07:55.737Z",
           "requested_window_days": 30.0,
-          "observed_timestamp_points": 258,
+          "observed_timestamp_points": 243,
           "metric_summaries": [
             {
               "metric": "disk_read_bytes_per_second",
               "query": "sum by (namespace,pod) (rate(container_fs_reads_bytes_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 5,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -360,9 +370,9 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 774,
+                "sample_points": 729,
                 "nonzero_points": 0,
-                "zero_points": 774,
+                "zero_points": 729,
                 "zero_fraction": 1.0,
                 "min": 0.0,
                 "median": 0.0,
@@ -374,9 +384,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -384,9 +394,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -394,9 +404,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -404,9 +414,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -415,8 +425,8 @@
                     "pod": "pbx-web-6d86477cdb-5wvwn"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -426,17 +436,17 @@
               "query": "sum by (namespace,pod) (rate(container_fs_reads_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 5,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -444,9 +454,9 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 774,
+                "sample_points": 729,
                 "nonzero_points": 0,
-                "zero_points": 774,
+                "zero_points": 729,
                 "zero_fraction": 1.0,
                 "min": 0.0,
                 "median": 0.0,
@@ -458,9 +468,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -468,9 +478,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -478,9 +488,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -488,9 +498,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -499,8 +509,8 @@
                     "pod": "pbx-web-6d86477cdb-5wvwn"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -510,17 +520,17 @@
               "query": "sum by (namespace,pod) (rate(container_fs_writes_bytes_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 5,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -528,13 +538,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 774,
-                "nonzero_points": 0,
-                "zero_points": 774,
-                "zero_fraction": 1.0,
+                "sample_points": 729,
+                "nonzero_points": 2,
+                "zero_points": 727,
+                "zero_fraction": 0.997257,
                 "min": 0.0,
                 "median": 0.0,
-                "max": 0.0
+                "max": 43243.08083916667
               },
               "series": [
                 {
@@ -542,9 +552,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -552,9 +562,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -562,9 +572,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -572,9 +582,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -583,8 +593,8 @@
                     "pod": "pbx-web-6d86477cdb-5wvwn"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -594,17 +604,17 @@
               "query": "sum by (namespace,pod) (rate(container_fs_writes_total{namespace=\"pbx-web\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 5,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -612,13 +622,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 774,
-                "nonzero_points": 0,
-                "zero_points": 774,
-                "zero_fraction": 1.0,
+                "sample_points": 729,
+                "nonzero_points": 2,
+                "zero_points": 727,
+                "zero_fraction": 0.997257,
                 "min": 0.0,
                 "median": 0.0,
-                "max": 0.0
+                "max": 2.246401758174503
               },
               "series": [
                 {
@@ -626,9 +636,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -636,9 +646,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -646,9 +656,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -656,9 +666,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -667,8 +677,8 @@
                     "pod": "pbx-web-6d86477cdb-5wvwn"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -681,29 +691,29 @@
           "metrics_present": 4,
           "metrics_expected": 4,
           "status": "partial",
-          "first_sample": "2026-07-30T18:44:38.362Z",
-          "last_sample": "2026-08-10T11:44:38.362Z",
-          "requested_window_start": "2026-07-11T11:44:38.362Z",
-          "requested_window_end": "2026-08-10T11:44:38.362Z",
+          "first_sample": "2026-07-31T12:07:55.737Z",
+          "last_sample": "2026-08-10T14:07:55.737Z",
+          "requested_window_start": "2026-07-11T14:07:55.737Z",
+          "requested_window_end": "2026-08-10T14:07:55.737Z",
           "requested_window_days": 30.0,
-          "observed_timestamp_points": 258,
+          "observed_timestamp_points": 243,
           "metric_summaries": [
             {
               "metric": "network_receive_bytes_per_second",
               "query": "sum by (namespace,pod) (rate(container_network_receive_bytes_total{namespace=\"pbx-web\",pod!=\"\",interface!=\"lo\"}[5m]))",
               "present": true,
               "series_count": 5,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -711,13 +721,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 774,
-                "nonzero_points": 774,
+                "sample_points": 729,
+                "nonzero_points": 729,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 68.80298976441438,
-                "median": 90.0668541439936,
-                "max": 334776.95114756766
+                "min": 67.52472356105994,
+                "median": 91.45558721312503,
+                "max": 22830.688630118697
               },
               "series": [
                 {
@@ -725,9 +735,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -735,9 +745,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -745,9 +755,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -755,9 +765,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -766,8 +776,8 @@
                     "pod": "pbx-web-6d86477cdb-5wvwn"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -777,17 +787,17 @@
               "query": "sum by (namespace,pod) (container_network_receive_bytes_total{namespace=\"pbx-web\",pod!=\"\",interface!=\"lo\"})",
               "present": true,
               "series_count": 5,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -795,13 +805,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 774,
-                "nonzero_points": 774,
+                "sample_points": 729,
+                "nonzero_points": 729,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 3556575.0,
-                "median": 153247905.0,
-                "max": 3068789930.0
+                "min": 7645378.0,
+                "median": 156429533.0,
+                "max": 3072961192.0
               },
               "series": [
                 {
@@ -809,9 +819,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -819,9 +829,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -829,9 +839,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -839,9 +849,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -850,8 +860,8 @@
                     "pod": "pbx-web-6d86477cdb-5wvwn"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -861,17 +871,17 @@
               "query": "sum by (namespace,pod) (rate(container_network_transmit_bytes_total{namespace=\"pbx-web\",pod!=\"\",interface!=\"lo\"}[5m]))",
               "present": true,
               "series_count": 5,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -879,13 +889,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 774,
-                "nonzero_points": 774,
+                "sample_points": 729,
+                "nonzero_points": 729,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 63.988235294117636,
-                "median": 69.06690925244129,
-                "max": 341363.23332520836
+                "min": 64.45067757632222,
+                "median": 70.55495407397059,
+                "max": 13852.895704055603
               },
               "series": [
                 {
@@ -893,9 +903,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -903,9 +913,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -913,9 +923,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -923,9 +933,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -934,8 +944,8 @@
                     "pod": "pbx-web-6d86477cdb-5wvwn"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -945,17 +955,17 @@
               "query": "sum by (namespace,pod) (container_network_transmit_bytes_total{namespace=\"pbx-web\",pod!=\"\",interface!=\"lo\"})",
               "present": true,
               "series_count": 5,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -963,13 +973,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 774,
-                "nonzero_points": 774,
+                "sample_points": 729,
+                "nonzero_points": 729,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 5087857.0,
-                "median": 124325716.0,
-                "max": 9769662557.0
+                "min": 20424767.0,
+                "median": 126785002.0,
+                "max": 9784527628.0
               },
               "series": [
                 {
@@ -977,9 +987,9 @@
                     "namespace": "pbx-web",
                     "pod": "lab-rebuild-relay-79957dbd4-xsqhl"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -987,9 +997,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -997,9 +1007,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-mkn8n"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1007,9 +1017,9 @@
                     "namespace": "pbx-web",
                     "pod": "pbx-web-5ff68464d-qx45p"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1018,8 +1028,8 @@
                     "pod": "pbx-web-6d86477cdb-5wvwn"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1096,29 +1106,29 @@
           "metrics_present": 1,
           "metrics_expected": 1,
           "status": "partial",
-          "first_sample": "2026-07-30T18:14:01.927Z",
-          "last_sample": "2026-08-10T11:14:01.927Z",
-          "requested_window_start": "2026-07-11T11:14:01.927Z",
-          "requested_window_end": "2026-08-10T11:14:01.927Z",
+          "first_sample": "2026-07-31T12:07:53.151Z",
+          "last_sample": "2026-08-10T14:07:53.151Z",
+          "requested_window_start": "2026-07-11T14:07:53.151Z",
+          "requested_window_end": "2026-08-10T14:07:53.151Z",
           "requested_window_days": 30.0,
-          "observed_timestamp_points": 258,
+          "observed_timestamp_points": 243,
           "metric_summaries": [
             {
               "metric": "cpu_usage",
               "query": "sum by (namespace,pod) (rate(container_cpu_usage_seconds_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 4,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:14:01.927Z",
-              "last_sample": "2026-08-10T11:14:01.927Z",
+              "first_sample": "2026-07-31T12:07:53.151Z",
+              "last_sample": "2026-08-10T14:07:53.151Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1126,13 +1136,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 517,
-                "nonzero_points": 517,
+                "sample_points": 486,
+                "nonzero_points": 486,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 0.0001628743068284141,
-                "median": 0.003981110519506185,
-                "max": 4.090072245010544
+                "min": 0.0003502217831156806,
+                "median": 0.003973510410342107,
+                "max": 4.073875616748416
               },
               "series": [
                 {
@@ -1140,9 +1150,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1151,8 +1161,8 @@
                     "pod": "whisper-stt-5b884b75f4-hwczc"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T20:14:01.927Z",
-                  "last_sample": "2026-08-08T20:14:01.927Z",
+                  "first_sample": "2026-08-08T20:07:53.151Z",
+                  "last_sample": "2026-08-08T20:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1160,9 +1170,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1170,9 +1180,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 218,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-08T19:14:01.927Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-08T19:07:53.151Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1185,29 +1195,29 @@
           "metrics_present": 1,
           "metrics_expected": 1,
           "status": "partial",
-          "first_sample": "2026-07-30T18:14:01.927Z",
-          "last_sample": "2026-08-10T11:14:01.927Z",
-          "requested_window_start": "2026-07-11T11:14:01.927Z",
-          "requested_window_end": "2026-08-10T11:14:01.927Z",
+          "first_sample": "2026-07-31T12:07:53.151Z",
+          "last_sample": "2026-08-10T14:07:53.151Z",
+          "requested_window_start": "2026-07-11T14:07:53.151Z",
+          "requested_window_end": "2026-08-10T14:07:53.151Z",
           "requested_window_days": 30.0,
-          "observed_timestamp_points": 258,
+          "observed_timestamp_points": 243,
           "metric_summaries": [
             {
               "metric": "memory_working_set",
               "query": "sum by (namespace,pod) (container_memory_working_set_bytes{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"})",
               "present": true,
-              "series_count": 3,
-              "observed_timestamp_points": 258,
+              "series_count": 4,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:14:01.927Z",
-              "last_sample": "2026-08-10T11:14:01.927Z",
+              "first_sample": "2026-07-31T12:07:53.151Z",
+              "last_sample": "2026-08-10T14:07:53.151Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1215,13 +1225,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 516,
-                "nonzero_points": 516,
+                "sample_points": 486,
+                "nonzero_points": 486,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 1210699776.0,
-                "median": 4892219392.0,
-                "max": 5848395776.0
+                "min": 2166865920.0,
+                "median": 4594571264.0,
+                "max": 5848121344.0
               },
               "series": [
                 {
@@ -1229,9 +1239,19 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
+                  "internal_gap_count": 0
+                },
+                {
+                  "labels": {
+                    "namespace": "whisper-stt",
+                    "pod": "whisper-stt-5b884b75f4-hwczc"
+                  },
+                  "sample_points": 1,
+                  "first_sample": "2026-08-08T20:07:53.151Z",
+                  "last_sample": "2026-08-08T20:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1239,9 +1259,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:14:01.927Z",
-                  "last_sample": "2026-08-10T11:14:01.927Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:53.151Z",
+                  "last_sample": "2026-08-10T14:07:53.151Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1249,9 +1269,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 218,
-                  "first_sample": "2026-07-30T18:14:01.927Z",
-                  "last_sample": "2026-08-08T19:14:01.927Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:53.151Z",
+                  "last_sample": "2026-08-08T19:07:53.151Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1264,29 +1284,29 @@
           "metrics_present": 4,
           "metrics_expected": 4,
           "status": "partial",
-          "first_sample": "2026-07-30T18:44:38.362Z",
-          "last_sample": "2026-08-10T11:44:38.362Z",
-          "requested_window_start": "2026-07-11T11:44:38.362Z",
-          "requested_window_end": "2026-08-10T11:44:38.362Z",
+          "first_sample": "2026-07-31T12:07:55.737Z",
+          "last_sample": "2026-08-10T14:07:55.737Z",
+          "requested_window_start": "2026-07-11T14:07:55.737Z",
+          "requested_window_end": "2026-08-10T14:07:55.737Z",
           "requested_window_days": 30.0,
-          "observed_timestamp_points": 258,
+          "observed_timestamp_points": 243,
           "metric_summaries": [
             {
               "metric": "disk_read_bytes_per_second",
               "query": "sum by (namespace,pod) (rate(container_fs_reads_bytes_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 4,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1294,13 +1314,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 516,
-                "nonzero_points": 1,
-                "zero_points": 515,
-                "zero_fraction": 0.998062,
+                "sample_points": 486,
+                "nonzero_points": 0,
+                "zero_points": 486,
+                "zero_fraction": 1.0,
                 "min": 0.0,
                 "median": 0.0,
-                "max": 10005.780286218524
+                "max": 0.0
               },
               "series": [
                 {
@@ -1308,9 +1328,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1319,8 +1339,8 @@
                     "pod": "whisper-stt-5b884b75f4-hwczc"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1328,9 +1348,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1338,9 +1358,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1350,17 +1370,17 @@
               "query": "sum by (namespace,pod) (rate(container_fs_reads_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 4,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1368,13 +1388,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 516,
-                "nonzero_points": 1,
-                "zero_points": 515,
-                "zero_fraction": 0.998062,
+                "sample_points": 486,
+                "nonzero_points": 0,
+                "zero_points": 486,
+                "zero_fraction": 1.0,
                 "min": 0.0,
                 "median": 0.0,
-                "max": 0.4647993150325883
+                "max": 0.0
               },
               "series": [
                 {
@@ -1382,9 +1402,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1393,8 +1413,8 @@
                     "pod": "whisper-stt-5b884b75f4-hwczc"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1402,9 +1422,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1412,9 +1432,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1424,17 +1444,17 @@
               "query": "sum by (namespace,pod) (rate(container_fs_writes_bytes_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 4,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1442,13 +1462,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 516,
+                "sample_points": 486,
                 "nonzero_points": 2,
-                "zero_points": 514,
-                "zero_fraction": 0.996124,
+                "zero_points": 484,
+                "zero_fraction": 0.995885,
                 "min": 0.0,
                 "median": 0.0,
-                "max": 39188.77252974282
+                "max": 37263.30961018499
               },
               "series": [
                 {
@@ -1456,9 +1476,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1467,8 +1487,8 @@
                     "pod": "whisper-stt-5b884b75f4-hwczc"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1476,9 +1496,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1486,9 +1506,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1498,17 +1518,17 @@
               "query": "sum by (namespace,pod) (rate(container_fs_writes_total{namespace=\"whisper-stt\",container!=\"\",container!=\"POD\",image!=\"\"}[5m]))",
               "present": true,
               "series_count": 4,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1516,13 +1536,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 516,
+                "sample_points": 486,
                 "nonzero_points": 2,
-                "zero_points": 514,
-                "zero_fraction": 0.996124,
+                "zero_points": 484,
+                "zero_fraction": 0.995885,
                 "min": 0.0,
                 "median": 0.0,
-                "max": 0.12110849896701574
+                "max": 0.11515807212403886
               },
               "series": [
                 {
@@ -1530,9 +1550,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1541,8 +1561,8 @@
                     "pod": "whisper-stt-5b884b75f4-hwczc"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1550,9 +1570,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1560,9 +1580,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1575,29 +1595,29 @@
           "metrics_present": 4,
           "metrics_expected": 4,
           "status": "partial",
-          "first_sample": "2026-07-30T18:44:38.362Z",
-          "last_sample": "2026-08-10T11:44:38.362Z",
-          "requested_window_start": "2026-07-11T11:44:38.362Z",
-          "requested_window_end": "2026-08-10T11:44:38.362Z",
+          "first_sample": "2026-07-31T12:07:55.737Z",
+          "last_sample": "2026-08-10T14:07:55.737Z",
+          "requested_window_start": "2026-07-11T14:07:55.737Z",
+          "requested_window_end": "2026-08-10T14:07:55.737Z",
           "requested_window_days": 30.0,
-          "observed_timestamp_points": 258,
+          "observed_timestamp_points": 243,
           "metric_summaries": [
             {
               "metric": "network_receive_bytes_per_second",
               "query": "sum by (namespace,pod) (rate(container_network_receive_bytes_total{namespace=\"whisper-stt\",pod!=\"\",interface!=\"lo\"}[5m]))",
               "present": true,
               "series_count": 4,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1605,13 +1625,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 516,
-                "nonzero_points": 516,
+                "sample_points": 486,
+                "nonzero_points": 486,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 37.99578584488987,
-                "median": 96.80547186196921,
-                "max": 41133.69684731721
+                "min": 38.10420357056798,
+                "median": 95.56416159267329,
+                "max": 38523.798424635475
               },
               "series": [
                 {
@@ -1619,9 +1639,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1630,8 +1650,8 @@
                     "pod": "whisper-stt-5b884b75f4-hwczc"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1639,9 +1659,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1649,9 +1669,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1661,17 +1681,17 @@
               "query": "sum by (namespace,pod) (container_network_receive_bytes_total{namespace=\"whisper-stt\",pod!=\"\",interface!=\"lo\"})",
               "present": true,
               "series_count": 4,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1679,13 +1699,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 516,
-                "nonzero_points": 516,
+                "sample_points": 486,
+                "nonzero_points": 486,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 88895.0,
-                "median": 438180741.5,
-                "max": 2588847988.0
+                "min": 224350.0,
+                "median": 438377526.0,
+                "max": 2588986289.0
               },
               "series": [
                 {
@@ -1693,9 +1713,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1704,8 +1724,8 @@
                     "pod": "whisper-stt-5b884b75f4-hwczc"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1713,9 +1733,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1723,9 +1743,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1735,17 +1755,17 @@
               "query": "sum by (namespace,pod) (rate(container_network_transmit_bytes_total{namespace=\"whisper-stt\",pod!=\"\",interface!=\"lo\"}[5m]))",
               "present": true,
               "series_count": 4,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1753,13 +1773,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 516,
-                "nonzero_points": 379,
-                "zero_points": 137,
-                "zero_fraction": 0.265504,
+                "sample_points": 486,
+                "nonzero_points": 359,
+                "zero_points": 127,
+                "zero_fraction": 0.261317,
                 "min": 0.0,
-                "median": 70.29071372906476,
-                "max": 1002.2958777929146
+                "median": 70.14362137805622,
+                "max": 963.6939487629483
               },
               "series": [
                 {
@@ -1767,9 +1787,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1778,8 +1798,8 @@
                     "pod": "whisper-stt-5b884b75f4-hwczc"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1787,9 +1807,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1797,9 +1817,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1809,17 +1829,17 @@
               "query": "sum by (namespace,pod) (container_network_transmit_bytes_total{namespace=\"whisper-stt\",pod!=\"\",interface!=\"lo\"})",
               "present": true,
               "series_count": 4,
-              "observed_timestamp_points": 258,
+              "observed_timestamp_points": 243,
               "expected_timestamp_points": 721,
-              "coverage_percentage_by_points": 35.784,
-              "observed_span_days": 10.708333,
+              "coverage_percentage_by_points": 33.703,
+              "observed_span_days": 10.083333,
               "requested_window_days": 30.0,
-              "first_sample": "2026-07-30T18:44:38.362Z",
-              "last_sample": "2026-08-10T11:44:38.362Z",
+              "first_sample": "2026-07-31T12:07:55.737Z",
+              "last_sample": "2026-08-10T14:07:55.737Z",
               "status": "partial",
               "gaps": {
-                "leading_gap_seconds": 1666800.0,
-                "leading_gap_days": 19.291667,
+                "leading_gap_seconds": 1720800.0,
+                "leading_gap_days": 19.916667,
                 "trailing_gap_seconds": 0.0,
                 "trailing_gap_days": 0.0,
                 "internal_gap_count": 0,
@@ -1827,13 +1847,13 @@
                 "internal_gaps": []
               },
               "statistics": {
-                "sample_points": 516,
-                "nonzero_points": 516,
+                "sample_points": 486,
+                "nonzero_points": 486,
                 "zero_points": 0,
                 "zero_fraction": 0.0,
-                "min": 42889.0,
-                "median": 175543713.5,
-                "max": 232993765.0
+                "min": 160471.0,
+                "median": 177696392.5,
+                "max": 233109153.0
               },
               "series": [
                 {
@@ -1841,9 +1861,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-openai-68966786fb-jsb5d"
                   },
-                  "sample_points": 258,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 243,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1852,8 +1872,8 @@
                     "pod": "whisper-stt-5b884b75f4-hwczc"
                   },
                   "sample_points": 1,
-                  "first_sample": "2026-08-08T19:44:38.362Z",
-                  "last_sample": "2026-08-08T19:44:38.362Z",
+                  "first_sample": "2026-08-08T20:07:55.737Z",
+                  "last_sample": "2026-08-08T20:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1861,9 +1881,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-mp2kl"
                   },
-                  "sample_points": 40,
-                  "first_sample": "2026-08-08T20:44:38.362Z",
-                  "last_sample": "2026-08-10T11:44:38.362Z",
+                  "sample_points": 42,
+                  "first_sample": "2026-08-08T21:07:55.737Z",
+                  "last_sample": "2026-08-10T14:07:55.737Z",
                   "internal_gap_count": 0
                 },
                 {
@@ -1871,9 +1891,9 @@
                     "namespace": "whisper-stt",
                     "pod": "whisper-stt-847fd8d7b9-v2rs5"
                   },
-                  "sample_points": 217,
-                  "first_sample": "2026-07-30T18:44:38.362Z",
-                  "last_sample": "2026-08-08T18:44:38.362Z",
+                  "sample_points": 200,
+                  "first_sample": "2026-07-31T12:07:55.737Z",
+                  "last_sample": "2026-08-08T19:07:55.737Z",
                   "internal_gap_count": 0
                 }
               ]
@@ -1965,7 +1985,7 @@
         "disk",
         "network"
       ],
-      "leading_gap_days": 19.291667,
+      "leading_gap_days": 19.916667,
       "cause": "The Prometheus export reports retention='10d'; verify retention and collection history."
     },
     {
@@ -1986,7 +2006,7 @@
       "type": "deployment_source_window_gap",
       "severity": "medium",
       "description": "The combined deployment source ends before the metric request window ends.",
-      "days_after_deployment_source": 3.468089
+      "days_after_deployment_source": 3.588821
     }
   ],
   "anomalies": [
@@ -2009,22 +2029,22 @@
       "zero_fraction": 1.0
     },
     {
-      "severity": "medium",
-      "type": "constant_zero_metric",
+      "severity": "info",
+      "type": "mostly_zero_metric",
       "service": "pbx-web",
       "category": "disk",
       "metric": "disk_write_bytes_per_second",
-      "description": "All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.",
-      "zero_fraction": 1.0
+      "description": "At least 95% of returned disk samples are zero; treat isolated activity as sparse.",
+      "zero_fraction": 0.997257
     },
     {
-      "severity": "medium",
-      "type": "constant_zero_metric",
+      "severity": "info",
+      "type": "mostly_zero_metric",
       "service": "pbx-web",
       "category": "disk",
       "metric": "disk_write_operations_per_second",
-      "description": "All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.",
-      "zero_fraction": 1.0
+      "description": "At least 95% of returned disk samples are zero; treat isolated activity as sparse.",
+      "zero_fraction": 0.997257
     },
     {
       "severity": "info",
@@ -2033,7 +2053,7 @@
       "category": "network",
       "metric": "network_receive_bytes_per_second",
       "description": "Maximum rate is at least 10x the median; inspect peak timestamps before interpreting as sustained behavior.",
-      "max_to_median_ratio": 3716.983
+      "max_to_median_ratio": 249.637
     },
     {
       "severity": "info",
@@ -2042,25 +2062,25 @@
       "category": "network",
       "metric": "network_transmit_bytes_per_second",
       "description": "Maximum rate is at least 10x the median; inspect peak timestamps before interpreting as sustained behavior.",
-      "max_to_median_ratio": 4942.5
+      "max_to_median_ratio": 196.342
     },
     {
-      "severity": "info",
-      "type": "mostly_zero_metric",
+      "severity": "medium",
+      "type": "constant_zero_metric",
       "service": "whisper-stt",
       "category": "disk",
       "metric": "disk_read_bytes_per_second",
-      "description": "At least 95% of returned disk samples are zero; treat isolated activity as sparse.",
-      "zero_fraction": 0.998062
+      "description": "All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.",
+      "zero_fraction": 1.0
     },
     {
-      "severity": "info",
-      "type": "mostly_zero_metric",
+      "severity": "medium",
+      "type": "constant_zero_metric",
       "service": "whisper-stt",
       "category": "disk",
       "metric": "disk_read_operations_per_second",
-      "description": "At least 95% of returned disk samples are zero; treat isolated activity as sparse.",
-      "zero_fraction": 0.998062
+      "description": "All returned disk samples are zero; verify exporter/query coverage or confirm no disk I/O occurred.",
+      "zero_fraction": 1.0
     },
     {
       "severity": "info",
@@ -2069,7 +2089,7 @@
       "category": "disk",
       "metric": "disk_write_bytes_per_second",
       "description": "At least 95% of returned disk samples are zero; treat isolated activity as sparse.",
-      "zero_fraction": 0.996124
+      "zero_fraction": 0.995885
     },
     {
       "severity": "info",
@@ -2078,7 +2098,7 @@
       "category": "disk",
       "metric": "disk_write_operations_per_second",
       "description": "At least 95% of returned disk samples are zero; treat isolated activity as sparse.",
-      "zero_fraction": 0.996124
+      "zero_fraction": 0.995885
     },
     {
       "severity": "info",
@@ -2087,7 +2107,7 @@
       "category": "network",
       "metric": "network_receive_bytes_per_second",
       "description": "Maximum rate is at least 10x the median; inspect peak timestamps before interpreting as sustained behavior.",
-      "max_to_median_ratio": 424.911
+      "max_to_median_ratio": 403.12
     },
     {
       "severity": "info",
@@ -2096,7 +2116,7 @@
       "category": "network",
       "metric": "network_transmit_bytes_per_second",
       "description": "Maximum rate is at least 10x the median; inspect peak timestamps before interpreting as sustained behavior.",
-      "max_to_median_ratio": 14.259
+      "max_to_median_ratio": 13.739
     },
     {
       "severity": "high",
@@ -2104,7 +2124,7 @@
       "service": "pbx-web",
       "category": "cpu",
       "description": "The requested window starts before the first observed sample.",
-      "leading_gap_days": 19.291667,
+      "leading_gap_days": 19.916667,
       "prometheus_retention_time": "10d"
     },
     {
@@ -2113,7 +2133,7 @@
       "service": "pbx-web",
       "category": "memory",
       "description": "The requested window starts before the first observed sample.",
-      "leading_gap_days": 19.291667,
+      "leading_gap_days": 19.916667,
       "prometheus_retention_time": "10d"
     },
     {
@@ -2122,7 +2142,7 @@
       "service": "pbx-web",
       "category": "disk",
       "description": "The requested window starts before the first observed sample.",
-      "leading_gap_days": 19.291667,
+      "leading_gap_days": 19.916667,
       "prometheus_retention_time": "10d"
     },
     {
@@ -2131,7 +2151,7 @@
       "service": "pbx-web",
       "category": "network",
       "description": "The requested window starts before the first observed sample.",
-      "leading_gap_days": 19.291667,
+      "leading_gap_days": 19.916667,
       "prometheus_retention_time": "10d"
     },
     {
@@ -2140,7 +2160,7 @@
       "service": "whisper-stt",
       "category": "cpu",
       "description": "The requested window starts before the first observed sample.",
-      "leading_gap_days": 19.291667,
+      "leading_gap_days": 19.916667,
       "prometheus_retention_time": "10d"
     },
     {
@@ -2149,7 +2169,7 @@
       "service": "whisper-stt",
       "category": "memory",
       "description": "The requested window starts before the first observed sample.",
-      "leading_gap_days": 19.291667,
+      "leading_gap_days": 19.916667,
       "prometheus_retention_time": "10d"
     },
     {
@@ -2158,7 +2178,7 @@
       "service": "whisper-stt",
       "category": "disk",
       "description": "The requested window starts before the first observed sample.",
-      "leading_gap_days": 19.291667,
+      "leading_gap_days": 19.916667,
       "prometheus_retention_time": "10d"
     },
     {
@@ -2167,7 +2187,7 @@
       "service": "whisper-stt",
       "category": "network",
       "description": "The requested window starts before the first observed sample.",
-      "leading_gap_days": 19.291667,
+      "leading_gap_days": 19.916667,
       "prometheus_retention_time": "10d"
     },
     {
@@ -2177,11 +2197,11 @@
       "details": {
         "deployment_source_start": "2026-07-07T00:00:00.000Z",
         "deployment_source_end": "2026-08-06T23:59:59.000Z",
-        "metric_window_start": "2026-07-11T11:14:01.927Z",
-        "metric_window_end": "2026-08-10T11:14:01.927Z",
+        "metric_window_start": "2026-07-11T14:07:53.151Z",
+        "metric_window_end": "2026-08-10T14:07:53.151Z",
         "metric_window_before_deployment_source_seconds": 0.0,
-        "metric_window_after_deployment_source_seconds": 299642.927,
-        "metric_window_after_deployment_source_days": 3.468089,
+        "metric_window_after_deployment_source_seconds": 310074.151,
+        "metric_window_after_deployment_source_days": 3.588821,
         "status": "different_windows"
       }
     },
@@ -2189,8 +2209,8 @@
       "severity": "medium",
       "type": "cross_category_timestamp_grid_offset",
       "description": "CPU/memory and disk/network exports do not share an exact timestamp grid.",
-      "offset_seconds": 1836.435,
-      "offset_minutes": 30.607,
+      "offset_seconds": 2.586,
+      "offset_minutes": 0.043,
       "impact": "Join categories by timestamp tolerance or resample before cross-category analysis."
     },
     {
