@@ -21,7 +21,12 @@ from src.components.hot_reload import get_reload_manager
 
 
 async def test_router_prompt_hot_reload():
-    """Test that router prompt is hot-reloaded."""
+    """Verify an edited router prompt becomes visible without a restart.
+
+    The test waits past ``HotReloadManager.CHECK_INTERVAL`` to exercise the
+    normal mtime-triggered path. The original file and manager cache are
+    restored in ``finally`` so a failed assertion cannot pollute later tests.
+    """
     print("\n=== Testing Router Prompt Hot-Reload ===")
 
     reload_mgr = get_reload_manager()
@@ -33,32 +38,32 @@ async def test_router_prompt_hot_reload():
     router_path = Path("prompts/router.md")
     original_content = router_path.read_text()
 
-    # Modify the file
-    test_content = original_content + "\n# Test line added at " + str(time.time())
-    router_path.write_text(test_content)
+    try:
+        # Modify the file and wait for the normal one-second check throttle.
+        test_content = original_content + "\n# Test line added at " + str(time.time())
+        router_path.write_text(test_content)
+        await asyncio.sleep(1.5)
 
-    # Wait for throttle interval (1 second)
-    await asyncio.sleep(1.5)
+        modified_prompt = reload_mgr.get_prompt('router')
+        print(f"Modified prompt length: {len(modified_prompt)} chars")
 
-    # Get the prompt again
-    modified_prompt = reload_mgr.get_prompt('router')
-
-    print(f"Modified prompt length: {len(modified_prompt)} chars")
-
-    # Restore original content
-    router_path.write_text(original_content)
-
-    # Check if the change was detected
-    if len(modified_prompt) > len(original_prompt):
-        print("✓ Router prompt hot-reload: PASSED (change detected)")
-        return True
-    else:
+        if len(modified_prompt) > len(original_prompt):
+            print("✓ Router prompt hot-reload: PASSED (change detected)")
+            return True
         print("✗ Router prompt hot-reload: FAILED (change not detected)")
         return False
+    finally:
+        router_path.write_text(original_content)
+        reload_mgr.force_reload('router')
 
 
 async def test_registry_config_hot_reload():
-    """Test that registry config is hot-reloaded."""
+    """Verify an edited registry config is parsed on the next eligible read.
+
+    The test adds a disposable project, waits past the mtime-check throttle,
+    and checks the parsed project map. Both the source file and the manager's
+    cached snapshot are restored in ``finally`` for repeatable isolated runs.
+    """
     print("\n=== Testing Registry Config Hot-Reload ===")
 
     reload_mgr = get_reload_manager()
@@ -70,29 +75,22 @@ async def test_registry_config_hot_reload():
     registry_path = Path("config/registry.yaml")
     original_content = registry_path.read_text()
 
-    # Add a test project
-    test_project = "\n  test-hot-reload-project:\n    description: 'Test project for hot-reload'\n    aliases: ['test', 'hotreload']\n    cluster: null\n    namespace: null\n    intent_support: ['status']\n"
-    modified_content = original_content + test_project
-    registry_path.write_text(modified_content)
+    try:
+        test_project = "\n  test-hot-reload-project:\n    description: 'Test project for hot-reload'\n    aliases: ['test', 'hotreload']\n    cluster: null\n    namespace: null\n    intent_support: ['status']\n"
+        registry_path.write_text(original_content + test_project)
+        await asyncio.sleep(1.5)
 
-    # Wait for throttle interval
-    await asyncio.sleep(1.5)
+        modified_config = reload_mgr.get_config('registry')
+        print(f"Modified config projects count: {len(modified_config.get('projects', {}))}")
 
-    # Get config again
-    modified_config = reload_mgr.get_config('registry')
-
-    print(f"Modified config projects count: {len(modified_config.get('projects', {}))}")
-
-    # Restore original content
-    registry_path.write_text(original_content)
-
-    # Check if the change was detected
-    if len(modified_config.get('projects', {})) > len(original_config.get('projects', {})):
-        print("✓ Registry config hot-reload: PASSED (change detected)")
-        return True
-    else:
+        if len(modified_config.get('projects', {})) > len(original_config.get('projects', {})):
+            print("✓ Registry config hot-reload: PASSED (change detected)")
+            return True
         print("✗ Registry config hot-reload: FAILED (change not detected)")
         return False
+    finally:
+        registry_path.write_text(original_content)
+        reload_mgr.force_reload('registry')
 
 
 async def test_yaml_registry_cache_expiry():

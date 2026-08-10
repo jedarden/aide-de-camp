@@ -20,7 +20,11 @@ from src.components.hot_reload import get_reload_manager
 
 
 async def test_router_prompt_hot_reload():
-    """Test that router prompt is hot-reloaded."""
+    """Verify the fast prompt regression path detects a disk edit.
+
+    The test waits beyond the manager's mtime-check throttle and restores both
+    the prompt file and its cached snapshot even if verification fails.
+    """
     print("\n=== Testing Router Prompt Hot-Reload ===")
 
     reload_mgr = get_reload_manager()
@@ -32,33 +36,29 @@ async def test_router_prompt_hot_reload():
     router_path = Path("prompts/router.md")
     original_content = router_path.read_text()
 
-    # Modify the file
-    test_marker = f"\n# Test line added at {time.time()}"
-    test_content = original_content + test_marker
-    router_path.write_text(test_content)
+    try:
+        test_marker = f"\n# Test line added at {time.time()}"
+        router_path.write_text(original_content + test_marker)
+        await asyncio.sleep(1.5)
+        modified_prompt = reload_mgr.get_prompt('router')
+        print(f"Modified prompt length: {len(modified_prompt)} chars")
 
-    # Wait for throttle interval (1 second)
-    await asyncio.sleep(1.5)
-
-    # Get the prompt again
-    modified_prompt = reload_mgr.get_prompt('router')
-
-    print(f"Modified prompt length: {len(modified_prompt)} chars")
-
-    # Restore original content
-    router_path.write_text(original_content)
-
-    # Check if the change was detected
-    if test_marker in modified_prompt:
-        print("✓ Router prompt hot-reload: PASSED (change detected)")
-        return True
-    else:
+        if test_marker in modified_prompt:
+            print("✓ Router prompt hot-reload: PASSED (change detected)")
+            return True
         print("✗ Router prompt hot-reload: FAILED (change not detected)")
         return False
+    finally:
+        router_path.write_text(original_content)
+        reload_mgr.force_reload('router')
 
 
 async def test_registry_config_hot_reload():
-    """Test that registry config is hot-reloaded."""
+    """Verify the fast registry-manager path observes a temporary project.
+
+    The modified YAML is parsed after the normal mtime-check throttle, then
+    the original file and manager cache are restored in ``finally``.
+    """
     print("\n=== Testing Registry Config Hot-Reload ===")
 
     import yaml
@@ -72,40 +72,37 @@ async def test_registry_config_hot_reload():
     registry_path = Path("config/registry.yaml")
     original_content = registry_path.read_text()
 
-    # Parse, modify, and write back
-    parsed = yaml.safe_load(original_content)
-    parsed['projects']['test-hot-reload-project'] = {
-        'description': 'Test project for hot-reload',
-        'aliases': ['test', 'hotreload'],
-        'cluster': None,
-        'namespace': None,
-        'intent_support': ['status']
-    }
-    modified_content = yaml.dump(parsed, default_flow_style=False)
-    registry_path.write_text(modified_content)
+    try:
+        parsed = yaml.safe_load(original_content)
+        parsed['projects']['test-hot-reload-project'] = {
+            'description': 'Test project for hot-reload',
+            'aliases': ['test', 'hotreload'],
+            'cluster': None,
+            'namespace': None,
+            'intent_support': ['status']
+        }
+        registry_path.write_text(yaml.dump(parsed, default_flow_style=False))
+        await asyncio.sleep(1.5)
 
-    # Wait for throttle interval
-    await asyncio.sleep(1.5)
+        modified_config = reload_mgr.get_config('registry')
+        print(f"Modified config projects count: {len(modified_config.get('projects', {}))}")
 
-    # Get config again
-    modified_config = reload_mgr.get_config('registry')
-
-    print(f"Modified config projects count: {len(modified_config.get('projects', {}))}")
-
-    # Restore original content
-    registry_path.write_text(original_content)
-
-    # Check if the change was detected
-    if 'test-hot-reload-project' in modified_config.get('projects', {}):
-        print("✓ Registry config hot-reload: PASSED (change detected)")
-        return True
-    else:
+        if 'test-hot-reload-project' in modified_config.get('projects', {}):
+            print("✓ Registry config hot-reload: PASSED (change detected)")
+            return True
         print("✗ Registry config hot-reload: FAILED (change not detected)")
         return False
+    finally:
+        registry_path.write_text(original_content)
+        reload_mgr.force_reload('registry')
 
 
 async def test_yaml_registry_force_reload():
-    """Test that YAML registry can be force-reloaded."""
+    """Verify ``get_registry(force=True)`` bypasses the five-minute TTL.
+
+    A temporary project is added to the real registry, observed immediately,
+    and removed in ``finally`` before the registry cache is rebuilt.
+    """
     print("\n=== Testing YAML Registry Force Reload ===")
 
     import yaml
@@ -119,37 +116,29 @@ async def test_yaml_registry_force_reload():
     # Read original content
     original_content = REGISTRY_PATH.read_text()
 
-    # Parse, modify, and write back
-    parsed = yaml.safe_load(original_content)
-    parsed['projects']['test-force-reload'] = {
-        'description': 'Test force reload',
-        'aliases': ['forcereload'],
-        'cluster': None,
-        'namespace': None,
-        'intent_support': ['status']
-    }
-    modified_content = yaml.dump(parsed, default_flow_style=False)
-    REGISTRY_PATH.write_text(modified_content)
+    try:
+        parsed = yaml.safe_load(original_content)
+        parsed['projects']['test-force-reload'] = {
+            'description': 'Test force reload',
+            'aliases': ['forcereload'],
+            'cluster': None,
+            'namespace': None,
+            'intent_support': ['status']
+        }
+        REGISTRY_PATH.write_text(yaml.dump(parsed, default_flow_style=False))
 
-    # Force reload
-    registry2 = get_registry(force=True)
-    modified_count = len(registry2['projects'])
+        registry2 = get_registry(force=True)
+        modified_count = len(registry2['projects'])
+        print(f"Registry count after force reload: {modified_count}")
 
-    print(f"Registry count after force reload: {modified_count}")
-
-    # Restore original content
-    REGISTRY_PATH.write_text(original_content)
-
-    # Clean up by forcing another reload
-    get_registry(force=True)
-
-    # Check if the change was detected
-    if 'test-force-reload' in registry2.get('projects', {}):
-        print("✓ YAML registry force reload: PASSED (change detected)")
-        return True
-    else:
+        if 'test-force-reload' in registry2.get('projects', {}):
+            print("✓ YAML registry force reload: PASSED (change detected)")
+            return True
         print("✗ YAML registry force reload: FAILED (change not detected)")
         return False
+    finally:
+        REGISTRY_PATH.write_text(original_content)
+        get_registry(force=True)
 
 
 async def main():
