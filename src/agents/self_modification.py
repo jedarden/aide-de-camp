@@ -905,11 +905,20 @@ class SelfModificationAgent:
                 if result.returncode == 0:
                     # P1 compare-and-swap boundary: the write lock prevents a
                     # concurrent apply/rollback from replacing this artifact.
+                    logger.info(
+                        "Rollback atomic write: restoring artifact %s at %s",
+                        artifact_name,
+                        artifact.path,
+                    )
                     atomic_write(artifact.path, result.stdout)
                     self.reload_mgr.force_reload(artifact_name)
+                    logger.info(
+                        "Rollback atomic write completed for artifact %s",
+                        artifact_name,
+                    )
                     return True
             except Exception as e:
-                print(f"Rollback failed: {e}")
+                logger.exception("Rollback failed for artifact %s: %s", artifact_name, e)
 
         return False
 
