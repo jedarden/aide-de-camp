@@ -16,6 +16,8 @@ string that the router *would* have sent.
 """
 
 import json
+import os
+import stat
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -23,8 +25,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.components.hot_reload import HotReloadManager, get_reload_manager
-from src.intent.router import IntentRouter, IntentType, _ROUTER_PROMPT_FALLBACK
-
+from src.intent.router import _ROUTER_PROMPT_FALLBACK, IntentRouter, IntentType
+from src.utils.atomic_write import atomic_write
 
 # --- fixtures ---------------------------------------------------------------
 
@@ -661,17 +663,42 @@ Classify "check logs" as status.
 
 @pytest.fixture
 def production_router_prompt():
-    """Back up the repository prompt and restore its manager snapshot."""
+    """Restore the exact repository prompt and manager snapshot after a test."""
     prompt_path = Path(__file__).resolve().parents[1] / "prompts" / "router.md"
-    original_bytes = prompt_path.read_bytes()
+    original_exists = prompt_path.exists()
+    original_bytes = prompt_path.read_bytes() if original_exists else None
+    original_mode = stat.S_IMODE(prompt_path.stat().st_mode) if original_exists else None
     reload_manager = get_reload_manager()
-    reload_manager.force_reload("router")
+    if original_exists:
+        reload_manager.force_reload("router")
 
     try:
         yield prompt_path, reload_manager
     finally:
-        prompt_path.write_bytes(original_bytes)
-        reload_manager.force_reload("router")
+        if not original_exists:
+            prompt_path.unlink(missing_ok=True)
+        else:
+            assert original_bytes is not None
+            assert original_mode is not None
+            already_restored = (
+                prompt_path.is_file()
+                and prompt_path.read_bytes() == original_bytes
+                and stat.S_IMODE(prompt_path.stat().st_mode) == original_mode
+            )
+            if not already_restored:
+                atomic_write(prompt_path, original_bytes, mode="wb")
+                os.chmod(prompt_path, original_mode)
+
+            assert prompt_path.read_bytes() == original_bytes, (
+                "router.md teardown did not restore its original content"
+            )
+            assert stat.S_IMODE(prompt_path.stat().st_mode) == original_mode, (
+                "router.md teardown did not restore its original permissions"
+            )
+            reload_manager.force_reload("router")
+
+        # The fixture is intentionally idempotent: a second teardown observes
+        # the same bytes/mode and does not publish another file unnecessarily.
 
 
 class TestProductionRouterDispatchHotReload:
