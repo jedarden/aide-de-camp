@@ -1,0 +1,155 @@
+{
+  "schema_version": "1.0",
+  "dataset_type": "service_metrics_30d",
+  "metadata": {
+    "service": "pbx-web",
+    "namespace": "pbx-web",
+    "cluster": "ardenone-cluster",
+    "generated_at": "2026-08-10T14:15:57.400Z",
+    "requested_window": {
+      "start": "2026-07-11T14:15:36.435Z",
+      "end": "2026-08-10T14:15:36.435Z",
+      "duration_days": 30,
+      "sampling_step_seconds": 3600
+    },
+    "observability_backends": ["VictoriaLogs", "Prometheus"],
+    "source_artifacts": [
+      "data/pbx-web-whisper-stt-metrics-30d-20260810.json",
+      "data/unified_metrics_30d.json",
+      "data/unified_metrics_availability_report.json"
+    ]
+  },
+  "deployment_context": {
+    "source": "data/metrics_deployment_aligned.json",
+    "source_window": {
+      "start": "2026-07-07T00:00:00Z",
+      "end": "2026-08-06T23:59:59Z"
+    },
+    "source_event_count": 5,
+    "events_in_requested_metric_window": 5,
+    "events_in_observed_prometheus_window": 0,
+    "alignment_note": "Events are retained as context; no metric values were interpolated at event timestamps."
+  },
+  "metrics": {
+    "error_rates": {
+      "status": "partial_aggregate",
+      "observed_log_window": {
+        "start": "2026-07-13T00:00:03.426Z",
+        "end": "2026-08-10T14:15:33.102Z"
+      },
+      "values": {
+        "total_log_lines": 1006771,
+        "http_requests": 340521,
+        "http_2xx": 340042,
+        "http_4xx": 312,
+        "http_5xx": 1,
+        "error_log_lines": 272,
+        "application_timing_lines": 175
+      },
+      "rates": {
+        "http_4xx": 0.0009162430510893601,
+        "http_5xx": 0.0000029366764457992313,
+        "error_log_lines": 0.00027017067436388214
+      },
+      "quality_note": "Counts are aggregate log queries, not a complete daily time series."
+    },
+    "latency": {
+      "status": "partial",
+      "application_processing_seconds": {
+        "count": 175,
+        "min": 1.384,
+        "p50": 1.758,
+        "p95": 3.5635,
+        "p99": 5.94152,
+        "max": 10.17,
+        "mean": 1.9575028571428572,
+        "sample_days": 13,
+        "first_sample": "2026-07-13T16:47:09.444831401Z",
+        "last_sample": "2026-08-08T20:13:16.346121501Z"
+      },
+      "health_probe_seconds": {
+        "observed_points": 243,
+        "observed_window": {
+          "start": "2026-07-31T12:15:36.435Z",
+          "end": "2026-08-10T14:15:36.435Z",
+          "coverage_days": 10.083333
+        },
+        "p50": 0.0025,
+        "p95": 0.00475,
+        "p99": 0.00495
+      }
+    },
+    "resource_usage": {
+      "status": "partial",
+      "prometheus_retention": "10d",
+      "observed_window": {
+        "start": "2026-07-31T12:07:53.151Z",
+        "end": "2026-08-10T14:07:55.737Z",
+        "coverage_days": 10.083333,
+        "hourly_observation_points": 243,
+        "leading_gap_days": 19.916667,
+        "trailing_gap_days": 0
+      },
+      "metric_groups": {
+        "cpu_memory": {
+          "metric_names": ["cpu_usage", "memory_working_set"],
+          "metrics_with_series": 2,
+          "series_per_metric": 5,
+          "observed_points_per_metric": 243
+        },
+        "disk": {
+          "metric_names": [
+            "disk_read_bytes_per_second",
+            "disk_read_operations_per_second",
+            "disk_write_bytes_per_second",
+            "disk_write_operations_per_second"
+          ],
+          "metrics_with_series": 4,
+          "series_per_metric": 5,
+          "observed_points_per_metric": 243
+        },
+        "network": {
+          "metric_names": [
+            "network_receive_bytes_per_second",
+            "network_receive_bytes_total",
+            "network_transmit_bytes_per_second",
+            "network_transmit_bytes_total"
+          ],
+          "metrics_with_series": 4,
+          "series_per_metric": 5,
+          "observed_points_per_metric": 243
+        },
+        "storage": {
+          "metric_names": [
+            "storage_available_bytes",
+            "storage_capacity_bytes",
+            "storage_filesystem_limit_bytes",
+            "storage_filesystem_usage_bytes",
+            "storage_pvc_info",
+            "storage_requested_bytes",
+            "storage_used_bytes"
+          ],
+          "metrics_with_series": 0,
+          "metrics_without_series": 7,
+          "observed_points_per_metric": 0
+        }
+      },
+      "quality_note": "Missing samples are unavailable, not zero-filled."
+    }
+  },
+  "quality": {
+    "overall_status": "degraded_but_structured",
+    "coverage_gaps": [
+      "Prometheus retention leaves the first 19.916667 days of the requested window unobserved.",
+      "VictoriaLogs starts on 2026-07-13, after the requested window began.",
+      "Error counts are aggregate-only and lack a complete daily breakdown.",
+      "Resource series are hourly summaries; storage series were unavailable for this namespace.",
+      "Deployment source ends on 2026-08-06, before the metrics request ends."
+    ],
+    "anomalies": [
+      "Disk read series are constant zero in the returned samples.",
+      "Network receive/transmit rates contain high peaks relative to their medians.",
+      "One HTTP 5xx response was observed."
+    ]
+  }
+}
