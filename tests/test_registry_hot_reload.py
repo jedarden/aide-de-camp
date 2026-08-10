@@ -7,19 +7,72 @@ This test verifies that:
 2. Changes are picked up on subsequent dispatches (via get_registry reload)
 3. Original state can be restored after testing
 4. Routing picks up changes without server restart
+
+The registry cache is process-local: an ordinary get_registry() call can keep
+returning the validated snapshot for up to CACHE_TTL (five minutes), while
+get_registry(force=True) rebuilds it immediately.  Tests therefore force a
+reload after publishing a complete YAML file and after restoring the original
+file.  Every mutation is atomic and is serialized in this module so concurrent
+callers in this process cannot expose a partial file or race cleanup.
 """
 
 import asyncio
+import os
+import stat
 import sys
-import time
-from unittest.mock import AsyncMock, patch, MagicMock
-from typing import Any
+import threading
+import uuid
+from functools import wraps
+from unittest.mock import MagicMock
 
 import yaml
 
-from src.registry import get_registry, REGISTRY_PATH, CACHE_TTL, get_project
+from src.registry import REGISTRY_PATH, get_project, get_registry
+from src.utils.atomic_write import atomic_write
+
+_REGISTRY_TEST_LOCK = threading.RLock()
 
 
+def _serialized_registry_test(test_func):
+    """Serialize real registry-file mutations within this test module."""
+
+    @wraps(test_func)
+    async def wrapper(*args, **kwargs):
+        with _REGISTRY_TEST_LOCK:
+            return await test_func(*args, **kwargs)
+
+    return wrapper
+
+
+def _registry_mode() -> int:
+    """Return only the permission bits that must survive a hot-reload test."""
+
+    return stat.S_IMODE(REGISTRY_PATH.stat().st_mode)
+
+
+def _publish_registry(content: str | bytes, mode: int, *, binary: bool = False) -> None:
+    """Publish a complete registry snapshot and preserve its permission bits."""
+
+    atomic_write(REGISTRY_PATH, content, mode="wb" if binary else "w")
+    # atomic_write publishes a new inode; restore the source file's mode so a
+    # test does not accidentally turn a read-only or specially-permissioned
+    # registry into the temporary file's default mode.
+    os.chmod(REGISTRY_PATH, mode)
+
+
+def _restore_registry(original_bytes: bytes, original_mode: int) -> None:
+    """Restore the exact pre-test registry bytes and mode atomically."""
+
+    _publish_registry(original_bytes, original_mode, binary=True)
+
+
+def _test_alias(prefix: str) -> str:
+    """Create an alias that cannot collide when tests run in one second."""
+
+    return f"{prefix}-{uuid.uuid4().hex}"
+
+
+@_serialized_registry_test
 async def test_registry_alias_hot_reload():
     """
     Test that modifying a registry alias in config/registry.yaml
@@ -45,11 +98,13 @@ async def test_registry_alias_hot_reload():
     print(f"Original aliases for {test_project}: {original_aliases}")
 
     # Read the YAML file directly
-    original_yaml_content = REGISTRY_PATH.read_text()
-    parsed = yaml.safe_load(original_yaml_content)
+    original_yaml_content = REGISTRY_PATH.read_bytes()
+    original_yaml_text = original_yaml_content.decode("utf-8")
+    original_mode = _registry_mode()
+    parsed = yaml.safe_load(original_yaml_text)
 
     # Add a test alias that doesn't exist yet
-    test_alias = f"test-alias-{int(time.time())}"
+    test_alias = _test_alias("test-alias")
 
     # Modify the YAML
     assert test_project in parsed.get("projects", {}), f"Test project '{test_project}' not found in YAML"
@@ -59,7 +114,7 @@ async def test_registry_alias_hot_reload():
 
     # Write the modified YAML
     try:
-        REGISTRY_PATH.write_text(modified_yaml_content)
+        _publish_registry(modified_yaml_content, original_mode)
         print(f"Added test alias '{test_alias}' to {test_project}")
 
         # Force reload to pick up the change
@@ -80,8 +135,8 @@ async def test_registry_alias_hot_reload():
 
     finally:
         # Always restore the original content, even if test fails
-        print(f"\nRestoring original YAML content...")
-        REGISTRY_PATH.write_text(original_yaml_content)
+        print("\nRestoring original YAML content...")
+        _restore_registry(original_yaml_content, original_mode)
 
         # Force reload again to pick up the restoration
         restored_registry = await get_registry(force=True)
@@ -92,12 +147,14 @@ async def test_registry_alias_hot_reload():
 
         # Verify restoration worked
         assert test_alias not in restored_aliases, "Test alias still present after restoration"
-        print(f"✓ Test alias successfully removed after restoration")
+        print("✓ Test alias successfully removed after restoration")
 
         # Verify we're back to original state
         assert set(restored_aliases) == set(original_aliases), \
             f"Registry aliases differ from original: {original_aliases} vs {restored_aliases}"
-        print(f"✓ Registry fully restored to original state")
+        assert REGISTRY_PATH.read_bytes() == original_yaml_content
+        assert _registry_mode() == original_mode
+        print("✓ Registry fully restored to original state")
 
     print("\n✓ Registry alias hot-reload test: PASSED")
 
@@ -142,6 +199,7 @@ async def test_registry_cache_invalidation():
     print("\n✓ Registry cache invalidation test: PASSED")
 
 
+@_serialized_registry_test
 async def test_registry_alias_dispatch_integration():
     """
     Test that a new alias in registry.yaml would be picked up in dispatch routing.
@@ -155,7 +213,7 @@ async def test_registry_alias_dispatch_integration():
 
     # Use whisper-stt as test project (has many aliases)
     test_project = "whisper-stt"
-    test_alias = f"voice-to-text-{int(time.time())}"
+    test_alias = _test_alias("voice-to-text")
 
     # Load fresh registry
     registry = await get_registry(force=True)
@@ -167,15 +225,17 @@ async def test_registry_alias_dispatch_integration():
     print(f"Original aliases for {test_project}: {original_aliases}")
 
     # Read and modify YAML
-    original_yaml = REGISTRY_PATH.read_text()
-    parsed = yaml.safe_load(original_yaml)
+    original_yaml = REGISTRY_PATH.read_bytes()
+    original_yaml_text = original_yaml.decode("utf-8")
+    original_mode = _registry_mode()
+    parsed = yaml.safe_load(original_yaml_text)
 
     assert test_project in parsed.get("projects", {}), f"Test project '{test_project}' not found in YAML"
     parsed["projects"][test_project]["aliases"] = original_aliases + [test_alias]
 
     try:
         # Write modified YAML
-        REGISTRY_PATH.write_text(yaml.dump(parsed, default_flow_style=False))
+        _publish_registry(yaml.dump(parsed, default_flow_style=False), original_mode)
         print(f"Added test alias '{test_alias}' to {test_project}")
 
         # Force reload
@@ -204,13 +264,16 @@ async def test_registry_alias_dispatch_integration():
 
     finally:
         # Restore original YAML
-        REGISTRY_PATH.write_text(original_yaml)
+        _restore_registry(original_yaml, original_mode)
         await get_registry(force=True)  # Force reload to restore
-        print(f"✓ Restored original registry state")
+        assert REGISTRY_PATH.read_bytes() == original_yaml
+        assert _registry_mode() == original_mode
+        print("✓ Restored original registry state")
 
     print("\n✓ Registry alias dispatch integration test: PASSED")
 
 
+@_serialized_registry_test
 async def test_registry_hot_reload_no_restart():
     """
     Test that modifying a registry alias and dispatching an utterance
@@ -226,10 +289,9 @@ async def test_registry_hot_reload_no_restart():
     """
     print("\n=== Testing Registry Hot-Reload No Restart ===\n")
 
-    # Import mock classes for testing routing
-    from unittest.mock import AsyncMock, MagicMock, patch
-    from fetch.commands import FetchRequest, FetchContext, IntentType
-    from fetch.orchestrator import execute_fetch
+    # FetchContext is built after the force reload to document the same
+    # in-process routing path used by dispatch.
+    from src.fetch.commands import FetchContext
 
     # Track if server restart was attempted
     restart_attempted = False
@@ -237,7 +299,7 @@ async def test_registry_hot_reload_no_restart():
 
     # Use whisper-stt as test project
     test_project = "whisper-stt"
-    test_alias = f"hot-reload-no-restart-{int(time.time())}"
+    test_alias = _test_alias("hot-reload-no-restart")
 
     original_entry = original_registry["projects"].get(test_project)
     assert original_entry is not None, f"Test project '{test_project}' not found"
@@ -246,15 +308,17 @@ async def test_registry_hot_reload_no_restart():
     print(f"Original aliases for {test_project}: {original_aliases}")
 
     # Read and modify YAML
-    original_yaml = REGISTRY_PATH.read_text()
-    parsed = yaml.safe_load(original_yaml)
+    original_yaml = REGISTRY_PATH.read_bytes()
+    original_yaml_text = original_yaml.decode("utf-8")
+    original_mode = _registry_mode()
+    parsed = yaml.safe_load(original_yaml_text)
 
     # Add test alias
     parsed["projects"][test_project]["aliases"] = original_aliases + [test_alias]
 
     try:
         # Write modified YAML
-        REGISTRY_PATH.write_text(yaml.dump(parsed, default_flow_style=False))
+        _publish_registry(yaml.dump(parsed, default_flow_style=False), original_mode)
         print(f"✓ Added test alias '{test_alias}' to {test_project}")
 
         # Force reload to simulate hot-reload (no server restart)
@@ -268,7 +332,7 @@ async def test_registry_hot_reload_no_restart():
 
         # Verify no restart occurred - we're still in the same process
         # (If restart occurred, process ID would change or globals would reset)
-        print(f"✓ No server restart occurred (same process, globals intact)")
+        print("✓ No server restart occurred (same process, globals intact)")
 
         # Simulate routing with the new alias
         # Create an utterance that would use the new alias
@@ -289,7 +353,8 @@ async def test_registry_hot_reload_no_restart():
                 MagicMock(source=MagicMock(value="argocd_app")),
             ]
         ]
-        print(f"✓ Fetch commands available for routed project")
+        assert len(fetch_commands) == 2
+        print("✓ Fetch commands available for routed project")
 
         # Verify context would be built correctly from the registry entry
         expected_context = FetchContext(
@@ -299,7 +364,7 @@ async def test_registry_hot_reload_no_restart():
             repo_path=project.get("repo_path"),
             app_name=project.get("argocd_app", test_project),
         )
-        print(f"✓ Fetch context would be built with:")
+        print("✓ Fetch context would be built with:")
         print(f"  - cluster: {expected_context.cluster}")
         print(f"  - namespace: {expected_context.namespace}")
         print(f"  - repo_path: {expected_context.repo_path}")
@@ -307,13 +372,13 @@ async def test_registry_hot_reload_no_restart():
 
         # Final verification: ensure we didn't restart
         assert restart_attempted is False, "Server restart was detected (should not happen)"
-        print(f"✓ Confirmed: No server restart during hot-reload")
+        print("✓ Confirmed: No server restart during hot-reload")
 
     finally:
         # Restore original YAML
-        REGISTRY_PATH.write_text(original_yaml)
+        _restore_registry(original_yaml, original_mode)
         await get_registry(force=True)  # Force reload to restore
-        print(f"✓ Restored original registry.yaml")
+        print("✓ Restored original registry.yaml")
 
         # Verify restoration worked
         restored_registry = await get_registry(force=False)
@@ -323,9 +388,49 @@ async def test_registry_hot_reload_no_restart():
         assert test_alias not in restored_aliases, "Test alias still present after restoration"
         assert set(restored_aliases) == set(original_aliases), \
             f"Registry not restored: expected {original_aliases}, got {restored_aliases}"
-        print(f"✓ Registry fully restored to original state")
+        assert REGISTRY_PATH.read_bytes() == original_yaml
+        assert _registry_mode() == original_mode
+        print("✓ Registry fully restored to original state")
 
     print("\n✓ Registry hot-reload no restart test: PASSED")
+
+
+@_serialized_registry_test
+async def test_registry_hot_reload_idempotent():
+    """Run the alias hot-reload test twice without leaking file or cache state.
+
+    A force reload makes a YAML edit visible immediately in the current
+    process; it does not restart the server or persist test state.  The nested
+    test restores its exact input after each run, so this intentionally calls
+    it twice in one async session to catch timestamp/alias collisions, stale
+    cache state, permission changes, and incomplete cleanup.
+    """
+
+    original_bytes = REGISTRY_PATH.read_bytes()
+    original_mode = _registry_mode()
+
+    try:
+        for run_number in (1, 2):
+            await test_registry_alias_hot_reload()
+
+            # The second invocation must start from precisely the same file,
+            # not merely equivalent YAML, and must leave its mode untouched.
+            assert REGISTRY_PATH.read_bytes() == original_bytes, \
+                f"Registry bytes changed after idempotency run {run_number}"
+            assert _registry_mode() == original_mode, \
+                f"Registry permissions changed after idempotency run {run_number}"
+
+            # Verify the in-memory snapshot was refreshed after cleanup too;
+            # otherwise a later dispatch could still observe the test alias.
+            await get_registry(force=True)
+    finally:
+        # Keep this outer cleanup as a safety net if the nested test fails
+        # before entering its own mutation/finally block.
+        _restore_registry(original_bytes, original_mode)
+        await get_registry(force=True)
+
+    assert REGISTRY_PATH.read_bytes() == original_bytes
+    assert _registry_mode() == original_mode
 
 
 def main():
@@ -336,7 +441,7 @@ def main():
 
     passed = 0
     failed = 0
-    total = 4
+    total = 5
 
     # Test 1: Basic alias hot-reload
     try:
@@ -378,6 +483,16 @@ def main():
         traceback.print_exc()
         failed += 1
 
+    # Test 5: Idempotency in one process/session
+    try:
+        asyncio.run(test_registry_hot_reload_idempotent())
+        passed += 1
+    except Exception as e:
+        print(f"\n✗ Test 5 failed with exception: {e}")
+        import traceback
+        traceback.print_exc()
+        failed += 1
+
     print("\n" + "=" * 60)
     print(f"Results: {passed}/{total} tests passed")
     print("=" * 60)
@@ -390,6 +505,7 @@ def main():
         print("- Original state is properly restored ✓")
         print("- Dispatch routing would recognize new aliases ✓")
         print("- Hot-reload works without server restart ✓")
+        print("- Hot-reload test is idempotent across repeated runs ✓")
         return 0
     else:
         print("\n✗ Some registry hot-reload tests FAILED")

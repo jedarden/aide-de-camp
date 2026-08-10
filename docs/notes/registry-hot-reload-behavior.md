@@ -143,14 +143,14 @@ The test suite (`tests/test_registry_hot_reload.py`) covers:
 1. **Basic Hot-Reload**: Alias modification is picked up by `get_registry(force=True)`
 2. **Cache Invalidation**: Cache respects TTL and `force=True` bypass
 3. **Dispatch Integration**: Routing recognizes new aliases without restart
-4. **Idempotency**: Tests can run multiple times without manual cleanup
-5. **Concurrent Safety**: Multiple modifications don't corrupt registry
+4. **No-Restart Routing**: A reloaded alias can build a fetch context in the same process
+5. **Idempotency**: `test_registry_hot_reload_idempotent()` runs the mutation twice in one session
 
 ### Running Tests
 
 ```bash
 # Run all hot-reload tests
-python tests/test_registry_hot_reload.py
+PYTHONPATH=. python tests/test_registry_hot_reload.py
 
 # Run with pytest
 pytest tests/test_registry_hot_reload.py -v
@@ -162,23 +162,24 @@ pytest tests/test_registry_hot_reload.py::test_registry_hot_reload_idempotent -v
 ### Test Idempotency
 
 All tests are designed to be **idempotent**:
-- **Unique Artifacts**: Time-based aliases prevent collision between runs
-- **State Capture**: Original YAML content captured before modification
-- **Guaranteed Cleanup**: `finally` blocks ensure restoration even on failure
-- **Verification**: Tests verify complete restoration before exit
+- **Unique Artifacts**: UUID-based aliases prevent collisions between rapid runs
+- **State Capture**: Original registry bytes and permission bits are captured before modification
+- **Atomic Publication**: `atomic_write()` makes each replacement visible as a complete YAML file
+- **Guaranteed Cleanup**: `finally` blocks restore the exact original file even on failure
+- **Verification**: Tests verify file bytes, permissions, and the forced in-memory snapshot after cleanup
 
 Example test structure:
 
 ```python
-original_yaml = REGISTRY_PATH.read_text()  # Capture state
+original_yaml = REGISTRY_PATH.read_bytes()  # Capture exact state
 try:
     # Modify registry
-    REGISTRY_PATH.write_text(modified_yaml)
+    atomic_write(REGISTRY_PATH, modified_yaml)
     # Test hot-reload
     reloaded = get_registry(force=True)
     assert "test-alias" in reloaded["projects"]["test"]["aliases"]
 finally:
-    REGISTRY_PATH.write_text(original_yaml)  # Always restore
+    atomic_write(REGISTRY_PATH, original_yaml, mode="wb")  # Always restore
     get_registry(force=True)  # Clear cache
 ```
 
@@ -187,7 +188,7 @@ finally:
 When tests pass, you should see:
 
 ```
-Results: 6/6 tests passed
+Results: 5/5 tests passed
 
 ✓ All registry hot-reload tests PASSED
 
@@ -198,7 +199,7 @@ Conclusion:
 - Dispatch routing would recognize new aliases ✓
 - Hot-reload works without server restart ✓
 - Tests are idempotent (no side effects) ✓
-- Concurrent access is handled safely ✓
+- Atomic replacement and cleanup preserve file integrity ✓
 ```
 
 ## Edge Cases and Safety
@@ -231,23 +232,19 @@ If a test crashes catastrophically, the backup can be used for manual recovery.
 
 ### Concurrent Access
 
-The test suite verifies that concurrent modifications are handled safely:
-
-- Sequential writes complete atomically (no partial writes visible to reads)
-- All aliases from concurrent modifications are present
-- Original aliases are preserved during concurrent updates
+The production registry lock serializes cache reads and force-rebuilds, while
+`atomic_write()` serializes same-path writers and publishes complete files.
+The real-file mutation tests also use a re-entrant module lock so their
+backup/modify/reload/restore sections cannot race within one test process.
+The suite does not merge independent concurrent writers; the CI entry point
+runs these repository-file tests serially.
 
 ### Permission Errors
 
-Tests handle potential permission issues:
-
-```python
-try:
-    REGISTRY_PATH.write_text(content)
-except OSError as e:
-    print(f"Failed to write registry: {e}")
-    raise
-```
+The idempotency test records and restores the registry's permission bits after
+each atomic replacement. A checkout whose registry directory is not writable
+fails with the underlying `PermissionError`; the test does not weaken
+permissions or leave a backup behind as a workaround.
 
 ## Performance Considerations
 
@@ -318,36 +315,11 @@ except OSError as e:
 
 ## CI/CD Integration
 
-### Argo Workflow
-
-The registry hot-reload tests can be integrated into CI/CD via Argo Workflows. Add to `declarative-config/k8s/iad-ci/argo-workflows/`:
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
-metadata:
-  name: aide-de-camp-test
-spec:
-  templates:
-  - name: test-registry-hot-reload
-    container:
-      image: python:3.12
-      command: [python, tests/test_registry_hot_reload.py]
-```
-
-### Pre-commit Hook
-
-For local development, add a pre-commit hook:
-
-```bash
-# .git/hooks/pre-commit
-#!/bin/bash
-python tests/test_registry_hot_reload.py
-if [ $? -ne 0 ]; then
-    echo "Registry hot-reload tests failed. Aborting commit."
-    exit 1
-fi
-```
+The repository has no checked-in CI workflow. `scripts/run_hot_reload_tests.sh`
+is the stable CI/local entry point and already includes
+`tests/test_registry_hot_reload.py`; pytest discovery also includes it in the
+normal `tests/` suite. The script keeps repository-file tests serial and the
+external dispatch smoke test opt-in because it requires a running server.
 
 ## Future Enhancements
 
