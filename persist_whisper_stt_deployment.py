@@ -162,7 +162,16 @@ def create_backup(file_path: Union[str, Path]) -> Optional[Path]:
             shutil.copy2(source, temp_backup_path)
             temp_backup_path.replace(backup_path)
         except BaseException:
-            temp_backup_path.unlink(missing_ok=True)
+            # Cleanup is idempotent and must not mask the copy/replace error.
+            # In particular, do not check ``exists()`` first: another owner
+            # may remove the staging path between the check and unlink.
+            try:
+                temp_backup_path.unlink(missing_ok=True)
+            except OSError as cleanup_error:
+                logger.error(
+                    f"Failed to clean up temporary backup {temp_backup_path}: "
+                    f"{cleanup_error}"
+                )
             raise
 
         logger.info(f"Created backup: {backup_path}")

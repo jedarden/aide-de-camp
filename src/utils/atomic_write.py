@@ -618,7 +618,11 @@ def _verify_no_orphaned_temps(directory: Path, operation_id: str) -> list[Path]:
     Returns list of orphaned temp files matching this operation's pattern.
     """
     try:
-        pattern = f'.*tmp_{operation_id}_.*\\.tmp$'
+        # ``Path.glob`` accepts shell-style wildcards, not regular
+        # expressions.  The previous ``\\.tmp$`` suffix therefore never
+        # matched a real staging file and left operation-owned leftovers
+        # undiscovered after a successful publication.
+        pattern = f'.*tmp_{operation_id}_*.tmp'
         orphaned = list(directory.glob(pattern))
         return orphaned
     except Exception as e:
