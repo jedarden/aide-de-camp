@@ -158,14 +158,16 @@ async def main():
 
     results = []
 
-    # Test router prompt hot-reload
-    results.append(await test_router_prompt_hot_reload())
-
-    # Test registry config hot-reload
-    results.append(await test_registry_config_hot_reload())
-
-    # Test YAML registry force reload
-    results.append(await test_yaml_registry_force_reload())
+    for test_func in (
+        test_router_prompt_hot_reload,
+        test_registry_config_hot_reload,
+        test_yaml_registry_force_reload,
+    ):
+        try:
+            results.append(await asyncio.wait_for(test_func(), timeout=4.0))
+        except asyncio.TimeoutError:
+            print(f"✗ {test_func.__name__}: timed out after 4 seconds")
+            results.append(False)
 
     print("\n" + "=" * 50)
     print(f"Results: {sum(results)}/{len(results)} tests passed")

@@ -14,8 +14,12 @@ Enhanced with robust edge case handling:
 
 import json
 import logging
+import math
+import queue
+import stat
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -31,37 +35,72 @@ class HotReloadError(Exception):
     pass
 
 
+class HotReloadTimeoutError(HotReloadError, TimeoutError):
+    """Raised when a hot-reload operation exceeds its bounded time budget.
+
+    File-system calls are made in a daemon worker so a blocked mount or mock
+    cannot hold the caller forever.  The worker is deliberately not joined
+    after the timeout: waiting for a stuck worker would defeat fail-fast
+    behavior.
+    """
+
+    def __init__(self, path: Path, operation: str, timeout: float, reason: str):
+        self.path = path
+        self.operation = operation
+        self.timeout = timeout
+        self.reason = reason
+        super().__init__(
+            f"Hot-reload operation timed out: operation='{operation}', "
+            f"path='{path}', timeout={timeout:.3f}s. Reason: {reason}. "
+            "Action: check whether the file or filesystem is blocked, verify "
+            "mount/storage health and permissions, then retry the operation."
+        )
+
+
 class PermissionDeniedError(HotReloadError):
     """Raised when file permission is denied."""
 
-    def __init__(self, path: Path, operation: str):
+    def __init__(self, path: Path, operation: str, reason: str = "the file is not readable"):
         self.path = path
         self.operation = operation
+        self.reason = reason
         super().__init__(
-            f"Permission denied for {operation} on '{path}'. "
-            f"Action: Check file permissions with 'ls -la {path.parent}' "
-            f"and ensure read access for the current user."
+            f"Hot-reload operation '{operation}' failed for path '{path}'. "
+            f"Reason: permission denied ({reason}). Action: check file "
+            f"permissions with 'ls -la {path.parent}' and ensure the current "
+            "user has read access before retrying."
         )
 
 
 class RegistryNotFoundError(HotReloadError):
     """Raised when registry file is not found."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, operation: str = "access file"):
         self.path = path
+        self.operation = operation
+        self.reason = "the path does not exist"
         super().__init__(
-            f"Registry file not found: '{path}'. "
-            f"Action: Verify the file exists at the expected location "
-            f"or check if the path is correct."
+            f"Hot-reload operation '{operation}' failed for path '{path}'. "
+            "Reason: the path does not exist. Action: verify the file exists "
+            "at the expected location and check the configured path before "
+            "retrying."
         )
 
 
 class RegistryParseError(HotReloadError):
     """Raised when registry file parsing fails."""
 
-    def __init__(self, path: Path, parse_error: Exception, content_preview: str = ""):
+    def __init__(
+        self,
+        path: Path,
+        parse_error: Exception,
+        content_preview: str = "",
+        operation: str = "parse configuration",
+    ):
         self.path = path
         self.parse_error = parse_error
+        self.operation = operation
+        self.reason = str(parse_error)
         self.content_preview = content_preview[:200] if content_preview else ""
 
         # Extract line/column info if available
@@ -69,9 +108,9 @@ class RegistryParseError(HotReloadError):
         error_details = f"Parse error: {details}"
 
         super().__init__(
-            f"Failed to parse registry file '{path}'. "
-            f"{error_details}. "
-            f"Action: Validate the file syntax. "
+            f"Hot-reload operation '{operation}' failed for path '{path}'. "
+            f"Reason: {error_details}. Action: validate the YAML/JSON syntax "
+            "and correct the reported line/column before retrying. "
             f"{f'Content preview: {self.content_preview}...' if self.content_preview else ''}"
         )
 
@@ -79,11 +118,19 @@ class RegistryParseError(HotReloadError):
 class EmptyRegistryError(HotReloadError):
     """Raised when registry file is empty or contains no data."""
 
-    def __init__(self, path: Path):
+    def __init__(
+        self,
+        path: Path,
+        operation: str = "load configuration",
+        reason: str = "the file is empty",
+    ):
         self.path = path
+        self.operation = operation
+        self.reason = reason
         super().__init__(
-            f"Registry file is empty or contains no valid data: '{path}'. "
-            f"Action: Ensure the file contains valid YAML or JSON configuration."
+            f"Hot-reload operation '{operation}' failed for path '{path}'. "
+            f"Reason: {reason}. Action: provide non-empty, valid YAML or JSON "
+            "configuration and retry the operation."
         )
 
 
@@ -123,7 +170,10 @@ class HotReloadManager:
     CHECK_INTERVAL = 1.0  # Seconds between mtime checks
     MAX_RETRIES = 3  # Retries after the initial attempt (four attempts total)
     RETRY_DELAY = 0.1  # Initial exponential-backoff delay in seconds
-    FILE_OPERATION_TIMEOUT = 5.0  # Seconds timeout for file operations
+    # Keep this strictly below the five-second acceptance limit.  The value is
+    # also the complete budget for a public operation, including retries,
+    # parsing, and lock acquisition.
+    FILE_OPERATION_TIMEOUT = 4.0
 
     def __init__(self):
         self._artifacts: Dict[str, Artifact] = {}
@@ -162,7 +212,168 @@ class HotReloadManager:
             error_details = f"line {e.lineno}, column {e.colno}: {e.msg}"
             raise ValueError(f"JSON parsing error at {error_details}") from e
 
-    def _read_file_with_retry(self, path: Path, operation: str = "read") -> str:
+    def _operation_deadline(self) -> float:
+        """Return a monotonic deadline for one hot-reload operation."""
+        try:
+            configured = float(self.FILE_OPERATION_TIMEOUT)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "Hot-reload operation configuration failed for path '<manager>'. "
+                f"Reason: FILE_OPERATION_TIMEOUT={self.FILE_OPERATION_TIMEOUT!r} "
+                "is not numeric. Action: configure a positive timeout below "
+                "5 seconds."
+            ) from exc
+        if not math.isfinite(configured) or configured <= 0:
+            raise ValueError(
+                "Hot-reload operation configuration failed for path '<manager>'. "
+                f"Reason: FILE_OPERATION_TIMEOUT={configured} is not positive. "
+                "Action: configure a positive timeout below 5 seconds."
+            )
+        return time.monotonic() + min(configured, 4.0)
+
+    @staticmethod
+    def _remaining(deadline: float) -> float:
+        """Return remaining operation budget in seconds."""
+        return deadline - time.monotonic()
+
+    def _run_with_timeout(
+        self,
+        path: Path,
+        operation: str,
+        callback: Callable[[], Any],
+        deadline: float,
+    ) -> Any:
+        """Run one potentially blocking callback without waiting forever.
+
+        ``open``/``read``/``stat`` are synchronous APIs and cannot be
+        cancelled safely once entered.  A daemon worker lets the caller stop
+        waiting at the operation deadline while ensuring a stuck worker cannot
+        keep the test process alive during interpreter shutdown.
+        """
+        remaining = self._remaining(deadline)
+        if remaining <= 0:
+            raise HotReloadTimeoutError(
+                path,
+                operation,
+                min(float(self.FILE_OPERATION_TIMEOUT), 4.0),
+                "the operation budget was exhausted before the callback started",
+            )
+
+        result_queue: queue.Queue[tuple[bool, Any]] = queue.Queue(maxsize=1)
+
+        def run() -> None:
+            try:
+                result_queue.put((True, callback()))
+            except BaseException as exc:  # transfer callback failures to caller
+                result_queue.put((False, exc))
+
+        worker = threading.Thread(
+            target=run,
+            name=f"hot-reload-{operation[:32]}",
+            daemon=True,
+        )
+        worker.start()
+        worker.join(timeout=remaining)
+
+        if worker.is_alive():
+            timeout = min(float(self.FILE_OPERATION_TIMEOUT), 4.0)
+            raise HotReloadTimeoutError(
+                path,
+                operation,
+                timeout,
+                f"the callback did not finish within the {timeout:.3f}s deadline",
+            )
+
+        succeeded, value = result_queue.get_nowait()
+        if succeeded:
+            return value
+        raise value
+
+    @contextmanager
+    def _locked(self, operation: str, path: Path, deadline: float):
+        """Acquire the manager lock with the same bounded operation budget."""
+        remaining = self._remaining(deadline)
+        if remaining <= 0 or not self._lock.acquire(timeout=max(remaining, 0)):
+            raise HotReloadTimeoutError(
+                path,
+                operation,
+                min(float(self.FILE_OPERATION_TIMEOUT), 4.0),
+                "waiting for another hot-reload operation to release the manager lock",
+            )
+        try:
+            yield
+        finally:
+            self._lock.release()
+
+    @staticmethod
+    def _validate_name(name: str, operation: str, path: str) -> None:
+        """Reject invalid artifact names before mutating manager state."""
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(
+                f"Hot-reload operation '{operation}' failed for path '{path}'. "
+                "Reason: artifact name must be a non-empty string. Action: "
+                "provide a stable artifact name such as 'router' and retry."
+            )
+
+    def _validate_file(self, path: Path, operation: str, deadline: float) -> float:
+        """Validate that ``path`` is a regular file and return its mtime."""
+        try:
+            file_stat = self._run_with_timeout(
+                path,
+                f"{operation}: validate path",
+                path.stat,
+                deadline,
+            )
+        except HotReloadTimeoutError:
+            raise
+        except FileNotFoundError as exc:
+            raise RegistryNotFoundError(path, operation) from exc
+        except PermissionError as exc:
+            raise PermissionDeniedError(path, operation, str(exc)) from exc
+        except OSError as exc:
+            raise OSError(
+                f"Hot-reload operation '{operation}' failed for path '{path}'. "
+                f"Reason: {type(exc).__name__}: {exc}. Action: check the path, "
+                "filesystem, and permissions, then retry."
+            ) from exc
+
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise ValueError(
+                f"Hot-reload operation '{operation}' failed for path '{path}'. "
+                "Reason: the path is not a regular file. Action: point the "
+                "artifact at a readable file instead of a directory or device."
+            )
+        return file_stat.st_mtime
+
+    def _sleep_before_retry(
+        self,
+        path: Path,
+        operation: str,
+        delay: float,
+        deadline: float,
+    ) -> None:
+        """Sleep only inside the remaining retry budget."""
+        remaining = self._remaining(deadline)
+        if remaining <= 0:
+            raise HotReloadTimeoutError(
+                path,
+                operation,
+                min(float(self.FILE_OPERATION_TIMEOUT), 4.0),
+                "retry backoff exhausted the operation budget",
+            )
+        self._run_with_timeout(
+            path,
+            f"{operation}: retry backoff",
+            lambda: time.sleep(min(delay, remaining)),
+            deadline,
+        )
+
+    def _read_file_with_retry(
+        self,
+        path: Path,
+        operation: str = "read",
+        deadline: Optional[float] = None,
+    ) -> str:
         """
         Read file content with retry logic for transient failures.
 
@@ -178,16 +389,23 @@ class HotReloadManager:
             FileNotFoundError: If file doesn't exist after retries
             OSError: For other OS-level errors after retries
         """
+        deadline = self._operation_deadline() if deadline is None else deadline
         last_error = None
 
         for attempt in range(self.MAX_RETRIES + 1):
             try:
-                with open(path, 'r') as f:
-                    content = f.read()
-                    # Check for empty files
-                    if not content.strip() and path.suffix.lower() in ['.yaml', '.yml', '.json']:
-                        logger.warning(f"Empty registry file detected: {path}")
-                    return content
+                content = self._run_with_timeout(
+                    path,
+                    operation,
+                    lambda: self._read_once(path),
+                    deadline,
+                )
+                # Check for empty files
+                if not content.strip() and path.suffix.lower() in ['.yaml', '.yml', '.json']:
+                    logger.warning(f"Empty registry file detected: {path}")
+                return content
+            except HotReloadTimeoutError:
+                raise
             except PermissionError as e:
                 last_error = e
                 if attempt < self.MAX_RETRIES:
@@ -195,13 +413,15 @@ class HotReloadManager:
                         f"Transient permission error during {operation} "
                         f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
+                    self._sleep_before_retry(
+                        path, operation, self.RETRY_DELAY * (2 ** attempt), deadline
+                    )
                 else:
                     # Raise custom permission error with actionable guidance
                     logger.error(
                         f"Permission denied after {self.MAX_RETRIES} retries for {path}"
                     )
-                    raise PermissionDeniedError(path, operation) from e
+                    raise PermissionDeniedError(path, operation, str(e)) from e
             except FileNotFoundError as e:
                 last_error = e
                 if attempt < self.MAX_RETRIES:
@@ -209,11 +429,13 @@ class HotReloadManager:
                         f"Transient not found error during {operation} "
                         f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
+                    self._sleep_before_retry(
+                        path, operation, self.RETRY_DELAY * (2 ** attempt), deadline
+                    )
                 else:
                     # Raise custom not found error with actionable guidance
                     logger.error(f"File not found after {self.MAX_RETRIES} retries for {path}")
-                    raise RegistryNotFoundError(path) from e
+                    raise RegistryNotFoundError(path, operation) from e
             except OSError as e:
                 last_error = e
                 if attempt < self.MAX_RETRIES:
@@ -221,11 +443,17 @@ class HotReloadManager:
                         f"Transient OS error during {operation} "
                         f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
+                    self._sleep_before_retry(
+                        path, operation, self.RETRY_DELAY * (2 ** attempt), deadline
+                    )
                 else:
                     # Final attempt failed - enhance error message
                     error_type = type(e).__name__
-                    enhanced_msg = f"{error_type} during {operation} for {path}: {str(e)}"
+                    enhanced_msg = (
+                        f"Hot-reload operation '{operation}' failed for path '{path}'. "
+                        f"Reason: {error_type}: {e}. Action: check the file, "
+                        "filesystem, and permissions, then retry."
+                    )
                     logger.error(f"Failed after {self.MAX_RETRIES} retries: {enhanced_msg}")
                     raise type(e)(enhanced_msg) from e
 
@@ -234,7 +462,18 @@ class HotReloadManager:
             raise last_error
         raise RuntimeError(f"Unexpected error in _read_file_with_retry for {path}")
 
-    def _get_mtime_with_retry(self, path: Path) -> float:
+    @staticmethod
+    def _read_once(path: Path) -> str:
+        """Read and close one file; executed inside a timeout worker."""
+        with open(path, "r") as file_handle:
+            return file_handle.read()
+
+    def _get_mtime_with_retry(
+        self,
+        path: Path,
+        operation: str = "get file modification time",
+        deadline: Optional[float] = None,
+    ) -> float:
         """
         Get file modification time with retry logic.
 
@@ -249,10 +488,13 @@ class HotReloadManager:
             PermissionDeniedError: If permission denied after retries
             OSError: For other OS-level errors after retries
         """
+        deadline = self._operation_deadline() if deadline is None else deadline
         last_error = None
         for attempt in range(self.MAX_RETRIES + 1):
             try:
-                return path.stat().st_mtime
+                return self._run_with_timeout(path, operation, path.stat, deadline).st_mtime
+            except HotReloadTimeoutError:
+                raise
             except PermissionError as e:
                 last_error = e
                 if attempt < self.MAX_RETRIES:
@@ -260,10 +502,12 @@ class HotReloadManager:
                         f"Transient permission error getting mtime "
                         f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
+                    self._sleep_before_retry(
+                        path, operation, self.RETRY_DELAY * (2 ** attempt), deadline
+                    )
                 else:
                     logger.error(f"Permission denied getting mtime for {path}")
-                    raise PermissionDeniedError(path, "get file modification time") from e
+                    raise PermissionDeniedError(path, operation, str(e)) from e
             except FileNotFoundError as e:
                 last_error = e
                 if attempt < self.MAX_RETRIES:
@@ -271,10 +515,12 @@ class HotReloadManager:
                         f"Transient not found error getting mtime "
                         f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
+                    self._sleep_before_retry(
+                        path, operation, self.RETRY_DELAY * (2 ** attempt), deadline
+                    )
                 else:
                     logger.error(f"File not found getting mtime for {path}")
-                    raise RegistryNotFoundError(path) from e
+                    raise RegistryNotFoundError(path, operation) from e
             except OSError as e:
                 last_error = e
                 if attempt < self.MAX_RETRIES:
@@ -282,16 +528,27 @@ class HotReloadManager:
                         f"Transient OS error getting mtime "
                         f"(retry {attempt + 1}/{self.MAX_RETRIES}): {e}"
                     )
-                    time.sleep(self.RETRY_DELAY * (2 ** attempt))
+                    self._sleep_before_retry(
+                        path, operation, self.RETRY_DELAY * (2 ** attempt), deadline
+                    )
                 else:
-                    raise
+                    raise OSError(
+                        f"Hot-reload operation '{operation}' failed for path '{path}'. "
+                        f"Reason: {type(e).__name__}: {e}. Action: check the "
+                        "filesystem and permissions, then retry."
+                    ) from e
 
         # Should never reach here
         if last_error:
             raise last_error
         raise RuntimeError(f"Unexpected error in _get_mtime_with_retry for {path}")
 
-    def register_prompt(self, name: str, path: str):
+    def register_prompt(
+        self,
+        name: str,
+        path: str,
+        _deadline: Optional[float] = None,
+    ):
         """
         Register a prompt artifact for hot-reload with retry logic and thread safety.
 
@@ -304,28 +561,16 @@ class HotReloadManager:
             PermissionDeniedError: If file is not readable after retries
             ValueError: If path is invalid
         """
-        with self._lock:
+        operation = f"register_prompt('{name}')"
+        self._validate_name(name, operation, str(path))
+        full_path = Path(path).expanduser().absolute()
+        deadline = self._operation_deadline() if _deadline is None else _deadline
+        with self._locked(operation, full_path, deadline):
             try:
-                full_path = Path(path).expanduser().absolute()
-
-                # Validate path
-                if not full_path.exists():
-                    logger.error(f"Prompt file not found: {full_path}")
-                    raise RegistryNotFoundError(full_path)
-
-                if not full_path.is_file():
-                    logger.error(f"Path is not a file: {full_path}")
-                    raise ValueError(f"Path is not a file: {full_path}")
-
-                # Get mtime with retry
-                try:
-                    mtime = self._get_mtime_with_retry(full_path)
-                except PermissionError as e:
-                    logger.error(f"Permission denied accessing prompt file: {full_path}")
-                    raise PermissionDeniedError(full_path, f"register_prompt('{name}')") from e
+                mtime = self._validate_file(full_path, operation, deadline)
 
                 # Read content with retry
-                content = self._read_file_with_retry(full_path, f"register_prompt('{name}')")
+                content = self._read_file_with_retry(full_path, operation, deadline)
 
                 # Store artifact
                 self._artifacts[name] = Artifact(
@@ -346,7 +591,12 @@ class HotReloadManager:
                 logger.error(f"Failed to register prompt '{name}': {e}")
                 raise
 
-    def register_config(self, name: str, path: str):
+    def register_config(
+        self,
+        name: str,
+        path: str,
+        _deadline: Optional[float] = None,
+    ):
         """
         Register a config artifact for hot-reload with retry logic and thread safety.
 
@@ -361,33 +611,21 @@ class HotReloadManager:
             EmptyRegistryError: If file is empty
             ValueError: If file type is unsupported
         """
-        with self._lock:
+        operation = f"register_config('{name}')"
+        self._validate_name(name, operation, str(path))
+        full_path = Path(path).expanduser().absolute()
+        deadline = self._operation_deadline() if _deadline is None else _deadline
+        with self._locked(operation, full_path, deadline):
             try:
-                full_path = Path(path).expanduser().absolute()
-
-                # Validate path
-                if not full_path.exists():
-                    logger.error(f"Config file not found: {full_path}")
-                    raise RegistryNotFoundError(full_path)
-
-                if not full_path.is_file():
-                    logger.error(f"Path is not a file: {full_path}")
-                    raise ValueError(f"Path is not a file: {full_path}")
-
-                # Get mtime with retry
-                try:
-                    mtime = self._get_mtime_with_retry(full_path)
-                except PermissionError as e:
-                    logger.error(f"Permission denied accessing config file: {full_path}")
-                    raise PermissionDeniedError(full_path, f"register_config('{name}')") from e
+                mtime = self._validate_file(full_path, operation, deadline)
 
                 # Read content with retry
-                content = self._read_file_with_retry(full_path, f"register_config('{name}')")
+                content = self._read_file_with_retry(full_path, operation, deadline)
 
                 # Check for empty files before parsing
                 if not content.strip():
                     logger.error(f"Empty config file detected: {full_path}")
-                    raise EmptyRegistryError(full_path)
+                    raise EmptyRegistryError(full_path, operation)
 
                 # Parse based on extension
                 suffix = full_path.suffix.lower()
@@ -395,15 +633,20 @@ class HotReloadManager:
                 if parser is None:
                     logger.error(f"Unsupported file type: {suffix}")
                     raise ValueError(
-                        f"Unsupported file type: {suffix}. "
-                        f"Supported types: {list(self._parsers.keys())}"
+                        f"Hot-reload operation '{operation}' failed for path '{full_path}'. "
+                        f"Reason: unsupported file type '{suffix}'. Action: use one "
+                        f"of the supported extensions {list(self._parsers.keys())}."
                     )
 
-                try:
-                    parsed = parser(content)
-                except (ValueError, yaml.YAMLError, json.JSONDecodeError) as e:
-                    logger.error(f"Parse error for {full_path}: {e}")
-                    raise RegistryParseError(full_path, e, content) from e
+                parsed = self._parse_with_timeout(
+                    full_path, operation, parser, content, deadline
+                )
+                if parsed is None:
+                    raise EmptyRegistryError(
+                        full_path,
+                        operation,
+                        "the parser returned no configuration data",
+                    )
 
                 # Store artifact
                 self._artifacts[name] = Artifact(
@@ -424,16 +667,49 @@ class HotReloadManager:
                 logger.error(f"Failed to register config '{name}': {e}")
                 raise
 
-    def _check_and_reload(self, name: str) -> bool:
+    def _parse_with_timeout(
+        self,
+        path: Path,
+        operation: str,
+        parser: Callable[[str], Any],
+        content: str,
+        deadline: float,
+    ) -> Any:
+        """Parse content under the same deadline as its file operation."""
+        try:
+            return self._run_with_timeout(
+                path,
+                f"{operation}: parse content",
+                lambda: parser(content),
+                deadline,
+            )
+        except HotReloadTimeoutError:
+            raise
+        except Exception as exc:
+            raise RegistryParseError(path, exc, content, operation) from exc
+
+    def _check_and_reload(
+        self,
+        name: str,
+        deadline: Optional[float] = None,
+    ) -> bool:
         """
         Check if an artifact needs reloading and reload if so, with thread safety.
 
         Returns:
             True if reloaded successfully, False otherwise (even on error)
         """
-        with self._lock:
+        operation = f"check_and_reload('{name}')"
+        deadline = self._operation_deadline() if deadline is None else deadline
+        artifact = self._artifacts.get(name)
+        artifact_path = artifact.path if artifact else Path("<unregistered-artifact>")
+        with self._locked(operation, artifact_path, deadline):
             if name not in self._artifacts:
-                return False
+                raise KeyError(
+                    f"Hot-reload operation '{operation}' failed for path "
+                    "'<unregistered-artifact>'. Reason: artifact is not registered. "
+                    "Action: register the file before requesting a reload."
+                )
 
             artifact = self._artifacts[name]
             now = time.time()
@@ -444,7 +720,9 @@ class HotReloadManager:
 
             try:
                 # Check mtime with retry
-                current_mtime = self._get_mtime_with_retry(artifact.path)
+                current_mtime = self._get_mtime_with_retry(
+                    artifact.path, operation, deadline
+                )
 
                 if current_mtime <= artifact.mtime:
                     artifact.last_check = now
@@ -453,7 +731,8 @@ class HotReloadManager:
                 # Reload with retry
                 new_content = self._read_file_with_retry(
                     artifact.path,
-                    f"_check_and_reload('{name}')"
+                    operation,
+                    deadline,
                 )
 
                 # Parse completely before publishing artifact metadata. A
@@ -462,10 +741,14 @@ class HotReloadManager:
                 parser = self._parsers.get(suffix)
                 if parser:
                     try:
-                        parsed_content = parser(new_content)
-                    except Exception as e:
+                        parsed_content = self._parse_with_timeout(
+                            artifact.path, operation, parser, new_content, deadline
+                        )
+                    except HotReloadTimeoutError:
+                        raise
+                    except RegistryParseError as e:
                         artifact.load_error = e
-                        logger.error(f"Parse error reloading '{name}': {e}")
+                        logger.error(f"Reload parse failed for '{name}': {e}")
                         self._error_count[name] = self._error_count.get(name, 0) + 1
                         return False
                 else:
@@ -482,6 +765,12 @@ class HotReloadManager:
                 logger.debug(f"Reloaded artifact '{name}' from {artifact.path}")
                 return True
 
+            except HotReloadTimeoutError as e:
+                artifact.load_error = e
+                artifact.last_check = now
+                self._error_count[name] = self._error_count.get(name, 0) + 1
+                logger.error(f"Fail-fast timeout reloading '{name}': {e}")
+                raise
             except Exception as e:
                 # Track load error but don't crash
                 artifact.load_error = e
@@ -504,11 +793,18 @@ class HotReloadManager:
             KeyError: If artifact not registered
             RuntimeError: If artifact has persistent load errors
         """
-        with self._lock:
+        operation = f"get_prompt('{name}')"
+        deadline = self._operation_deadline()
+        artifact = self._artifacts.get(name)
+        artifact_path = artifact.path if artifact else Path("<unregistered-artifact>")
+        with self._locked(operation, artifact_path, deadline):
             if name not in self._artifacts:
                 raise KeyError(
-                    f"Artifact '{name}' not registered. "
-                    f"Available prompts: {[k for k in self._artifacts if self._artifacts[k].path.suffix in ['.md']]}"
+                    f"Hot-reload operation '{operation}' failed for path "
+                    f"'<unregistered-artifact>'. Reason: artifact '{name}' is "
+                    "not registered. Action: register the prompt file before "
+                    "requesting it. Available prompts: "
+                    f"{[k for k in self._artifacts if self._artifacts[k].path.suffix in ['.md']]}"
                 )
 
             # Check if there have been too many recent errors
@@ -516,11 +812,14 @@ class HotReloadManager:
             if error_count > 5:
                 artifact = self._artifacts[name]
                 raise RuntimeError(
-                    f"Artifact '{name}' has {error_count} recent load errors. "
-                    f"Last error: {artifact.load_error}"
+                    f"Hot-reload operation '{operation}' failed for path "
+                    f"'{artifact.path}'. Reason: artifact has {error_count} "
+                    f"recent load errors; last error: {artifact.load_error}. "
+                    "Action: fix the file or filesystem error shown above and "
+                    "retry the prompt load."
                 )
 
-            self._check_and_reload(name)
+            self._check_and_reload(name, deadline)
             return self._cache[name]
 
     def get_config(self, name: str) -> Any:
@@ -533,8 +832,18 @@ class HotReloadManager:
         Returns:
             The parsed config (dict for YAML)
         """
-        with self._lock:
-            self._check_and_reload(name)
+        operation = f"get_config('{name}')"
+        deadline = self._operation_deadline()
+        artifact = self._artifacts.get(name)
+        artifact_path = artifact.path if artifact else Path("<unregistered-artifact>")
+        with self._locked(operation, artifact_path, deadline):
+            if name not in self._artifacts:
+                raise KeyError(
+                    f"Hot-reload operation '{operation}' failed for path "
+                    "'<unregistered-artifact>'. Reason: artifact is not registered. "
+                    "Action: register the configuration file before requesting it."
+                )
+            self._check_and_reload(name, deadline)
             # Read the parsed value from the same owner snapshot that the
             # reload path publishes, never from an unlocked cache pointer.
             return self._cache[name]
@@ -550,35 +859,34 @@ class HotReloadManager:
             PermissionDeniedError: If file cannot be read
             RegistryParseError: If file parsing fails
         """
-        with self._lock:
+        operation = f"force_reload('{name}')"
+        deadline = self._operation_deadline()
+        artifact = self._artifacts.get(name)
+        artifact_path = artifact.path if artifact else Path("<unregistered-artifact>")
+        with self._locked(operation, artifact_path, deadline):
             if name not in self._artifacts:
-                raise KeyError(f"Unknown artifact: {name}")
+                raise KeyError(
+                    f"Hot-reload operation '{operation}' failed for path "
+                    "'<unregistered-artifact>'. Reason: artifact is not registered. "
+                    "Action: register the file before forcing a reload."
+                )
 
             artifact = self._artifacts[name]
-            try:
-                # Force reload uses the same retrying primitives as the
-                # throttled path.  Atomic writers may briefly replace a file,
-                # so a transient read/stat failure must not publish a partial
-                # artifact or discard the last known-good snapshot.
-                new_content = self._read_file_with_retry(
-                    artifact.path,
-                    f"force_reload('{name}')",
-                )
-                new_mtime = self._get_mtime_with_retry(artifact.path)
-            except (PermissionDeniedError, RegistryNotFoundError):
-                raise
-            except OSError as e:
-                logger.error(f"File error during force reload of {artifact.path}: {e}")
-                raise
+            # Atomic writers may briefly replace a file.  Retry the complete
+            # read/stat sequence without publishing partial state.
+            new_content = self._read_file_with_retry(
+                artifact.path, operation, deadline
+            )
+            new_mtime = self._get_mtime_with_retry(
+                artifact.path, operation, deadline
+            )
 
             suffix = artifact.path.suffix.lower()
             parser = self._parsers.get(suffix)
             if parser:
-                try:
-                    parsed_content = parser(new_content)
-                except (ValueError, yaml.YAMLError, json.JSONDecodeError) as e:
-                    logger.error(f"Parse error during force reload of {artifact.path}: {e}")
-                    raise RegistryParseError(artifact.path, e, new_content) from e
+                parsed_content = self._parse_with_timeout(
+                    artifact.path, operation, parser, new_content, deadline
+                )
             else:
                 parsed_content = new_content
 
@@ -592,14 +900,20 @@ class HotReloadManager:
 
     def get_mtime(self, name: str) -> Optional[float]:
         """Get the current mtime of an artifact."""
-        with self._lock:
+        operation = f"get_mtime('{name}')"
+        deadline = self._operation_deadline()
+        artifact = self._artifacts.get(name)
+        artifact_path = artifact.path if artifact else Path("<unregistered-artifact>")
+        with self._locked(operation, artifact_path, deadline):
             if name in self._artifacts:
                 return self._artifacts[name].mtime
         return None
 
     def list_artifacts(self) -> Dict[str, str]:
         """List all registered artifacts and their paths."""
-        with self._lock:
+        operation = "list_artifacts()"
+        deadline = self._operation_deadline()
+        with self._locked(operation, Path("<artifact-registry>"), deadline):
             return {
                 name: str(artifact.path)
                 for name, artifact in self._artifacts.items()
@@ -619,19 +933,31 @@ def get_reload_manager() -> HotReloadManager:
     own RLock protects artifact reads after construction.
     """
     global _reload_manager
-    with _reload_manager_lock:
+    operation = "get_reload_manager()"
+    timeout = min(float(HotReloadManager.FILE_OPERATION_TIMEOUT), 4.0)
+    deadline = time.monotonic() + timeout
+    if not _reload_manager_lock.acquire(timeout=timeout):
+        raise HotReloadTimeoutError(
+            Path("<reload-manager>"),
+            operation,
+            timeout,
+            "waiting for another thread to finish singleton initialization",
+        )
+    try:
         if _reload_manager is None:
             manager = HotReloadManager()
-            manager.register_prompt('router', 'prompts/router.md')
-            manager.register_prompt('synthesize', 'prompts/synthesize.md')
-            manager.register_prompt('voice', 'prompts/voice.md')
-            manager.register_prompt('urgency', 'prompts/urgency.md')
-            manager.register_prompt('fetch_status', 'prompts/fetch/status.md')
-            manager.register_prompt('fetch_action', 'prompts/fetch/action.md')
-            manager.register_config('registry', 'config/registry.yaml')
-            manager.register_config('monitoring', 'config/monitoring.yaml')
-            manager.register_config('exceptions', 'config/exceptions.yaml')
+            manager.register_prompt('router', 'prompts/router.md', _deadline=deadline)
+            manager.register_prompt('synthesize', 'prompts/synthesize.md', _deadline=deadline)
+            manager.register_prompt('voice', 'prompts/voice.md', _deadline=deadline)
+            manager.register_prompt('urgency', 'prompts/urgency.md', _deadline=deadline)
+            manager.register_prompt('fetch_status', 'prompts/fetch/status.md', _deadline=deadline)
+            manager.register_prompt('fetch_action', 'prompts/fetch/action.md', _deadline=deadline)
+            manager.register_config('registry', 'config/registry.yaml', _deadline=deadline)
+            manager.register_config('monitoring', 'config/monitoring.yaml', _deadline=deadline)
+            manager.register_config('exceptions', 'config/exceptions.yaml', _deadline=deadline)
             # Publish only after every built-in artifact is registered.  A
             # failed initialization cannot expose a half-populated manager.
             _reload_manager = manager
         return _reload_manager
+    finally:
+        _reload_manager_lock.release()
