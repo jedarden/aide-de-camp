@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "cluster": "ardenone-cluster",
+  "prometheus": {
+    "base_url": "http://127.0.0.1:19090",
+    "service": "monitoring/kube-prometheus-stack-arde-prometheus:9090",
+    "retention_days": 10,
+    "port_forward_command": "kubectl --server=http://traefik-ardenone-cluster:8001 port-forward -n monitoring svc/kube-prometheus-stack-arde-prometheus 19090:9090"
+  },
+  "victorialogs": {
+    "base_url": "http://127.0.0.1:19428",
+    "query_path": "/select/logsql/query",
+    "service": "monitoring/vlogs-server:9428",
+    "retention_days": 28,
+    "port_forward_command": "kubectl --server=http://traefik-ardenone-cluster:8001 port-forward -n monitoring svc/vlogs-server 19428:9428"
+  },
+  "services": {
+    "pbx-web": {
+      "namespace": "pbx-web",
+      "selector": "{namespace=\"pbx-web\"}"
+    },
+    "whisper-stt": {
+      "namespace": "whisper-stt",
+      "selector": "{namespace=\"whisper-stt\"}"
+    }
+  },
+  "availability": {
+    "days": 30,
+    "step_seconds": 3600
+  }
+}
