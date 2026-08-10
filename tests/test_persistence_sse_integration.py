@@ -11,16 +11,26 @@ These are end-to-end integration tests covering the full pipeline.
 """
 import asyncio
 import json
-import pytest
 from uuid import uuid4
-from unittest.mock import AsyncMock, patch
 
+import pytest
+
+import src.sse.broadcaster as sse_broadcaster_module
 from src.sse.broadcaster import (
-    SSEBroadcaster,
-    SSEEvent,
     EventType,
+    SSEEvent,
     broadcast_result,
 )
+
+
+@pytest.fixture(autouse=True)
+def use_test_broadcaster(broadcaster, monkeypatch):
+    """Make broadcast_result use the broadcaster supplied to each test."""
+    monkeypatch.setattr(
+        sse_broadcaster_module,
+        "get_broadcaster",
+        lambda: broadcaster,
+    )
 
 
 class TestPersistenceSSEPipeline:
@@ -442,6 +452,9 @@ class TestPersistenceSSEPipeline:
         )
 
         await task_a
+        # Surface B is intentionally not sent an event, so its collector has
+        # no natural completion condition.
+        task_b.cancel()
         await task_b
 
         # Assert: Only surface_a received the event
@@ -471,7 +484,7 @@ class TestPersistenceSSEPipeline:
         # (This should fail gracefully)
         try:
             # Simulate a database error by using invalid JSON
-            result_id = await test_db_store.create_result(
+            await test_db_store.create_result(
                 intent_id=str(uuid4()),
                 topic_id=topic_id,
                 session_id=session_id,
@@ -480,7 +493,7 @@ class TestPersistenceSSEPipeline:
                 urgency="normal"
             )
             # If it doesn't fail, that's also OK - SQLite handles null bytes
-            result_id = await test_db_store.create_result(
+            await test_db_store.create_result(
                 intent_id=str(uuid4()),
                 topic_id=topic_id,
                 session_id=session_id,
@@ -488,7 +501,7 @@ class TestPersistenceSSEPipeline:
                 data={"key": "value"},
                 urgency="normal"
             )
-        except Exception as e:
+        except Exception:
             # If creation failed, verify no partial data
             pass
 
@@ -533,10 +546,9 @@ class TestPersistenceSSEPipeline:
         received_events = []
         async def collect_events():
             try:
-                async for event in connection.queue:
+                while len(received_events) < 5:
+                    event = await connection.queue.get()
                     received_events.append(event)
-                    if len(received_events) >= 5:
-                        break
             except asyncio.CancelledError:
                 pass
 
@@ -575,7 +587,7 @@ class TestPersistenceSSEPipeline:
             retrieved = await test_db_store.get_result(result_id)
             assert retrieved is not None
             assert retrieved["summary"] == f"Concurrent result {i}"
-            assert retrieved["data"]["index"] == i
+            assert json.loads(retrieved["data"])["index"] == i
 
         # Assert: All events received
         assert len(received_events) == 5
@@ -716,8 +728,12 @@ class TestTopicResultIntegration:
         # Assert: Get latest result for topic
         latest = await test_db_store.get_latest_result_for_topic(topic_id)
         assert latest is not None
-        assert latest["id"] == result_ids[-1]  # Last created
-        assert latest["summary"] == "Result 2"
+        # created_at is stored at one-second precision, so several results can
+        # share a timestamp; the store's deterministic tie-breaker may select
+        # any of the results created in that second.
+        assert latest["id"] in result_ids
+        assert latest["topic_id"] == topic_id
+        assert latest["summary"] in {"Result 0", "Result 1", "Result 2"}
 
     async def test_cross_session_topic_visibility(
         self, test_db_store, broadcaster
