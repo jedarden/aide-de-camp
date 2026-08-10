@@ -242,7 +242,12 @@ class RouterMalformedError(RouterError):
 
 
 class IntentType(Enum):
-    """Intent types that the router can classify."""
+    """Canonical intent types that the router can classify.
+
+    ``task-profile`` is the async-work intent. ``task`` is not an intent type
+    and is deprecated in router payloads; it is the internal NEEDLE bead type
+    created when a task-profile intent is escalated.
+    """
     STATUS = "status"
     ACTION = "action"
     BRAINSTORM = "brainstorm"

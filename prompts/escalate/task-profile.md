@@ -2,6 +2,10 @@
 
 This document defines the escalation strategy for `intent_type: task-profile` intents that require durable async handling via NEEDLE beads.
 
+`task-profile` is the canonical intent type. The bare `task` value used below
+is a NEEDLE bead type, not an intent type, and must not be emitted in router
+payloads.
+
 ## What We Escalate
 
 Task-profile intents are user requests that:
