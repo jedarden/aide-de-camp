@@ -6,16 +6,13 @@ This shows how to use the new helper functions and pytest fixtures for safe
 registry modification during tests.
 """
 
+import asyncio
 import sys
-from pathlib import Path
 
 import pytest
 import yaml
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from registry import get_registry, REGISTRY_PATH
+from src.registry import get_registry, REGISTRY_PATH
 
 from tests.helpers.registry_test_helpers import (
     backup_registry,
@@ -66,7 +63,8 @@ class TestRegistryHelpers:
 
         print("\n✓ backup_registry() and restore_registry() test PASSED\n")
 
-    def test_context_manager(self):
+    @pytest.mark.asyncio
+    async def test_context_manager(self):
         """Test RegistryModificationContext context manager."""
         print("\n=== Testing RegistryModificationContext ===\n")
 
@@ -74,7 +72,7 @@ class TestRegistryHelpers:
         test_alias = "ctx-test-alias"
 
         # Get original aliases
-        original_registry = get_registry(force=True)
+        original_registry = await get_registry(force=True)
         original_entry = original_registry["projects"].get(test_project)
         original_aliases = list(original_entry.get("aliases", []))
         print(f"Original aliases: {original_aliases}")
@@ -88,7 +86,7 @@ class TestRegistryHelpers:
             print(f"✓ Added alias '{test_alias}' to {test_project}")
 
             # Force reload to pick up change
-            modified_registry = get_registry(force=True)
+            modified_registry = await get_registry(force=True)
             modified_entry = modified_registry["projects"].get(test_project)
             modified_aliases = list(modified_entry.get("aliases", []))
 
@@ -96,7 +94,7 @@ class TestRegistryHelpers:
             print(f"✓ Alias '{test_alias}' found in modified registry")
 
         # Context manager should have restored on exit
-        restored_registry = get_registry(force=True)
+        restored_registry = await get_registry(force=True)
         restored_entry = restored_registry["projects"].get(test_project)
         restored_aliases = list(restored_entry.get("aliases", []))
 
@@ -158,7 +156,8 @@ class TestRegistryHelpers:
 class TestPytestFixtures:
     """Test suite demonstrating pytest fixture usage."""
 
-    def test_registry_backup_path_fixture(self, registry_backup_path):
+    @pytest.mark.asyncio
+    async def test_registry_backup_path_fixture(self, registry_backup_path):
         """
         Demonstrate registry_backup_path fixture usage.
 
@@ -168,7 +167,7 @@ class TestPytestFixtures:
         print("\n=== Testing registry_backup_path fixture ===\n")
 
         # Modify registry by adding a project alias (this will be picked up)
-        original = get_registry(force=True)
+        original = await get_registry(force=True)
         test_project = "declarative-config"
         original_entry = original["projects"].get(test_project)
         original_aliases = list(original_entry.get("aliases", []))
@@ -183,7 +182,7 @@ class TestPytestFixtures:
         print(f"✓ Added alias '{test_alias}' to {test_project}")
 
         # Force reload to see change
-        modified = get_registry(force=True)
+        modified = await get_registry(force=True)
         modified_entry = modified["projects"].get(test_project)
         modified_aliases = list(modified_entry.get("aliases", []))
 
@@ -195,7 +194,8 @@ class TestPytestFixtures:
 
         print("\n✓ registry_backup_path fixture test PASSED\n")
 
-    def test_registry_context_fixture(self, registry_context):
+    @pytest.mark.asyncio
+    async def test_registry_context_fixture(self, registry_context):
         """
         Demonstrate registry_context fixture usage.
 
@@ -207,7 +207,7 @@ class TestPytestFixtures:
         test_alias = "fixture-test-alias"
 
         # Get original state
-        original = get_registry(force=True)
+        original = await get_registry(force=True)
         original_entry = original["projects"].get(test_project)
         original_aliases = list(original_entry.get("aliases", []))
         print(f"Original aliases: {original_aliases}")
@@ -218,7 +218,7 @@ class TestPytestFixtures:
             print(f"✓ Added alias '{test_alias}' to {test_project}")
 
             # Force reload to see change
-            modified = get_registry(force=True)
+            modified = await get_registry(force=True)
             modified_entry = modified["projects"].get(test_project)
             modified_aliases = list(modified_entry.get("aliases", []))
 
@@ -226,7 +226,7 @@ class TestPytestFixtures:
             print(f"✓ Alias '{test_alias}' found in modified registry")
 
         # Context automatically restores on exit
-        restored = get_registry(force=True)
+        restored = await get_registry(force=True)
         restored_entry = restored["projects"].get(test_project)
         restored_aliases = list(restored_entry.get("aliases", []))
 
@@ -236,7 +236,7 @@ class TestPytestFixtures:
         print("\n✓ registry_context fixture test PASSED\n")
 
 
-def main():
+async def main():
     """Run all tests if executed directly."""
     print("=" * 60)
     print("Registry Hot-Reload Infrastructure Test Suite")
@@ -245,7 +245,7 @@ def main():
     # Run helper tests
     helper_tests = TestRegistryHelpers()
     helper_tests.test_backup_and_restore()
-    helper_tests.test_context_manager()
+    await helper_tests.test_context_manager()
     helper_tests.test_get_and_set_content()
     helper_tests.test_cleanup_safety()
 
@@ -265,4 +265,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(asyncio.run(main()))

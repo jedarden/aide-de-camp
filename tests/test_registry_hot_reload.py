@@ -12,16 +12,12 @@ This test verifies that:
 import asyncio
 import sys
 import time
-from pathlib import Path
 from unittest.mock import AsyncMock, patch, MagicMock
 from typing import Any
 
 import yaml
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from registry import get_registry, REGISTRY_PATH, CACHE_TTL, get_project
+from src.registry import get_registry, REGISTRY_PATH, CACHE_TTL, get_project
 
 
 async def test_registry_alias_hot_reload():
@@ -88,7 +84,7 @@ async def test_registry_alias_hot_reload():
         REGISTRY_PATH.write_text(original_yaml_content)
 
         # Force reload again to pick up the restoration
-        restored_registry = get_registry(force=True)
+        restored_registry = await get_registry(force=True)
         restored_entry = restored_registry["projects"].get(test_project)
         restored_aliases = list(restored_entry.get("aliases", []))
 
@@ -118,12 +114,12 @@ async def test_registry_cache_invalidation():
     print("\n=== Testing Registry Cache Invalidation ===\n")
 
     # Force rebuild to start fresh
-    registry1 = get_registry(force=True)
+    registry1 = await get_registry(force=True)
     initial_project_count = len(registry1["projects"])
     print(f"Initial project count: {initial_project_count}")
 
     # Call again without force - should return cached version
-    registry2 = get_registry(force=False)
+    registry2 = await get_registry(force=False)
     cached_project_count = len(registry2["projects"])
     print(f"Cached project count: {cached_project_count}")
 
@@ -135,7 +131,7 @@ async def test_registry_cache_invalidation():
     print("✓ Cache returned same object reference")
 
     # Force reload should rebuild
-    registry3 = get_registry(force=True)
+    registry3 = await get_registry(force=True)
     forced_project_count = len(registry3["projects"])
     print(f"Forced reload project count: {forced_project_count}")
 
@@ -146,7 +142,7 @@ async def test_registry_cache_invalidation():
     print("\n✓ Registry cache invalidation test: PASSED")
 
 
-def test_registry_alias_dispatch_integration():
+async def test_registry_alias_dispatch_integration():
     """
     Test that a new alias in registry.yaml would be picked up in dispatch routing.
 
@@ -162,7 +158,7 @@ def test_registry_alias_dispatch_integration():
     test_alias = f"voice-to-text-{int(time.time())}"
 
     # Load fresh registry
-    registry = get_registry(force=True)
+    registry = await get_registry(force=True)
     original_entry = registry["projects"].get(test_project)
 
     assert original_entry is not None, f"Test project '{test_project}' not found"
@@ -183,7 +179,7 @@ def test_registry_alias_dispatch_integration():
         print(f"Added test alias '{test_alias}' to {test_project}")
 
         # Force reload
-        reloaded_registry = get_registry(force=True)
+        reloaded_registry = await get_registry(force=True)
 
         # Simulate utterance matching with the new alias
         # Check if the new alias would be found in the registry
@@ -209,7 +205,7 @@ def test_registry_alias_dispatch_integration():
     finally:
         # Restore original YAML
         REGISTRY_PATH.write_text(original_yaml)
-        get_registry(force=True)  # Force reload to restore
+        await get_registry(force=True)  # Force reload to restore
         print(f"✓ Restored original registry state")
 
     print("\n✓ Registry alias dispatch integration test: PASSED")
@@ -237,7 +233,7 @@ async def test_registry_hot_reload_no_restart():
 
     # Track if server restart was attempted
     restart_attempted = False
-    original_registry = get_registry(force=True)
+    original_registry = await get_registry(force=True)
 
     # Use whisper-stt as test project
     test_project = "whisper-stt"
@@ -262,7 +258,7 @@ async def test_registry_hot_reload_no_restart():
         print(f"✓ Added test alias '{test_alias}' to {test_project}")
 
         # Force reload to simulate hot-reload (no server restart)
-        reloaded_registry = get_registry(force=True)
+        reloaded_registry = await get_registry(force=True)
         reloaded_entry = reloaded_registry["projects"].get(test_project)
         reloaded_aliases = list(reloaded_entry.get("aliases", []))
 
@@ -316,11 +312,11 @@ async def test_registry_hot_reload_no_restart():
     finally:
         # Restore original YAML
         REGISTRY_PATH.write_text(original_yaml)
-        get_registry(force=True)  # Force reload to restore
+        await get_registry(force=True)  # Force reload to restore
         print(f"✓ Restored original registry.yaml")
 
         # Verify restoration worked
-        restored_registry = get_registry(force=False)
+        restored_registry = await get_registry(force=False)
         restored_entry = restored_registry["projects"].get(test_project)
         restored_aliases = list(restored_entry.get("aliases", []))
 
