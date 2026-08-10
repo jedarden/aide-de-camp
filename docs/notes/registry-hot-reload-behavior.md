@@ -117,8 +117,12 @@ if project:
 
 2. **Dispatch Again**: Same utterance re-dispatched
    ```python
-   # Router calls get_registry() to resolve project
-   registry = get_registry(force=True)  # Picks up new alias
+   # The deterministic router asks the shared loader for its current snapshot
+   # on each routing call.  The normal call uses the five-minute TTL cache.
+   registry = get_registry()
+
+   # A self-modification workflow can request an immediate reload instead.
+   registry = get_registry(force=True)  # Picks up the new alias now
    ```
 
 3. **Routing**: Router recognizes new alias
@@ -132,6 +136,9 @@ if project:
 
 - **Single Process**: Cache is in-memory, same process sees updated registry immediately after reload
 - **Multiple Processes**: Each process has its own cache, TTL ensures eventual consistency
+- **Long-lived Router**: The deterministic router refreshes its reference from
+  `get_registry()` for each routing call, so it does not pin the snapshot that
+  existed when the server started
 - **Force Reload**: Agents use `force=True` to bypass cache and see changes immediately
 
 ## Testing
