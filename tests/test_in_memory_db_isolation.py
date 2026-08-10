@@ -5,9 +5,33 @@ Verify that in-memory database fixtures provide complete isolation from
 production data and between tests.
 """
 
+import hashlib
+from pathlib import Path
+
 import aiosqlite
 import pytest
+
 from src.session.store import SessionStore
+
+
+def _snapshot_database_files(db_path: Path) -> dict[str, tuple | None]:
+    """Return read-only snapshots of a SQLite database and its sidecars."""
+    snapshot = {}
+    for path in (db_path, Path(f"{db_path}-wal"), Path(f"{db_path}-shm")):
+        if not path.exists():
+            snapshot[str(path)] = None
+            continue
+
+        stat = path.stat()
+        snapshot[str(path)] = (
+            stat.st_ino,
+            stat.st_mode,
+            stat.st_size,
+            stat.st_mtime_ns,
+            stat.st_ctime_ns,
+            hashlib.sha256(path.read_bytes()).digest(),
+        )
+    return snapshot
 
 
 @pytest.mark.asyncio
@@ -107,9 +131,7 @@ async def test_in_memory_database_supports_all_operations(in_memory_db_store):
     session_id = await in_memory_db_store.create_session()
 
     # Register a surface
-    surface_id = await in_memory_db_store.register_surface(
-        session_id, "canvas"
-    )
+    await in_memory_db_store.register_surface(session_id, "canvas")
 
     # Create an utterance
     utterance_id = await in_memory_db_store.create_utterance(
@@ -176,6 +198,31 @@ async def test_in_memory_database_isolation_between_stores(in_memory_db_store, t
     assert session is None, "Fixture in-memory database should be isolated"
 
     await separate_store.close()
+
+
+@pytest.mark.asyncio
+async def test_in_memory_writes_leave_production_unchanged(in_memory_db_store):
+    """Test writes to the in-memory store do not change production SQLite files."""
+    from src.session.store import DEFAULT_DB_PATH
+
+    production_before = _snapshot_database_files(DEFAULT_DB_PATH)
+    marker = "in-memory-database-only-marker"
+
+    session_id = await in_memory_db_store.create_session()
+    utterance_id = await in_memory_db_store.create_utterance(session_id, marker)
+
+    async with aiosqlite.connect(in_memory_db_store.db_path, uri=True) as db:
+        async with db.execute(
+            "SELECT raw_text FROM utterances WHERE id = ?", (utterance_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+        async with db.execute("PRAGMA database_list") as cursor:
+            databases = await cursor.fetchall()
+
+    assert row[0] == marker, "The marker must be stored in the in-memory database"
+    assert "mode=memory" in in_memory_db_store.db_path
+    assert databases[0][2] == "", "The in-memory database must have no filesystem path"
+    assert _snapshot_database_files(DEFAULT_DB_PATH) == production_before
 
 
 if __name__ == "__main__":
