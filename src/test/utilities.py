@@ -8,12 +8,20 @@ import asyncio
 import logging
 import tempfile
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+class TestSessionClientError(RuntimeError):
+    """Base exception raised by :class:`TestSessionClient`."""
+
+
+class SessionCreationError(TestSessionClientError):
+    """Raised when the test-session API cannot return a valid session."""
 
 
 class TestSessionClient:
@@ -33,7 +41,7 @@ class TestSessionClient:
         """
         self.base_url = base_url.rstrip("/")
         self.test_db_path = test_db_path
-        self.client = None
+        self.client: Optional[httpx.AsyncClient] = None
         self._created_session_ids: List[str] = []
         self._created_surface_ids: List[str] = []
         self._created_surface_by_session: Dict[str, List[str]] = {}
@@ -41,7 +49,8 @@ class TestSessionClient:
 
     async def __aenter__(self):
         """Async context manager entry."""
-        self.client = httpx.AsyncClient(timeout=60.0)
+        if self.client is None or self.client.is_closed:
+            self.client = httpx.AsyncClient(timeout=60.0)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -53,7 +62,7 @@ class TestSessionClient:
     async def create_session(
         self,
         session_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, str]:
         """
         Create a test session via POST /api/v1/sessions.
 
@@ -61,44 +70,102 @@ class TestSessionClient:
             session_id: Optional session ID (generated if not provided)
 
         Returns:
-            Dict with session_id and surface_id
+            Response containing ``session_id`` and ``created_at``.
+
+        Raises:
+            SessionCreationError: If the request fails or the API response is
+                not a valid session response.
         """
         session_id = session_id or f"test-inject-{uuid4().hex[:12]}"
 
-        # Create the session via test endpoint
-        response = await self.client.post(
-            f"{self.base_url}/api/v1/sessions",
-            json={"session_id": session_id}
-        )
+        if self.client is None or self.client.is_closed:
+            raise SessionCreationError(
+                "TestSessionClient is not open; use it as an async context manager"
+            )
 
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/api/v1/sessions",
+                json={"session_id": session_id},
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise SessionCreationError(
+                f"Failed to create test session: HTTP {exc.response.status_code}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise SessionCreationError(
+                f"Failed to create test session: {exc}"
+            ) from exc
 
-        # Register a canvas surface for the session
-        surface_response = await self.client.post(
-            f"{self.base_url}/api/v1/surfaces/register",
-            json={
-                "session_id": session_id,
-                "surface_type": "canvas",
-            }
-        )
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise SessionCreationError(
+                "Failed to create test session: response was not valid JSON"
+            ) from exc
 
-        surface_response.raise_for_status()
-        surface_data = surface_response.json()
+        if not isinstance(data, dict):
+            raise SessionCreationError(
+                "Failed to create test session: response must be a JSON object"
+            )
+
+        response_session_id = data.get("session_id")
+        created_at = data.get("created_at")
+        if not isinstance(response_session_id, str) or not response_session_id.strip():
+            raise SessionCreationError(
+                "Failed to create test session: response is missing a valid session_id"
+            )
+        if not isinstance(created_at, str) or not created_at.strip():
+            raise SessionCreationError(
+                "Failed to create test session: response is missing a valid created_at timestamp"
+            )
 
         async with self._cleanup_lock:
-            self._created_session_ids.append(session_id)
-            if "surface_id" in surface_data:
-                surface_id = surface_data["surface_id"]
-                self._created_surface_ids.append(surface_id)
-                self._created_surface_by_session.setdefault(session_id, []).append(surface_id)
+            self._created_session_ids.append(response_session_id)
 
-        logger.info(f"[TEST] Created session: {session_id}, surface: {surface_data.get('surface_id')}")
-        return {
-            "session_id": session_id,
-            "surface_id": surface_data.get("surface_id"),
-            "created": data.get("created", True),
-        }
+        logger.info("[TEST] Created session: %s", response_session_id)
+        return {"session_id": response_session_id, "created_at": created_at}
+
+    async def register_surface(
+        self,
+        session_id: str,
+        surface_type: str = "canvas",
+    ) -> Dict[str, str]:
+        """Register a surface for a session when a canvas test needs one."""
+        if self.client is None or self.client.is_closed:
+            raise TestSessionClientError(
+                "TestSessionClient is not open; use it as an async context manager"
+            )
+
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/api/v1/surfaces/register",
+                json={"session_id": session_id, "surface_type": surface_type},
+            )
+            response.raise_for_status()
+            data = response.json()
+        except httpx.HTTPStatusError as exc:
+            raise TestSessionClientError(
+                f"Failed to register surface: HTTP {exc.response.status_code}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise TestSessionClientError(f"Failed to register surface: {exc}") from exc
+        except ValueError as exc:
+            raise TestSessionClientError(
+                "Failed to register surface: response was not valid JSON"
+            ) from exc
+
+        surface_id = data.get("surface_id") if isinstance(data, dict) else None
+        if not isinstance(surface_id, str) or not surface_id.strip():
+            raise TestSessionClientError(
+                "Failed to register surface: response is missing a valid surface_id"
+            )
+
+        async with self._cleanup_lock:
+            self._created_surface_ids.append(surface_id)
+            self._created_surface_by_session.setdefault(session_id, []).append(surface_id)
+        return {"surface_id": surface_id, "session_id": session_id}
 
     async def dispatch_utterance(
         self,
@@ -448,7 +515,8 @@ class TestFixture:
         # Create a default test session
         session_data = await self._client.create_session()
         self._session_id = session_data.get("session_id")
-        self._surface_id = session_data.get("surface_id")
+        surface_data = await self._client.register_surface(self._session_id)
+        self._surface_id = surface_data.get("surface_id")
 
         return self
 
