@@ -388,6 +388,69 @@ class TestGitStateCleanupMergeConflicts:
         # No merge conflicts should remain
         assert "UU" not in result.stdout
 
+    def test_abort_merge_handles_modify_delete_conflict(self, temp_repo: Path):
+        """Abort also handles unmerged status codes other than ``UU``."""
+        conflict_branch = "modify-delete-conflict"
+        test_file = temp_repo / "test.txt"
+
+        subprocess.run(
+            ["git", "branch", conflict_branch],
+            cwd=temp_repo,
+            capture_output=True,
+            check=True,
+        )
+        test_file.write_text("main branch content")
+        subprocess.run(
+            ["git", "commit", "-am", "Main branch change"],
+            cwd=temp_repo,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "checkout", conflict_branch],
+            cwd=temp_repo,
+            capture_output=True,
+            check=True,
+        )
+        test_file.unlink()
+        subprocess.run(
+            ["git", "commit", "-am", "Delete file on conflict branch"],
+            cwd=temp_repo,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "merge", "main"],
+            cwd=temp_repo,
+            capture_output=True,
+            check=False,
+        )
+
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=temp_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        assert any(
+            len(line) >= 2
+            and ("U" in line[:2] or line[:2] in {"AA", "DD"})
+            for line in status.splitlines()
+        )
+
+        with GitStateCleanup(repo_path=temp_repo, cleanup_merge_state=True):
+            pass
+
+        assert not (temp_repo / ".git" / "MERGE_HEAD").exists()
+        assert subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=temp_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip() == ""
+
     def test_automatic_merge_cleanup_on_exception(self, temp_repo: Path):
         """Test that merge conflicts are cleaned up even when exception occurs."""
         # Create a conflicting branch
