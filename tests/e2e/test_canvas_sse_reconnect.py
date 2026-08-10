@@ -74,7 +74,7 @@ async def inj(tmp_path, monkeypatch):
     main_mod._store = None
     main_mod._topic_manager = None
 
-    store = store_mod.get_store()
+    store = await store_mod.get_store()
     await store.initialize()
     main_mod._topic_manager = TopicManager(store)
 

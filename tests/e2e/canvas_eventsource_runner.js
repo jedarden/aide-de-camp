@@ -73,6 +73,38 @@ function escapeAttr(s) {
     return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
+function dataKeyToProperty(name) {
+    return name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+function matchesSelector(node, selector) {
+    if (!node || node._tag === "#text") return false;
+
+    const classes = [...selector.matchAll(/\.([A-Za-z0-9_-]+)/g)].map((m) => m[1]);
+    if (classes.some((name) => !node._classes.includes(name))) return false;
+
+    const attributes = [...selector.matchAll(/\[data-([^\]=]+)(?:="([^"]*)")?\]/g)];
+    if (attributes.some(([, name, expected]) => {
+        const value = node._dataset[dataKeyToProperty(name)];
+        return value === undefined || (expected !== undefined && String(value) !== expected);
+    })) return false;
+
+    return classes.length > 0 || attributes.length > 0;
+}
+
+function descendantNodes(root) {
+    const nodes = [];
+    const visit = (children) => {
+        for (const child of children || []) {
+            if (!child || child._tag === "#text") continue;
+            nodes.push(child);
+            visit(child._children);
+        }
+    };
+    visit(root._children);
+    return nodes;
+}
+
 // --- setup mock document FIRST (before loading canvas.js) --------------------
 
 const elementsById = {};
@@ -141,7 +173,7 @@ class El {
     get textContent() { return this._textContent; }
     set innerHTML(v) {
         this._innerHTML = v == null ? "" : String(v);
-        if (this._innerHTML === "") this._children = [];   // container.innerHTML = ''
+        this._children = [];
     }
     get innerHTML() {
         if (this._children.length) {
@@ -169,6 +201,7 @@ class El {
                     // Text nodes
                     this._children.push(child);
                 }
+                if (child) child._parent = this;
             });
             return c;
         }
@@ -179,51 +212,14 @@ class El {
             // Text nodes are appended but not tracked in _children for querySelector
             this._children.push(c);  // Keep for innerHTML rendering
         }
+        if (c) c._parent = this;
         return c;
     }
     querySelector(selector) {
-        // Minimal querySelector support for class selectors (e.g., ".pending-progress")
-        if (selector.startsWith(".")) {
-            const className = selector.slice(1);
-            // Check this element
-            if (this._classes && this._classes.includes(className)) {
-                return this;
-            }
-            // Recursively search all descendants
-            function searchDeep(children) {
-                for (const child of children) {
-                    // Skip text nodes in search
-                    if (!child || child._tag === "#text") continue;
-
-                    if (child._classes && child._classes.includes(className)) {
-                        return child;
-                    }
-                    if (child._children && child._children.length) {
-                        const found = searchDeep(child._children);
-                        if (found) return found;
-                    }
-                }
-                return null;
-            }
-            // Fall back to searching all elements with matching class
-            function searchAllElements(element) {
-                if (element._classes && element._classes.includes(className)) {
-                    return element;
-                }
-                if (element._children && element._children.length) {
-                    for (const child of element._children) {
-                        if (child && child._tag !== "#text") {
-                            const found = searchAllElements(child);
-                            if (found) return found;
-                        }
-                    }
-                }
-                return null;
-            }
-            return searchAllElements(this);
-            return searchDeep(this._children);
-        }
-        return null;
+        return this.querySelectorAll(selector)[0] || null;
+    }
+    querySelectorAll(selector) {
+        return descendantNodes(this).filter((node) => matchesSelector(node, selector));
     }
     addEventListener() {}   // handlers are not driven by this harness
     _datasetAttrs() {
@@ -275,82 +271,37 @@ class El {
         }
         // Insert the new node before the reference node
         this._children.splice(refIndex, 0, newNode);
+        newNode._parent = this;
         return newNode;
     }
     remove() {
-        // Remove this element from its parent's children
-        // In the mock, we need to find the parent and remove this element
-        // Since elementsById tracks top-level elements, we search for a parent
-        for (const id in elementsById) {
-            const parent = elementsById[id];
-            if (parent._children && parent._children.includes(this)) {
-                parent._children = parent._children.filter((c) => c !== this);
-                return;
-            }
-        }
-        // Also search recursively through all children
-        function removeFromParent(children) {
-            for (let i = 0; i < children.length; i++) {
-                const child = children[i];
-                if (child && child._children && child._children.includes(this)) {
-                    child._children = child._children.filter((c) => c !== this);
-                    return true;
-                }
-                if (child && child._children && child._children.length) {
-                    if (removeFromParent(child._children)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-        for (const id in elementsById) {
-            const parent = elementsById[id];
-            if (parent._children && removeFromParent(parent._children)) {
-                return;
-            }
-        }
+        const parent = this._parent;
+        if (!parent) return;
+        parent._children = parent._children.filter((child) => child !== this);
+        this._parent = null;
+    }
+    replaceWith(replacement) {
+        const parent = this._parent;
+        if (!parent) return;
+        const index = parent._children.indexOf(this);
+        if (index === -1) return;
+        parent._children.splice(index, 1, replacement);
+        this._parent = null;
+        replacement._parent = parent;
     }
 }
 
 global.document = {
     querySelector(selector) {
-        // Search through all registered elements for a matching selector
-        // Only supports attribute selectors like [data-pending-id="..."]
-        // Fixed regex to support hyphens in attribute names (was [^-]+ which failed on data-pending-id)
-        if (selector.startsWith('[') && selector.endsWith(']')) {
-            const attrMatch = selector.match(/\[data-([^\]]+)="([^"]+)"\]/);
-            if (attrMatch) {
-                const attrName = attrMatch[1];
-                const attrValue = attrMatch[2];
-                // Convert attrName from kebab-case to camelCase
-                const camelAttrName = attrName.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-                // Search through all elements
-                for (const id in elementsById) {
-                    const el = elementsById[id];
-                    if (el._dataset && el._dataset[camelAttrName] === attrValue) {
-                        return el;
-                    }
-                    // Search recursively through children
-                    function searchDeep(children) {
-                        for (const child of children) {
-                            if (!child || child._tag === "#text") continue;
-                            if (child._dataset && child._dataset[camelAttrName] === attrValue) {
-                                return child;
-                            }
-                            if (child._children && child._children.length) {
-                                const found = searchDeep(child._children);
-                                if (found) return found;
-                            }
-                        }
-                        return null;
-                    }
-                    const found = searchDeep(el._children || []);
-                    if (found) return found;
-                }
-            }
+        return this.querySelectorAll(selector)[0] || null;
+    },
+    querySelectorAll(selector) {
+        const nodes = [];
+        for (const root of Object.values(elementsById)) {
+            if (matchesSelector(root, selector)) nodes.push(root);
+            nodes.push(...descendantNodes(root).filter((node) => matchesSelector(node, selector)));
         }
-        return null;
+        return nodes;
     },
     getElementById(id) {
         if (!elementsById[id]) elementsById[id] = new El("div");
@@ -387,6 +338,14 @@ let topicsCards = [];
 let mockSurfaceId = "surf-mock";
 const fetchLog = [];
 
+function topicCardsResponse() {
+    return topicsCards.map((card) => {
+        if (card.card_id) return card;
+        const topicId = card.topic && card.topic.id ? card.topic.id : "topic";
+        return { ...card, card_id: `${topicId}::status` };
+    });
+}
+
 global.fetch = async (url) => {
     fetchLog.push(url);
     if (url === "/openapi.json") {
@@ -396,7 +355,7 @@ global.fetch = async (url) => {
         return { ok: true, json: async () => ({ surface_id: mockSurfaceId }) };
     }
     if (url.startsWith("/api/v1/sessions/") && url.endsWith("/topics")) {
-        return { ok: true, json: async () => ({ cards: topicsCards }) };
+        return { ok: true, json: async () => ({ cards: topicCardsResponse() }) };
     }
     if (url === "/dispatch") {
         return { ok: true, json: async () => ({}), text: async () => "" };
@@ -481,6 +440,7 @@ global.setTimeout = () => 0;
 const canvasPath = path.resolve(__dirname, "..", "..", "src", "canvas", "canvas.js");
 const canvas = require(canvasPath);
 global.createTopicCard = canvas.createTopicCard;
+global.createWelcomeCard = canvas.createWelcomeCard;
 global.escapeHtml = canvas.escapeHtml;
 global.formatStaleness = canvas.formatStaleness;
 global.getStalenessLevel = canvas.getStalenessLevel;
@@ -533,7 +493,7 @@ async function run() {
             fetchLog.push(url);
             if (url === "/openapi.json") return { ok: true, json: async () => ({ info: { version: v } }), text: async () => "" };
             if (url === "/api/v1/surfaces/register") return { ok: true, json: async () => ({ surface_id: mockSurfaceId }) };
-            if (url.startsWith("/api/v1/sessions/") && url.endsWith("/topics")) return { ok: true, json: async () => ({ cards: topicsCards }) };
+            if (url.startsWith("/api/v1/sessions/") && url.endsWith("/topics")) return { ok: true, json: async () => ({ cards: topicCardsResponse() }) };
             if (url === "/dispatch") return { ok: true, json: async () => ({}), text: async () => "" };
             return { ok: false, json: async () => ({}), text: async () => "" };
         };
