@@ -22,15 +22,50 @@ import stat
 import sys
 import threading
 import uuid
+from dataclasses import dataclass
 from functools import wraps
 from unittest.mock import MagicMock
 
+import pytest
 import yaml
 
 from src.registry import REGISTRY_PATH, get_project, get_registry
 from src.utils.atomic_write import atomic_write
 
 _REGISTRY_TEST_LOCK = threading.RLock()
+
+
+@dataclass(frozen=True)
+class _RegistrySnapshot:
+    """The exact registry state owned by one pytest test invocation."""
+
+    exists: bool
+    content: bytes | None
+    mode: int | None
+
+
+def _snapshot_registry() -> _RegistrySnapshot:
+    """Capture the current file, including externally-created baseline state."""
+
+    if not REGISTRY_PATH.exists():
+        return _RegistrySnapshot(False, None, None)
+    return _RegistrySnapshot(
+        True,
+        REGISTRY_PATH.read_bytes(),
+        stat.S_IMODE(REGISTRY_PATH.stat().st_mode),
+    )
+
+
+def _registry_matches(snapshot: _RegistrySnapshot) -> bool:
+    """Return whether the registry already equals a captured snapshot."""
+
+    if not snapshot.exists:
+        return not REGISTRY_PATH.exists()
+    return (
+        REGISTRY_PATH.is_file()
+        and REGISTRY_PATH.read_bytes() == snapshot.content
+        and _registry_mode() == snapshot.mode
+    )
 
 
 def _serialized_registry_test(test_func):
@@ -63,7 +98,53 @@ def _publish_registry(content: str | bytes, mode: int, *, binary: bool = False) 
 def _restore_registry(original_bytes: bytes, original_mode: int) -> None:
     """Restore the exact pre-test registry bytes and mode atomically."""
 
+    if (
+        REGISTRY_PATH.is_file()
+        and REGISTRY_PATH.read_bytes() == original_bytes
+        and _registry_mode() == original_mode
+    ):
+        return
     _publish_registry(original_bytes, original_mode, binary=True)
+
+
+def _restore_registry_snapshot(snapshot: _RegistrySnapshot) -> None:
+    """Restore a snapshot safely, including the missing-file edge case."""
+
+    if not snapshot.exists:
+        REGISTRY_PATH.unlink(missing_ok=True)
+        return
+
+    assert snapshot.content is not None
+    assert snapshot.mode is not None
+    _restore_registry(snapshot.content, snapshot.mode)
+
+
+@pytest.fixture(autouse=True)
+def restore_registry_after_test():
+    """Restore the exact registry baseline after every pytest test.
+
+    The snapshot is taken at setup time, so a registry edit made before the
+    test by another process is treated as the baseline and is preserved.  The
+    explicit ``finally`` keeps cleanup active for assertion failures and for
+    errors raised before a test's own mutation block is entered.  Repeating
+    teardown is safe because restoring an already-restored snapshot is a
+    no-op.
+
+    The standalone ``main()`` below does not run pytest fixtures; mutating
+    tests retain their local ``try/finally`` blocks for that execution mode.
+    """
+
+    with _REGISTRY_TEST_LOCK:
+        snapshot = _snapshot_registry()
+        try:
+            yield
+        finally:
+            _restore_registry_snapshot(snapshot)
+            if snapshot.exists:
+                # Refresh the process-local snapshot only after the exact file
+                # restoration has been published.
+                get_registry(force=True)
+            assert _registry_matches(snapshot), "Registry teardown did not restore its baseline"
 
 
 def _test_alias(prefix: str) -> str:
