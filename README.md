@@ -143,14 +143,14 @@ adc --help
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `OPENAI_API_KEY` | OpenAI key — required for voice/Realtime API | _(none; voice disabled without it)_ |
-| `ZAI_PROXY_URL` | ZAI proxy endpoint for LLM calls (routing and synthesis) | `https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages` |
+| `ZAI_PROXY_URL` | Canonical ZAI proxy endpoint for LLM routing and synthesis | `https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages` |
 | `ADC_SERVER_URL` | Server URL used by the `adc` CLI | `http://localhost:8000` |
 | `ADC_TELEGRAM_BOT_TOKEN` | Telegram bot token for direct Bot API integration — required for Telegram fallback notifications | _(none; Telegram disabled without it)_ |
 | `ADC_TELEGRAM_CHAT_ID` | Telegram chat ID for the fallback notification destination | _(none; Telegram disabled without it)_ |
 | `ADC_WHISPER_STT_URL` | Whisper STT service URL for browser speech-to-text fallback | `https://whisper.ardenone.com` |
 | `ADC_SYNTHESIZE_CONCURRENCY_LIMIT` | Maximum concurrent synthesize LLM calls to the ZAI proxy | `8` |
 
-The LLM backend for intent routing and synthesis is configured via the `ZAI_PROXY_URL` environment variable. All LLM calls route through the ZAI proxy.
+The canonical LLM backend for intent routing and synthesis is configured via the `ZAI_PROXY_URL` environment variable. All LLM calls route through the ZAI proxy. See [CLAUDE.md's ZAI Proxy section](CLAUDE.md#zai-proxy) for details.
 
 **Telegram Bot API integration.** Per ADR-1 (2026-07-20), aide-de-camp uses a direct Telegram Bot API integration for fallback notifications — not coupled to telegram-claude-bridge. The integration requires:
 
