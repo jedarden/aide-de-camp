@@ -16,7 +16,10 @@ from logging import getLogger
 from typing import Optional
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field, field_validator
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+from ..api.models import DispatchRequest, DispatchResponse
 
 logger = getLogger(__name__)
 
@@ -530,40 +533,17 @@ async def api_v1_test_sse_broadcast(request: TestSSEBroadcastRequest) -> dict:
     }
 
 
-class DispatchRequest(BaseModel):
-    """Request model for dispatch endpoint."""
-    utterance: str = Field(..., description="The utterance text to dispatch")
-    session_id: str = Field(..., description="Session ID for the dispatch")
-    surface_id: str = Field(..., description="Surface ID for SSE targeting")
-
-    @field_validator('utterance')
-    @classmethod
-    def utterance_must_be_non_empty(cls, v: str) -> str:
-        """Validate that utterance is a non-empty string."""
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError('utterance must be a non-empty string')
-        return stripped
-
-
-class DispatchResponse(BaseModel):
-    """Response model for dispatch endpoint."""
-    status: str
-    message: str
-    utterance: str
-    session_id: str
-    surface_id: str
-    timestamp: int
-
-
 @router.post("/dispatch")
 async def dispatch(request: DispatchRequest) -> DispatchResponse:
     """
-    Test dispatch endpoint for simple utterance processing.
+    Test dispatch endpoint - connect to intent router and fetch/synthesize pipeline.
 
-    Mounted at ``POST /api/v1/dispatch``. This endpoint accepts test
+    Mounted at ``POST /api/v1/test/dispatch``. This endpoint accepts test
     dispatch requests with utterance, session_id, and surface_id, validates
-    the input, and returns a structured response.
+    the input, routes through the intent router, executes fetch/synthesize,
+    and returns a structured response.
+
+    Bypasses Web Speech API transcription - takes utterance text directly.
 
     Request body:
     ```
@@ -574,22 +554,17 @@ async def dispatch(request: DispatchRequest) -> DispatchResponse:
     }
     ```
 
-    Returns:
-    ```
-    {
-        "status": "received",
-        "message": "Dispatch request received successfully",
-        "utterance": "test utterance here",
-        "session_id": "test-session-id",
-        "surface_id": "test-surface-id",
-        "timestamp": 1722638400
-    }
-    ```
+    Returns the same ``DispatchResponse`` envelope as ``POST /dispatch``.
 
     Error responses:
-        422: Validation error (missing or invalid fields)
+        400: Validation error (missing or invalid fields)
+        500: Router or processing error
     """
-    import time
+    import asyncio
+
+    from ..intent.router import get_router
+    from ..session.store import get_store
+    from ..sse.broadcaster import SSEEvent, get_broadcaster
 
     logger.info(
         f"[TEST] Dispatch request received - "
@@ -598,11 +573,102 @@ async def dispatch(request: DispatchRequest) -> DispatchResponse:
         f"surface_id: {request.surface_id}"
     )
 
-    return DispatchResponse(
-        status="received",
-        message="Dispatch request received successfully",
-        utterance=request.utterance,
-        session_id=request.session_id,
-        surface_id=request.surface_id,
-        timestamp=int(time.time()),
-    )
+    # Generate utterance ID
+    utterance_id = request.utterance_id or str(__import__('uuid').uuid4())
+    session_id = request.session_id
+    surface_id = request.surface_id
+
+    try:
+        # Initialize store and router
+        store = await get_store()
+        router = get_router(store)
+
+        # Create session if needed (pass session_id so sessions.id PK matches)
+        session = await store.get_session(session_id)
+        if not session:
+            await store.create_session(session_id)
+            logger.info(f"[TEST] Created new session: {session_id}")
+
+        # Create utterance record
+        await store.create_utterance(session_id, request.utterance, utterance_id)
+
+        # Route the utterance through intent router
+        routed_intents = await router.route_utterance(
+            utterance=request.utterance,
+            utterance_id=utterance_id,
+            session_id=session_id,
+        )
+
+        # Create intent records and process in parallel
+        intent_tasks = []
+        intent_ids = []
+
+        for routed_intent in routed_intents:
+            classification = routed_intent.classification
+            await store.create_intent(
+                utterance_id=utterance_id,
+                session_id=session_id,
+                project_slug=classification.project_slug,
+                intent_type=classification.intent_type.value,
+            )
+            intent_ids.append(routed_intent.intent_id)
+
+            # Create task for parallel processing
+            task = asyncio.create_task(
+                router.process_intent(routed_intent),
+                name=f"dispatch_process_{routed_intent.intent_id[:8]}"
+            )
+            intent_tasks.append((routed_intent.intent_id, task))
+
+        logger.info(f"[TEST] Dispatched {len(intent_ids)} intents for parallel processing")
+
+        # Broadcast results via SSE in background
+        broadcaster = get_broadcaster()
+
+        async def stream_results():
+            """Process intents and stream results to SSE."""
+            for intent_id, task in intent_tasks:
+                try:
+                    result = await task
+
+                    # Broadcast result_created so canvas reloads topics
+                    if broadcaster and surface_id:
+                        await broadcaster.broadcast(
+                            SSEEvent(
+                                event_type="result_created",
+                                target_surface_id=surface_id,
+                                data={
+                                    "intent_id": intent_id,
+                                    "topic_id": result.get("topic_id"),
+                                    "summary": result.get("summary"),
+                                    "urgency": result.get("urgency"),
+                                }
+                            )
+                        )
+                except Exception as e:
+                    logger.error(f"[TEST] Intent processing failed: {e}")
+
+        # Start background processing
+        asyncio.create_task(stream_results())
+
+        return DispatchResponse(
+            success=True,
+            message=f"Dispatched {len(intent_ids)} intents for parallel processing",
+            data={
+                "utterance_id": utterance_id,
+                "session_id": session_id,
+                "intent_count": len(intent_ids),
+                "intent_ids": intent_ids,
+                "status": "dispatched",
+                "utterance_confirmation": request.utterance[:100] + (
+                    "..." if len(request.utterance) > 100 else ""
+                ),
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"[TEST] Dispatch error: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Dispatch error: {str(e)}"},
+        )

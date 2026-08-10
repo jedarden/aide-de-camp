@@ -33,7 +33,7 @@ from .realtime.dispatch import dispatch_intent, result_listener
 from .realtime.continuity import handle_surface_switch
 from ._version import read_version
 from .session.store import get_store as session_store_get_store
-from .api.models import DispatchRequest
+from .api.models import DispatchRequest, DispatchResponse
 from .memory.extraction import create_memory_handler
 from .sse.broadcaster import SSEBroadcaster, get_broadcaster, EventType, SSEEvent
 from .topic.model import TopicManager
@@ -1028,7 +1028,7 @@ async def route_intent(request: dict):
 
 
 @app.post("/dispatch")
-async def dispatch_intent(request: DispatchRequest):
+async def dispatch_intent(request: DispatchRequest) -> DispatchResponse:
     """
     Dispatch endpoint: router → N parallel synthesize calls → SSE stream.
 
@@ -1156,15 +1156,19 @@ async def dispatch_intent(request: DispatchRequest):
         # Start parallel processing in background
         asyncio.create_task(stream_results())
 
-        # Return acknowledgment immediately
-        return {
-            "utterance_id": utterance_id,
-            "session_id": session_id,
-            "intent_count": len(intent_ids),
-            "intent_ids": intent_ids,
-            "status": "dispatched",
-            "message": f"Dispatched {len(intent_ids)} intents for parallel processing",
-        }
+        # Return structured acknowledgment with DispatchResponse model
+        return DispatchResponse(
+            success=True,
+            message=f"Dispatched {len(intent_ids)} intents for parallel processing",
+            data={
+                "utterance_id": utterance_id,
+                "session_id": session_id,
+                "intent_count": len(intent_ids),
+                "intent_ids": intent_ids,
+                "status": "dispatched",
+                "utterance_confirmation": utterance[:100] + ("..." if len(utterance) > 100 else ""),
+            },
+        )
 
     except Exception as e:
         logger.error(f"Dispatch error: {e}", exc_info=True)
