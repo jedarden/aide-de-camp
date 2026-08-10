@@ -3266,3 +3266,39 @@ Dispatch failed: All connection attempts failed
 The required assertions for non-empty SSE `summary` and `data`, `intents.status = 'resolved'`, and a matching `results` row were not runnable because the application was not listening. Existing rows in `data/session.db` were not treated as evidence for this run. The hot-reload touch/modify → re-dispatch check was likewise not run; source inspection confirms the prompt manager uses mtime-based reloads and the YAML registry uses TTL/forced rebuilds, but runtime routing pickup remains unverified.
 
 **Finding:** the precise failure point is application startup at session-store initialization, not the ZAI proxy or any downstream text-path strand. A subsequent run should fix or otherwise resolve this startup contract, restart with the smoke-bead command, then rerun the harness, strict SSE/store assertions, and hot-reload dispatch check.
+
+### Run addendum — 2026-08-10 (adc-3rt)
+
+The configured ZAI proxy was re-probed before E2E:
+
+```text
+POST https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages
+HTTP 200 OK
+latency: 1767 ms
+```
+
+The first local server launch exposed a separate existing-database migration issue. `data/session.db` passed `PRAGMA integrity_check`, but its legacy `dispatch_timings` table lacked `session_id`; the current `SCHEMA_SQL` creates `idx_dispatch_timings_session` before the later additive migration can run, producing `sqlite3.OperationalError: no such column: session_id`. A SQLite backup was made under `/home/coding/scratch/adc-3rt-db-3F8FTA/session.db`, and the intended nullable column/index migration was applied locally. The server then initialized successfully; port 8000 was already held by the active ADC process, which returned `GET /health` 200.
+
+The required harness passed against that active server:
+
+```text
+python3 test_e2e.py "what is the status of aide-de-camp"
+exit 0
+result_created received in 9.00s
+```
+
+The event contained a non-empty summary and non-empty `rendered_html`; the matching `results` row had non-empty summary/data and valid JSON data. The stricter one-shot assertion script found these remaining failures:
+
+```text
+event keys: card_fallback, intent_id, rendered_html, summary, topic_id, urgency
+sse_data_nonempty: false
+intent_status_resolved: false
+intents row: status=pending, topic_id=NULL
+results row: exists, summary_len=46, data_len=435
+```
+
+The status failure is an ID/wiring issue: `/dispatch` creates an `intents` row with the store-generated ID, while `route_utterance()` creates a separate `RoutedIntent.intent_id`; the successful path returns `status: resolved` in the result dictionary but never updates the persistent `intents` row. The result/timing rows and SSE event instead use the routed thread ID. The SSE failure is also precise: `src/main.py` builds `sse_data` with IDs, summary, urgency, and card metadata, but does not include `result["data"]` (HTML is carried separately as `rendered_html`). The existing `test_e2e_assertions.py` therefore passes while not checking the requested SSE `data` field or `intents.status`.
+
+Hot-reload verification passed: `tests/test_router_prompt_hotreload.py` plus the registry hot-load tests passed (14 tests), and a live no-restart dispatch after adding a unique temporary alias routed to `project_slug=aide-de-camp`. `config/registry.yaml` and `prompts/router.md` were restored byte-for-byte (hashes unchanged).
+
+**Text-path result:** router → fetch → synthesize → result persistence → SSE/card rendering passed. The strict acceptance assertions remain **not met** because SSE `data` is absent and the persistent intent remains `pending`; the startup schema mismatch is an additional database migration defect. No source files were changed by this verification.
