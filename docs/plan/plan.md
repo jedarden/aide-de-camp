@@ -493,7 +493,7 @@ results (
 topics (
   id           TEXT PRIMARY KEY,
   label        TEXT NOT NULL,
-  type         TEXT NOT NULL CHECK(type IN ('project', 'research', 'personal', 'exception', 'compound')) DEFAULT 'adhoc',
+  type         TEXT NOT NULL CHECK(type IN ('project', 'research', 'personal', 'exception', 'compound', 'adhoc')) DEFAULT 'adhoc',
   project_slugs TEXT,  -- JSON array
   scope        TEXT NOT NULL CHECK(scope IN ('session', 'cross-session', 'global')) DEFAULT 'session',
   session_id   TEXT,
@@ -538,6 +538,23 @@ pending_bead_approvals (
   created_at        INTEGER NOT NULL,  -- When the approval was requested
   expires_at        INTEGER NOT NULL,  -- When this approval request expires
   status            TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+  FOREIGN KEY (intent_id) REFERENCES intents(id) ON DELETE CASCADE,
+  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+)
+
+-- Confirmation prompts: quick user confirmations for actions
+-- Stores confirmation dialog requests and their user responses.
+confirmation_prompts (
+  id           TEXT PRIMARY KEY,
+  intent_id    TEXT NOT NULL,  -- Reference to the intent that created this confirmation
+  session_id   TEXT NOT NULL,  -- Session for this confirmation
+  prompt_type  TEXT NOT NULL,  -- Type of confirmation (e.g., 'pod_deletion')
+  question     TEXT NOT NULL,  -- The confirmation question displayed to the user
+  context      TEXT,           -- JSON: additional context (pod_name, namespace, etc.)
+  response     TEXT,           -- User's raw response (yes/no/pod name)
+  created_at   INTEGER NOT NULL,
+  responded_at INTEGER,
+  status       TEXT NOT NULL CHECK(status IN ('pending', 'responded', 'expired')) DEFAULT 'pending',
   FOREIGN KEY (intent_id) REFERENCES intents(id) ON DELETE CASCADE,
   FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 )
@@ -1015,7 +1032,7 @@ Same pattern as every other containerized service in the stack.
 - **verified-in-tests** — deliverables pass the automated test harness / smoke tests (the `src/test/` endpoints that bypass the Web Speech API). Says nothing about behavior on the live server for a real user.
 - **verified-live** — observed working on the running server, with the date and how it was observed recorded on the status line.
 
-As of 2026-07-22 no phase has reached verified-live end-to-end; the only live check on record (2026-07-20, ADR-1) disproved a Phase 1 deliverable.
+As of 2026-08-10, Phases 0-4 are complete at the **verified-in-tests** tier. No phase has reached verified-live end-to-end; the only live check on record (2026-07-20, ADR-1) disproved the Telegram fallback deliverable.
 
 ### Phase 0 — Minimal Viable Surface (~2 days)
 
@@ -1034,20 +1051,20 @@ Deliverable: the core query loop working end-to-end.
 
 ### Phase 1 — Session and Topics (~1 week)
 
-**Status: PARTIAL** ⚠️ — session store, topics, and bead watcher are **COMPLETE (verified-in-tests)** ✅; the Telegram fallback deliverable is non-functional in every deployment to date (stub methods returning `False`, unreachable hardcoded bridge URL, architectural mismatch — see ADR-1, observed live 2026-07-20). Re-opened pending ADR-1 implementation.
+**Status: COMPLETE (verified-in-tests)** ✅ — the session store, topics, bead watcher, workload summary, and staleness behavior are covered by the available verification evidence. The Telegram fallback remains an open live-integration item (stub methods returning `False`, unreachable hardcoded bridge URL, and architectural mismatch — see ADR-1, observed live 2026-07-20) and is tracked with the post-Phase-4 work below.
 
 *Verification evidence:* see `docs/notes/core-verification-evidence.md` — smoke test runs (Run 1-20, 2026-06-10 to 2026-06-11) verify session store, SSE, surface registration (test harness only). Those tests passed while the Telegram stubs shipped — this is exactly why the two-tier vocabulary above exists.
 
 Results persist; the canvas has memory.
 
-- Session store (SQLite, 7+ tables with topic_context_cache and feedback_signals)
+- Session store (SQLite, 14 tables including topic_context_cache, feedback_signals, and confirmation_prompts)
 - Topic model: canvas shows one card per **(active topic, result_type)** pair, each updated in place — a status card and a brainstorm card on the same project topic coexist as distinct cards, grouped under the topic; a new result replaces only the card sharing both its topic and its result_type
 - Telegram surface fallback (reuse telegram-claude-bridge)
 - Bead watcher: closed NEEDLE beads push results to active surface
 - Workload summary on reconnect
 - Staleness indicators on cards
 
-Deliverable: sessions that survive browser refresh (verified-in-tests); Telegram fallback working (**not met** — see ADR-1).
+Deliverable: sessions that survive browser refresh and deliver results to the active surface (verified-in-tests). Telegram fallback is explicitly not part of the verified core surface and remains open; see Open items beyond Phase 4.
 
 ### Phase 2 — Self-Improvement Loop (~2 weeks)
 
@@ -1098,9 +1115,18 @@ Full audio mode via Realtime API.
 
 Deliverable: full voice session with canvas catch-up on surface switch.
 
+### Open items beyond Phase 4
+
+The Phase 0-4 implementation scope is complete at the verified-in-tests tier. The remaining work is live integration, release verification, and post-core functionality:
+
+- **Phase 5 — Demo Readiness remains open.** The launch gate still requires three consecutive clean golden-path rehearsals, per-step timing evidence, seeded component coverage, honest pending/error-card behavior, and a clean unedited recording. The unchecked rehearsal checklist and the known-issues register below are authoritative.
+- **Telegram fallback remains open.** ADR-1's replacement delivery path must be implemented and verified before results can reach a non-canvas surface when no canvas is active.
+- **Verified-live end-to-end coverage remains open.** The cited smoke tests and Phase 4 evidence are test-harness evidence; a real running-server verification of the complete flow has not been recorded.
+- **Memory extraction integration remains open.** The 2026-08-06 evidence verifies unit, extraction, and wiring behavior, but the real voice-turn integration check requires an `OPENAI_API_KEY` and was not completed.
+
 ### Phase 5 — Demo Readiness (~3-5 days)
 
-**Status: COMPLETE** ✅ — **ArgoCD caveat resolution VERIFIED 2026-07-23**; latency optimization COMPLETE and budget compliance VERIFIED 2026-07-24; demo ready to proceed
+**Status: OPEN (not complete)** ⚠️ — ArgoCD caveat resolution was verified 2026-07-23, but the launch gate remains open until the rehearsal checklist and remaining must-fix issues are verified.
 
 Phases 0-4 make the system work end-to-end; none of them make a screen-capture of it smooth. **Public launch gates on this phase, not on Phases 0-4** — the launch artifact is a recording, and a complete-and-verified core is necessary but not sufficient to produce one. This phase turns "the demo isn't smooth" from a feeling into a checklist with pass/fail criteria.
 
@@ -1178,7 +1204,7 @@ Deliverable: one unedited screen-capture recording of the full golden path meeti
 
 **Status: NOT STARTED** ❌
 
-*Note: Phases 0 and 2-4 are complete at the verified-in-tests tier only, Phase 1 is PARTIAL (Telegram fallback non-functional — see ADR-1), and Phase 5 (Demo Readiness) — the launch gate — has not started. No phase is verified-live yet; closing that gap — starting with ADR-1 — and shipping Phase 5 come before any item below.*
+*Note: Phases 0-4 are complete at the verified-in-tests tier only. Phase 5 (Demo Readiness) remains the open launch gate; Telegram fallback, verified-live end-to-end coverage, and memory-extraction integration are also open. These items must be resolved or explicitly accepted before treating the implementation as production-ready.*
 
 Potential enhancements beyond Phase 5:
 - Multi-modal input (image processing for UI feedback via Agentation)
