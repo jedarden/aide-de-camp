@@ -219,6 +219,16 @@ class ComparisonReport:
             return 0.0
         return self.matching_count / self.total_comparisons
 
+    @property
+    def detailed_diffs(self) -> List[FieldDiff]:
+        """Return all field comparisons as one report-level list.
+
+        Individual ``ComparisonResult`` objects retain the classification
+        boundaries, while callers that render a report generally need a flat
+        list. Returning a new list keeps the report's result collection intact.
+        """
+        return [diff for result in self.results for diff in result.diffs]
+
     def get_partial_accuracy_rate(self) -> float:
         """
         Calculate the partial accuracy rate (including partial matches).
