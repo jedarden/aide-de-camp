@@ -56,7 +56,7 @@ from .feedback.background_analysis import get_background_processor
 from .intent.router import get_router as get_intent_router
 from .escalate import escalate_intent, EscalateRequest
 from .escalate.llm import warmup_zai_connections
-from .test.router import router as test_router
+from .test.router import router as test_router, session_router
 from .environment.discovery import (
     scan_environment, set_registry,
     refresh_registry, start_background_refresh, stop_background_refresh,
@@ -245,6 +245,8 @@ app = FastAPI(title="ADC (aide-de-camp)", version=read_version(), lifespan=lifes
 
 # Mount test endpoints under the versioned test API namespace.
 app.include_router(test_router, prefix="/api/v1/test", tags=["test"])
+# Session creation is also available at the documented /api/v1/sessions path.
+app.include_router(session_router, prefix="/api/v1", tags=["test"])
 
 
 # =============================================================================
