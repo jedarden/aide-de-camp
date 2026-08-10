@@ -17,13 +17,12 @@ Usage:
         print("All classifications matched!")
 """
 
-from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass, field
 import math
-
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Union
 
 # Import the FieldDiff model from the comparison module
-from src.validation.comparison import FieldDiff
+from src.validation.comparison import FieldDiff, _compare_nested_structures
 
 
 @dataclass
@@ -326,8 +325,9 @@ def compare_classifications(
         # Compare confidence with tolerance
         # If both are None, skip confidence comparison (missing in both is OK)
         if dispatch_conf is None and test_conf is None:
-            # Skip confidence comparison when both are missing
-            continue
+            # Missing confidence on both sides is equivalent; continue with
+            # structured_result comparison for this classification.
+            pass
         elif dispatch_conf is None or test_conf is None:
             # One is None but not the other - this is a mismatch
             detailed_diffs.append(
@@ -347,46 +347,87 @@ def compare_classifications(
                 detailed_diffs=detailed_diffs
             )
 
-        # Ensure both are numeric (only if not both None)
-        if not isinstance(dispatch_conf, (int, float)) or not isinstance(test_conf, (int, float)):
-            detailed_diffs.append(
-                FieldDiff(
-                    field_name=f"classification_{i}_confidence",
-                    expected_value=f"numeric (got {type(dispatch_conf).__name__})",
-                    actual_value=f"numeric (got {type(test_conf).__name__})",
-                    is_match=False
+        else:
+            # Ensure both are numeric.
+            if not isinstance(dispatch_conf, (int, float)) or not isinstance(test_conf, (int, float)):
+                detailed_diffs.append(
+                    FieldDiff(
+                        field_name=f"classification_{i}_confidence",
+                        expected_value=f"numeric (got {type(dispatch_conf).__name__})",
+                        actual_value=f"numeric (got {type(test_conf).__name__})",
+                        is_match=False
+                    )
                 )
-            )
-            # Early return on confidence type mismatch
-            return ComparisonReport(
-                overall_match=False,
-                summary=f"Confidence type mismatch at classification {i}: "
-                       f"dispatch={type(dispatch_conf).__name__}, test={type(test_conf).__name__}",
-                detailed_diffs=detailed_diffs
+                # Early return on confidence type mismatch
+                return ComparisonReport(
+                    overall_match=False,
+                    summary=f"Confidence type mismatch at classification {i}: "
+                           f"dispatch={type(dispatch_conf).__name__}, test={type(test_conf).__name__}",
+                    detailed_diffs=detailed_diffs
+                )
+
+            # Convert to float for comparison.
+            dispatch_conf_float = float(dispatch_conf)
+            test_conf_float = float(test_conf)
+
+            # Check if confidence values are within tolerance.
+            if not math.isclose(dispatch_conf_float, test_conf_float, abs_tol=confidence_tolerance):
+                detailed_diffs.append(
+                    FieldDiff(
+                        field_name=f"classification_{i}_confidence",
+                        expected_value=dispatch_conf_float,
+                        actual_value=test_conf_float,
+                        is_match=False
+                    )
+                )
+                # Early return on confidence mismatch
+                return ComparisonReport(
+                    overall_match=False,
+                    summary=f"Confidence mismatch at classification {i}: "
+                           f"dispatch={dispatch_conf_float}, test={test_conf_float} "
+                           f"(tolerance={confidence_tolerance})",
+                    detailed_diffs=detailed_diffs
+                )
+
+        # Compare structured_result recursively. A missing structured_result
+        # and an explicit None are equivalent; only run the recursive walk when
+        # at least one side contains an actual value.
+        dispatch_structured = dispatch_cls.get("structured_result")
+        test_structured = test_cls.get("structured_result")
+        if dispatch_structured is not None or test_structured is not None:
+            structured_diffs: List[FieldDiff] = []
+            structured_matches: Dict[str, bool] = {}
+            structured_match = _compare_nested_structures(
+                dispatch_structured,
+                test_structured,
+                f"classification_{i}_structured_result",
+                structured_diffs,
+                structured_matches,
             )
 
-        # Convert to float for comparison
-        dispatch_conf_float = float(dispatch_conf)
-        test_conf_float = float(test_conf)
-
-        # Check if confidence values are within tolerance
-        if not math.isclose(dispatch_conf_float, test_conf_float, abs_tol=confidence_tolerance):
-            detailed_diffs.append(
-                FieldDiff(
-                    field_name=f"classification_{i}_confidence",
-                    expected_value=dispatch_conf_float,
-                    actual_value=test_conf_float,
-                    is_match=False
+            # The report is intentionally a difference report, so retain only
+            # mismatching FieldDiff objects while preserving every mismatching
+            # nested leaf path.
+            if not structured_match:
+                mismatching_diffs = [diff for diff in structured_diffs if not diff.is_match]
+                nested_mismatch_paths = {
+                    diff.field_name
+                    for diff in mismatching_diffs
+                    if "[" in diff.field_name
+                }
+                detailed_diffs.extend(
+                    diff
+                    for diff in mismatching_diffs
+                    if not any(
+                        path.startswith(f"{diff.field_name}[")
+                        for path in nested_mismatch_paths
+                    )
                 )
-            )
-            # Early return on confidence mismatch
-            return ComparisonReport(
-                overall_match=False,
-                summary=f"Confidence mismatch at classification {i}: "
-                       f"dispatch={dispatch_conf_float}, test={test_conf_float} "
-                       f"(tolerance={confidence_tolerance})",
-                detailed_diffs=detailed_diffs
-            )
+                return ComparisonReport(
+                    overall_match=False,
+                    summary=f"Structured result mismatch at classification {i}",
+                    detailed_diffs=detailed_diffs,
+                )
 
     # All classifications matched
     return ComparisonReport(
