@@ -476,13 +476,17 @@ async def test_session_id(test_db_store):
 
 
 @pytest.fixture(scope="function")
-async def test_db_connection(test_db_path):
+async def test_db_connection():
     """
-    Provide a direct aiosqlite connection to an isolated database.
+    Provide a fresh direct connection to an isolated in-memory database.
 
     This fixture gives tests direct database access for low-level testing
     without going through the SessionStore API. The database is initialized
-    with the full schema.
+    with the full schema and additive migrations.
+
+    Each fixture invocation owns a separate ``:memory:`` database. Closing the
+    connection destroys the database, so no test data or production files can
+    survive fixture teardown.
 
     Usage in tests:
         async def test_raw_sql(test_db_connection):
@@ -491,23 +495,22 @@ async def test_db_connection(test_db_path):
                 # Test with direct SQL access
     """
     import aiosqlite
-    from src.session.store import SCHEMA_SQL
 
-    # Create database connection
-    db = await aiosqlite.connect(test_db_path)
+    from src.session.store import SCHEMA_SQL, SessionStore
 
-    # Enable WAL mode for consistency with production
-    await db.execute("PRAGMA journal_mode=WAL")
-    await db.execute("PRAGMA synchronous=NORMAL")
+    db = await aiosqlite.connect(":memory:")
+    try:
+        # WAL is not supported for a private in-memory database. The schema
+        # itself is shared with production through the SessionStore constant.
+        await db.execute("PRAGMA synchronous=NORMAL")
+        await db.executescript(SCHEMA_SQL)
+        await SessionStore._migrate_additive_columns(db)
+        await db.commit()
 
-    # Initialize schema
-    await db.executescript(SCHEMA_SQL)
-    await db.commit()
-
-    yield db
-
-    # Cleanup: close the connection
-    await db.close()
+        yield db
+    finally:
+        # Closing the only connection destroys the private in-memory database.
+        await db.close()
 
 
 @pytest.fixture(scope="function")
@@ -615,29 +618,23 @@ async def in_memory_db_connection():
                 # Test with direct SQL access to in-memory database
     """
     import aiosqlite
-    import uuid
-    from src.session.store import SessionStore, SCHEMA_SQL
 
-    # Use shared cache mode with unique cache name per test for isolation
-    cache_name = f"in_memory_conn_{uuid.uuid4().hex}"
-    db_path = f"file:{cache_name}?mode=memory&cache=shared"
+    from src.session.store import SCHEMA_SQL, SessionStore
 
-    # Create in-memory database connection
-    db = await aiosqlite.connect(db_path)
+    # A private :memory: connection is isolated by SQLite itself. Do not use a
+    # shared-cache URI here: the fixture intentionally yields one fresh
+    # database connection per test.
+    db = await aiosqlite.connect(":memory:")
+    try:
+        await db.execute("PRAGMA synchronous=NORMAL")
+        await db.executescript(SCHEMA_SQL)
+        await SessionStore._migrate_additive_columns(db)
+        await db.commit()
 
-    # Enable WAL mode for consistency with production
-    await db.execute("PRAGMA journal_mode=WAL")
-    await db.execute("PRAGMA synchronous=NORMAL")
-
-    # Initialize schema with all migrations
-    await db.executescript(SCHEMA_SQL)
-    await SessionStore._migrate_additive_columns(db)
-    await db.commit()
-
-    yield db
-
-    # Cleanup: close the connection (in-memory database is automatically destroyed)
-    await db.close()
+        yield db
+    finally:
+        # Closing the only connection tears down the in-memory database.
+        await db.close()
 
 
 # -----------------------------------------------------------------------------
