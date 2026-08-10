@@ -185,6 +185,19 @@ repository root, preserve the serial execution, and set
 isolated database/session. No deployment or live cluster is needed for the
 in-process hot-reload tests.
 
+### Verification record
+
+On 2026-08-10, the focused registry module passed 5 tests, the production
+router-prompt module passed 12 tests, and the named registry dispatch test
+(`tests/test_config_hot_reload.py::test_registry_hot_reload`) passed. Two
+consecutive runs of `./scripts/run_hot_reload_tests.sh` each passed all 116
+in-process tests. The runs mutated `config/registry.yaml` and
+`prompts/router.md`, then restored their original bytes and permission modes;
+no new `registry.yaml.backup.*` files remained. The same live process observed
+the edited registry alias and router instruction, confirming that these
+changes are picked up without restarting the server. The suite emitted six
+non-fatal runtime/deprecation warnings from existing dependencies.
+
 ## Useful commands
 
 ```bash
