@@ -93,6 +93,7 @@ def _card(
     shape ``loadTopics()`` hands to ``createTopicCard()``)."""
     level = "fresh" if seconds < 600 else ("stale" if seconds < 3600 else "very-stale")
     return {
+        "card_id": f"{topic_id}::status",
         "topic": {"id": topic_id, "label": label, "type": topic_type},
         "staleness": {"seconds": seconds, "level": level},
         "latest_result": {"summary": summary, "urgency": urgency},
@@ -178,10 +179,10 @@ class TestOnOpenLoadsTopics:
         assert "Alpha" in t["containerHTML"]
         assert t["containerCardLabels"] == ["Alpha"]
 
-    def test_empty_card_set_renders_empty_state(self):
+    def test_empty_card_set_renders_welcome_card(self):
         t = run_plan(_plan(cards=[], steps=[{"action": "open"}]))
         assert t["containerCardCount"] == 0
-        assert "No active topics" in t["containerHTML"]
+        assert "Welcome to ADC" in t["containerHTML"]
 
 
 # === named live events re-render ==============================================
@@ -400,8 +401,8 @@ class TestPendingAckCards:
         # All threads should be kind="thread"
         assert all(pc["pendingKind"] == "thread" for pc in t["pendingCards"])
 
-    def test_progress_update_updates_thread_card(self):
-        """A progress_update SSE event updates a thread card's per-source progress
+    def test_fetch_progress_updates_thread_card(self):
+        """A fetch_progress SSE event updates a thread card's per-source progress
         ('3/5 sources in')."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -410,7 +411,7 @@ class TestPendingAckCards:
                 "utterance": "Fetch logs",
                 "intent_ids": ["intent-x"],
             }},
-            {"action": "event", "name": "progress_update", "data": {
+            {"action": "event", "name": "fetch_progress", "data": {
                 "intent_id": "intent-x",
                 "completed": 3,
                 "total": 5,
@@ -421,8 +422,8 @@ class TestPendingAckCards:
         # The progress text should be in the container HTML
         assert "3/5 sources in" in t["containerHTML"]
 
-    def test_multiple_progress_updates_increment_progress(self):
-        """Multiple progress_update events for the same thread increment the
+    def test_multiple_fetch_progress_updates_increment_progress(self):
+        """Multiple fetch_progress events for the same thread increment the
         progress counter."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -431,17 +432,17 @@ class TestPendingAckCards:
                 "utterance": "Poll status",
                 "intent_ids": ["intent-y"],
             }},
-            {"action": "event", "name": "progress_update", "data": {
+            {"action": "event", "name": "fetch_progress", "data": {
                 "intent_id": "intent-y",
                 "completed": 1,
                 "total": 4,
             }},
-            {"action": "event", "name": "progress_update", "data": {
+            {"action": "event", "name": "fetch_progress", "data": {
                 "intent_id": "intent-y",
                 "completed": 2,
                 "total": 4,
             }},
-            {"action": "event", "name": "progress_update", "data": {
+            {"action": "event", "name": "fetch_progress", "data": {
                 "intent_id": "intent-y",
                 "completed": 4,
                 "total": 4,
@@ -482,16 +483,15 @@ class TestPendingAckCards:
         assert "ResultCard" in t["containerCardLabels"]
 
 
-# === thread_progress events (bead adc-2l7pv) ====================================
+# === fetch_progress events (bead adc-2l7pv) ====================================
 
 
-class TestThreadProgress:
-    """thread_progress SSE events update per-thread pending cards with per-source
-    progress ('3/5 sources in') and elapsed time counters. Uses thread_id targeting
-    (different from progress_update which uses intent_id)."""
+class TestFetchProgress:
+    """fetch_progress SSE events update per-thread pending cards with per-source
+    progress ('3/5 sources in') and elapsed time counters using intent_id."""
 
-    def test_thread_progress_updates_card_by_thread_id(self):
-        """A thread_progress event with thread_id finds the matching pending card
+    def test_fetch_progress_updates_card_by_intent_id(self):
+        """A fetch_progress event with intent_id finds the matching pending card
         and updates its progress text."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -500,8 +500,8 @@ class TestThreadProgress:
                 "utterance": "Track progress",
                 "intent_ids": ["thread-123"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-123",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-123",
                 "completed": 3,
                 "total": 5,
             }},
@@ -514,8 +514,8 @@ class TestThreadProgress:
         pending_ids = [pc["pendingId"] for pc in t["pendingCards"]]
         assert "thread-123" in pending_ids
 
-    def test_thread_progress_updates_elapsed_time_footer(self):
-        """A thread_progress event also ensures the elapsed time footer is present
+    def test_fetch_progress_updates_elapsed_time_footer(self):
+        """A fetch_progress event also ensures the elapsed time footer is present
         on the card (e.g., '0s elapsed')."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -524,8 +524,8 @@ class TestThreadProgress:
                 "utterance": "Time tracking",
                 "intent_ids": ["thread-time"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-time",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-time",
                 "completed": 2,
                 "total": 7,
             }},
@@ -538,7 +538,7 @@ class TestThreadProgress:
         # Verify the pending-elapsed element exists
         assert "pending-elapsed" in html
 
-    def test_thread_progress_uses_escapeHtml_for_xss_protection(self):
+    def test_fetch_progress_uses_escapeHtml_for_xss_protection(self):
         """Thread progress values are escaped through escapeHtml() to prevent XSS
         injection via progress text."""
         t = run_plan(_plan(steps=[
@@ -548,8 +548,8 @@ class TestThreadProgress:
                 "utterance": "Test XSS",
                 "intent_ids": ["thread-xss"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-xss",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-xss",
                 "completed": 1,
                 "total": 1,
             }},
@@ -562,8 +562,8 @@ class TestThreadProgress:
         # Verify no raw HTML in progress text (textContent is used)
         assert "pending-progress" in html
 
-    def test_multiple_thread_progress_events_update_same_card(self):
-        """Multiple thread_progress events for the same thread_id update the same
+    def test_multiple_fetch_progress_events_update_same_card(self):
+        """Multiple fetch_progress events for the same intent_id update the same
         card incrementally."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -572,18 +572,18 @@ class TestThreadProgress:
                 "utterance": "Multiple updates",
                 "intent_ids": ["thread-multi"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-multi",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-multi",
                 "completed": 1,
                 "total": 4,
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-multi",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-multi",
                 "completed": 2,
                 "total": 4,
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-multi",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-multi",
                 "completed": 4,
                 "total": 4,
             }},
@@ -597,9 +597,9 @@ class TestThreadProgress:
         # Should still have exactly one thread card
         assert t["pendingThreadCount"] == 1
 
-    def test_thread_progress_with_multiple_threads(self):
-        """When multiple thread cards exist, thread_progress events target only
-        the specific thread by thread_id."""
+    def test_fetch_progress_with_multiple_threads(self):
+        """When multiple thread cards exist, fetch_progress targets only
+        the specific thread by intent_id."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
             {"action": "event", "name": "dispatch_ack", "data": {
@@ -607,8 +607,8 @@ class TestThreadProgress:
                 "utterance": "Parallel threads",
                 "intent_ids": ["thread-a", "thread-b", "thread-c"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-b",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-b",
                 "completed": 5,
                 "total": 10,
             }},
@@ -623,7 +623,7 @@ class TestThreadProgress:
         assert "thread-a" in pending_ids
         assert "thread-c" in pending_ids
 
-    def test_thread_progress_completed_hides_progress_element(self):
+    def test_fetch_progress_completed_hides_progress_element(self):
         """When total is 0, the progress element is hidden (display: none)."""
         t = run_plan(_plan(steps=[
             {"action": "open"},
@@ -632,8 +632,8 @@ class TestThreadProgress:
                 "utterance": "Hide progress",
                 "intent_ids": ["thread-hide"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-hide",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-hide",
                 "completed": 0,
                 "total": 0,
             }},
@@ -643,7 +643,7 @@ class TestThreadProgress:
         # _setProgress sets style.display = 'none' when total == 0
         assert "pending-progress" in html
 
-    def test_thread_progress_and_elapsed_time_together(self):
+    def test_fetch_progress_and_elapsed_time_together(self):
         """Test that both progress updates and elapsed time counters work together
         on the same card."""
         t = run_plan(_plan(steps=[
@@ -653,8 +653,8 @@ class TestThreadProgress:
                 "utterance": "Combined test",
                 "intent_ids": ["thread-together"],
             }},
-            {"action": "event", "name": "thread_progress", "data": {
-                "thread_id": "thread-together",
+            {"action": "event", "name": "fetch_progress", "data": {
+                "intent_id": "thread-together",
                 "completed": 7,
                 "total": 9,
             }},
