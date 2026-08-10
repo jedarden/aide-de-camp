@@ -155,9 +155,16 @@ def create_backup(file_path: Union[str, Path]) -> Optional[Path]:
         backup_name = f"{source.stem}_backup_{timestamp}{source.suffix}"
         backup_path = backup_dir / backup_name
 
-        # Copy file to backup location
+        # Stage the backup in the same directory, then publish it atomically so
+        # readers never observe a partially copied backup file.
         import shutil
-        shutil.copy2(source, backup_path)
+        temp_backup_path = backup_dir / f".{backup_name}.{uuid.uuid4()}.tmp"
+        try:
+            shutil.copy2(source, temp_backup_path)
+            temp_backup_path.replace(backup_path)
+        except BaseException:
+            temp_backup_path.unlink(missing_ok=True)
+            raise
 
         logger.info(f"Created backup: {backup_path}")
 
