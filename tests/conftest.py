@@ -638,6 +638,74 @@ async def in_memory_db_connection():
 
 
 # -----------------------------------------------------------------------------
+# Test data cleanup fixtures
+# -----------------------------------------------------------------------------
+
+
+def _new_test_data_cleanup(request):
+    """Build a cleanup registry for whichever isolated store the test uses."""
+    from src.test.utilities import TestDataCleanup
+
+    # Prefer an explicitly requested in-memory store, otherwise use the file
+    # backed fixture. If neither was named, dynamically request the file-backed
+    # fixture so the cleanup fixture is useful on its own as well.
+    store_fixture = next(
+        (
+            fixture_name
+            for fixture_name in ("in_memory_db_store", "test_db_store")
+            if fixture_name in request.fixturenames
+        ),
+        "test_db_store",
+    )
+    store = request.getfixturevalue(store_fixture)
+
+    params = getattr(request, "param", None)
+    if isinstance(params, dict):
+        session_ids = params.get("session_ids", [])
+        topic_ids = params.get("topic_ids", [])
+    elif params is None:
+        session_ids = []
+        topic_ids = []
+    else:
+        # A plain indirect list is treated as session IDs, while the mapping
+        # form above supports both ID types in one parametrized fixture.
+        session_ids = params
+        topic_ids = []
+
+    return TestDataCleanup(
+        store,
+        session_ids=list(session_ids),
+        topic_ids=list(topic_ids),
+    )
+
+
+@pytest.fixture(scope="function")
+async def test_data_cleanup(request):
+    """Register test session/topic IDs and delete them during teardown.
+
+    Tests can register IDs as they create rows::
+
+        cleanup.add_session(session_id)
+        cleanup.add_topic(topic_id)
+
+    The fixture also supports indirect parametrization with either a plain
+    list of session IDs or ``{"session_ids": [...], "topic_ids": [...]}``.
+    Teardown verifies that each requested ID has a zero remaining row count.
+    """
+    cleanup = _new_test_data_cleanup(request)
+    yield cleanup
+    await cleanup.cleanup()
+
+
+@pytest.fixture(scope="function")
+async def cleanup_test_data(request):
+    """Alias for :fixture:`test_data_cleanup` with the cleanup-first name."""
+    cleanup = _new_test_data_cleanup(request)
+    yield cleanup
+    await cleanup.cleanup()
+
+
+# -----------------------------------------------------------------------------
 # Global singleton reset fixture
 # -----------------------------------------------------------------------------
 
