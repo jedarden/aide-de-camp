@@ -9,6 +9,7 @@ import logging
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 from uuid import uuid4
 
 import httpx
@@ -298,6 +299,48 @@ class TestSessionClient:
         logger.info(f"[TEST] Deleted result: {result_id}")
         return response.json()
 
+    async def delete_session(self, session_id: str) -> Dict[str, Any]:
+        """Delete a test session and all of its server-side test data.
+
+        The session endpoint owns the complete teardown transaction.  Calling
+        it is important here instead of deleting the visible result cards one
+        at a time: dispatches also create utterances, intents, timing rows,
+        surfaces, and cache rows that are not necessarily represented by a
+        canvas card.
+        """
+        if self.client is None or self.client.is_closed:
+            raise TestSessionClientError(
+                "TestSessionClient is not open; use it as an async context manager"
+            )
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise ValueError("session_id must be a non-empty string")
+
+        url_session_id = quote(session_id, safe="")
+        try:
+            response = await self.client.delete(
+                f"{self.base_url}/api/v1/sessions/{url_session_id}"
+            )
+            response.raise_for_status()
+            data = response.json()
+        except httpx.HTTPStatusError as exc:
+            raise TestSessionClientError(
+                f"Failed to delete test session: HTTP {exc.response.status_code}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise TestSessionClientError(f"Failed to delete test session: {exc}") from exc
+        except ValueError as exc:
+            raise TestSessionClientError(
+                "Failed to delete test session: response was not valid JSON"
+            ) from exc
+
+        if not isinstance(data, dict):
+            raise TestSessionClientError(
+                "Failed to delete test session: response must be a JSON object"
+            )
+
+        logger.info("[TEST] Deleted session: %s", session_id)
+        return data
+
     async def cleanup_session(self, session_id: str) -> bool:
         """
         Clean up all test data for a session.
@@ -309,24 +352,7 @@ class TestSessionClient:
             True if cleanup successful
         """
         try:
-            # Get all topics for the session
-            topics_response = await self.get_session_topics(session_id)
-            cards = topics_response.get("cards", [])
-
-            # Delete each result (this cascades to intents and topics)
-            failures = False
-            for card in cards:
-                result_id = card.get("result_id")
-                if result_id:
-                    try:
-                        await self.delete_result(session_id, result_id)
-                    except Exception as e:
-                        logger.warning(f"[TEST] Failed to delete result {result_id}: {e}")
-                        failures = True
-
-            if failures:
-                logger.warning(f"[TEST] Session remains queued for cleanup: {session_id}")
-                return False
+            await self.delete_session(session_id)
             logger.info(f"[TEST] Cleaned up session: {session_id}")
             return True
 

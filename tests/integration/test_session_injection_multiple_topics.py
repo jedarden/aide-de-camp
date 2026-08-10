@@ -1,15 +1,15 @@
 """End-to-end session injection coverage for multiple topics.
 
 This test deliberately uses the live HTTP service rather than an ASGI or mock
-transport.  ``ADC_TEST_DB_PATH`` may point at a database explicitly configured
-for the live service; otherwise the service's production default is used.
+transport.  ``ADC_TEST_DB_PATH`` must point at the isolated database configured
+for that service.  The test is skipped without an explicit isolated database so
+it can never write test rows to production ``data/session.db`` by accident.
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from uuid import uuid4
 
 import aiosqlite
 import httpx
@@ -26,9 +26,10 @@ from src.test.utilities import (
 )
 
 BASE_URL = os.environ.get("ADC_TEST_BASE_URL", "http://localhost:8000")
-DATABASE_PATH = Path(
-    os.environ.get("ADC_TEST_DB_PATH", "/home/coding/aide-de-camp/data/session.db")
+ISOLATED_DATABASE_PATH = os.environ.get("ADC_TEST_DB_PATH") or os.environ.get(
+    "ADC_DB_PATH"
 )
+DATABASE_PATH = Path(ISOLATED_DATABASE_PATH) if ISOLATED_DATABASE_PATH else None
 
 
 class _DeterministicTopicClient(TopicClient):
@@ -39,6 +40,8 @@ class _DeterministicTopicClient(TopicClient):
         utterance: str,
         session_id: str,
         surface_id: str,
+        *,
+        known_topic_ids: set[str] | None = None,
     ) -> dict:
         """Create one topic through HTTP and normalize its test response."""
         client = self._require_client()
@@ -76,10 +79,25 @@ def _server_is_up() -> bool:
         return False
 
 
-pytestmark = pytest.mark.skipif(
-    not _server_is_up(),
-    reason="ADC server is not running at ADC_TEST_BASE_URL",
-)
+def _has_isolated_database() -> bool:
+    """Require an explicit non-production database for the live test."""
+    if DATABASE_PATH is None:
+        return False
+    return DATABASE_PATH.resolve() != Path(
+        "/home/coding/aide-de-camp/data/session.db"
+    ).resolve()
+
+
+pytestmark = [
+    pytest.mark.skipif(
+        not _server_is_up(),
+        reason="ADC server is not running at ADC_TEST_BASE_URL",
+    ),
+    pytest.mark.skipif(
+        not _has_isolated_database(),
+        reason="ADC_TEST_DB_PATH or ADC_DB_PATH must point to a non-production database",
+    ),
+]
 
 
 async def _row_count(db_path: Path, query: str, parameters: tuple[str, ...]) -> int:
@@ -122,7 +140,10 @@ async def _session_data_counts(db_path: Path, session_id: str) -> dict[str, int]
 @pytest.mark.asyncio
 async def test_session_injection_stores_and_cleans_multiple_topics() -> None:
     """Create, verify, and fully remove three topics through real HTTP APIs."""
-    session_id = f"test-inject-multi-topic-{uuid4().hex}"
+    assert DATABASE_PATH is not None
+    # The isolated test database makes this stable ID safe to reuse between
+    # runs and keeps failures easy to reproduce.
+    session_id = "test-inject-multi-topic"
     scenario = [
         TestDataBuilder.build_synthetic_data(
             utterance="check the deployment status for the api service",
@@ -206,13 +227,8 @@ async def test_session_injection_stores_and_cleans_multiple_topics() -> None:
                 (session_id,),
             ) == len(scenario)
 
-            cleanup = TestDataCleanup(
-                store,
-                session_ids=[session_id],
-                topic_ids=topic_ids,
-            )
-            summary = await cleanup.cleanup()
-            assert summary["sessions"][session_id]["session_removed"] == 1
+            summary = await session_client.delete_session(session_id)
+            assert summary["session_removed"] == 1
 
             final_counts = await _session_data_counts(DATABASE_PATH, session_id)
             assert final_counts == {table: 0 for table in final_counts}

@@ -86,6 +86,7 @@ async def api_v1_create_session(request: SessionCreateRequest) -> SessionCreateR
     return SessionCreateResponse(session_id=session_id, created_at=created_at)
 
 
+@session_router.delete("/sessions/{session_id}")
 @router.delete("/sessions/{session_id}")
 async def api_v1_delete_session(session_id: str) -> dict:
     """

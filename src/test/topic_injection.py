@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Iterable, Mapping
 from typing import Any, Optional
@@ -59,11 +60,13 @@ class TestTopicClient:
             raise ValueError("timeout must be greater than zero")
 
         normalized_base_url = base_url.rstrip("/")
+        self.base_url = normalized_base_url
         self.dispatch_url = dispatch_url or (
             normalized_base_url
             if normalized_base_url.endswith("/dispatch")
             else f"{normalized_base_url}/dispatch"
         )
+        self.topics_url = f"{normalized_base_url}/api/v1/sessions"
         self.timeout = timeout
         self.client = client
 
@@ -94,6 +97,8 @@ class TestTopicClient:
         utterance: str,
         session_id: str,
         surface_id: str,
+        *,
+        known_topic_ids: Optional[set[str]] = None,
     ) -> dict[str, Any]:
         """Create one topic through the dispatch endpoint.
 
@@ -145,6 +150,24 @@ class TestTopicClient:
         response_data = data.get("data") if isinstance(data.get("data"), dict) else data
         topic_id = response_data.get("topic_id")
         if not isinstance(topic_id, str) or not topic_id.strip():
+            # The real dispatch API acknowledges the request before its
+            # background processing finishes.  Its eventual topic is exposed
+            # through the session-card endpoint, while deterministic test
+            # adapters return topic_id directly.  Resolve the former here so
+            # callers can use one utility for both APIs.
+            resolved = self._topic_from_dispatch_response(data)
+            if resolved is None and self._is_dispatch_ack(data):
+                resolved = await self._wait_for_topic(
+                    session_id,
+                    known_topic_ids=known_topic_ids or set(),
+                )
+            if resolved is not None:
+                topic_id, result = resolved
+                data["topic_id"] = topic_id
+                data.setdefault("result", result)
+                response_data = data
+
+        if not isinstance(topic_id, str) or not topic_id.strip():
             raise TopicCreationError(
                 "Failed to create topic: response is missing a valid topic_id"
             )
@@ -182,6 +205,7 @@ class TestTopicClient:
         later topics are not attempted.
         """
         results: list[dict[str, Any]] = []
+        created_topic_ids: set[str] = set()
         for topic in topics:
             if isinstance(topic, str):
                 request_session_id = session_id
@@ -206,8 +230,12 @@ class TestTopicClient:
                     utterance=utterance,
                     session_id=request_session_id,
                     surface_id=request_surface_id,
+                    known_topic_ids=created_topic_ids,
                 )
             )
+            topic_id = results[-1].get("topic_id")
+            if isinstance(topic_id, str):
+                created_topic_ids.add(topic_id)
         return results
 
     async def inject_topic(
@@ -262,6 +290,83 @@ class TestTopicClient:
         if status in {"error", "failed", "failure"}:
             return str(data.get("message") or "dispatch failed")
         return None
+
+    @staticmethod
+    def _is_dispatch_ack(data: dict[str, Any]) -> bool:
+        """Return whether a response represents an accepted dispatch."""
+        status = str(data.get("status", "")).lower()
+        return (
+            data.get("success") is True
+            or status in {"dispatched", "completed"}
+            or isinstance(data.get("data"), dict)
+            and "intent_ids" in data["data"]
+        )
+
+    @staticmethod
+    def _topic_from_dispatch_response(
+        data: dict[str, Any],
+    ) -> Optional[tuple[str, Any]]:
+        """Extract a topic from a dispatch response that waited for results."""
+        candidates = data.get("results")
+        if not isinstance(candidates, list):
+            nested = data.get("data")
+            candidates = nested.get("results") if isinstance(nested, dict) else None
+        if not isinstance(candidates, list):
+            return None
+
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            topic_id = candidate.get("topic_id")
+            if isinstance(topic_id, str) and topic_id.strip():
+                return topic_id, candidate
+        return None
+
+    async def _wait_for_topic(
+        self,
+        session_id: str,
+        *,
+        known_topic_ids: set[str],
+    ) -> tuple[str, Any]:
+        """Wait for a background dispatch to publish a new session topic."""
+        client = self._require_client()
+        deadline = asyncio.get_running_loop().time() + self.timeout
+        last_error: Optional[Exception] = None
+
+        while asyncio.get_running_loop().time() < deadline:
+            try:
+                response = await client.get(f"{self.topics_url}/{session_id}/topics")
+                response.raise_for_status()
+                payload = response.json()
+                cards = payload.get("cards", []) if isinstance(payload, dict) else []
+                candidates = []
+                for card in cards:
+                    if not isinstance(card, dict):
+                        continue
+                    topic = card.get("topic")
+                    latest_result = card.get("latest_result")
+                    topic_id = topic.get("id") if isinstance(topic, dict) else None
+                    if (
+                        isinstance(topic_id, str)
+                        and topic_id.strip()
+                        and topic_id not in known_topic_ids
+                        and isinstance(latest_result, dict)
+                    ):
+                        candidates.append((topic_id, latest_result))
+
+                if candidates:
+                    # The topic endpoint orders cards by activity; retaining
+                    # that order also avoids relying on timestamp precision.
+                    return candidates[0]
+            except (httpx.HTTPError, ValueError, KeyError) as exc:
+                last_error = exc
+
+            await asyncio.sleep(min(0.1, max(0.0, deadline - asyncio.get_running_loop().time())))
+
+        detail = f": {last_error}" if last_error else ""
+        raise TopicCreationError(
+            f"Failed to create topic: dispatch did not produce a session topic{detail}"
+        )
 
     @staticmethod
     def _error_for_message(message: str, status_code: Optional[int] = None) -> TopicCreationError:
