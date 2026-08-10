@@ -3302,3 +3302,49 @@ The status failure is an ID/wiring issue: `/dispatch` creates an `intents` row w
 Hot-reload verification passed: `tests/test_router_prompt_hotreload.py` plus the registry hot-load tests passed (14 tests), and a live no-restart dispatch after adding a unique temporary alias routed to `project_slug=aide-de-camp`. `config/registry.yaml` and `prompts/router.md` were restored byte-for-byte (hashes unchanged).
 
 **Text-path result:** router → fetch → synthesize → result persistence → SSE/card rendering passed. The strict acceptance assertions remain **not met** because SSE `data` is absent and the persistent intent remains `pending`; the startup schema mismatch is an additional database migration defect. No source files were changed by this verification.
+
+## Parallel fan-out
+
+**Verification date:** 2026-08-10
+**Bead:** adc-1ua
+**Server:** `.venv/bin/python -m uvicorn src.main:app --host 127.0.0.1 --port 18181`
+**Utterance:** `what is the current status of aide-de-camp, and what is the current status of declarative-config`
+**Session/surface:** `a1b09d41-8be3-432c-984d-0f5c8631fc77` / `dc35b89a-b0bb-47ba-86cb-5b4b9a33c6c8`
+
+### Results
+
+- **Dispatch fan-out: PASS.** The `/dispatch` ack returned `intent_count: 2` and distinct intent IDs `bcce79b0-5c29-4281-aa6c-84ff35e8862e` (`aide-de-camp`) and `4f36e5e6-e15c-4dd3-aa5b-71d6e855715e` (`declarative-config`).
+- **SSE cards: PASS for count/identity/summary.** The live SSE connection returned two distinct `result_created` events, one per routed intent, both with non-empty summaries and non-empty event payloads. Both carried rendered card HTML. The raw synthesized `data` object was present and non-empty in each `results.data` store row, but—consistent with the earlier text-path finding—the `result_created` SSE payload had no `data` key (only `intent_id`, `topic_id`, `summary`, `urgency`, `card_fallback`, and `rendered_html`). This is a localized SSE payload omission, not a missing result.
+- **Session store counts: PASS, with the known ID/status defect.** The utterance has two `intents` rows and two `results` rows, each result containing non-empty summary and JSON data. The persistent intent rows remain `status=pending` and have store-generated IDs, while the results/timings use the separate routed intent IDs; this is the same `/dispatch` ID-wiring issue recorded under Text path.
+- **Parallel processing: PASS.** Per-intent fetch+synthesize timings were 15,680ms (`aide-de-camp`: 11ms fetch + 15,669ms synthesize) and 15,071ms (`declarative-config`: 255ms + 14,816ms), summing to 30,751ms. The last result arrived 15,691ms after the ack, and the two result events arrived only 3.4ms apart. Server log order also shows both syntheses started before either completed: `Synthesizing ... bcce79b0`, then `Synthesizing ... 4f36e5e6`, then completion of `4f36e5e6` at 14,817ms followed by `bcce79b0` at 15,669ms. This is consistent with the `asyncio.create_task` fan-out in `/dispatch`, not serial processing.
+
+### Router segmentation evidence
+
+The server logged `Fast-path HIT: 2 intents (10ms)` and stored `intents_count: 2` in `utterances.router_timing_breakdown`. The topic labels/project slugs persisted for this session recover the actual fragments. The deterministic router output was:
+
+```json
+[
+  {
+    "intent_type": "lookup",
+    "project_slug": "aide-de-camp",
+    "utterance_fragment": "what is the current status of aide-de-camp",
+    "confidence": 0.9,
+    "reasoning": "Deterministic fast-path match",
+    "urgency": "normal",
+    "lookup_kind": "docs"
+  },
+  {
+    "intent_type": "lookup",
+    "project_slug": "declarative-config",
+    "utterance_fragment": ", and what is the current status of declarative-config",
+    "confidence": 0.9,
+    "reasoning": "Deterministic fast-path match",
+    "urgency": "normal",
+    "lookup_kind": "config"
+  }
+]
+```
+
+This confirms accurate two-way project segmentation for the fan-out, while also exposing a routing-quality detail for plan.md open question #1: the status-shaped fragments were classified as `lookup` because the fast path prioritizes the `what is` lookup keyword, and the second fragment retains the leading `, and`.
+
+**Overall:** the core differentiator—one compound utterance producing two concurrent agent executions and two canvas result cards—passed. Remaining localized defects are the already-known missing raw `data` field in `result_created` and persistent routed/store intent ID/status wiring.
