@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from uuid import UUID
 
 import pytest
 
@@ -168,6 +169,23 @@ class TestAtomicWriteFailureModes:
 
         assert filepath.read_text() == "new content"
         assert not orphan.exists()
+
+    def test_orphan_verification_finds_operation_owned_staging_files(self, tmp_path):
+        """A real staging-name match is removed after publication."""
+        filepath = tmp_path / "published.txt"
+        orphan = tmp_path / ".published.txt.tmp_12345678_stale.tmp"
+        orphan.write_text("stale")
+
+        with patch.object(
+            atomic_write_module.uuid,
+            "uuid4",
+            return_value=UUID("12345678-1234-5678-1234-567812345678"),
+        ):
+            atomic_write(filepath, "new content")
+
+        assert filepath.read_text() == "new content"
+        assert not orphan.exists()
+        assert list(tmp_path.glob(".published.txt.tmp_*.tmp")) == []
 
 
 class TestRollbackCleanupFailureModes:
