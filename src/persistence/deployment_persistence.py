@@ -8,21 +8,16 @@ Matches pbx-web deployment data structure for comparative analysis.
 """
 
 import json
-import os
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, Union
-import logging
+from typing import Any, Dict, Optional, Union
 
 from pydantic import ValidationError
 
-from src.schemas.whisper_stt_deployment import (
-    WhisperSTTDeploymentData,
-    validate_deployment_data
-)
+from src.schemas.whisper_stt_deployment import WhisperSTTDeploymentData, validate_deployment_data
 from src.utils.atomic_write import atomic_write
-
 
 logger = logging.getLogger(__name__)
 
@@ -164,14 +159,23 @@ def persist_deployment_data(
                 # Atomic rename to final backup location
                 temp_backup_path.replace(backup_path)
                 logger.debug(f"Created backup: {backup_path}")
-            except Exception as e:
-                logger.warning(f"Failed to create backup: {e}")
-                # Clean up temp backup if it exists
-                if 'temp_backup_path' in locals() and temp_backup_path.exists():
+            except (OSError, IOError) as e:
+                logger.warning(f"Failed to create backup for {filepath}: {e}")
+                # Clean up temp backup if it exists - use idempotent cleanup
+                if 'temp_backup_path' in locals():
                     try:
-                        temp_backup_path.unlink()
-                    except Exception:
-                        pass
+                        # Use missing_ok=True for idempotent cleanup (safe if
+                        # another owner already removed the staging path).
+                        # Avoid an exists() check, which is racy.
+                        temp_backup_path.unlink(missing_ok=True)
+                        logger.debug(f"Cleaned up temp backup file: {temp_backup_path}")
+                    except OSError as cleanup_error:
+                        # Preserve the backup failure while making cleanup
+                        # failure observable for a later recovery sweep.
+                        logger.error(
+                            f"Failed to cleanup temp backup {temp_backup_path}: "
+                            f"{cleanup_error}"
+                        )
 
         # Write to file with atomic operations using atomic_write utility
         # Uses temp file + atomic rename pattern with unique naming (UUID4)
@@ -185,9 +189,25 @@ def persist_deployment_data(
                     default=serialize_datetime
                 )
             )
-        except Exception as e:
-            logger.error(f"Failed atomic write for {filepath}: {e}")
-            raise
+            logger.debug(f"Atomic write successful for {filepath}")
+        except (OSError, PermissionError) as e:
+            # Handle atomic write failures with context-specific error message
+            error_msg = f"Atomic write failed for {filepath}: {type(e).__name__}: {e}"
+            logger.error(error_msg)
+            raise DeploymentPersistenceError(
+                f"Atomic write operation failed: {e}",
+                filepath=filepath,
+                original_error=e
+            ) from e
+        except (TypeError, ValueError) as e:
+            # Handle content validation errors
+            error_msg = f"Content validation failed for atomic write to {filepath}: {e}"
+            logger.error(error_msg)
+            raise DeploymentPersistenceError(
+                f"Content validation failed: {e}",
+                filepath=filepath,
+                original_error=e
+            ) from e
 
         logger.info(f"Successfully persisted deployment data to: {filepath}")
 

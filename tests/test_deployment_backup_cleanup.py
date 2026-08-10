@@ -1,5 +1,6 @@
 """Failure-path tests for deployment backup retention cleanup."""
 
+import shutil
 from pathlib import Path
 from unittest.mock import patch
 
@@ -38,3 +39,21 @@ def test_backup_retention_success_removes_quarantine_marker(tmp_path):
 
     assert not old_backup.exists()
     assert list(backup_dir.glob(".deleting_*.tmp")) == []
+
+
+def test_backup_copy_failure_cleans_unique_staging_file(tmp_path, monkeypatch):
+    """A failed backup copy does not leave its UUID staging file behind."""
+    source = tmp_path / "state.json"
+    source.write_text("current")
+    backup_dir = tmp_path / ".backups"
+
+    monkeypatch.chdir(tmp_path)
+
+    def fail_copy(*_args, **_kwargs):
+        raise OSError("simulated copy failure")
+
+    with patch.object(shutil, "copy2", side_effect=fail_copy):
+        # ``create_backup`` reports backup failure as a best-effort result.
+        assert deployment.create_backup(source) is None
+
+    assert list(backup_dir.glob(".*.tmp")) == []
