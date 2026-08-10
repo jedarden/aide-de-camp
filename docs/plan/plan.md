@@ -649,107 +649,197 @@ aide-de-camp/
 ├── README.md                ← operational/configuration reference (env vars, configuration table — the file ADR-1 cites)
 ├── README-PHASE4.md         ← Phase 4 verification evidence (cited by Implementation Phases)
 ├── config/
-│   ├── registry.yaml        ← project registry (hot-reloaded by router)
-│   ├── clusters.yaml        ← cluster → ArgoCD endpoint mapping (see Fetch Strand)
-│   ├── monitoring.yaml      ← ambient monitoring rules
-│   └── exceptions.yaml      ← exception routing rules
+│   ├── clusters.yaml         ← cluster → ArgoCD endpoint mapping (see Fetch Strand)
+│   ├── confirmations.yaml    ← destructive-operation confirmation settings
+│   ├── exceptions.yaml       ← exception routing rules
+│   ├── fetch.yaml            ← fetch configuration
+│   ├── monitoring.yaml       ← ambient monitoring rules
+│   ├── registry.yaml         ← project registry (hot-reloaded by router)
+│   └── time_step_granularity.yaml ← time-step granularity configuration
 ├── prompts/
-│   ├── router.md            ← intent segmentation prompt
-│   ├── synthesize.md        ← result generation prompt
-│   ├── voice.md             ← voice model system prompt
-│   ├── urgency.md           ← urgency classification prompt
+│   ├── router.md             ← intent segmentation prompt
+│   ├── self_mod_generate.md  ← self-modification generation prompt
+│   ├── self_mod_parse.md     ← self-modification response parser prompt
+│   ├── synthesize.md         ← result generation prompt
+│   ├── test_add.md           ← test-generation prompt
+│   ├── ui_regen_generate.md  ← UI regeneration prompt
+│   ├── ui_regen_iterate.md   ← UI regeneration iteration prompt
+│   ├── urgency.md            ← urgency classification prompt
+│   ├── voice.md              ← voice model system prompt
 │   ├── fetch/               ← per-intent-type fetch instructions
-│   │   ├── status.md
 │   │   ├── action.md
-│   │   ├── lookup-logs.md   ← lookup matrices are per lookup_kind (see Intent Router)
-│   │   ├── lookup-config.md
+│   │   ├── brainstorm.md
+│   │   ├── lookup-config.md  ← lookup matrices are per lookup_kind (see Intent Router)
 │   │   ├── lookup-docs.md
-│   │   └── ...
+│   │   ├── lookup-logs.md
+│   │   ├── lookup.md
+│   │   ├── monitoring-config.md
+│   │   ├── reminder.md
+│   │   ├── self-modification.md
+│   │   └── status.md
 │   └── escalate/            ← escalate/task-profile prompts
 │       └── task-profile.md
 ├── src/
-│   ├── main.py              ← FastAPI app entry point
-│   ├── registry.py          ← project registry loader
-│   ├── action/              ← action execution strand (NOT BUILT — design-only)
-│   ├── agents/              ← agent implementations
-│   │   ├── self_modification.py  ← self-improvement agent
-│   │   └── ui_regen.py          ← UI-regen agent
-│   ├── bead_validation/     ← bead validation logic (Generated-Bead Safety)
-│   ├── components/          ← component library and hot-reload
-│   │   ├── library.py           ← component library DB operations
-│   │   └── hot_reload.py        ← hot-reload watcher
-│   ├── concurrency/         ← concurrency control (asyncio.Semaphore limiter for synthesize calls)
-│   ├── context/             ← context warming and pre-fetch
-│   │   ├── warmer.py            ← context warmer for active topics
-│   │   └── prefetch.py          ← speculative pre-fetch
-│   ├── conversation/        ← multi-turn conversation handling
-│   ├── diff/                ← diff generation for results
-│   ├── environment/         ← environment and repo discovery
-│   │   └── discovery.py        ← repo scanner: seeds registry.yaml (one-time/on-demand scan); self-mod agent is sole ongoing author (see Project Registry)
-│   ├── errors/              ← error handling (degraded state, circuit breaker, stuck intents)
-│   │   ├── degraded_state.py    ← Degraded-state UX card rendering
-│   │   └── circuit_breaker.py   ← Re-dispatch circuit breaker logic
-│   ├── escalate/            ← escalate strand for task-profile intents
-│   │   ├── handler.py           ← escalate request handler
-│   │   ├── llm.py               ← LLM calls for bead formulation
-│   │   └── commands.py          ├── bead creation commands
-│   ├── feedback/            ← feedback processing and background analysis
-│   │   ├── processor.py         ← explicit feedback processor
-│   │   ├── signals.py           ← implicit feedback signal tracking
-│   │   └── background_analysis.py ← background analysis bead
-│   ├── fetch/               ← fetch strand (deterministic, per intent type)
-│   │   ├── commands.py          ← fetch command matrix, intent types, data structures
-│   │   └── orchestrator.py      ← FetchStrand: concurrent fetch execution, streaming, coverage tracking
-│   ├── intent/              ← intent router (LLM classification)
-│   │   ├── router.py            ← intent segmentation and routing
-│   │   ├── deterministic_router.py ← fast-path deterministic routing (70-80% of requests)
-│   │   └── ...
-│   ├── instrument/           ← timing instrumentation (DispatchTimings, latency budget)
-│   │   └── timings.py           ← DispatchTimings class
-│   ├── llm/                 ← LLM client wrappers (ZAI proxy integration, timing breakdown)
-│   │   ├── client.py             ← ZAI proxy client with timeout variants
-│   │   └── response_parser.py   ← LLM response parsing with fence stripping
-│   ├── memory/              ← memory store and extraction (supporting store for cross-session context; not yet surfaced by any component — Future Work)
-│   │   ├── store.py             ← memory persistence
-│   │   └── extraction.py        ← memory extraction from results
-│   ├── monitoring/          ← ambient monitoring
-│   │   └── ambient.py           ← ambient monitoring rules
-│   ├── persistence/         ← persistence layer abstractions (DB connections, repository pattern)
-│   │   └── deployment_persistence.py ← deployment data persistence
-│   ├── realtime/            ← OpenAI Realtime API voice session
-│   │   ├── session.py           ← voice session handler
-│   │   ├── batching.py          ← result batching for narration
-│   │   ├── continuity.py        ← audio-to-canvas session continuity
-│   │   └── dispatch.py          ← tool-as-trigger dispatch
-│   ├── render/              ← hot-path rendering (deterministic component selection, card cache)
-│   │   └── hot_path.py          ← hot-path selector (no LLM)
-│   ├── schemas/             ← Pydantic schemas (API models, validation)
-│   ├── session/             ← session store (SQLite)
-│   │   └── store.py             ← session store operations
-│   ├── sse/                 ← SSE broadcasting
-│   │   ├── broadcaster.py       ← SSE connection registry
-│   │   └── events.py            ← SSE event types
-│   ├── stt/                 ← speech-to-text (whisper-stt browser fallback)
-│   │   └── fallback.py          ← STT fallback client behind /api/v1/stt
-│   ├── surface/             ← surface routing
-│   │   └── router.py            ← result surface routing logic
-│   ├── synthesize/          ← synthesize strand (LLM)
-│   │   └── strand.py            ← result synthesis
-│   ├── telegram/            ← Telegram fallback surface
-│   │   └── fallback.py          ← Telegram delivery (⚠ NON-FUNCTIONAL until ADR-1 implementation)
-│   ├── test/                ← test-harness endpoints (bypass Web Speech API for e2e tests)
-│   ├── topic/               ← topic model
-│   │   └── model.py             ← topic operations
-│   ├── validation/          ← validation utilities (bead body validation, safety checks)
-│   ├── watcher/             ← bead watcher daemon
-│   │   └── daemon.py            ← NEEDLE bead watcher
-│   ├── canvas/              ← web frontend (SSE consumer, card renderer)
-│   │   └── index.html           ← single-page canvas UI
-│   └── cli/                 ← adc CLI
-│       ├── main.py              ← CLI entry point
-│       ├── commands.py          ← CLI commands
-│       ├── config.py            ← CLI configuration
-│       └── sse.py               ← SSE streaming for CLI
+│   ├── _version.py           ← package version metadata
+│   ├── calculate_deployment_metrics.py ← deployment metrics utility
+│   ├── categorize_events.py  ← event categorization utility
+│   ├── confirmations.py      ← confirmation helpers
+│   ├── freeze.py             ← self-modification kill switch
+│   ├── main.py               ← FastAPI app entry point
+│   ├── metrics_client.py     ← metrics client
+│   ├── metrics_query_client.py ← metrics query client
+│   ├── parse_log.py          ← log parsing utility
+│   ├── registry.py           ← project registry loader
+│   ├── victorialogs_latency_queries.py ← VictoriaLogs latency queries
+│   ├── victorialogs_queries.py ← VictoriaLogs queries
+│   ├── action/               ← action execution strand (design and step implementations)
+│   │   ├── executor.py
+│   │   ├── manifest_template.py
+│   │   ├── models.py
+│   │   ├── registry.py
+│   │   └── steps/
+│   │       ├── git_validation.py
+│   │       ├── gitops.py
+│   │       └── read.py
+│   ├── agents/               ← agent implementations
+│   │   ├── self_modification.py
+│   │   └── ui_regen.py
+│   ├── api/                  ← API request/response models
+│   │   └── models.py
+│   ├── bead_validation/      ← bead validation logic (Generated-Bead Safety)
+│   │   ├── exceptions.py
+│   │   ├── models.py
+│   │   └── validator.py
+│   ├── canvas/               ← web frontend (SSE consumer, card renderer)
+│   │   ├── canvas.js
+│   │   └── index.html
+│   ├── cli/                  ← adc CLI
+│   │   ├── commands.py
+│   │   ├── config.py
+│   │   ├── main.py
+│   │   └── sse.py
+│   ├── components/           ← component library and hot-reload
+│   │   ├── hot_reload.py
+│   │   ├── library.py
+│   │   └── seed_patterns.py
+│   ├── concurrency/          ← concurrency control
+│   │   └── limit.py
+│   ├── config/               ← application configuration helpers
+│   │   └── retry.py
+│   ├── confirmations/        ← confirmation and deletion safeguards
+│   │   ├── confirmations.py
+│   │   ├── confirmed_deletions.py
+│   │   └── prompts.py
+│   ├── context/              ← context warming and pre-fetch
+│   │   ├── prefetch.py
+│   │   └── warmer.py
+│   ├── conversation/         ← multi-turn conversation handling
+│   │   └── tracker.py
+│   ├── diff/                 ← diff generation for results
+│   │   └── engine.py
+│   ├── environment/          ← environment and repo discovery
+│   │   └── discovery.py      ← repo scanner that seeds registry.yaml (see Project Registry)
+│   ├── errors/               ← error and degraded-state handling
+│   │   ├── degraded_state.py
+│   │   └── transient_errors.py
+│   ├── escalate/             ← escalate strand for task-profile intents
+│   │   ├── commands.py
+│   │   ├── handler.py
+│   │   ├── llm.py
+│   │   └── pod_input.py
+│   ├── feedback/             ← feedback processing and background analysis
+│   │   ├── background_analysis.py
+│   │   ├── processor.py
+│   │   └── signals.py
+│   ├── fetch/                ← fetch strand (deterministic, per intent type)
+│   │   ├── clusters.py
+│   │   ├── commands.py
+│   │   └── orchestrator.py
+│   ├── instrument/           ← timing instrumentation
+│   │   └── timings.py
+│   ├── intent/               ← intent router and comparison tools
+│   │   ├── comparison.py
+│   │   ├── deterministic_router.py
+│   │   ├── router.py
+│   │   └── unified_comparison.py
+│   ├── llm/                  ← LLM response helpers
+│   │   └── response_parser.py
+│   ├── memory/               ← memory store and extraction
+│   │   ├── extraction.py
+│   │   └── store.py
+│   ├── monitoring/           ← ambient monitoring
+│   │   ├── ambient.py
+│   │   └── config_loader.py
+│   ├── persistence/           ← persistence layer abstractions
+│   │   └── deployment_persistence.py
+│   ├── realtime/              ← OpenAI Realtime API voice session
+│   │   ├── batching.py
+│   │   ├── continuity.py
+│   │   ├── dispatch.py
+│   │   └── session.py
+│   ├── render/                ← hot-path rendering
+│   │   └── hot_path.py
+│   ├── schemas/               ← Pydantic schemas
+│   │   ├── whisper_stt_deployment.py
+│   │   └── whisper_stt_simplified.py
+│   ├── session/               ← session store (SQLite)
+│   │   ├── connection_monitor.py
+│   │   ├── migrations/
+│   │   │   ├── add_card_cache.py
+│   │   │   ├── add_component_id_to_results.py
+│   │   │   ├── add_component_usage_patterns.py
+│   │   │   ├── add_result_type.py
+│   │   │   └── seed_component_patterns.py
+│   │   └── store.py
+│   ├── sse/                   ← SSE broadcasting
+│   │   ├── broadcaster.py
+│   │   └── events.py
+│   ├── stt/                   ← speech-to-text fallback
+│   │   └── fallback.py
+│   ├── surface/               ← surface routing
+│   │   └── router.py
+│   ├── synthesize/             ← synthesize strand (LLM)
+│   │   └── strand.py
+│   ├── telegram/               ← Telegram fallback surface
+│   │   ├── fallback.py        ← delivery is non-functional until ADR-1 implementation
+│   │   └── state_tracker.py
+│   ├── test/                   ← test-harness endpoints
+│   │   ├── dispatch.py
+│   │   ├── fixtures/
+│   │   │   ├── utterances.json
+│   │   │   └── validate_utterances.py
+│   │   ├── helpers.py
+│   │   ├── narration.py
+│   │   ├── router.py
+│   │   ├── synthetic.py
+│   │   └── utilities.py
+│   ├── topic/                  ← topic model
+│   │   └── model.py
+│   ├── utilities/              ← shared utilities
+│   │   └── retry.py
+│   ├── utils/                   ← filesystem and retry utilities
+│   │   ├── atomic_write.py
+│   │   ├── git_cleanup.py
+│   │   └── git_retry.py
+│   ├── validation/              ← validation utilities
+│   │   ├── classification_comparison.py
+│   │   ├── comparison.py
+│   │   ├── completeness.py
+│   │   ├── coverage_gap.py
+│   │   ├── day_coverage_validation.py
+│   │   ├── deployment_data.py
+│   │   ├── deployment_validator.py
+│   │   ├── integration.py
+│   │   ├── runner.py
+│   │   └── validate_completeness.py
+│   ├── victorialogs/            ← VictoriaLogs client and query helpers
+│   │   ├── client.py
+│   │   ├── metrics.py
+│   │   ├── queries.py
+│   │   ├── test_victorialogs.py
+│   │   └── README.md
+│   └── watcher/                 ← NEEDLE bead watcher daemon
+│       └── daemon.py
 ├── data/
 │   ├── session.db           ← session store (SQLite)
 │   └── components.db        ← component library (SQLite)
