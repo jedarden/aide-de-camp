@@ -201,7 +201,7 @@ class ContextWarmer:
             bundle = await self.build_context_bundle(topic_id, project_slugs)
 
             # Store in session store
-            store = get_store()
+            store = await get_store()
             await store.set_topic_context(
                 topic_id=topic_id,
                 context_data=bundle.to_dict(),
@@ -215,7 +215,7 @@ class ContextWarmer:
 
     async def warm_all_active_topics(self) -> None:
         """Warm context for all active topics."""
-        store = get_store()
+        store = await get_store()
 
         # Get active topic IDs
         active_topic_ids = await store.get_active_topic_ids()
@@ -242,7 +242,7 @@ class ContextWarmer:
 
     async def cleanup_expired_context(self) -> None:
         """Clean up expired context cache entries."""
-        store = get_store()
+        store = await get_store()
         deleted = await store.cleanup_expired_context()
         if deleted > 0:
             logger.info(f"Cleaned up {deleted} expired context cache entries")

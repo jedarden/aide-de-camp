@@ -10,6 +10,7 @@ appropriate error cards.
 """
 
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
@@ -488,14 +489,19 @@ class DegradedStateHandler:
 
 # Global degraded state handler instance
 _degraded_state_handler: Optional[DegradedStateHandler] = None
+_degraded_state_handler_lock = threading.RLock()
 
 
 def get_degraded_state_handler() -> DegradedStateHandler:
     """Get or create the global degraded state handler instance."""
     global _degraded_state_handler
-    if _degraded_state_handler is None:
-        _degraded_state_handler = DegradedStateHandler()
-    return _degraded_state_handler
+    # This singleton is reached from synchronous helpers, async tasks, and
+    # tests running event loops in worker threads.  An asyncio.Lock would only
+    # protect one event loop, so use a process-wide lock for publication.
+    with _degraded_state_handler_lock:
+        if _degraded_state_handler is None:
+            _degraded_state_handler = DegradedStateHandler()
+        return _degraded_state_handler
 
 
 # Convenience functions for broadcasting error events

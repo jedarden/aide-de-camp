@@ -47,10 +47,8 @@ from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 
 
 @pytest.fixture
-
-@pytest.fixture
-    Returns a callable that advances 100ms (0.1s) per call.
-    """
+def mock_clock():
+    """Return a callable that advances 100ms (0.1s) per call."""
     timestamps = []
 
     def clock() -> float:
@@ -64,16 +62,6 @@ from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 
     return clock
 
-
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
 
 # =============================================================================
 # HOT-PATH dispatch tests

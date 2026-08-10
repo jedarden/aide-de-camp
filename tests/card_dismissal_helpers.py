@@ -36,7 +36,7 @@ from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 # Session Creation Helpers
 # =============================================================================
 
-async def create_test_session(test_db_store | None = None, tmp_path: Path | None = None) -> tuple[SessionStore, str]:
+async def create_test_session(store: SessionStore | None = None, tmp_path: Path | None = None) -> tuple[SessionStore, str]:
     """
     Create a test session with an isolated test_db_store.
 
@@ -55,14 +55,14 @@ async def create_test_session(test_db_store | None = None, tmp_path: Path | None
             raise ValueError("tmp_path is required when store is not provided")
         db_path = tmp_path / "test_session.db"
         store = SessionStore(db_path)
-        await test_db_store.initialize()
+        await store.initialize()
 
-    session_id = await test_db_store.create_session()
+    session_id = await store.create_session()
     return store, session_id
 
 
 async def create_test_session_with_topic(
-    test_db_store | None = None,
+    store: SessionStore | None = None,
     tmp_path: Path | None = None,
     label: str = "Test Topic",
     topic_type: str = "project"
@@ -83,7 +83,7 @@ async def create_test_session_with_topic(
         store, session_id, topic_id = await create_test_session_with_topic(tmp_path)
     """
     store, session_id = await create_test_session(store, tmp_path)
-    topic_id, _ = await test_db_store.find_or_create_topic(
+    topic_id, _ = await store.find_or_create_topic(
         label=label,
         session_id=session_id,
         topic_type=topic_type
@@ -96,7 +96,7 @@ async def create_test_session_with_topic(
 # =============================================================================
 
 async def create_stuck_card(
-    test_db_store,
+    store,
     session_id: str,
     topic_id: str | None = None,
     bead_id: str = "adc-stuck-test",
@@ -126,20 +126,20 @@ async def create_stuck_card(
     """
     # Create topic if not provided
     if topic_id is None:
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Stuck Card Topic",
             session_id=session_id,
             topic_type="project"
         )
 
     # Create utterance
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="test stuck card",
     )
 
     # Create intent with bead_ref
-    intent_id = await test_db_store.create_intent(
+    intent_id = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -150,7 +150,7 @@ async def create_stuck_card(
     )
 
     # Create bead_watch row
-    await test_db_store.create_bead_watch(
+    await store.create_bead_watch(
         bead_ref=bead_id,
         sla_hours=24,
         intent_type="task-profile",
@@ -169,7 +169,7 @@ async def create_stuck_card(
 
 
 async def create_failed_card(
-    test_db_store,
+    store,
     session_id: str,
     topic_id: str | None = None,
     bead_id: str = "adc-failed-test",
@@ -199,20 +199,20 @@ async def create_failed_card(
     """
     # Create topic if not provided
     if topic_id is None:
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Failed Card Topic",
             session_id=session_id,
             topic_type="project"
         )
 
     # Create utterance
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="test failed card",
     )
 
     # Create intent with bead_ref
-    intent_id = await test_db_store.create_intent(
+    intent_id = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -396,7 +396,7 @@ async def verify_result_deleted_from_db(
     import sqlite3
 
     # Check if result exists in database
-    result_exists = not await verify_result_exists_in_db(store, result_id)
+    result_exists = not await verify_result_exists_in_db(test_db_store, result_id)
 
     # Check session isolation by attempting to delete again
     deletion_result = await test_db_store.delete_result(result_id, session_id)
@@ -421,7 +421,7 @@ async def get_all_results_for_session(test_db_store, session_id: str) -> list[di
         List of result dicts
 
     Example:
-        results = await get_all_results_for_session(store, session_id)
+        results = await get_all_results_for_session(test_db_store, session_id)
     """
     async with aiosqlite.connect(test_db_store.db_path) as db:
         db.row_factory = aiosqlite.Row
@@ -498,7 +498,7 @@ async def verify_database_integrity_after_dismissal(
 
     # Check 2: Result count consistency
     if expected_result_count is not None:
-        results = await get_all_results_for_session(store, session_id)
+        results = await get_all_results_for_session(test_db_store, session_id)
         checks_passed["result_count_match"] = len(results) == expected_result_count
         if len(results) != expected_result_count:
             all_passed = False
@@ -621,7 +621,7 @@ async def count_results_by_bead_id(
     """
     import json
 
-    results = await get_all_results_for_session(store, session_id)
+    results = await get_all_results_for_session(test_db_store, session_id)
     count = 0
     for result in results:
         try:
@@ -663,12 +663,12 @@ async def verify_cards_remain_after_dismissal(
 
     # Check dismissed cards are gone
     for bead_id in dismissed_bead_ids:
-        count = await count_results_by_bead_id(store, session_id, bead_id)
+        count = await count_results_by_bead_id(test_db_store, session_id, bead_id)
         results[f"dismissed_{bead_id}"] = count == 0
 
     # Check remaining cards still exist
     for bead_id in remaining_bead_ids:
-        count = await count_results_by_bead_id(store, session_id, bead_id)
+        count = await count_results_by_bead_id(test_db_store, session_id, bead_id)
         results[f"remaining_{bead_id}"] = count > 0
 
     results["all_correct"] = all(results.values())
@@ -849,14 +849,6 @@ async def broadcast_failed_card(
 # =============================================================================
 # Test Fixtures
 # =============================================================================
-
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
 
 # =============================================================================
 # Mock Helpers

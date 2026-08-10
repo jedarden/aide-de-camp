@@ -96,8 +96,9 @@ class AmbientMonitor:
         self.tasks: list[asyncio.Task] = []
         self._http_client: Optional[ClientSession] = None
         self._fetch_strand = get_fetch_strand()
-        # Use provided store or get default
-        self._store = session_store or get_store()
+        # Store initialization is asynchronous; resolve it lazily when the
+        # first database-backed operation runs.
+        self._store = session_store
         # Create config loader instance (not singleton) to respect config_path
         from .config_loader import ConfigLoader
         self._config_loader = ConfigLoader(config_path=config_path, default_tick_interval_seconds=300)
@@ -107,6 +108,11 @@ class AmbientMonitor:
         self._reload_lock = asyncio.Lock()
         self._stop_task: Optional[asyncio.Task] = None
         self._lifecycle_state = "STOPPED"
+
+    async def _get_store(self) -> SessionStore:
+        if self._store is None:
+            self._store = await get_store()
+        return self._store
 
     async def _get_http_client(self) -> ClientSession:
         """Get or create HTTP client."""
@@ -294,7 +300,8 @@ class AmbientMonitor:
 
     async def _get_topic_context_cache(self, topic_id: str) -> Optional[dict]:
         """Get cached context data for a topic from topic_context_cache table."""
-        cached = await self._store.get_topic_context(topic_id)
+        store = await self._get_store()
+        cached = await store.get_topic_context(topic_id)
         if cached:
             return cached.get("context")
         return None
@@ -306,7 +313,8 @@ class AmbientMonitor:
         ttl_seconds: int = TOPIC_CONTEXT_TTL_SECONDS,
     ) -> None:
         """Store context data in topic_context_cache table."""
-        await self._store.set_topic_context(
+        store = await self._get_store()
+        await store.set_topic_context(
             topic_id=topic_id,
             context_data=context_data,
             ttl_seconds=ttl_seconds,
@@ -378,7 +386,8 @@ class AmbientMonitor:
         Reads previous state from topic_context_cache and updates it after writing result.
         """
         # Find or create topic for this monitoring rule
-        topic_id, _ = await self._store.find_or_create_topic(
+        store = await self._get_store()
+        topic_id, _ = await store.find_or_create_topic(
             label=rule.topic_id,
             session_id=session_id,
             topic_type="project",
@@ -404,7 +413,7 @@ class AmbientMonitor:
         result_type = derive_result_type(intent_type="monitoring", project_slug=rule.project_slug)
 
         # Write result with intent_id=NULL (system-originated, no utterance behind it)
-        result_id = await self._store.create_result(
+        result_id = await store.create_result(
             intent_id=None,  # NULL for monitoring-originated results
             topic_id=topic_id,
             session_id=session_id,
@@ -426,7 +435,7 @@ class AmbientMonitor:
         )
 
         # Update result's card_fallback flag
-        await self._store.update_result_card_fallback(result_id, render_outcome.card_fallback)
+        await store.update_result_card_fallback(result_id, render_outcome.card_fallback)
 
         logger.info(f"Created monitoring result {result_id} for topic {rule.topic_id} (intent_id=NULL)")
 

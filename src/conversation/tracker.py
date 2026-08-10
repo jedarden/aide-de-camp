@@ -237,7 +237,7 @@ class ConversationTracker:
 
     async def _get_topic_label(self, topic_id: str) -> Optional[str]:
         """Get the label for a topic."""
-        store = get_store()
+        store = await get_store()
         # This is a simplified lookup - in practice we'd query the topics table
         # For now, return None
         return None

@@ -311,23 +311,15 @@ class StorageVerificationAssertions:
 
 
 @pytest.fixture
-
-@pytest.fixture
-    # Import after setting env var so the store picks it up
-    from src.session.store import SessionStore
-
-    # Initialize the test database
-    store = SessionStore(test_store_path)
-    await test_db_store.initialize()
-    yield store
-    await test_db_store.close()
-
-    # Cleanup
-    del os.environ["ADC_DB_PATH"]
+async def verification_test_db_store(test_db_store):
+    yield test_db_store
 
 
 @pytest.fixture
-    with patch("src.test.dispatch.get_store", return_value=verification_store):
+def sync_verification_client(verification_test_db_store):
+    from fastapi.testclient import TestClient
+
+    with patch("src.test.dispatch.get_store", return_value=verification_test_db_store):
         with TestClient(app) as client:
             yield client
 

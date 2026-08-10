@@ -70,6 +70,49 @@ def render_card(card: dict[str, Any]) -> dict[str, Any]:
     return render_cards([card])[0]
 
 
+def render_component_card(
+    rendered_html: str = "",
+    component_id: str = "test-component-1",
+    topic: dict[str, Any] | None = None,
+    staleness: dict[str, Any] | None = None,
+    topic_label: str | None = None,
+    topic_type: str | None = None,
+    topic_id: str = "t-1",
+) -> dict[str, Any]:
+    """Render a hot-path component result through the real topic-card path.
+
+    Component cards are represented by a normal topic card whose latest result
+    contains ``rendered_html``; the production canvas does not expose a second
+    standalone ``createComponentCard`` function.
+    """
+    resolved_topic = {
+        "id": topic_id,
+        "label": topic_label or "Pods",
+        "type": topic_type or "project",
+    }
+    if topic is not None:
+        resolved_topic.update(topic)
+    if topic_label is not None:
+        resolved_topic["label"] = topic_label
+    if topic_type is not None:
+        resolved_topic["type"] = topic_type
+
+    return render_card({
+        "topic": resolved_topic,
+        "staleness": staleness or {"seconds": 5},
+        "card_id": f"{resolved_topic.get('id', '')}:component",
+        "latest_result": {
+            "rendered_html": rendered_html,
+            "component_id": component_id,
+        },
+    })
+
+
+def render_component_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Render multiple flattened component-card fixtures."""
+    return [render_component_card(**card) for card in cards]
+
+
 def render_container(
     cards: list[dict[str, Any]] | None = None,
     projects: list[dict[str, Any]] | None = None,

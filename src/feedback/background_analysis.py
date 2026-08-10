@@ -95,11 +95,18 @@ class BackgroundAnalysisProcessor:
         self.auto_apply_enabled = auto_apply_enabled
         self.running = False
         self.task: Optional[asyncio.Task] = None
-        self.store = get_store()
+        # Store initialization is asynchronous; resolve it from the first
+        # operation instead of retaining a coroutine created in __init__.
+        self.store = None
         self.self_mod_agent = get_self_modification_agent()
         self._lifecycle_lock = asyncio.Lock()
         self._stop_task: Optional[asyncio.Task] = None
         self._lifecycle_state = "STOPPED"
+
+    async def _get_store(self):
+        if self.store is None:
+            self.store = await get_store()
+        return self.store
 
     async def analyze_signals(self, limit: int = 100) -> list[AnalysisProposal]:
         """
@@ -112,7 +119,8 @@ class BackgroundAnalysisProcessor:
             List of proposals for artifact updates
         """
         # Get unprocessed signals
-        signals = await self.store.get_unprocessed_signals(limit=limit)
+        store = await self._get_store()
+        signals = await store.get_unprocessed_signals(limit=limit)
 
         if not signals:
             logger.debug("No unprocessed signals to analyze")
@@ -132,7 +140,7 @@ class BackgroundAnalysisProcessor:
 
         # Mark processed signals
         signal_ids = [s["signal_id"] for s in signals]
-        await self.store.mark_signals_processed(signal_ids)
+        await store.mark_signals_processed(signal_ids)
 
         logger.info(f"Generated {len(proposals)} proposals from {len(signals)} signals")
 

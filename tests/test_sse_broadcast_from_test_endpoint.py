@@ -21,8 +21,6 @@ from src.session.store import SessionStore, get_store
 from pathlib import Path
 
 
-@pytest.fixture
-
 class TestSSEBroadcastFromTestEndpoint:
     """Verify SSE broadcast from /test endpoint."""
 

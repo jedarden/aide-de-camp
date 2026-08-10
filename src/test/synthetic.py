@@ -107,7 +107,7 @@ async def api_v1_synthetic_dispatch(request: SyntheticDispatchRequest) -> Synthe
 
     try:
         # Initialize store and broadcaster
-        store = get_store()
+        store = await get_store()
         broadcaster = get_broadcaster()
 
         # Create session if needed (pass session_id so sessions.id PK matches)
@@ -252,7 +252,7 @@ async def api_v1_batch_synthetic_dispatch(
     logger.info(f"[BATCH SYNTHETIC] Generating {count} results for session {session_id}")
 
     try:
-        store = get_store()
+        store = await get_store()
         broadcaster = get_broadcaster()
 
         # Create session if needed

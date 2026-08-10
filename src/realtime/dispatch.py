@@ -62,7 +62,7 @@ async def dispatch_intent(
             logger.info(f"Found pre-fetched data for topic {suggested_topic_id}: {list(prefetch_data.keys())}")
 
     # Store utterance
-    store = get_store()
+    store = await get_store()
     utterance_id = await store.create_utterance(session_id, utterance)
 
     # Call router (this will spawn fetch+synthesize workers)
@@ -168,7 +168,7 @@ async def result_listener(
     from .batching import get_result_batcher
     from ..feedback.signals import get_feedback_tracker
 
-    store = get_store()
+    store = await get_store()
     batcher = get_result_batcher() if use_batching else None
     diff_engine = get_diff_engine()
     feedback_tracker = get_feedback_tracker()

@@ -165,7 +165,7 @@ class EscalateHandler:
     async def _get_store(self):
         """Get or create session store."""
         if self.store is None:
-            self.store = get_store()
+            self.store = await get_store()
         return self.store
 
     def _get_reload_manager(self):

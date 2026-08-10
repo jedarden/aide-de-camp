@@ -102,7 +102,7 @@ async def dispatch_test_utterance(request: TestDispatchRequest) -> TestDispatchR
     logger.info(f"[TEST] Dispatching utterance: {request.utterance[:100]}...")
 
     # Initialize store and router
-    store = get_store()
+    store = await get_store()
     router = get_router(store)
 
     # Create session if needed (pass session_id so the sessions.id PK matches
@@ -227,7 +227,7 @@ async def generate_synthetic_result(request: SyntheticResultRequest) -> Syntheti
     logger.info(f"[TEST] Generating synthetic result for session {session_id}")
 
     # Initialize store
-    store = get_store()
+    store = await get_store()
 
     # Create session if needed
     session = await store.get_session(session_id)
