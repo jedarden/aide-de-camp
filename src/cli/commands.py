@@ -6,14 +6,20 @@ Each command function handles a specific CLI command and returns an exit code.
 
 import asyncio
 import json
+import logging
 import sys
 import uuid
+from pathlib import Path
 from typing import Optional
 
 import httpx
 
 from .config import Config
 from . import sse
+from src.utils.atomic_write import atomic_write
+
+
+logger = logging.getLogger(__name__)
 
 
 async def dispatch(
@@ -494,7 +500,6 @@ def restore_artifacts_cmd(commits: int = 1, dry_run: bool = False) -> int:
         Exit code (0 for success, non-zero for error)
     """
     import subprocess
-    from pathlib import Path
 
     from src.freeze import set_frozen, check_frozen
 
@@ -561,36 +566,105 @@ def restore_artifacts_cmd(commits: int = 1, dry_run: bool = False) -> int:
                 set_frozen(True)
             return 0
 
-        print("\n🔄 Reverting commits...")
+        print("\n🔄 Reverting commits atomically...")
 
-        # Revert each commit in reverse order (oldest first)
-        for short_hash, _ in reversed(self_mod_commits):
-            print(f"  Reverting {short_hash}...", end=" ")
+        # Read all rollback payloads before mutating any file.  The
+        # self-modification writer commits one artifact at a time, so the
+        # parent blob for each commit is the exact content to publish.
+        rollback_operations = []
+        original_contents = {}
+        for short_hash, subject in reversed(self_mod_commits):
+            prefix = "auto: self-mod write to "
+            if prefix not in subject:
+                raise ValueError(f"Unsupported self-mod commit subject: {subject}")
+
+            relative_path = subject.split(prefix, 1)[1]
+            if " [" in relative_path:
+                relative_path = relative_path.rsplit(" [", 1)[0]
+            relative_path = Path(relative_path)
+            target_path = (repo_root / relative_path).resolve()
+            try:
+                relative_path = target_path.relative_to(repo_root.resolve())
+            except ValueError as error:
+                raise ValueError(f"Self-mod commit targets path outside repository: {target_path}") from error
+
+            if not target_path.is_file():
+                raise FileNotFoundError(
+                    f"Cannot atomically restore missing artifact {relative_path}"
+                )
+            original_contents.setdefault(target_path, target_path.read_text())
+
             result = subprocess.run(
-                ['git', 'revert', '--no-commit', short_hash],
+                ["git", "show", f"{short_hash}^:{relative_path}"],
                 cwd=repo_root,
                 capture_output=True,
                 text=True,
                 check=False,
-                timeout=30
+                timeout=30,
             )
-
             if result.returncode != 0:
-                print(f"❌")
-                print(f"    Failed: {result.stderr}", file=sys.stderr)
-                # Abort the revert on failure
-                subprocess.run(['git', 'revert', '--abort'], cwd=repo_root, capture_output=True)
-                if was_frozen:
-                    print("🔓 Re-freezing (restore state)")
-                    set_frozen(True)
-                return 1
+                raise RuntimeError(
+                    f"Cannot read parent version for {relative_path}: {result.stderr}"
+                )
 
-            print("✓")
+            rollback_operations.append((short_hash, target_path, result.stdout))
 
-        # Commit the revert
+        def restore_original_files() -> None:
+            """Restore every touched artifact through atomic_write."""
+            for target_path, content in original_contents.items():
+                logger.info("Rollback atomic restore: %s", target_path)
+                atomic_write(target_path, content)
+
+        paths_to_stage = [
+            str(target_path.relative_to(repo_root))
+            for target_path in original_contents
+        ]
+
+        try:
+            for short_hash, target_path, content in rollback_operations:
+                print(f"  Restoring {target_path.relative_to(repo_root)} from {short_hash}...", end=" ")
+                logger.info(
+                    "Rollback atomic write: restoring %s from commit %s",
+                    target_path,
+                    short_hash,
+                )
+                atomic_write(target_path, content)
+                print("✓")
+
+            stage_result = subprocess.run(
+                ["git", "add", "--", *paths_to_stage],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=10,
+            )
+            if stage_result.returncode != 0:
+                raise RuntimeError(f"Failed to stage atomic rollback: {stage_result.stderr}")
+
+        except Exception:
+            logger.exception("Atomic artifact rollback failed before commit; restoring snapshot")
+            try:
+                subprocess.run(
+                    ["git", "reset", "HEAD", "--", *paths_to_stage],
+                    cwd=repo_root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=10,
+                )
+                restore_original_files()
+            except Exception:
+                logger.exception("Failed to restore original artifact snapshot atomically")
+            if was_frozen:
+                print("🔓 Re-freezing (restore state)")
+                set_frozen(True)
+            return 1
+
+        # Commit the atomically prepared rollback
         print("\n💾 Committing revert...", end=" ")
         result = subprocess.run(
-            ['git', 'commit', '-m', f"adc restore-artifacts: revert {len(self_mod_commits)} self-mod commit(s)"],
+            ["git", "commit", "-m", f"adc restore-artifacts: revert {len(self_mod_commits)} self-mod commit(s)"],
             cwd=repo_root,
             capture_output=True,
             text=True,
@@ -601,6 +675,19 @@ def restore_artifacts_cmd(commits: int = 1, dry_run: bool = False) -> int:
         if result.returncode != 0:
             print(f"❌")
             print(f"    Failed to commit: {result.stderr}", file=sys.stderr)
+            logger.warning("Atomic artifact rollback commit failed; restoring snapshot")
+            try:
+                subprocess.run(
+                    ["git", "reset", "HEAD", "--", *paths_to_stage],
+                    cwd=repo_root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=10,
+                )
+                restore_original_files()
+            except Exception:
+                logger.exception("Failed to restore artifact snapshot after commit failure")
             if was_frozen:
                 print("🔓 Re-freezing (restore state)")
                 set_frozen(True)
