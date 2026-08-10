@@ -109,3 +109,35 @@ async def test_create_session_wraps_http_failures():
 async def test_create_session_requires_open_client():
     with pytest.raises(SessionCreationError, match="async context manager"):
         await SessionClient().create_session("test-session-123")
+
+
+@pytest.mark.asyncio
+async def test_cleanup_all_deletes_the_whole_session_not_only_visible_cards():
+    requests = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        assert request.method == "DELETE"
+        return httpx.Response(
+            200,
+            json={
+                "status": "deleted",
+                "session_id": "test-session-123",
+                "session_removed": 1,
+                "topics_removed": 3,
+            },
+            request=request,
+        )
+
+    client, http_client = await _client_for(handler)
+    client._created_session_ids.append("test-session-123")
+    try:
+        assert await client.cleanup_all() is None
+    finally:
+        await http_client.aclose()
+
+    assert len(requests) == 1
+    assert all(
+        str(request.url) == "http://localhost:8000/api/v1/sessions/test-session-123"
+        for request in requests
+    )

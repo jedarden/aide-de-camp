@@ -73,8 +73,15 @@ DEFAULT_VOICE = "alloy"
 # Voice prompt path
 VOICE_PROMPT_PATH = Path("/home/coding/aide-de-camp/prompts/voice.md")
 
-# Session store
-DB_PATH = Path("/home/coding/aide-de-camp/data/session.db")
+# Session store. Test servers can opt into an isolated file with ADC_DB_PATH
+# (or ADC_TEST_DB_PATH when the test server is launched directly); production
+# keeps the existing data/session.db default.
+DEFAULT_DB_PATH = Path("/home/coding/aide-de-camp/data/session.db")
+DB_PATH = Path(
+    os.environ.get("ADC_DB_PATH")
+    or os.environ.get("ADC_TEST_DB_PATH")
+    or str(DEFAULT_DB_PATH)
+)
 CANVAS_PATH = Path("/home/coding/aide-de-camp/src/canvas/index.html")
 # Canvas render helpers (createTopicCard + friends) — served separately so they
 # are unit-testable headlessly (tests/e2e/canvas_dom_runner.js).

@@ -116,3 +116,43 @@ async def test_create_topic_rejects_missing_response_fields():
 async def test_create_topic_requires_open_client():
     with pytest.raises(TopicCreationError, match="async context manager"):
         await TestTopicClient().create_topic("check status", "session-1", "surface-1")
+
+
+@pytest.mark.asyncio
+async def test_create_topic_resolves_background_dispatch_from_session_cards():
+    requests = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "POST":
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "message": "accepted",
+                    "data": {"intent_ids": ["intent-1"]},
+                },
+                request=request,
+            )
+        return httpx.Response(
+            200,
+            json={
+                "cards": [
+                    {
+                        "topic": {"id": "topic-1"},
+                        "latest_result": {"id": "result-1", "summary": "healthy"},
+                    }
+                ]
+            },
+            request=request,
+        )
+
+    client, http_client = await _client_for(handler)
+    try:
+        result = await client.create_topic("check status", "session-1", "surface-1")
+    finally:
+        await http_client.aclose()
+
+    assert result["topic_id"] == "topic-1"
+    assert result["result"]["id"] == "result-1"
+    assert [request.method for request in requests] == ["POST", "GET"]
