@@ -304,15 +304,84 @@
     "namespace": "pbx-web",
     "cluster": "ardenone-cluster",
     "analysis_period": "2026-07-07 to 2026-08-06 (30 days)",
-    "total_deployment_events": 2,
-    "successful_rollouts": 2,
+    "total_deployment_events": 5,
+    "successful_rollouts": 4,
     "failed_rollouts": 0,
-    "rollback_events": 0,
+    "rollback_events": 1,
     "crashloops": 0,
     "oomkills": 0,
     "pod_restarts": 0,
     "error_rate": "Very low (6 client disconnect errors in 30 days)",
     "availability": "100%",
     "overall_status": "EXCELLENT - Zero incidents, zero downtime, minimal errors"
+  },
+  "deployment_events": [
+    {
+      "event_id": "pbx-web:2026-07-13T18:07:55Z:deployment_rollback:11",
+      "timestamp": "2026-07-13T18:07:55.000Z",
+      "event_type": "deployment_rollback",
+      "deployment_name": "pbx-web",
+      "revision": 11,
+      "replica_set": "pbx-web-754f4cfdf7",
+      "image": "ronaldraygun/pbx-web:1.0.8",
+      "outcome": "rolled_back",
+      "notes": "Rolled back from 1.0.9 to 1.0.8 on the same day."
+    },
+    {
+      "event_id": "pbx-web:2026-07-13T18:18:07Z:deployment_rollout:14",
+      "timestamp": "2026-07-13T18:18:07.000Z",
+      "event_type": "deployment_rollout",
+      "deployment_name": "pbx-web",
+      "revision": 14,
+      "replica_set": "pbx-web-5ff68464d",
+      "image": "ronaldraygun/pbx-web:1.0.9",
+      "outcome": "success",
+      "notes": "Re-deployment after the rollback, 10m 12s later."
+    },
+    {
+      "event_id": "pbx-web:2026-07-15T03:24:40Z:deployment_rollout:5",
+      "timestamp": "2026-07-15T03:24:40.000Z",
+      "event_type": "deployment_rollout",
+      "deployment_name": "pbx-rebuild-relay",
+      "revision": 5,
+      "replica_set": "pbx-rebuild-relay-588d79c5b9",
+      "image": "python:3-slim",
+      "outcome": "success",
+      "notes": "Supporting PBX rebuild relay deployment."
+    },
+    {
+      "event_id": "pbx-web:2026-07-27T17:56:07Z:deployment_rollout:2",
+      "timestamp": "2026-07-27T17:56:07.000Z",
+      "event_type": "deployment_rollout",
+      "deployment_name": "lab-rebuild-relay",
+      "revision": 2,
+      "replica_set": "lab-rebuild-relay-79957dbd4",
+      "image": "python:3-slim",
+      "outcome": "success",
+      "notes": "Supporting lab rebuild relay deployment."
+    },
+    {
+      "event_id": "pbx-web:2026-07-28T17:26:12Z:deployment_rollout:14",
+      "timestamp": "2026-07-28T17:26:12.000Z",
+      "event_type": "deployment_rollout",
+      "deployment_name": "pbx-web",
+      "revision": 14,
+      "replica_set": "pbx-web-5ff68464d",
+      "image": "ronaldraygun/pbx-web:1.0.9",
+      "outcome": "success",
+      "notes": "Current active deployment; same image, possible configuration restart."
+    }
+  ],
+  "event_summary": {
+    "total_events": 5,
+    "successful_events": 4,
+    "failed_events": 0,
+    "rollback_events": 1,
+    "unique_deployment_names": 3,
+    "source": "deployment-events-30days.json",
+    "source_window": {
+      "start": "2026-07-07T00:00:00Z",
+      "end": "2026-08-06T23:59:59Z"
+    }
   }
 }
