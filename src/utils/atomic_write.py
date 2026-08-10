@@ -9,6 +9,7 @@ handling, rollback support, and logging.
 import logging
 import os
 import random
+import shutil
 import tempfile
 import threading
 import time
@@ -105,6 +106,34 @@ def _cleanup_temp_path(
 
     logger.debug("[%s] Cleaned up temp file %s (%s)", operation_id, path, reason)
     return True
+
+
+def _atomic_backup(source: Path, destination: Path, operation_id: str) -> None:
+    """Copy ``source`` to ``destination`` without exposing a partial backup."""
+    temp_fd, temp_path = tempfile.mkstemp(
+        dir=destination.parent,
+        prefix=f'.{destination.name}.tmp_{operation_id}_',
+        suffix='.bak',
+    )
+    temp_path_obj = Path(temp_path)
+    try:
+        os.close(temp_fd)
+        temp_fd = None
+        shutil.copy2(source, temp_path_obj)
+        os.replace(temp_path_obj, destination)
+    except BaseException:
+        if temp_fd is not None:
+            try:
+                os.close(temp_fd)
+            except OSError as close_error:
+                logger.warning(
+                    "[%s] Failed to close backup temp descriptor for %s: %s",
+                    operation_id,
+                    temp_path_obj,
+                    close_error,
+                )
+        _cleanup_temp_path(temp_path_obj, operation_id, "atomic backup error")
+        raise
 
 
 def _atomic_write_with_retries(
@@ -300,8 +329,7 @@ def _atomic_write_impl(
         if create_backup and original_existed:
             backup_path = filepath.with_suffix(filepath.suffix + '.bak')
             try:
-                import shutil
-                shutil.copy2(filepath, backup_path)
+                _atomic_backup(filepath, backup_path, operation_id)
                 logger.info(f"[{operation_id}] Created backup at {backup_path}")
             except OSError as e:
                 error_msg = f"Failed to create backup at {backup_path}: {e}"
