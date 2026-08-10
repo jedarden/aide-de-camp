@@ -28,10 +28,6 @@ from src.main import app
 # --- fixtures ---------------------------------------------------------------
 
 
-@pytest.fixture
-
-@pytest.fixture
-
 # --- test data ---------------------------------------------------------------
 
 TEST_SYNTHETIC_PAYLOAD = {

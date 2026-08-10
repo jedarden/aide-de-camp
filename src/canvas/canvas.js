@@ -92,7 +92,7 @@ function createTopicCard(cardData) {
     // When the result has rendered_html (from hot-path component match), inject it directly.
     // The HTML is already escaped server-side (hot-path renderer's escaping contract),
     // so we inject it as-is. Topic metadata is preserved via data attributes.
-    if (latestResult && latestResult.rendered_html) {
+    if (latestResult && Object.prototype.hasOwnProperty.call(latestResult, 'rendered_html')) {
         const card = document.createElement('div');
         card.className = 'topic-card component-card';
         card.dataset.topicId = topic.id;
@@ -105,9 +105,19 @@ function createTopicCard(cardData) {
         const typeClass = topic.type || 'adhoc';
         card.dataset.topicType = typeClass;
 
-        // Build the full card HTML: component content + staleness indicator
+        // Build the full card HTML: topic metadata + component content +
+        // staleness indicator. Keep the component path structurally aligned
+        // with ordinary topic cards so labels and stale state remain visible.
         const timeAgo = formatStaleness(staleness.seconds);
-        const html = latestResult.rendered_html + `
+        const html = `
+            <div class="topic-header">
+                <div class="topic-label">${escapeHtml(topic.label)}</div>
+                <div>
+                    <span class="topic-type ${typeClass}">${escapeHtml(topic.type || 'adhoc')}</span>
+                    ${stalenessLevel !== 'fresh' ? `<span class="stale-badge ${stalenessLevel}">STALE</span>` : ''}
+                </div>
+            </div>
+            <div class="component-content">${latestResult.rendered_html || ''}</div>
             <div class="staleness-indicator ${stalenessLevel}">
                 <span class="staleness-dot ${stalenessLevel}"></span>
                 <span>Updated ${timeAgo}</span>

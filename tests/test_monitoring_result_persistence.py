@@ -30,22 +30,13 @@ from src.render.hot_path import derive_result_type
 
 
 @pytest.fixture
-    s = SessionStore(db_path)
-    await s.initialize()
-
-    yield s
-
-    # Cleanup
-    await s.close()
-    db_path.unlink(missing_ok=True)
+async def store(test_db_store):
+    yield test_db_store
 
 
 @pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-    # Set up a config with exception rules
+async def ambient_monitor(store):
+    monitor = AmbientMonitor(session_store=store)
     monitor.config = MonitoringConfig(
         active_topics=[],
         exceptions=[
@@ -68,13 +59,30 @@ from src.render.hot_path import derive_result_type
         quiet_hours={},
         channels={},
     )
-
     return monitor
 
 
 @pytest.fixture
+def sample_monitoring_rule():
+    return MonitoringRule(
+        topic_id="test-topic",
+        project_slug="test-pipeline",
+        intent_type="status",
+        check_interval=60,
+        urgency="normal",
+        filters=[],
+        notification_threshold="any_change",
+    )
+
 
 @pytest.fixture
+def session_with_surface(test_db_store):
+    return ("test-session", "test-surface")
+
+
+@pytest.fixture
+def mock_broadcaster():
+    return AsyncMock()
 
 # --- Integration Tests ----------------------------------------------------------
 

@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, patch
 import aiosqlite
 import pytest
 
-from src.monitoring.ambient import AmbientMonitor, MonitoringRule, ExceptionRule
+from src.monitoring.ambient import AmbientMonitor, MonitoringRule, ExceptionRule, MonitoringConfig
 from src.session.store import SessionStore
 
 
@@ -25,19 +25,16 @@ from src.session.store import SessionStore
 
 
 @pytest.fixture
-    s = SessionStore(db_path)
+async def store(tmp_path):
+    s = SessionStore(tmp_path / "ambient_rule_engine.db")
     await s.initialize()
-
     yield s
-
-    # Cleanup
     await s.close()
-    db_path.unlink(missing_ok=True)
 
 
 @pytest.fixture
-    # Set up a config with exception rules
-    from src.monitoring.ambient import MonitoringConfig
+async def ambient_monitor(store):
+    monitor = AmbientMonitor(session_store=store)
     monitor.config = MonitoringConfig(
         active_topics=[],
         exceptions=[
@@ -72,6 +69,16 @@ from src.session.store import SessionStore
 
 
 @pytest.fixture
+def sample_monitoring_rule():
+    return MonitoringRule(
+        topic_id="test-topic",
+        project_slug="test-pipeline",
+        intent_type="status",
+        check_interval=60,
+        urgency="normal",
+        filters=[],
+        notification_threshold="any_change",
+    )
 
 # --- Tests ---------------------------------------------------------------------
 

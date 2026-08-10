@@ -121,7 +121,7 @@ class TestComponentCardRendering:
         # Fresh (under 10 minutes)
         out = render_component_card(
             rendered_html="<div>Content</div>",
-            stal={"seconds": 60},
+            staleness={"seconds": 60},
         )
         html = out["outerHTML"]
         assert "fresh" in out["className"].split()
@@ -132,7 +132,7 @@ class TestComponentCardRendering:
         # Stale (over 10 minutes)
         out = render_component_card(
             rendered_html="<div>Content</div>",
-            stal={"seconds": 900},  # 15 minutes
+            staleness={"seconds": 900},  # 15 minutes
         )
         html = out["outerHTML"]
         assert "stale" in out["className"].split()
@@ -258,4 +258,4 @@ def test_dom_runner_targets_real_canvas_module():
 
     assert CANVAS_JS.exists(), f"canvas.js missing at {CANVAS_JS}"
     content = CANVAS_JS.read_text()
-    assert "createComponentCard" in content
+    assert "createTopicCard" in content

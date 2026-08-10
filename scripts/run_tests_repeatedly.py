@@ -40,6 +40,8 @@ class TestResult:
     passed: bool
     duration: float
     error_message: str = ""
+    phase: str = "call"
+    skipped: bool = False
 
     def __hash__(self):
         return hash(self.test_name)
@@ -58,6 +60,7 @@ class RunSummary:
     skipped: int
     errors: int
     test_results: List[TestResult] = field(default_factory=list)
+    exit_code: int = 0
 
     @property
     def success_rate(self) -> float:
@@ -116,7 +119,7 @@ class TestRepeatRunner:
             self._print_run_summary(run_summary)
 
             # Check if run failed
-            if run_summary.failed > 0 or run_summary.errors > 0:
+            if run_summary.failed > 0 or run_summary.errors > 0 or run_summary.exit_code != 0:
                 all_success = False
                 if self.fail_fast:
                     print(f"\n⚠️  Run {run_num} failed.Stopping due to --fail-fast")
@@ -137,26 +140,49 @@ class TestRepeatRunner:
         class ResultCollector:
             def __init__(self, results_list):
                 self.results = results_list
+                self._result_indexes = {}
 
             def pytest_runtest_logreport(self, report: TestReport):
-                """Collect results from each test."""
-                if report.when == "call":  # Only collect the call phase, not setup/teardown
-                    # Extract test name from nodeid (e.g., "tests/test_foo.py::test_bar")
-                    test_name = report.nodeid
-                    passed = report.outcome == "passed"
-                    duration = report.duration
+                """Collect call results and failures from setup/teardown too."""
+                # A setup failure has no call-phase report, while a teardown
+                # failure must replace an otherwise passing call result.  Keep
+                # one result per node so summary counts match pytest's outcome.
+                if report.when == "setup" and report.outcome == "passed":
+                    return
 
-                    error_msg = ""
-                    if not passed and hasattr(report, "longrepr"):
-                        error_msg = str(report.longrepr) if report.longrepr else ""
+                skipped = report.outcome == "skipped"
+                passed = report.outcome == "passed"
+                error_msg = ""
+                if not passed and hasattr(report, "longrepr"):
+                    error_msg = str(report.longrepr) if report.longrepr else ""
 
-                    test_result = TestResult(
-                        test_name=test_name,
-                        passed=passed,
-                        duration=duration,
-                        error_message=error_msg
-                    )
-                    self.results.append(test_result)
+                result = TestResult(
+                    test_name=report.nodeid,
+                    passed=passed,
+                    duration=report.duration,
+                    error_message=error_msg,
+                    phase=report.when,
+                    skipped=skipped,
+                )
+                index = self._result_indexes.get(report.nodeid)
+                if index is None:
+                    self._result_indexes[report.nodeid] = len(self.results)
+                    self.results.append(result)
+                elif report.when == "teardown" and not passed:
+                    self.results[index] = result
+
+            def pytest_collectreport(self, report):
+                """Record import/syntax/fixture errors during collection."""
+                if not report.failed:
+                    return
+                nodeid = report.nodeid or "<unknown collection target>"
+                self.results.append(TestResult(
+                    test_name=f"{nodeid}::<collection>",
+                    passed=False,
+                    duration=0.0,
+                    error_message=str(report.longrepr) if report.longrepr else "collection failed",
+                    phase="collection",
+                ))
 
         # Run pytest with our collector
         args = [
@@ -169,16 +195,28 @@ class TestRepeatRunner:
         collector = ResultCollector(test_results)
 
         # Use pytest.main to run tests
-        exit_code = pytest.main(args, plugins=[collector])
+        exit_code = int(pytest.main(args, plugins=[collector]))
+
+        # A plugin or an unexpected pytest interruption can produce a non-zero
+        # exit code without a report hook firing.  Preserve that failure in
+        # the per-run data instead of reporting a false 0/0 success.
+        if exit_code != 0 and not any(not result.passed and not result.skipped for result in test_results):
+            test_results.append(TestResult(
+                test_name="<pytest session>",
+                passed=False,
+                duration=0.0,
+                error_message=f"pytest exited with code {exit_code}",
+                phase="session",
+            ))
 
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
 
         # Count results
         passed = sum(1 for r in test_results if r.passed)
-        failed = sum(1 for r in test_results if not r.passed and r.error_message)
-        errors = sum(1 for r in test_results if not r.passed and not r.error_message)
-        skipped = 0  # Pytest doesn't report skipped in the call phase
+        failed = sum(1 for r in test_results if not r.passed and not r.skipped)
+        errors = sum(1 for r in test_results if not r.passed and not r.skipped and not r.error_message)
+        skipped = sum(1 for r in test_results if r.skipped)
 
         total = len(test_results)
 
@@ -192,12 +230,13 @@ class TestRepeatRunner:
             failed=failed,
             skipped=skipped,
             errors=errors,
-            test_results=test_results
+            test_results=test_results,
+            exit_code=exit_code,
         )
 
     def _print_run_summary(self, run_summary: RunSummary):
         """Print summary of a single run."""
-        status_emoji = "✅" if run_summary.failed == 0 else "❌"
+        status_emoji = "✅" if run_summary.failed == 0 and run_summary.errors == 0 and run_summary.exit_code == 0 else "❌"
 
         print(f"{status_emoji} Results: {run_summary.passed}/{run_summary.total_tests} passed "
               f"({run_summary.success_rate:.1f}%)")
@@ -214,7 +253,7 @@ class TestRepeatRunner:
         if self.verbose and run_summary.failed > 0:
             print("\n   Failed tests:")
             for result in run_summary.test_results:
-                if not result.passed:
+                if not result.passed and not result.skipped:
                     print(f"     - {result.test_name}")
                     if result.error_message:
                         # Show first line of error
@@ -348,12 +387,15 @@ class TestRepeatRunner:
                     "skipped": run.skipped,
                     "errors": run.errors,
                     "success_rate": run.success_rate,
+                    "exit_code": run.exit_code,
                     "test_results": [
                         {
                             "test_name": result.test_name,
                             "passed": result.passed,
                             "duration": result.duration,
-                            "error_message": result.error_message
+                            "error_message": result.error_message,
+                            "phase": result.phase,
+                            "skipped": result.skipped,
                         }
                         for result in run.test_results
                     ]

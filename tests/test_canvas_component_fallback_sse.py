@@ -55,12 +55,13 @@ async def isolated_store(tmp_path, monkeypatch):
     main_mod._store = None
     main_mod._topic_manager = None
 
-    store = store_mod.get_store()
+    store = await store_mod.get_store()
     await store.initialize()
     main_mod._topic_manager = TopicManager(store)
 
     yield store
 
+    await store.close()
     main_mod._topic_manager = saved_tm
     main_mod._store = saved_main_store
     store_mod._store = saved_store

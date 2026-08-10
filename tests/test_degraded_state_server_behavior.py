@@ -44,12 +44,55 @@ from src.fetch.commands import (
 
 
 @pytest.fixture
+def degraded_handler():
+    return DegradedStateHandler()
+
 
 @pytest.fixture
+def sample_fetch_result():
+    sources = {
+        FetchSource.KUBECTL_PODS: SourceResult(
+            source=FetchSource.KUBECTL_PODS,
+            status="success",
+            data={},
+            duration_ms=100,
+        ),
+        FetchSource.ARGOCD_APP: SourceResult(
+            source=FetchSource.ARGOCD_APP,
+            status="timeout",
+            data=None,
+            duration_ms=100,
+            error="timed out",
+        ),
+        FetchSource.GIT_LOG: SourceResult(
+            source=FetchSource.GIT_LOG,
+            status="success",
+            data={},
+            duration_ms=100,
+        ),
+    }
+    return FetchResult(
+        intent_id="intent-1",
+        intent_type=FetchIntentType.STATUS,
+        sources=sources,
+        coverage=FetchCoverage(
+            total_sources=3,
+            succeeded=[FetchSource.KUBECTL_PODS, FetchSource.GIT_LOG],
+            timed_out=[FetchSource.ARGOCD_APP],
+            failed=[],
+            skipped=[],
+        ),
+        total_duration_ms=300,
+        caveats=["argocd_app timed out"],
+    )
+
 
 @pytest.fixture
-
-@pytest.fixture
+def all_failed_fetch_result():
+    sources = {
+        source: SourceResult(source=source, status="failed", data=None, duration_ms=100)
+        for source in (FetchSource.KUBECTL_PODS, FetchSource.ARGOCD_APP, FetchSource.GIT_LOG)
+    }
     return FetchResult(
         intent_id="intent-1",
         intent_type=FetchIntentType.STATUS,
@@ -58,10 +101,10 @@ from src.fetch.commands import (
             total_sources=3,
             succeeded=[],
             timed_out=[],
-            failed=[FetchSource.KUBECTL_PODS, FetchSource.ARGOCD_APP, FetchSource.GIT_LOG],
+            failed=list(sources),
             skipped=[],
         ),
-        total_duration_ms=3000,
+        total_duration_ms=300,
         caveats=["All sources failed"],
         terminal_failure="all_sources_failed",
     )

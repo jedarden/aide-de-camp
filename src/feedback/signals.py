@@ -406,7 +406,7 @@ class ImplicitFeedbackTracker:
 
     async def _store_signal(self, signal: FeedbackSignal) -> None:
         """Store a signal in the session store."""
-        store = get_store()
+        store = await get_store()
         await store.create_feedback_signal(
             signal_id=signal.signal_id,
             signal_type=signal.signal_type.value,

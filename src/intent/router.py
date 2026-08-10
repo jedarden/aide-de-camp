@@ -419,7 +419,7 @@ class IntentRouter:
     async def _get_store(self):
         """Get or create session store."""
         if self.store is None:
-            self.store = get_store()
+            self.store = await get_store()
         return self.store
 
     def _get_reload_manager(self):
@@ -1132,7 +1132,7 @@ class IntentRouter:
                 )
 
                 # Update intent status to failed
-                store = get_store()
+                store = await get_store()
                 await store.update_intent_status(
                     routed_intent.intent_id,
                     "failed",
@@ -1205,7 +1205,7 @@ class IntentRouter:
                 )
 
                 # Update intent status to failed
-                store = get_store()
+                store = await get_store()
                 await store.update_intent_status(
                     routed_intent.intent_id,
                     "failed",
@@ -1227,7 +1227,7 @@ class IntentRouter:
             # synthesize strand streams — see src/instrument/timings.py.
 
             # Persist result to session store so loadTopics() can display it
-            store = get_store()
+            store = await get_store()
             _topic_type_map = {
                 IntentType.ACTION: "project",
                 IntentType.TASK_PROFILE: "project",

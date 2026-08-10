@@ -42,7 +42,7 @@ class ConfirmationPromptManager:
     async def _get_store(self):
         """Get or create session store."""
         if self.store is None:
-            self.store = get_store()
+            self.store = await get_store()
         return self.store
 
     async def create_pod_deletion_confirmation(

@@ -574,9 +574,10 @@ async def in_memory_db_store():
 
     yield store
 
-    # Cleanup: close the keeper connection first, then the store
-    await keeper_conn.close()
+    # Keep the database alive while SessionStore checkpoints and closes its
+    # own per-operation connections, then release the keeper last.
     await store.close()
+    await keeper_conn.close()
 
 
 @pytest.fixture(scope="function")
@@ -645,7 +646,7 @@ async def in_memory_db_connection():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def reset_global_store_singleton(tmp_path):
+async def reset_global_store_singleton(tmp_path):
     """
     Reset the global SessionStore singleton before each test.
 
@@ -687,6 +688,13 @@ def reset_global_store_singleton(tmp_path):
     store_module._store = None
 
     yield
+
+    # Cleanup the store created by this test before restoring the previous
+    # singleton.  Without this, tests that call get_store() leave a live store
+    # behind and its database/WAL files can outlive the test that created them.
+    current_store = store_module._store
+    if current_store is not None and current_store is not original_store:
+        await current_store.close()
 
     # Cleanup: restore original state
     store_module._store = original_store
