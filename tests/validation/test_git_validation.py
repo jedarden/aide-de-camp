@@ -512,6 +512,196 @@ class TestValidateGitState:
         assert summary["passed"] > 0
 
 
+class TestGitStateError:
+    """Tests for GitStateError exception class."""
+
+    def test_basic_exception_creation(self):
+        """Should create exception with basic message."""
+        error = GitStateError("Test error message")
+        assert str(error) == "Test error message"
+        # The message is stored in args[0] by the base Exception class
+        assert error.args[0] == "Test error message"
+
+    def test_validation_type_attribute(self):
+        """Should store validation type attribute."""
+        error = GitStateError(
+            "Test error",
+            validation_type="branch"
+        )
+        assert error.validation_type == "branch"
+
+    def test_details_attribute(self):
+        """Should store details dictionary."""
+        details = {"expected": "main", "actual": "feature"}
+        error = GitStateError(
+            "Test error",
+            validation_type="branch",
+            details=details
+        )
+        assert error.details == details
+        assert error.details["expected"] == "main"
+        assert error.details["actual"] == "feature"
+
+    def test_repo_path_attribute(self):
+        """Should store repository path."""
+        error = GitStateError(
+            "Test error",
+            validation_type="changes",
+            repo_path="/path/to/repo"
+        )
+        assert error.repo_path == "/path/to/repo"
+
+    def test_empty_details_defaults_to_empty_dict(self):
+        """Should default to empty details dict."""
+        error = GitStateError("Test error")
+        assert error.details == {}
+
+    def test_formatted_error_message_with_validation_type(self):
+        """Should include validation type in formatted message."""
+        error = GitStateError(
+            "Test error",
+            validation_type="branch"
+        )
+        formatted = str(error)
+        assert "[branch]" in formatted
+        assert "Test error" in formatted
+
+    def test_formatted_error_message_with_repo_path(self):
+        """Should include repo path in formatted message."""
+        error = GitStateError(
+            "Test error",
+            validation_type="changes",
+            repo_path="/path/to/repo"
+        )
+        formatted = str(error)
+        assert "(repository: /path/to/repo)" in formatted
+
+    def test_formatted_error_message_with_details(self):
+        """Should include details in formatted message."""
+        error = GitStateError(
+            "Test error",
+            validation_type="branch",
+            details={"expected": "main", "actual": "feature"}
+        )
+        formatted = str(error)
+        assert "Details:" in formatted
+        assert "expected=main" in formatted
+        assert "actual=feature" in formatted
+
+    def test_complete_formatted_message(self):
+        """Should produce complete formatted message with all attributes."""
+        error = GitStateError(
+            "Not on expected branch",
+            validation_type="branch",
+            details={"expected": "main", "actual": "feature"},
+            repo_path="/test/repo"
+        )
+        formatted = str(error)
+        assert "[branch]" in formatted
+        assert "Not on expected branch" in formatted
+        assert "(repository: /test/repo)" in formatted
+        assert "Details:" in formatted
+        assert "expected=main" in formatted
+        assert "actual=feature" in formatted
+
+    def test_unknown_validation_type_not_in_message(self):
+        """Should not include validation type when set to unknown."""
+        error = GitStateError(
+            "Test error",
+            validation_type="unknown"
+        )
+        formatted = str(error)
+        assert "[unknown]" not in formatted
+        assert "Test error" in formatted
+
+    def test_inheritance_from_git_error(self):
+        """Should inherit from GitError base class."""
+        from src.action.steps.git_validation import GitError
+        error = GitStateError("Test error")
+        assert isinstance(error, GitError)
+        assert isinstance(error, Exception)
+
+    def test_can_be_raised_and_caught(self):
+        """Should be raiseable and catchable as GitStateError."""
+        with pytest.raises(GitStateError) as exc_info:
+            raise GitStateError("Test error", validation_type="test")
+
+        assert exc_info.value.validation_type == "test"
+        assert "Test error" in str(exc_info.value)
+
+    def test_user_friendly_branch_error_message(self):
+        """Should produce user-friendly error message for branch validation."""
+        error = GitStateError(
+            "Not on expected branch 'main': currently on 'feature'",
+            validation_type="branch",
+            details={"expected": "main", "actual": "feature"},
+            repo_path="/path/to/repo"
+        )
+        formatted = str(error)
+
+        # Check for user-friendly elements
+        assert "[branch]" in formatted
+        assert "Not on expected branch" in formatted
+        assert "(repository: /path/to/repo)" in formatted
+        assert "Details:" in formatted
+        assert "expected=main" in formatted
+        assert "actual=feature" in formatted
+
+    def test_user_friendly_changes_error_message(self):
+        """Should produce user-friendly error message for uncommitted changes."""
+        error = GitStateError(
+            "Repository has uncommitted changes",
+            validation_type="changes",
+            details={
+                "unstaged": 2,
+                "staged": 1
+            },
+            repo_path="/path/to/repo"
+        )
+        formatted = str(error)
+
+        assert "[changes]" in formatted
+        assert "Repository has uncommitted changes" in formatted
+        assert "Details:" in formatted
+        assert "unstaged=2" in formatted
+        assert "staged=1" in formatted
+
+    def test_user_friendly_remote_error_message(self):
+        """Should produce user-friendly error message for remote validation."""
+        error = GitStateError(
+            "Git remote does not match expected pattern",
+            validation_type="remote",
+            details={"expected_pattern": "github.com", "configured": "gitlab.com"}
+        )
+        formatted = str(error)
+
+        assert "[remote]" in formatted
+        assert "Git remote does not match expected pattern" in formatted
+        assert "Details:" in formatted
+        assert "expected_pattern=github.com" in formatted
+        assert "configured=gitlab.com" in formatted
+
+    def test_docstring_exists_and_is_comprehensive(self):
+        """Should have comprehensive docstring."""
+        assert GitStateError.__doc__ is not None
+        doc = GitStateError.__doc__
+
+        # Check for key documentation elements
+        assert "validation checks" in doc.lower()
+        assert "Attributes:" in doc
+        assert "validation_type" in doc
+        assert "details" in doc
+        assert "repo_path" in doc
+        assert "Example:" in doc
+
+    def test_message_attribute_access(self):
+        """Should allow access to message via parent Exception."""
+        error = GitStateError("Test message")
+        # In Python, the message is stored in args[0] for the base Exception
+        assert error.args[0] == "Test message"
+        assert str(error) == "Test message"
+
+
 class TestValidationIntegration:
     """Integration tests for validation workflow."""
 
