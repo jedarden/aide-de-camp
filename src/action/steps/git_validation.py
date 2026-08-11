@@ -512,16 +512,35 @@ def detect_merge_conflicts(
     =======, >>>>>>>) in tracked files to identify which files have unresolved
     merge conflicts.
 
+    Conflict File Format:
+        Git uses standard conflict markers to identify conflicting sections:
+
+        <<<<<<< HEAD
+        Local changes (current branch)
+        =======
+        Remote changes (incoming branch)
+        >>>>>>> origin/main
+
+        The function searches for lines starting with "<<<<<<< " to detect
+        these conflicts in both staged (cached) and unstaged files.
+
     Args:
         repo_path: Path to the repository
         timeout: Timeout in seconds for git commands
 
     Returns:
-        List of file paths (relative to repo root) that contain conflict markers
+        List of file paths (relative to repo root) that contain conflict markers.
+        Returns an empty list if no conflicts are detected or if the repository
+        is not in a merge/rebase/cherry-pick state.
 
     Raises:
-        GitStateError: If repository check fails
+        GitStateError: If repository check fails or git is not installed
         GitNetworkError: If git command times out
+
+    Conflict States Detected:
+        - Active merge: .git/MERGE_HEAD exists
+        - Rebase in progress: .git/rebase/merge directory exists
+        - Cherry-pick conflict: .git/CHERRY_PICK_HEAD exists
 
     Example:
         >>> conflicts = detect_merge_conflicts("/path/to/repo")
