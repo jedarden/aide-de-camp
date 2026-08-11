@@ -22,9 +22,10 @@ import tempfile
 import shutil
 import os
 from dataclasses import dataclass, field as dataclass_field
+from enum import Enum
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable
 
 import yaml
 
@@ -42,9 +43,17 @@ from .git_validation import (
 # Import atomic write utility for safe file operations
 from src.utils.atomic_write import atomic_write
 
+# Import git state cleanup utilities
+from src.utils.git_cleanup import GitStateCleanup
+
 logger = logging.getLogger(__name__)
 
-GitOperationStatus = Literal["success", "failed", "partial"]
+
+class GitOperationStatus(Enum):
+    """Status of a GitOps operation."""
+    SUCCESS = "success"
+    FAILED = "failed"
+    PARTIAL = "partial"
 
 
 def retry_with_exponential_backoff(
@@ -138,18 +147,106 @@ class GitOperationResult:
     commit_sha: str | None = None
     branch: str | None = None
     manifest_path: str | None = None
-    status: GitOperationStatus = "failed"
+    status: GitOperationStatus = GitOperationStatus.FAILED
     error: str | None = None
     details: dict[str, Any] = dataclass_field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.status not in {"success", "failed", "partial"}:
-            raise ValueError(f"Unsupported Git operation status: {self.status}")
+        # Ensure status is a GitOperationStatus enum, not a string
+        if isinstance(self.status, str):
+            try:
+                self.status = GitOperationStatus(self.status)
+            except ValueError:
+                raise ValueError(f"Unsupported Git operation status: {self.status}")
+
+    @classmethod
+    def create_success(
+        cls,
+        commit_sha: str,
+        branch: str,
+        manifest_path: str,
+        **details: Any,
+    ) -> "GitOperationResult":
+        """Create a successful operation result.
+
+        Args:
+            commit_sha: The SHA of the committed change
+            branch: The branch the operation was performed on
+            manifest_path: Path to the modified manifest
+            **details: Additional metadata about the operation
+
+        Returns:
+            GitOperationResult with status SUCCESS
+        """
+        return cls(
+            commit_sha=commit_sha,
+            branch=branch,
+            manifest_path=manifest_path,
+            status=GitOperationStatus.SUCCESS,
+            details=details,
+        )
+
+    @classmethod
+    def create_failure(
+        cls,
+        manifest_path: str | None = None,
+        error: str | None = None,
+        **details: Any,
+    ) -> "GitOperationResult":
+        """Create a failed operation result.
+
+        Args:
+            manifest_path: Path to the manifest (if applicable)
+            error: Description of the failure
+            **details: Additional metadata about the operation
+
+        Returns:
+            GitOperationResult with status FAILED
+        """
+        return cls(
+            commit_sha=None,
+            branch=None,
+            manifest_path=manifest_path,
+            status=GitOperationStatus.FAILED,
+            error=error,
+            details=details,
+        )
+
+    @classmethod
+    def create_partial(
+        cls,
+        commit_sha: str,
+        manifest_path: str | None = None,
+        error: str | None = None,
+        **details: Any,
+    ) -> "GitOperationResult":
+        """Create a partial success operation result.
+
+        A partial result indicates that the local operation succeeded
+        (e.g., commit) but a subsequent operation failed (e.g., push).
+
+        Args:
+            commit_sha: The SHA of the locally committed change
+            manifest_path: Path to the modified manifest (if applicable)
+            error: Description of what failed after the local commit
+            **details: Additional metadata about the operation
+
+        Returns:
+            GitOperationResult with status PARTIAL
+        """
+        return cls(
+            commit_sha=commit_sha,
+            branch=None,
+            manifest_path=manifest_path,
+            status=GitOperationStatus.PARTIAL,
+            error=error,
+            details=details,
+        )
 
     @property
     def success(self) -> bool:
         """Return whether the complete operation succeeded."""
-        return self.status == "success"
+        return self.status == GitOperationStatus.SUCCESS
 
     @property
     def data(self) -> dict[str, Any]:
@@ -159,7 +256,7 @@ class GitOperationResult:
             "commit_sha": self.commit_sha,
             "branch": self.branch,
             "manifest_path": self.manifest_path,
-            "status": self.status,
+            "status": self.status.value,
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -251,25 +348,6 @@ class GitOpsCommitStep:
         self.git_name = git_name
         self.timeout = timeout
 
-    def _operation_result(
-        self,
-        manifest_path: str | None,
-        status: GitOperationStatus,
-        *,
-        commit_sha: str | None = None,
-        error: str | None = None,
-        **details: Any,
-    ) -> GitOperationResult:
-        """Build a result with the common GitOps operation metadata."""
-        return GitOperationResult(
-            commit_sha=commit_sha,
-            branch=self.TARGET_BRANCH,
-            manifest_path=manifest_path or None,
-            status=status,
-            error=error,
-            details=details,
-        )
-
     async def execute(
         self,
         manifest_path: str,
@@ -295,25 +373,21 @@ class GitOpsCommitStep:
 
         # Validate inputs
         if not manifest_path:
-            return self._operation_result(
-                None,
-                "failed",
+            return GitOperationResult.create_failure(
                 error="manifest_path is required",
             )
 
         if not template_fields:
-            return self._operation_result(
-                manifest_path,
-                "failed",
+            return GitOperationResult.create_failure(
+                manifest_path=manifest_path,
                 error="template_fields is required",
             )
 
         # Build full path to manifest
         full_manifest_path = self.declarative_config_path / manifest_path
         if not full_manifest_path.exists():
-            return self._operation_result(
-                manifest_path,
-                "failed",
+            return GitOperationResult.create_failure(
+                manifest_path=manifest_path,
                 error=f"Manifest file not found: {full_manifest_path}",
             )
 
@@ -322,9 +396,8 @@ class GitOpsCommitStep:
             try:
                 self._validate_declarative_config_repo()
             except (GitStateError, GitAuthenticationError, GitNetworkError, GitError) as e:
-                return self._operation_result(
-                    manifest_path,
-                    "failed",
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
                     error=str(e),
                 )
 
@@ -332,20 +405,18 @@ class GitOpsCommitStep:
         try:
             validated_fields = self._parse_and_validate_fields(template_fields)
         except (ValueError, RuntimeError) as e:
-            return self._operation_result(
-                manifest_path,
-                "failed",
-                template_fields=template_fields,
+            return GitOperationResult.create_failure(
+                manifest_path=manifest_path,
                 error=f"Invalid template fields: {e}",
+                template_fields=template_fields,
             )
 
         # Read manifest YAML
         try:
             manifest_data = self._read_manifest(full_manifest_path)
         except Exception as e:
-            return self._operation_result(
-                manifest_path,
-                "failed",
+            return GitOperationResult.create_failure(
+                manifest_path=manifest_path,
                 error=f"Failed to read manifest: {e}",
             )
 
@@ -353,11 +424,10 @@ class GitOpsCommitStep:
         try:
             modified_manifest = self._apply_substitutions(manifest_data, validated_fields)
         except Exception as e:
-            return self._operation_result(
-                manifest_path,
-                "failed",
-                fields=[{"path": field.path, "value": field.value} for field in validated_fields],
+            return GitOperationResult.create_failure(
+                manifest_path=manifest_path,
                 error=f"Failed to apply substitutions: {e}",
+                fields=[{"path": field.path, "value": field.value} for field in validated_fields],
             )
 
         # Validate that no kubectl mutations are performed
@@ -366,99 +436,111 @@ class GitOpsCommitStep:
 
         if dry_run:
             logger.info("Dry run: skipping commit and push")
-            return self._operation_result(
-                manifest_path,
-                "success",
+            return GitOperationResult.create_success(
+                commit_sha="dry-run",
+                branch=self.TARGET_BRANCH,
+                manifest_path=manifest_path,
                 dry_run=True,
                 modifications=len(validated_fields),
                 preview=self._diff_manifests(manifest_data, modified_manifest),
             )
 
-        # Write modified manifest
-        try:
-            self._write_manifest(full_manifest_path, modified_manifest)
-        except Exception as e:
-            return self._operation_result(
-                manifest_path,
-                "failed",
-                error=f"Failed to write manifest: {e}",
-            )
+        # Track cleanup state and prepare for operations
+        original_manifest_backup = manifest_data
+        commit_attempted = False
+        commit_sha = None
 
-        # Commit changes
-        original_manifest_backup = None
-        try:
-            # Backup original manifest for potential rollback
-            original_manifest_backup = manifest_data
+        # Use git state cleanup to ensure we leave the repo in a clean state on failure
+        # We only cleanup merge state, not branches (we're on main the whole time)
+        with GitStateCleanup(
+            repo_path=self.declarative_config_path,
+            cleanup_branches=False,  # We're on main, not creating temp branches
+            cleanup_merge_state=True,  # Clean up merge conflicts on failure
+            return_to_original_branch=True,  # Return to main if somehow switched
+            timeout=self.timeout,
+        ) as cleanup_mgr:
 
-            commit_result = self._commit_changes(
-                manifest_path,
-                validated_fields,
-                project_cfg,
-            )
-            commit_sha = commit_result.commit_sha
-        except (GitConflictError, GitAuthenticationError, GitStateError) as e:
-            # Rollback on commit failure for git-specific errors
             try:
-                self._write_manifest(full_manifest_path, original_manifest_backup or manifest_data)
-                logger.info(f"Rolled back manifest changes after commit failure: {e}")
-            except Exception as rollback_error:
-                logger.error(f"Failed to rollback changes: {rollback_error}")
+                # Write modified manifest
+                self._write_manifest(full_manifest_path, modified_manifest)
+                logger.debug(f"Wrote modified manifest: {manifest_path}")
+            except Exception as e:
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
+                    error=f"Failed to write manifest: {e}",
+                )
 
-            return self._operation_result(
-                manifest_path,
-                "failed",
-                error=f"Failed to commit changes: {e}",
-            )
-        except Exception as e:
-            # Rollback on any other error
+            # Commit changes
             try:
-                self._write_manifest(full_manifest_path, original_manifest_backup or manifest_data)
-                logger.info(f"Rolled back manifest changes after unexpected error: {e}")
-            except Exception as rollback_error:
-                logger.error(f"Failed to rollback changes: {rollback_error}")
+                commit_attempted = True
+                commit_result = self._commit_changes(
+                    manifest_path,
+                    validated_fields,
+                    project_cfg,
+                )
+                commit_sha = commit_result.commit_sha
+                logger.debug(f"Committed changes: {commit_sha}")
+            except (GitConflictError, GitAuthenticationError, GitStateError) as e:
+                # Rollback manifest changes - cleanup_mgr will handle git state
+                try:
+                    self._write_manifest(full_manifest_path, original_manifest_backup)
+                    logger.info(f"Rolled back manifest changes after commit failure: {e}")
+                except Exception as rollback_error:
+                    logger.error(f"Failed to rollback manifest changes: {rollback_error}")
 
-            return self._operation_result(
-                manifest_path,
-                "failed",
-                error=f"Failed to commit changes: {e}",
-            )
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
+                    error=f"Failed to commit changes: {e}",
+                )
+            except Exception as e:
+                # Rollback manifest changes on unexpected error
+                try:
+                    self._write_manifest(full_manifest_path, original_manifest_backup)
+                    logger.info(f"Rolled back manifest changes after unexpected error: {e}")
+                except Exception as rollback_error:
+                    logger.error(f"Failed to rollback manifest changes: {rollback_error}")
 
-        # Push to origin
-        try:
-            self._push_changes(manifest_path=manifest_path, commit_sha=commit_sha)
-        except (GitConflictError, GitAuthenticationError) as e:
-            # Don't rollback on push failures - commit is local and valid
-            # User can resolve conflicts or auth issues and retry
-            return self._operation_result(
-                manifest_path,
-                "partial",
-                commit_sha=commit_sha,
-                commit_locally=True,
-                error=f"Failed to push changes: {e}",
-            )
-        except GitNetworkError as e:
-            # Network failures might be transient
-            return self._operation_result(
-                manifest_path,
-                "partial",
-                commit_sha=commit_sha,
-                commit_locally=True,
-                error=f"Failed to push changes (network): {e}",
-            )
-        except Exception as e:
-            return self._operation_result(
-                manifest_path,
-                "partial",
-                commit_sha=commit_sha,
-                error=f"Failed to push changes: {e}",
-            )
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
+                    error=f"Failed to commit changes: {e}",
+                )
+
+            # Push to origin - this is outside the with block so cleanup only runs on push failure
+            # But we still want to track cleanup state
+            try:
+                self._push_changes(manifest_path=manifest_path, commit_sha=commit_sha)
+                logger.debug(f"Pushed changes: {commit_sha}")
+            except (GitConflictError, GitAuthenticationError) as e:
+                # Don't rollback on push failures - commit is local and valid
+                # User can resolve conflicts or auth issues and retry
+                # cleanup_mgr will clean up any merge state on exit
+                return GitOperationResult.create_partial(
+                    commit_sha=commit_sha,
+                    manifest_path=manifest_path,
+                    error=f"Failed to push changes: {e}",
+                    commit_locally=True,
+                )
+            except GitNetworkError as e:
+                # Network failures might be transient - commit is local and valid
+                return GitOperationResult.create_partial(
+                    commit_sha=commit_sha,
+                    manifest_path=manifest_path,
+                    error=f"Failed to push changes (network): {e}",
+                    commit_locally=True,
+                )
+            except Exception as e:
+                return GitOperationResult.create_partial(
+                    commit_sha=commit_sha,
+                    manifest_path=manifest_path,
+                    error=f"Failed to push changes: {e}",
+                )
 
         logger.info(f"gitops_commit completed: commit={commit_sha}, manifest={manifest_path}")
 
-        return self._operation_result(
-            manifest_path,
-            "success",
+        return GitOperationResult.create_success(
             commit_sha=commit_sha,
+            branch=self.TARGET_BRANCH,
+            manifest_path=manifest_path,
             modifications=len(validated_fields),
         )
 
@@ -712,11 +794,10 @@ class GitOpsCommitStep:
             if not commit_sha:
                 raise GitStateError("Git commit succeeded but returned no commit SHA")
 
-            return GitOperationResult(
+            return GitOperationResult.create_success(
                 commit_sha=commit_sha,
                 branch=self.TARGET_BRANCH,
                 manifest_path=manifest_path,
-                status="success",
             )
 
         except subprocess.TimeoutExpired:
@@ -817,11 +898,10 @@ class GitOpsCommitStep:
             else:
                 raise GitError(f"git push failed: {result.stderr.strip()}")
 
-        return GitOperationResult(
+        return GitOperationResult.create_success(
             commit_sha=commit_sha,
             branch=self.TARGET_BRANCH,
             manifest_path=manifest_path,
-            status="success",
         )
 
     async def rollback(self, manifest_path: str, commit_sha: str) -> GitOperationResult:
@@ -836,6 +916,16 @@ class GitOpsCommitStep:
             GitOperationResult with rollback information
         """
         logger.info(f"Rolling back commit {commit_sha} for {manifest_path}")
+
+        # Validate repository state before starting rollback operations
+        try:
+            self._validate_declarative_config_repo()
+        except (GitStateError, GitAuthenticationError, GitNetworkError, GitError) as e:
+            return GitOperationResult.create_failure(
+                manifest_path=manifest_path,
+                error=f"Repository validation failed before rollback: {e}",
+                commit_sha=commit_sha,
+            )
 
         manifest_file = self.declarative_config_path / manifest_path
         original_content: str | None = None
@@ -881,11 +971,10 @@ class GitOpsCommitStep:
             )
 
             if result.returncode != 0:
-                return self._operation_result(
-                    manifest_path,
-                    "failed",
-                    commit_sha=commit_sha,
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
                     error=f"git revert failed while reading parent: {result.stderr}",
+                    commit_sha=commit_sha,
                 )
 
             logger.info(
@@ -914,11 +1003,10 @@ class GitOpsCommitStep:
                         manifest_file,
                         restore_error,
                     )
-                return self._operation_result(
-                    manifest_path,
-                    "failed",
-                    commit_sha=commit_sha,
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
                     error=f"Rollback staging failed: {result.stderr}",
+                    commit_sha=commit_sha,
                 )
 
             # Commit the revert
@@ -957,11 +1045,10 @@ class GitOpsCommitStep:
                         manifest_file,
                         restore_error,
                     )
-                return self._operation_result(
-                    manifest_path,
-                    "failed",
-                    commit_sha=commit_sha,
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
                     error=f"Revert commit failed: {result.stderr}",
+                    commit_sha=commit_sha,
                 )
 
             revert_committed = True
@@ -969,17 +1056,25 @@ class GitOpsCommitStep:
             # Push the revert
             self._push_changes(manifest_path=manifest_path, commit_sha=commit_sha)
 
-            return self._operation_result(
-                manifest_path,
-                "success",
+            return GitOperationResult.create_success(
                 commit_sha=commit_sha,
+                branch=self.TARGET_BRANCH,
+                manifest_path=manifest_path,
                 reverted_commit=commit_sha,
             )
 
         except Exception as e:
-            return self._operation_result(
-                manifest_path,
-                "partial" if revert_committed else "failed",
-                commit_sha=commit_sha,
-                error=f"Rollback failed: {e}",
-            )
+            # Determine status based on whether the revert was committed
+            if revert_committed:
+                return GitOperationResult.create_partial(
+                    commit_sha=commit_sha,
+                    manifest_path=manifest_path,
+                    error=f"Rollback failed: {e}",
+                    reverted_commit=commit_sha,
+                )
+            else:
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
+                    error=f"Rollback failed: {e}",
+                    commit_sha=commit_sha,
+                )
