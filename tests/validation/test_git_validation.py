@@ -25,6 +25,7 @@ from src.action.steps.git_validation import (
     check_remote_configuration,
     check_uncommitted_changes,
     validate_git_state,
+    validate_main_branch,
 )
 
 
@@ -157,6 +158,77 @@ class TestCheckCurrentBranch:
 
             with pytest.raises(GitNetworkError, match="timed out"):
                 check_current_branch(temp_repo, "main")
+
+
+class TestValidateMainBranch:
+    """Tests for validate_main_branch function."""
+
+    def test_on_main_branch_returns_true(self, temp_repo):
+        """Should return True when on main branch."""
+        result = validate_main_branch(temp_repo)
+        assert result is True
+
+    def test_on_main_branch_custom_expected(self, temp_repo):
+        """Should return True when on custom expected branch."""
+        # Switch to a different branch
+        subprocess.run(
+            ["git", "checkout", "-b", "develop"],
+            cwd=temp_repo,
+            capture_output=True,
+            check=True,
+        )
+
+        result = validate_main_branch(temp_repo, expected_branch="develop")
+        assert result is True
+
+    def test_on_different_branch_raises_error(self, repo_on_different_branch):
+        """Should raise GitStateError when not on expected main branch."""
+        with pytest.raises(GitStateError, match="Not on expected branch 'main'"):
+            validate_main_branch(repo_on_different_branch)
+
+    def test_error_message_includes_branch_names(self, repo_on_different_branch):
+        """Error message should include both expected and actual branch names."""
+        with pytest.raises(GitStateError) as exc_info:
+            validate_main_branch(repo_on_different_branch)
+
+        error_msg = str(exc_info.value)
+        assert "main" in error_msg
+        assert "feature" in error_msg
+        assert "currently on" in error_msg.lower()
+
+    def test_error_message_includes_instruction(self, repo_on_different_branch):
+        """Error message should include instruction to switch branches."""
+        with pytest.raises(GitStateError) as exc_info:
+            validate_main_branch(repo_on_different_branch)
+
+        error_msg = str(exc_info.value)
+        assert "switch to" in error_msg.lower() or "please" in error_msg.lower()
+
+    def test_timeout(self, temp_repo):
+        """Should raise GitNetworkError on timeout."""
+        with mock.patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired("git", 10)
+
+            with pytest.raises(GitNetworkError, match="timed out"):
+                validate_main_branch(temp_repo)
+
+    def test_git_command_not_found(self, temp_repo):
+        """Should raise GitStateError when git is not installed."""
+        with mock.patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("git")
+
+            with pytest.raises(GitStateError, match="Git command not found"):
+                validate_main_branch(temp_repo)
+
+    def test_validation_type_in_error(self, repo_on_different_branch):
+        """GitStateError should have validation_type set to 'branch'."""
+        with pytest.raises(GitStateError) as exc_info:
+            validate_main_branch(repo_on_different_branch)
+
+        error = exc_info.value
+        assert error.validation_type == "branch"
+        assert error.details["expected"] == "main"
+        assert error.details["actual"] == "feature"
 
 
 class TestCheckUncommittedChanges:
