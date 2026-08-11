@@ -1,0 +1,299 @@
+{
+  "generated_at": "2026-08-07T09:02:11.543860",
+  "analysis_period": "Last 30 days from data collection",
+  "services_analyzed": [
+    "pbx-web",
+    "whisper-stt"
+  ],
+  "pbx_web_profile": {
+    "deployment_reliability": {
+      "total_deployments": 5,
+      "successful_deployments": 5,
+      "failed_deployments": 0,
+      "success_rate_percentage": 100.0,
+      "failure_rate_percentage": 0.0,
+      "rollback_count": 1,
+      "rollback_rate_percentage": 20.0,
+      "deployment_frequency_days": 6,
+      "deployment_stability": "MEDIUM"
+    },
+    "operational_stability": {
+      "current_pod_age_days": 9,
+      "pod_ready": true,
+      "restart_count": 0,
+      "health_indicators": {
+        "no_crashes": true,
+        "no_restart_loops": true,
+        "no_image_pull_errors": true,
+        "liveness_probes_passing": true,
+        "readiness_probes_passing": true
+      }
+    },
+    "infrastructure_profile": {
+      "strategy": "Recreate",
+      "managed_by": "ArgoCD",
+      "cluster": "ardenone-cluster"
+    },
+    "failure_pattern_exposure": {
+      "pbx-web-parsed": 1438,
+      "unknown": 1,
+      "pbx-web": 3
+    },
+    "reliability_grade": "C"
+  },
+  "whisper_stt_profile": {
+    "deployment_reliability": {
+      "total_deployments": 1,
+      "successful_deployments": 1,
+      "failed_deployments": 0,
+      "success_rate_percentage": 100.0,
+      "failure_rate_percentage": 0.0,
+      "rollback_count": 0,
+      "rollback_rate_percentage": 0.0,
+      "deployment_frequency_days": 30.0,
+      "deployment_stability": "HIGH"
+    },
+    "operational_stability": {
+      "current_pod_age_days": 25,
+      "pod_ready": true,
+      "restart_count": 0,
+      "health_indicators": {
+        "total_pods": 1,
+        "healthy_pods": 1,
+        "unhealthy_pods": 0,
+        "failed_pods": 0,
+        "pending_pods": 0,
+        "success_rate": 1.0,
+        "total_restarts": 0,
+        "avg_pod_age_days": 25.0,
+        "oldest_pod_age_days": 25.0,
+        "pvc_mount_issues": 0
+      }
+    },
+    "infrastructure_profile": {
+      "strategy": "Recreate",
+      "managed_by": "ArgoCD",
+      "cluster": "ardenone-cluster"
+    },
+    "failure_pattern_exposure": {
+      "pbx-web-parsed": 1438,
+      "unknown": 1,
+      "pbx-web": 3
+    },
+    "reliability_grade": "A"
+  },
+  "comparative_metrics": {
+    "deployment_reliability": {
+      "success_rate_comparison": {
+        "pbx_web": 100.0,
+        "whisper_stt": 100.0,
+        "delta_percentage": 0.0,
+        "winner": "TIE",
+        "significance": "LOW"
+      },
+      "deployment_frequency_comparison": {
+        "pbx_web_deployments": 5,
+        "whisper_stt_deployments": 1,
+        "pbx_frequency_days": 6,
+        "whisper_frequency_days": 30.0,
+        "more_frequent": "pbx-web",
+        "stability_advantage": "whisper-stt"
+      },
+      "rollback_comparison": {
+        "pbx_web_rollback_rate": 20.0,
+        "whisper_stt_rollback_rate": 0.0,
+        "delta_percentage": 20.0,
+        "more_stable": "whisper-stt"
+      }
+    },
+    "operational_stability": {
+      "uptime_comparison": {
+        "pbx_web_uptime_days": 9,
+        "whisper_stt_uptime_days": 25,
+        "delta_days": -16,
+        "longer_uptime": "whisper-stt"
+      },
+      "restart_comparison": {
+        "pbx_web_restarts": 0,
+        "whisper_stt_restarts": 0,
+        "more_stable": "TIE"
+      }
+    },
+    "overall_reliability_assessment": {
+      "deployment_success_winner": "TIE",
+      "operational_stability_winner": "whisper-stt",
+      "overall_winner": "TIE",
+      "confidence_level": "HIGH"
+    }
+  },
+  "shared_vs_unique_patterns": {
+    "shared_patterns": {},
+    "pbx_web_specific_patterns": {
+      "DependencyTimeout": {
+        "count": 12,
+        "total_count": 12,
+        "severity": "unknown",
+        "description": ""
+      },
+      "HTTPError": {
+        "count": 1420,
+        "total_count": 1420,
+        "severity": "unknown",
+        "description": ""
+      },
+      "NetworkIssue": {
+        "count": 8,
+        "total_count": 8,
+        "severity": "unknown",
+        "description": ""
+      },
+      "RecordingFetchError": {
+        "count": 1,
+        "total_count": 1,
+        "severity": "unknown",
+        "description": ""
+      }
+    },
+    "whisper_stt_specific_patterns": {},
+    "pattern_summary": {
+      "total_shared_patterns": 0,
+      "total_pbx_patterns": 4,
+      "total_whisper_patterns": 0,
+      "most_concerning_shared": null,
+      "most_concerning_pbx": "HTTPError",
+      "most_concerning_whisper": null
+    }
+  },
+  "temporal_analysis": {
+    "temporal_patterns_by_category": {
+      "DependencyTimeout": {
+        "daily_distribution": {
+          "2026-07-28": 4,
+          "2026-08-04": 4,
+          "2026-08-05": 4
+        },
+        "peak_day": "2026-07-28",
+        "peak_count": 4,
+        "active_days": 3,
+        "time_span": {
+          "start": "2026-07-28",
+          "end": "2026-08-05",
+          "days": 3
+        }
+      },
+      "DeploymentRollback": {
+        "daily_distribution": {
+          "2026-07-13": 1
+        },
+        "peak_day": "2026-07-13",
+        "peak_count": 1,
+        "active_days": 1,
+        "time_span": {
+          "start": "2026-07-13",
+          "end": "2026-07-13",
+          "days": 1
+        }
+      },
+      "HTTPError": {
+        "daily_distribution": {
+          "2026-07-28": 26,
+          "2026-07-29": 10,
+          "2026-07-30": 5,
+          "2026-07-31": 7,
+          "2026-08-03": 147,
+          "2026-08-04": 463,
+          "2026-08-05": 514,
+          "2026-08-06": 248
+        },
+        "peak_day": "2026-08-05",
+        "peak_count": 514,
+        "active_days": 8,
+        "time_span": {
+          "start": "2026-07-28",
+          "end": "2026-08-06",
+          "days": 8
+        }
+      },
+      "NetworkIssue": {
+        "daily_distribution": {
+          "2026-07-28": 2,
+          "2026-08-04": 2,
+          "2026-08-05": 2,
+          "unknown": 2
+        },
+        "peak_day": "2026-07-28",
+        "peak_count": 2,
+        "active_days": 4,
+        "time_span": {
+          "start": "2026-07-28",
+          "end": "2026-08-05",
+          "days": 3
+        }
+      },
+      "RecordingFetchError": {
+        "daily_distribution": {
+          "unknown": 1
+        },
+        "peak_day": "unknown",
+        "peak_count": 1,
+        "active_days": 1,
+        "time_span": {
+          "start": "unknown",
+          "end": "unknown",
+          "days": 0
+        }
+      }
+    },
+    "aggregate_temporal_analysis": {
+      "peak_failure_day": "2026-08-05",
+      "peak_failure_count": 520,
+      "average_failures_per_active_day": 144.2,
+      "high_failure_days": {
+        "2026-08-04": 469,
+        "2026-08-05": 520
+      },
+      "total_active_days": 10,
+      "failure_clustering_detected": true
+    },
+    "time_correlation_indicators": {
+      "correlated_failures": true,
+      "temporal_spikes": [
+        [
+          "2026-08-05",
+          520
+        ],
+        [
+          "2026-08-04",
+          469
+        ],
+        [
+          "2026-08-06",
+          248
+        ]
+      ]
+    }
+  },
+  "executive_summary": {
+    "key_findings": [
+      "Deployment success rates: pbx-web 100.0% vs whisper-stt 100.0%",
+      "Winner: TIE by 0.0 percentage points",
+      "Operational uptime: whisper-stt leads with 25 days vs pbx-web 9 days",
+      "Shared failure patterns: 0 categories affecting both services",
+      "Service-specific patterns: pbx-web 4 vs whisper-stt 0",
+      "Peak failure day: 2026-08-05 with 520 failures"
+    ],
+    "reliability_recommendation": "EXCELLENT: Both services demonstrate comparable high reliability with minimal differences",
+    "risk_assessment": {
+      "risk_level": "MEDIUM",
+      "risk_color": "yellow",
+      "risk_factors_count": 1,
+      "primary_concerns": [
+        null,
+        null,
+        "Temporal failure clustering detected"
+      ],
+      "overall_assessment": "Both services show strong reliability metrics with room for improvement in shared failure pattern mitigation"
+    },
+    "confidence_level": "HIGH"
+  }
+}

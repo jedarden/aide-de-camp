@@ -1,0 +1,211 @@
+{
+  "generated_at": "2026-08-07T09:00:01.854906",
+  "services": {
+    "pbx-web": {
+      "prometheus_metrics": [],
+      "victorialogs_templates": [
+        {
+          "template_name": "basic_latency_query",
+          "available": true,
+          "description": "VictoriaLogs query template for basic_latency_query"
+        },
+        {
+          "template_name": "processing_duration_analysis",
+          "available": true,
+          "description": "VictoriaLogs query template for processing_duration_analysis"
+        },
+        {
+          "template_name": "high_latency_detection",
+          "available": true,
+          "description": "VictoriaLogs query template for high_latency_detection"
+        },
+        {
+          "template_name": "container_specific_latency",
+          "available": true,
+          "description": "VictoriaLogs query template for container_specific_latency"
+        },
+        {
+          "template_name": "structured_json_latency",
+          "available": true,
+          "description": "VictoriaLogs query template for structured_json_latency"
+        },
+        {
+          "template_name": "error_related_latency",
+          "available": true,
+          "description": "VictoriaLogs query template for error_related_latency"
+        },
+        {
+          "template_name": "performance_pattern_aggregation",
+          "available": true,
+          "description": "VictoriaLogs query template for performance_pattern_aggregation"
+        },
+        {
+          "template_name": "pod_level_latency_aggregation",
+          "available": true,
+          "description": "VictoriaLogs query template for pod_level_latency_aggregation"
+        },
+        {
+          "template_name": "temporal_latency_distribution",
+          "available": true,
+          "description": "VictoriaLogs query template for temporal_latency_distribution"
+        },
+        {
+          "template_name": "percentile_calculation_query",
+          "available": true,
+          "description": "VictoriaLogs query template for percentile_calculation_query"
+        }
+      ],
+      "availability_30day": {
+        "service": "pbx-web",
+        "verification_timestamp": "2026-08-07T09:05:02.250665",
+        "time_range": {
+          "start": "2026-07-08T09:05:02.250665",
+          "end": "2026-08-07T09:05:02.250665",
+          "days": 30
+        },
+        "prometheus_availability": {
+          "available": false,
+          "error": ""
+        },
+        "victorialogs_availability": {
+          "available": false,
+          "error": "[Errno -2] Name or service not known"
+        }
+      }
+    },
+    "whisper-stt": {
+      "prometheus_metrics": [],
+      "victorialogs_templates": [
+        {
+          "template_name": "basic_latency_query",
+          "available": true,
+          "description": "VictoriaLogs query template for basic_latency_query"
+        },
+        {
+          "template_name": "processing_duration_analysis",
+          "available": true,
+          "description": "VictoriaLogs query template for processing_duration_analysis"
+        },
+        {
+          "template_name": "high_latency_detection",
+          "available": true,
+          "description": "VictoriaLogs query template for high_latency_detection"
+        },
+        {
+          "template_name": "container_specific_latency",
+          "available": true,
+          "description": "VictoriaLogs query template for container_specific_latency"
+        },
+        {
+          "template_name": "structured_json_latency",
+          "available": true,
+          "description": "VictoriaLogs query template for structured_json_latency"
+        },
+        {
+          "template_name": "error_related_latency",
+          "available": true,
+          "description": "VictoriaLogs query template for error_related_latency"
+        },
+        {
+          "template_name": "performance_pattern_aggregation",
+          "available": true,
+          "description": "VictoriaLogs query template for performance_pattern_aggregation"
+        },
+        {
+          "template_name": "pod_level_latency_aggregation",
+          "available": true,
+          "description": "VictoriaLogs query template for pod_level_latency_aggregation"
+        },
+        {
+          "template_name": "temporal_latency_distribution",
+          "available": true,
+          "description": "VictoriaLogs query template for temporal_latency_distribution"
+        },
+        {
+          "template_name": "percentile_calculation_query",
+          "available": true,
+          "description": "VictoriaLogs query template for percentile_calculation_query"
+        }
+      ],
+      "availability_30day": {
+        "service": "whisper-stt",
+        "verification_timestamp": "2026-08-07T09:11:02.682423",
+        "time_range": {
+          "start": "2026-07-08T09:11:02.682423",
+          "end": "2026-08-07T09:11:02.682423",
+          "days": 30
+        },
+        "prometheus_availability": {
+          "available": false,
+          "error": ""
+        },
+        "victorialogs_availability": {
+          "available": false,
+          "error": "[Errno -2] Name or service not known"
+        }
+      }
+    }
+  },
+  "metric_types": {
+    "prometheus": {
+      "description": "Standard Kubernetes/Prometheus metrics",
+      "common_types": [
+        {
+          "type": "gauge",
+          "description": "Current value (e.g., memory usage)"
+        },
+        {
+          "type": "counter",
+          "description": "Cumulative value (e.g., network bytes)"
+        },
+        {
+          "type": "histogram",
+          "description": "Distribution of values"
+        }
+      ],
+      "label_conventions": {
+        "namespace": "Kubernetes namespace",
+        "pod": "Pod name",
+        "container": "Container name",
+        "node": "Node name"
+      }
+    },
+    "victorialogs": {
+      "description": "Log-based metrics and latency analysis",
+      "query_patterns": [
+        {
+          "pattern": "{namespace=\"...\"}",
+          "description": "Filter by namespace"
+        },
+        {
+          "pattern": "|= \"keyword\"",
+          "description": "Full-text search"
+        },
+        {
+          "pattern": "| json",
+          "description": "Parse logs as JSON"
+        },
+        {
+          "pattern": "| stats ...",
+          "description": "Aggregation functions"
+        },
+        {
+          "pattern": "@now()-Nd",
+          "description": "Time range (N days ago)"
+        }
+      ]
+    }
+  },
+  "naming_conventions": {
+    "prometheus": {
+      "container_metrics": "container_* (prefixed with container_)",
+      "kube_pod_metrics": "kube_pod_* (Kubernetes pod metrics)",
+      "rate_metrics": "rate(metric[5m]) for per-second rates"
+    },
+    "victorialogs": {
+      "filters": "LogSQL format with {} for field selection",
+      "pipes": "Pipe operations (|=, | json, | stats)",
+      "time_range": "@now()-Xd for relative time ranges"
+    }
+  }
+}

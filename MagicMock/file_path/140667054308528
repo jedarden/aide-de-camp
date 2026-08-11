@@ -1,0 +1,13 @@
+{
+  "facts": [
+    {
+      "text": "Test fact",
+      "category": "context",
+      "confidence": 0.7,
+      "created_at": "2026-08-10T08:17:35.091877+00:00",
+      "last_referenced": "2026-08-10T08:17:35.091877+00:00"
+    }
+  ],
+  "session_id": "error-session",
+  "updated_at": "2026-08-10T08:17:35.091888+00:00"
+}

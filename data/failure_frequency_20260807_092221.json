@@ -1,0 +1,552 @@
+{
+  "generated_at": "2026-08-07T09:22:21.018812",
+  "log_file": "/home/coding/aide-de-camp/data/repeat_run_20260807_091110.log",
+  "total_runs": 5,
+  "summary": {
+    "total_tests_with_failures": 33,
+    "consistent_failures_count": 33,
+    "intermittent_failures_count": 0,
+    "rare_failures_count": 0,
+    "error_type_distribution": {
+      "ModuleNotFoundError": 1,
+      "Failed": 4,
+      "IndentationError": 8,
+      "ValueError": 12,
+      "ImportError": 4,
+      "SyntaxError": 4
+    },
+    "consistent_failure_tests": [
+      "tests/e2e/test_canvas_navigation.py",
+      "tests/test_ambient_fetch_and_diff.py",
+      "tests/test_ambient_rule_engine.py",
+      "tests/test_backend_stuck_failed_cards.py",
+      "tests/test_bead_watcher_integration.py",
+      "tests/test_canvas_component_cards.py",
+      "tests/test_card_cache.py",
+      "tests/test_card_dismissal_db_verification.py",
+      "tests/test_card_dismissal_helpers.py",
+      "tests/test_circuit_breaker.py",
+      "tests/test_client_timings_api.py",
+      "tests/test_comprehensive_stuck_failed_flows.py",
+      "tests/test_degraded_state_server_behavior.py",
+      "tests/test_dispatch_instrumentation.py",
+      "tests/test_dispatch_timings.py",
+      "tests/test_dispatch_timings_e2e.py",
+      "tests/test_e2e_dispatch_timing_verification.py",
+      "tests/test_escalate_handler_stuck_scenarios.py",
+      "tests/test_escalate_stuck_intent.py",
+      "tests/test_failed_card_integration.py",
+      "tests/test_monitoring_result_persistence.py",
+      "tests/test_permission_and_registry_errors.py",
+      "tests/test_registry_hot_reload.py",
+      "tests/test_registry_hot_reload_new_infrastructure.py",
+      "tests/test_session_storage_verification.py",
+      "tests/test_sse_broadcast_endpoint.py",
+      "tests/test_sse_broadcast_from_test_endpoint.py",
+      "tests/test_sse_broadcast_test_endpoint.py",
+      "tests/test_sse_stuck_failed_broadcasts.py",
+      "tests/test_stuck_card_integration.py",
+      "tests/test_stuck_failed_cards.py",
+      "tests/test_synthetic_dispatch_storage.py",
+      "tests/test_utterance_linkage_verification.py"
+    ],
+    "intermittent_failure_tests": []
+  },
+  "failure_matrix": [
+    {
+      "test_name": "tests/e2e/test_canvas_navigation.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ModuleNotFoundError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_ambient_fetch_and_diff.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "Failed",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_ambient_rule_engine.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "IndentationError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_backend_stuck_failed_cards.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_bead_watcher_integration.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "Failed",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_canvas_component_cards.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ImportError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_card_cache.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_card_dismissal_db_verification.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "SyntaxError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_card_dismissal_helpers.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "SyntaxError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_circuit_breaker.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "IndentationError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_client_timings_api.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_comprehensive_stuck_failed_flows.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_degraded_state_server_behavior.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "IndentationError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_dispatch_instrumentation.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "IndentationError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_dispatch_timings.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_dispatch_timings_e2e.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_e2e_dispatch_timing_verification.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_escalate_handler_stuck_scenarios.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_escalate_stuck_intent.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_failed_card_integration.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "Failed",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_monitoring_result_persistence.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "IndentationError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_permission_and_registry_errors.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ImportError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_registry_hot_reload.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ImportError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_registry_hot_reload_new_infrastructure.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ImportError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_session_storage_verification.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "IndentationError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_sse_broadcast_endpoint.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "IndentationError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_sse_broadcast_from_test_endpoint.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_sse_broadcast_test_endpoint.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "IndentationError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_sse_stuck_failed_broadcasts.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_stuck_card_integration.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "Failed",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_stuck_failed_cards.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "ValueError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_synthetic_dispatch_storage.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "SyntaxError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "test_name": "tests/test_utterance_linkage_verification.py",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "classification": "consistent",
+      "error_type": "SyntaxError",
+      "runs_failed": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ]
+}

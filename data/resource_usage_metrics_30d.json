@@ -1,0 +1,293 @@
+{
+  "collection_metadata": {
+    "collected_at": "2026-08-07T08:12:15.340915",
+    "period_days": 30,
+    "time_window_start": "2026-07-08",
+    "time_window_end": "2026-08-07T08:12:15.340915",
+    "services": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "collection_method": "Kubernetes API via kubectl proxy",
+    "note": "Historical metrics not available - showing current state and configuration"
+  },
+  "services": {
+    "pbx-web": {
+      "service_name": "pbx-web",
+      "namespace": "pbx-web",
+      "collection_timestamp": "2026-08-07T08:12:15.340915",
+      "period_days": 30,
+      "current_cpu_usage": [
+        {
+          "pod": "lab-rebuild-relay-79957dbd4-xsqhl",
+          "current_cpu_cores": 0.001,
+          "current_cpu_millicores": 1.0
+        },
+        {
+          "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+          "current_cpu_cores": 0.001,
+          "current_cpu_millicores": 1.0
+        },
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "current_cpu_cores": 0.001,
+          "current_cpu_millicores": 1.0
+        }
+      ],
+      "cpu_requests": [
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "container": "site-generator",
+          "request_cores": 0.01
+        },
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "container": "nginx",
+          "request_cores": 0.005
+        }
+      ],
+      "cpu_limits": [
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "container": "site-generator",
+          "limit_cores": 0.5
+        },
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "container": "nginx",
+          "limit_cores": 0.1
+        }
+      ],
+      "cpu_utilization": {
+        "current_usage_cores": 0.003,
+        "requests_cores": "0.005",
+        "limits_cores": "0.1",
+        "vs_request_percent": 60.0,
+        "vs_limit_percent": 3.0
+      },
+      "current_memory_usage": [
+        {
+          "pod": "lab-rebuild-relay-79957dbd4-xsqhl",
+          "current_memory_bytes": 18874368,
+          "current_memory_mib": 18.0
+        },
+        {
+          "pod": "pbx-rebuild-relay-588d79c5b9-vmmlz",
+          "current_memory_bytes": 24117248,
+          "current_memory_mib": 23.0
+        },
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "current_memory_bytes": 79691776,
+          "current_memory_mib": 76.0
+        }
+      ],
+      "memory_requests": [
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "container": "site-generator",
+          "request_bytes": 134217728
+        },
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "container": "nginx",
+          "request_bytes": 33554432
+        }
+      ],
+      "memory_limits": [
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "container": "site-generator",
+          "limit_bytes": 536870912
+        },
+        {
+          "pod": "pbx-web-5ff68464d-mkn8n",
+          "container": "nginx",
+          "limit_bytes": 134217728
+        }
+      ],
+      "memory_utilization": {
+        "current_usage_bytes": 122683392.0,
+        "requests_bytes": "33554432",
+        "limits_bytes": "134217728",
+        "vs_request_percent": 365.625,
+        "vs_limit_percent": 91.40625
+      },
+      "pvcs": [],
+      "volume_usage": [],
+      "network_stats": [
+        {
+          "note": "Detailed network metrics require Prometheus/monitoring integration",
+          "available_data": "pod-level network connectivity only",
+          "metrics_available": [
+            "pod_status",
+            "pod_ip",
+            "network_policy"
+          ]
+        }
+      ],
+      "metric_coverage": {
+        "current_usage": "available",
+        "resource_limits": "available",
+        "storage_info": "no_pvcs",
+        "resource_events": "none",
+        "deployment_alignment": "available"
+      },
+      "data_gaps": [],
+      "anomalies": [
+        "High memory utilization: 365.6% of requests"
+      ],
+      "temporal_alignment": {
+        "deployment_data_loaded": true,
+        "deployment_events_count": 3,
+        "resource_events_count": 0,
+        "alignment_status": "partial"
+      }
+    },
+    "whisper-stt": {
+      "service_name": "whisper-stt",
+      "namespace": "whisper-stt",
+      "collection_timestamp": "2026-08-07T08:12:15.340915",
+      "period_days": 30,
+      "current_cpu_usage": [
+        {
+          "pod": "whisper-openai-68966786fb-jsb5d",
+          "current_cpu_cores": 0.005,
+          "current_cpu_millicores": 5.0
+        },
+        {
+          "pod": "whisper-stt-847fd8d7b9-v2rs5",
+          "current_cpu_cores": 0.001,
+          "current_cpu_millicores": 1.0
+        }
+      ],
+      "cpu_requests": [
+        {
+          "pod": "whisper-stt-847fd8d7b9-v2rs5",
+          "container": "whisper-stt",
+          "request_cores": 1.0
+        }
+      ],
+      "cpu_limits": [
+        {
+          "pod": "whisper-stt-847fd8d7b9-v2rs5",
+          "container": "whisper-stt",
+          "limit_cores": 8.0
+        }
+      ],
+      "cpu_utilization": {
+        "current_usage_cores": 0.006,
+        "requests_cores": "1.0",
+        "limits_cores": "8.0",
+        "vs_request_percent": 0.6,
+        "vs_limit_percent": 0.075
+      },
+      "current_memory_usage": [
+        {
+          "pod": "whisper-openai-68966786fb-jsb5d",
+          "current_memory_bytes": 5839519744,
+          "current_memory_mib": 5569.0
+        },
+        {
+          "pod": "whisper-stt-847fd8d7b9-v2rs5",
+          "current_memory_bytes": 3290431488,
+          "current_memory_mib": 3138.0
+        }
+      ],
+      "memory_requests": [
+        {
+          "pod": "whisper-stt-847fd8d7b9-v2rs5",
+          "container": "whisper-stt",
+          "request_bytes": 4294967296
+        }
+      ],
+      "memory_limits": [
+        {
+          "pod": "whisper-stt-847fd8d7b9-v2rs5",
+          "container": "whisper-stt",
+          "limit_bytes": 8589934592
+        }
+      ],
+      "memory_utilization": {
+        "current_usage_bytes": 9129951232.0,
+        "requests_bytes": "4294967296",
+        "limits_bytes": "8589934592",
+        "vs_request_percent": 212.5732421875,
+        "vs_limit_percent": 106.28662109375
+      },
+      "pvcs": [
+        {
+          "name": "whisper-model-cache",
+          "storage_class": "longhorn",
+          "request": "10Gi",
+          "capacity": "10Gi",
+          "status": "Bound",
+          "request_bytes": 10737418240,
+          "capacity_bytes": 10737418240
+        },
+        {
+          "name": "whisper-openai-model-cache",
+          "storage_class": "longhorn",
+          "request": "10Gi",
+          "capacity": "10Gi",
+          "status": "Bound",
+          "request_bytes": 10737418240,
+          "capacity_bytes": 10737418240
+        },
+        {
+          "name": "whisper-stt-jobs",
+          "storage_class": "longhorn",
+          "request": "1Gi",
+          "capacity": "1Gi",
+          "status": "Bound",
+          "request_bytes": 1073741824,
+          "capacity_bytes": 1073741824
+        }
+      ],
+      "volume_usage": [],
+      "network_stats": [
+        {
+          "note": "Detailed network metrics require Prometheus/monitoring integration",
+          "available_data": "pod-level network connectivity only",
+          "metrics_available": [
+            "pod_status",
+            "pod_ip",
+            "network_policy"
+          ]
+        }
+      ],
+      "metric_coverage": {
+        "current_usage": "available",
+        "resource_limits": "available",
+        "storage_info": "available",
+        "resource_events": "none",
+        "deployment_alignment": "available"
+      },
+      "data_gaps": [],
+      "anomalies": [
+        "High memory utilization: 212.6% of requests"
+      ],
+      "temporal_alignment": {
+        "deployment_data_loaded": true,
+        "deployment_events_count": 2,
+        "resource_events_count": 0,
+        "alignment_status": "partial"
+      }
+    }
+  },
+  "summary": {
+    "total_pods_monitored": 5,
+    "total_cpu_usage_cores": 0.009000000000000001,
+    "total_memory_usage_bytes": 9252634624.0,
+    "total_pvcs": 3,
+    "services_with_issues": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "data_gaps": [],
+    "anomalies": [
+      "pbx-web: High memory utilization: 365.6% of requests",
+      "whisper-stt: High memory utilization: 212.6% of requests"
+    ]
+  }
+}

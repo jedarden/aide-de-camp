@@ -1,0 +1,76 @@
+{
+  "metadata": {
+    "timestamp": "2026-08-07T08:59:53.869956",
+    "total_runs": 5,
+    "requested_runs": 5,
+    "fail_fast": false
+  },
+  "runs": [
+    {
+      "run_number": 1,
+      "start_time": "2026-08-07T08:59:44.704982",
+      "end_time": "2026-08-07T08:59:47.216494",
+      "duration": 2.511512,
+      "total_tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 0.0,
+      "test_results": []
+    },
+    {
+      "run_number": 2,
+      "start_time": "2026-08-07T08:59:47.216539",
+      "end_time": "2026-08-07T08:59:48.785783",
+      "duration": 1.569244,
+      "total_tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 0.0,
+      "test_results": []
+    },
+    {
+      "run_number": 3,
+      "start_time": "2026-08-07T08:59:48.785815",
+      "end_time": "2026-08-07T08:59:50.516544",
+      "duration": 1.730729,
+      "total_tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 0.0,
+      "test_results": []
+    },
+    {
+      "run_number": 4,
+      "start_time": "2026-08-07T08:59:50.516575",
+      "end_time": "2026-08-07T08:59:52.184433",
+      "duration": 1.667858,
+      "total_tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 0.0,
+      "test_results": []
+    },
+    {
+      "run_number": 5,
+      "start_time": "2026-08-07T08:59:52.184463",
+      "end_time": "2026-08-07T08:59:53.869868",
+      "duration": 1.685405,
+      "total_tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 0.0,
+      "test_results": []
+    }
+  ],
+  "flaky_tests": []
+}

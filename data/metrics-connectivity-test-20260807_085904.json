@@ -1,0 +1,27 @@
+{
+  "test_metadata": {
+    "timestamp": "2026-08-07T08:58:52.488636",
+    "prometheus_ip": "10.43.253.70",
+    "services_tested": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "connectivity_tests": [
+    {
+      "test": "prometheus_api_health",
+      "status": "failed",
+      "http_code": "unknown"
+    },
+    {
+      "test": "pbx_web_metrics",
+      "status": "failed",
+      "http_code": "unknown"
+    },
+    {
+      "test": "whisper_stt_metrics",
+      "status": "failed",
+      "http_code": "unknown"
+    }
+  ]
+}

@@ -1,0 +1,965 @@
+{
+  "total_runs_analyzed": 5,
+  "unique_tests_with_failures": 33,
+  "consistent_failures_100pct": 33,
+  "intermittent_failures_20_80pct": 0,
+  "failure_frequency_matrix": [
+    {
+      "test_name": "tests.e2e.test_canvas_navigation",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_ambient_fetch_and_diff",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_ambient_rule_engine",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_backend_stuck_failed_cards",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_bead_watcher_integration",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_canvas_component_cards",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_card_cache",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_card_dismissal_db_verification",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_card_dismissal_helpers",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_circuit_breaker",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_client_timings_api",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_comprehensive_stuck_failed_flows",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_degraded_state_server_behavior",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_dispatch_instrumentation",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_dispatch_timings",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_dispatch_timings_e2e",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_e2e_dispatch_timing_verification",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_escalate_handler_stuck_scenarios",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_escalate_stuck_intent",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_failed_card_integration",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_monitoring_result_persistence",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_permission_and_registry_errors",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_registry_hot_reload",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_registry_hot_reload_new_infrastructure",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_session_storage_verification",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_sse_broadcast_endpoint",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_sse_broadcast_from_test_endpoint",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_sse_broadcast_test_endpoint",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_sse_stuck_failed_broadcasts",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_stuck_card_integration",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_stuck_failed_cards",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_synthetic_dispatch_storage",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    },
+    {
+      "test_name": "tests.test_utterance_linkage_verification",
+      "failure_count": 5,
+      "total_runs": 5,
+      "failure_rate": 100.0,
+      "consistency": "consistent",
+      "run_details": [
+        {
+          "run": 1,
+          "status": "ERROR"
+        },
+        {
+          "run": 2,
+          "status": "ERROR"
+        },
+        {
+          "run": 3,
+          "status": "ERROR"
+        },
+        {
+          "run": 4,
+          "status": "ERROR"
+        },
+        {
+          "run": 5,
+          "status": "ERROR"
+        }
+      ]
+    }
+  ]
+}

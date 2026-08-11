@@ -1,0 +1,13 @@
+{
+  "facts": [
+    {
+      "text": "User's dog is named Rex",
+      "category": "personal",
+      "confidence": 0.95,
+      "created_at": "2026-08-10T11:24:09.463194+00:00",
+      "last_referenced": "2026-08-10T11:24:09.463194+00:00"
+    }
+  ],
+  "session_id": "test-session-eb2fd0a4",
+  "updated_at": "2026-08-10T11:24:09.463210+00:00"
+}
