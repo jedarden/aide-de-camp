@@ -197,7 +197,10 @@ class FetchStrand:
                     caveats.append(result.data["caveat"])
             elif result.status == "timeout":
                 timed_out.append(source)
-                caveats.append(f"{source.value} timed out")
+                if required:
+                    caveats.append(f"Required source {source.value} timed out")
+                else:
+                    caveats.append(f"Optional source {source.value} timed out")
             elif result.status == "error":
                 failed.append(source)
                 if required:
