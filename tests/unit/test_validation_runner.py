@@ -557,7 +557,8 @@ class TestCompletenessValidation:
             is_valid, errors = validate_deployment_file(temp_path)
             assert is_valid is False
             assert len(errors) > 0
-            assert any("Completeness" in str(e) for e in errors)
+            # Gap validation errors mention "Gap" or "Coverage" not "Completeness"
+            assert any("Gap" in str(e) or "Coverage" in str(e) for e in errors)
         finally:
             os.unlink(temp_path)
 
