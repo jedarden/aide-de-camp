@@ -290,10 +290,10 @@
         "period_coverage_days": {
           "type": "integer",
           "minimum": 30,
-          "description": "Number of days covered by the deployment data. Must be at least 30 for completeness validation.",
+          "description": "Number of days covered by the deployment data. Must be at least 30 for completeness validation. Expected range: days 1-30 of the analysis period.",
           "errorMessage": {
-            "minimum": "Period coverage is only {actual} days. Required minimum: 30 days for completeness validation. SHORTFALL: {30 - actual} days. ACTION: Extend the data collection period from '{data_period_start}' to '{data_period_end}' by at least {30 - actual} more days, or expand the analysis period to cover a full 30-day window.",
-            "type": "Period coverage days must be an integer value representing the total days covered by deployment data. Current value: '{actual}' is invalid type."
+            "minimum": "MISSING DAYS IN 30-DAY COVERAGE: Period has only {actual} days instead of required 30 days. EXPECTED RANGE: Days 1-30 of analysis period. MISSING: {30 - actual} day(s) from the 30-day window. IDENTIFY GAPS: Check which specific days in the 1-30 range are missing from deployment data. CURRENT DATA: '{data_period_start}' to '{data_period_end}' covers {actual} days. ACTION REQUIRED: 1) Add deployment data for the missing {30 - actual} day(s) in the 1-30 day range, 2) Verify replica_history has entries for all days 1-30, 3) Check if data collection skipped days in the period, 4) Extend data collection if days are genuinely missing from the timeframe.",
+            "type": "Period coverage days must be an integer value representing the total days covered by deployment data. Current value: '{actual}' is invalid type. EXPECTED: Integer between 30 and 365 representing days in analysis period."
           },
           "examples": [30, 31, 35]
         },
@@ -320,7 +320,7 @@
           "description": "List of gaps detected in the deployment data. For completeness validation, this array should be empty or only contain gaps <3 days. Each gap includes start, end, duration, severity, and affected data types.",
           "errorMessage": {
             "type": "Gap details must be an array of gap objects, even if empty. Current type: '{actual}'. ACTION: Provide an array (e.g., []) of gap objects with structure: {gap_start_days_ago, gap_end_days_ago, gap_duration_days, severity, missing_data_types}.",
-            "custom": "DATA GAPS FOUND: {length} gap(s) detected in coverage period. REVIEW REQUIRED: Each gap entry specifies duration (gap_duration_days), severity (critical: >7 days, warning: 3-7 days, info: <3 days), and missing data types. CRITICAL GAPS: Gaps >7 days prevent completeness validation. ACTION: 1) Identify missing periods from gap_details, 2) Collect missing deployment data for those periods, 3) Re-run completeness validation, or 4) Document why gaps are acceptable (e.g., service decommissioned)."
+            "custom": "MISSING DAYS DETECTED IN 30-DAY COVERAGE: {length} gap(s) found in deployment data. EXPECTED RANGE: Continuous coverage across days 1-30. GAPS IDENTIFIED: Each gap entry shows missing day ranges (gap_start_days_ago to gap_end_days_ago). For example, gap_start_days_ago=25, gap_end_days_ago=20 means days 20-25 in the 1-30 range are missing. SEVERITY LEVELS: CRITICAL gaps >7 days (prevent completeness validation), WARNING gaps 3-7 days (partial coverage), INFO gaps <3 days (minor gaps). ACTION REQUIRED: 1) Map gap_start_days_ago and gap_end_days_ago to specific missing days in the 1-30 range, 2) Add deployment data for the missing days identified in gap_details, 3) Verify replica_history has entries for all days 1-30, 4) Re-run completeness validation after adding missing deployment data. CRITICAL GAPS: Gaps >7 days indicate major data loss - investigate data collection failures or service downtime."
           },
           "items": {
             "type": "object",
@@ -417,7 +417,7 @@
           "description": "Whether the minimum deployment days threshold is met. For completeness validation, this should be true.",
           "errorMessage": {
             "type": "Deployment days threshold must be a boolean value (true/false). Current value: '{actual}' is invalid type. ACTION: Provide boolean: 'true' if deployment days meet minimum, 'false' if below minimum.",
-            "custom": "DEPLOYMENT DAYS THRESHOLD NOT MET: Insufficient deployment activity in analysis period. ACTUAL DEPLOYMENT DAYS: {actual_deployment_days} distinct days with deployments vs REQUIRED MINIMUM: {minimum_deployment_days} days. SHORTFALL: {minimum_deployment_days - actual_deployment_days} deployment days missing. ROOT CAUSES: 1) New deployment with limited history, 2) Deployment paused during analysis period, 3) Insufficient replica_history coverage. ACTIONS: 1) Verify replica_history captures all deployment events, 2) Check deployment occurred on distinct days (not same day multiple times), 3) Extend analysis period to capture more deployment activity, 4) Adjust minimum_deployment_days if deployment frequency is lower than expected for this service."
+            "custom": "MISSING DEPLOYMENT DAYS IN 30-DAY PERIOD: Insufficient deployment activity detected. EXPECTED RANGE: Days 1-30 of analysis period. ACTUAL: {actual_deployment_days} distinct days with deployments vs REQUIRED: {minimum_deployment_days} minimum deployment days. SHORTFALL: {minimum_deployment_days - actual_deployment_days} deployment day(s) missing from the 30-day window. IDENTIFY MISSING DAYS: Review which specific days in the 1-30 range lack deployment events. CHECK REPLICA_HISTORY: Verify replica_history captures deployment events for all active days. ROOT CAUSES: 1) New deployment with limited history in the 30-day window, 2) Deployment paused or inactive during specific days in 1-30 range, 3) Insufficient replica_history coverage for some days. ACTION REQUIRED: 1) Add deployment data for the {minimum_deployment_days - actual_deployment_days} missing deployment day(s) in the 1-30 range, 2) Check if deployment occurred on days not captured in replica_history, 3) Extend analysis period to capture more deployment activity, 4) Adjust minimum_deployment_days if deployment frequency is lower than expected for this service type."
           }
         }
       }
