@@ -27,8 +27,6 @@ from src.main import report_client_timings, get_latency_percentiles_endpoint
 # --- fixtures ---------------------------------------------------------------
 
 
-@pytest.fixture
-
 # --- report_client_timings() tests ------------------------------------------
 
 

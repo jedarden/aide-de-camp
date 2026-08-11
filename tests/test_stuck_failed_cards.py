@@ -25,12 +25,6 @@ from src.watcher.daemon import BeadWatcher
 from src.session.store import SessionStore
 
 
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
 class TestTaskStuckSSEEvent:
     """Test task_stuck SSE event broadcasting."""
 

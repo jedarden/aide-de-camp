@@ -234,13 +234,15 @@ class GitOperationResult:
         Returns:
             GitOperationResult with status PARTIAL
         """
+        # Add commit_locally flag to indicate local commit succeeded
+        details_with_flag = {"commit_locally": True, **details}
         return cls(
             commit_sha=commit_sha,
             branch=None,
             manifest_path=manifest_path,
             status=GitOperationStatus.PARTIAL,
             error=error,
-            details=details,
+            details=details_with_flag,
         )
 
     @property
@@ -471,69 +473,35 @@ class GitOpsCommitStep:
                 )
 
             # Commit changes
-            try:
-                commit_attempted = True
-                commit_result = self._commit_changes(
-                    manifest_path,
-                    validated_fields,
-                    project_cfg,
-                )
-                commit_sha = commit_result.commit_sha
-                logger.debug(f"Committed changes: {commit_sha}")
-            except (GitConflictError, GitAuthenticationError, GitStateError) as e:
+            commit_attempted = True
+            commit_result = self._commit_changes(
+                manifest_path,
+                validated_fields,
+                project_cfg,
+            )
+
+            # Check if commit succeeded
+            if not commit_result.success:
                 # Rollback manifest changes - cleanup_mgr will handle git state
                 try:
                     self._write_manifest(full_manifest_path, original_manifest_backup)
-                    logger.info(f"Rolled back manifest changes after commit failure: {e}")
+                    logger.info(f"Rolled back manifest changes after commit failure: {commit_result.error}")
                 except Exception as rollback_error:
                     logger.error(f"Failed to rollback manifest changes: {rollback_error}")
 
-                return GitOperationResult.create_failure(
-                    manifest_path=manifest_path,
-                    error=f"Failed to commit changes: {e}",
-                )
-            except Exception as e:
-                # Rollback manifest changes on unexpected error
-                try:
-                    self._write_manifest(full_manifest_path, original_manifest_backup)
-                    logger.info(f"Rolled back manifest changes after unexpected error: {e}")
-                except Exception as rollback_error:
-                    logger.error(f"Failed to rollback manifest changes: {rollback_error}")
+                return commit_result
 
-                return GitOperationResult.create_failure(
-                    manifest_path=manifest_path,
-                    error=f"Failed to commit changes: {e}",
-                )
+            commit_sha = commit_result.commit_sha
+            logger.debug(f"Committed changes: {commit_sha}")
 
             # Push to origin - this is outside the with block so cleanup only runs on push failure
             # But we still want to track cleanup state
-            try:
-                self._push_changes(manifest_path=manifest_path, commit_sha=commit_sha)
-                logger.debug(f"Pushed changes: {commit_sha}")
-            except (GitConflictError, GitAuthenticationError) as e:
-                # Don't rollback on push failures - commit is local and valid
-                # User can resolve conflicts or auth issues and retry
-                # cleanup_mgr will clean up any merge state on exit
-                return GitOperationResult.create_partial(
-                    commit_sha=commit_sha,
-                    manifest_path=manifest_path,
-                    error=f"Failed to push changes: {e}",
-                    commit_locally=True,
-                )
-            except GitNetworkError as e:
-                # Network failures might be transient - commit is local and valid
-                return GitOperationResult.create_partial(
-                    commit_sha=commit_sha,
-                    manifest_path=manifest_path,
-                    error=f"Failed to push changes (network): {e}",
-                    commit_locally=True,
-                )
-            except Exception as e:
-                return GitOperationResult.create_partial(
-                    commit_sha=commit_sha,
-                    manifest_path=manifest_path,
-                    error=f"Failed to push changes: {e}",
-                )
+            push_result = self._push_changes(manifest_path=manifest_path, commit_sha=commit_sha)
+            logger.debug(f"Push result: {push_result.status.value}")
+
+            # If push failed, return the partial result
+            if not push_result.success:
+                return push_result
 
         logger.info(f"gitops_commit completed: commit={commit_sha}, manifest={manifest_path}")
 
@@ -728,7 +696,10 @@ class GitOpsCommitStep:
             )
 
             if not result.stdout.strip():
-                raise GitStateError("No changes to commit")
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
+                    error="No changes to commit",
+                )
 
             # Build commit message
             commit_msg = self._build_commit_message(manifest_path, fields, project_cfg)
@@ -752,30 +723,35 @@ class GitOpsCommitStep:
                 error_output = result.stderr.strip().lower()
                 # Check for authentication failures
                 if any(pattern in error_output for pattern in ["authentication", "permission denied", "credentials", "auth"]):
-                    raise GitAuthenticationError(f"Git authentication failed during commit: {result.stderr.strip()}")
+                    return GitOperationResult.create_failure(
+                        manifest_path=manifest_path,
+                        error=f"Git authentication failed during commit: {result.stderr.strip()}",
+                    )
 
                 # Check for merge conflicts in error message
                 if "merge conflict" in error_output or "fix conflicts" in error_output:
                     # Detect actual conflicting files
                     conflict_files = detect_merge_conflicts(self.declarative_config_path, timeout=5)
-                    raise GitConflictError(
-                        f"Merge conflict detected during commit: {result.stderr.strip()}",
+                    return GitOperationResult.create_failure(
+                        manifest_path=manifest_path,
+                        error=f"Merge conflict detected during commit: {result.stderr.strip()}",
                         conflict_files=conflict_files,
-                        conflict_type="merge",
-                        details={"operation": "commit"}
                     )
-                raise GitError(f"git commit failed: {result.stderr.strip()}")
+
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
+                    error=f"git commit failed: {result.stderr.strip()}",
+                )
 
             # After successful commit, still check for lingering conflict state
             # This catches cases where commit succeeded but left conflicts behind
             try:
                 conflict_files = detect_merge_conflicts(self.declarative_config_path, timeout=5)
                 if conflict_files:
-                    raise GitConflictError(
-                        "Merge conflicts detected after commit - repository is in conflicted state",
+                    return GitOperationResult.create_failure(
+                        manifest_path=manifest_path,
+                        error="Merge conflicts detected after commit - repository is in conflicted state",
                         conflict_files=conflict_files,
-                        conflict_type="merge",
-                        details={"operation": "post_commit_check"}
                     )
             except (GitStateError, GitNetworkError) as e:
                 # Don't fail commit for detection errors, just log
@@ -792,7 +768,10 @@ class GitOpsCommitStep:
 
             commit_sha = result.stdout.strip()
             if not commit_sha:
-                raise GitStateError("Git commit succeeded but returned no commit SHA")
+                return GitOperationResult.create_failure(
+                    manifest_path=manifest_path,
+                    error="Git commit succeeded but returned no commit SHA",
+                )
 
             return GitOperationResult.create_success(
                 commit_sha=commit_sha,
@@ -801,9 +780,15 @@ class GitOpsCommitStep:
             )
 
         except subprocess.TimeoutExpired:
-            raise GitNetworkError("Git operation timed out during commit")
+            return GitOperationResult.create_failure(
+                manifest_path=manifest_path,
+                error="Git operation timed out during commit",
+            )
         except FileNotFoundError:
-            raise GitError("Git command not found - ensure git is installed")
+            return GitOperationResult.create_failure(
+                manifest_path=manifest_path,
+                error="Git command not found - ensure git is installed",
+            )
 
     def _build_commit_message(
         self,
@@ -862,41 +847,53 @@ class GitOpsCommitStep:
                 "authentication", "permission denied", "credentials",
                 "auth", "could not read", "fatal"
             ]):
-                raise GitAuthenticationError(f"Git authentication failed during push: {result.stderr.strip()}")
+                # Local commit succeeded, but push failed due to auth
+                return GitOperationResult.create_partial(
+                    commit_sha=commit_sha,
+                    manifest_path=manifest_path,
+                    error=f"Git authentication failed during push: {result.stderr.strip()}",
+                )
 
-            # Detect network failures (these will trigger retry)
+            # Detect network failures (these will trigger retry via decorator)
             if any(pattern in error_msg + stdout_msg for pattern in [
                 "connection", "network", "timeout", "unreachable", "dns", "host"
             ]):
-                raise GitNetworkError(f"Network failure during git push: {result.stderr.strip()}")
+                # Local commit succeeded, but push failed due to network
+                # Note: The retry decorator will handle retries for transient network errors
+                return GitOperationResult.create_partial(
+                    commit_sha=commit_sha,
+                    manifest_path=manifest_path,
+                    error=f"Network failure during git push: {result.stderr.strip()}",
+                )
 
             # Detect common push failures
             if "rejected" in error_msg or "rejected" in stdout_msg:
                 if "non-fast-forward" in error_msg or "non-fast-forward" in stdout_msg:
-                    raise GitConflictError(
-                        f"Non-fast-forward push: {result.stderr.strip()} - remote has new commits, pull required",
-                        conflict_files=[],
-                        conflict_type="push_rejection",
-                        details={"reason": "non_fast_forward", "hint": "pull remote changes first"}
+                    return GitOperationResult.create_partial(
+                        commit_sha=commit_sha,
+                        manifest_path=manifest_path,
+                        error=f"Non-fast-forward push: {result.stderr.strip()} - remote has new commits, pull required",
                     )
                 else:
-                    raise GitConflictError(
-                        f"Push rejected: {result.stderr.strip()} - may need to pull remote changes first",
-                        conflict_files=[],
-                        conflict_type="push_rejection",
-                        details={"reason": "unknown"}
+                    return GitOperationResult.create_partial(
+                        commit_sha=commit_sha,
+                        manifest_path=manifest_path,
+                        error=f"Push rejected: {result.stderr.strip()} - may need to pull remote changes first",
                     )
             elif "merge conflict" in error_msg or "merge conflict" in stdout_msg:
                 # Detect actual conflicting files after push failure
                 conflict_files = detect_merge_conflicts(self.declarative_config_path, timeout=5)
-                raise GitConflictError(
-                    f"Merge conflict detected: {result.stderr.strip()}",
-                    conflict_files=conflict_files,
-                    conflict_type="merge",
-                    details={"operation": "push"}
+                return GitOperationResult.create_partial(
+                    commit_sha=commit_sha,
+                    manifest_path=manifest_path,
+                    error=f"Merge conflict detected: {result.stderr.strip()}",
                 )
             else:
-                raise GitError(f"git push failed: {result.stderr.strip()}")
+                return GitOperationResult.create_partial(
+                    commit_sha=commit_sha,
+                    manifest_path=manifest_path,
+                    error=f"git push failed: {result.stderr.strip()}",
+                )
 
         return GitOperationResult.create_success(
             commit_sha=commit_sha,
@@ -1054,7 +1051,11 @@ class GitOpsCommitStep:
             revert_committed = True
 
             # Push the revert
-            self._push_changes(manifest_path=manifest_path, commit_sha=commit_sha)
+            push_result = self._push_changes(manifest_path=manifest_path, commit_sha=commit_sha)
+
+            # If push failed, return the partial result
+            if not push_result.success:
+                return push_result
 
             return GitOperationResult.create_success(
                 commit_sha=commit_sha,

@@ -702,18 +702,7 @@ aide-de-camp/
 │   └── escalate/            ← escalate/task-profile prompts
 │       └── task-profile.md
 ├── src/
-│   ├── _version.py           ← package version metadata
-│   ├── calculate_deployment_metrics.py ← deployment metrics utility
-│   ├── categorize_events.py  ← event categorization utility
-│   ├── confirmations.py      ← confirmation helpers
-│   ├── freeze.py             ← self-modification kill switch
-│   ├── main.py               ← FastAPI app entry point
-│   ├── metrics_client.py     ← metrics client
-│   ├── metrics_query_client.py ← metrics query client
-│   ├── parse_log.py          ← log parsing utility
-│   ├── registry.py           ← project registry loader
-│   ├── victorialogs_latency_queries.py ← VictoriaLogs latency queries
-│   ├── victorialogs_queries.py ← VictoriaLogs queries
+│   ├── __init__.py            ← package init
 │   ├── action/               ← action execution strand (design and step implementations)
 │   │   ├── executor.py
 │   │   ├── manifest_template.py
@@ -732,9 +721,11 @@ aide-de-camp/
 │   │   ├── exceptions.py
 │   │   ├── models.py
 │   │   └── validator.py
+│   ├── calculate_deployment_metrics.py ← deployment metrics utility
 │   ├── canvas/               ← web frontend (SSE consumer, card renderer)
 │   │   ├── canvas.js
 │   │   └── index.html
+│   ├── categorize_events.py  ← event categorization utility
 │   ├── cli/                  ← adc CLI
 │   │   ├── commands.py
 │   │   ├── config.py
@@ -748,6 +739,7 @@ aide-de-camp/
 │   │   └── limit.py
 │   ├── config/               ← application configuration helpers
 │   │   └── retry.py
+│   ├── confirmations.py      ← confirmation helpers (legacy; confirmations/ is current)
 │   ├── confirmations/        ← confirmation and deletion safeguards
 │   │   ├── confirmations.py
 │   │   ├── confirmed_deletions.py
@@ -777,6 +769,7 @@ aide-de-camp/
 │   │   ├── clusters.py
 │   │   ├── commands.py
 │   │   └── orchestrator.py
+│   ├── freeze.py             ← self-modification kill switch
 │   ├── instrument/           ← timing instrumentation
 │   │   └── timings.py
 │   ├── intent/               ← intent router and comparison tools
@@ -786,25 +779,30 @@ aide-de-camp/
 │   │   └── unified_comparison.py
 │   ├── llm/                  ← LLM response helpers
 │   │   └── response_parser.py
+│   ├── main.py               ← FastAPI app entry point
 │   ├── memory/               ← memory store and extraction
 │   │   ├── extraction.py
 │   │   └── store.py
+│   ├── metrics_client.py     ← metrics client
+│   ├── metrics_query_client.py ← metrics query client
 │   ├── monitoring/           ← ambient monitoring
 │   │   ├── ambient.py
 │   │   └── config_loader.py
+│   ├── parse_log.py          ← log parsing utility
 │   ├── persistence/           ← persistence layer abstractions
 │   │   └── deployment_persistence.py
-│   ├── realtime/              ← OpenAI Realtime API voice session
+│   ├── realtime/             ← OpenAI Realtime API voice session
 │   │   ├── batching.py
 │   │   ├── continuity.py
 │   │   ├── dispatch.py
 │   │   └── session.py
-│   ├── render/                ← hot-path rendering
+│   ├── registry.py           ← project registry loader
+│   ├── render/               ← hot-path rendering
 │   │   └── hot_path.py
-│   ├── schemas/               ← Pydantic schemas
+│   ├── schemas/              ← Pydantic schemas
 │   │   ├── whisper_stt_deployment.py
 │   │   └── whisper_stt_simplified.py
-│   ├── session/               ← session store (SQLite)
+│   ├── session/              ← session store (SQLite)
 │   │   ├── connection_monitor.py
 │   │   ├── migrations/
 │   │   │   ├── add_card_cache.py
@@ -813,19 +811,19 @@ aide-de-camp/
 │   │   │   ├── add_result_type.py
 │   │   │   └── seed_component_patterns.py
 │   │   └── store.py
-│   ├── sse/                   ← SSE broadcasting
+│   ├── sse/                  ← SSE broadcasting
 │   │   ├── broadcaster.py
 │   │   └── events.py
-│   ├── stt/                   ← speech-to-text fallback
+│   ├── stt/                  ← speech-to-text fallback
 │   │   └── fallback.py
-│   ├── surface/               ← surface routing
+│   ├── surface/              ← surface routing
 │   │   └── router.py
-│   ├── synthesize/             ← synthesize strand (LLM)
+│   ├── synthesize/           ← synthesize strand (LLM)
 │   │   └── strand.py
-│   ├── telegram/               ← Telegram fallback surface
-│   │   ├── fallback.py        ← delivery is non-functional until ADR-1 implementation
+│   ├── telegram/             ← Telegram fallback surface
+│   │   ├── fallback.py       ← delivery is non-functional until ADR-1 implementation
 │   │   └── state_tracker.py
-│   ├── test/                   ← test-harness endpoints
+│   ├── test/                 ← test-harness endpoints
 │   │   ├── dispatch.py
 │   │   ├── fixtures/
 │   │   │   ├── utterances.json
@@ -835,15 +833,15 @@ aide-de-camp/
 │   │   ├── router.py
 │   │   ├── synthetic.py
 │   │   └── utilities.py
-│   ├── topic/                  ← topic model
+│   ├── topic/                ← topic model
 │   │   └── model.py
-│   ├── utilities/              ← shared utilities
+│   ├── utilities/            ← shared utilities
 │   │   └── retry.py
-│   ├── utils/                   ← filesystem and retry utilities
+│   ├── utils/                ← filesystem and retry utilities
 │   │   ├── atomic_write.py
 │   │   ├── git_cleanup.py
 │   │   └── git_retry.py
-│   ├── validation/              ← validation utilities
+│   ├── validation/           ← validation utilities
 │   │   ├── classification_comparison.py
 │   │   ├── comparison.py
 │   │   ├── completeness.py
@@ -854,14 +852,17 @@ aide-de-camp/
 │   │   ├── integration.py
 │   │   ├── runner.py
 │   │   └── validate_completeness.py
-│   ├── victorialogs/            ← VictoriaLogs client and query helpers
+│   ├── victorialogs/         ← VictoriaLogs client and query helpers
 │   │   ├── client.py
 │   │   ├── metrics.py
 │   │   ├── queries.py
 │   │   ├── test_victorialogs.py
 │   │   └── README.md
-│   └── watcher/                 ← NEEDLE bead watcher daemon
-│       └── daemon.py
+│   ├── victorialogs_latency_queries.py ← VictoriaLogs latency queries
+│   ├── victorialogs_queries.py ← VictoriaLogs queries
+│   ├── watcher/              ← NEEDLE bead watcher daemon
+│   │   └── daemon.py
+│   └── _version.py           ← package version metadata
 ├── data/
 │   ├── session.db           ← session store (SQLite)
 │   └── components.db        ← component library (SQLite)
@@ -999,7 +1000,9 @@ One exception: the kill-switch fallbacks (`adc freeze`'s `data/FREEZE` sentinel,
 
 **Status: NOT BUILT** ❌
 
-New Argo WorkflowTemplate `aide-de-camp-build` on iad-ci:
+Containerization and CI/CD are explicitly future work, not built. Deploy Stage A runs directly from source with no CI build pipeline. When Stage B is implemented:
+
+- New Argo WorkflowTemplate `aide-de-camp-build` on iad-ci
 - Docker build → `ronaldraygun/aide-de-camp`
 - Update image tag in `jedarden/declarative-config` (k8s/ardenone-cluster/aide-de-camp/)
 - ArgoCD syncs automatically

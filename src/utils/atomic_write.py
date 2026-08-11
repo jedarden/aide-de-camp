@@ -956,3 +956,150 @@ def _atomic_append_impl(
     if last_exception:
         raise last_exception
     raise RuntimeError(f"Unexpected error in atomic append for {filepath}")
+
+
+def rollback(
+    filepath: Union[str, Path],
+    *,
+    backup_path: Optional[Union[str, Path]] = None,
+    create_rollback_backup: bool = True,
+    validate_fn: Optional[Callable[[Union[str, bytes]], bool]] = None,
+) -> Path:
+    """
+    Restore a file from its backup atomically.
+
+    This function restores a file to a previous state by reading from a backup
+    file and writing it atomically to the target location. If no backup path
+    is specified, it looks for a .bak file with the same name as the target.
+
+    Args:
+        filepath: Target file path to restore (str or Path object)
+        backup_path: Optional path to backup file. If None, uses filepath.bak
+        create_rollback_backup: If True, creates a backup of the current file
+                               before restoring (for rollback of the rollback)
+        validate_fn: Optional validation function called with backup content
+                     before restore. Should return True if content is valid.
+
+    Returns:
+        Path to the backup file that was used for restoration
+
+    Raises:
+        FileNotFoundError: If backup file does not exist
+        PermissionError: If lacking write permissions
+        OSError: If filesystem error occurs
+        ValueError: If validation function returns False
+
+    Example:
+        >>> # Create initial backup
+        >>> atomic_write('config.json', '{"version": 1}', create_backup=True)
+        >>> # Modify file
+        >>> atomic_write('config.json', '{"version": 2}')
+        >>> # Rollback to previous version
+        >>> rollback('config.json')
+
+        >>> # Rollback with custom backup path
+        >>> rollback('config.json', backup_path='backups/config.json.bak')
+
+        >>> # Rollback with validation
+        >>> def is_valid_json(content):
+        ...     try:
+        ...         json.loads(content)
+        ...         return True
+        ...     except json.JSONDecodeError:
+        ...         return False
+        >>> rollback('config.json', validate_fn=is_valid_json)
+    """
+    filepath = Path(filepath)
+    operation_id = str(uuid.uuid4())[:8]
+
+    # Determine backup path
+    if backup_path is None:
+        backup_path = filepath.with_suffix(filepath.suffix + '.bak')
+    else:
+        backup_path = Path(backup_path)
+
+    logger.info(
+        f"[{operation_id}] Starting rollback operation for {filepath} from {backup_path}",
+        extra={"filepath": str(filepath), "backup_path": str(backup_path), "operation_id": operation_id}
+    )
+
+    # Check if backup file exists
+    if not backup_path.exists():
+        error_msg = f"Backup file {backup_path} does not exist - cannot rollback {filepath}"
+        logger.error(f"[{operation_id}] {error_msg}")
+        raise FileNotFoundError(error_msg)
+
+    # Read backup content
+    try:
+        backup_content = backup_path.read_bytes()
+        logger.debug(f"[{operation_id}] Read backup content from {backup_path} ({len(backup_content)} bytes)")
+    except OSError as e:
+        error_msg = f"Failed to read backup file {backup_path}: {e}"
+        logger.error(f"[{operation_id}] {error_msg}")
+        raise OSError(error_msg) from e
+
+    # Validate backup content if validation function provided
+    if validate_fn is not None:
+        logger.debug(f"[{operation_id}] Running validation function on backup content")
+        # Try to decode as UTF-8 for text validation
+        try:
+            decoded_content = backup_content.decode('utf-8')
+        except UnicodeDecodeError:
+            # If it's binary content, pass the bytes directly
+            decoded_content = backup_content
+
+        if not validate_fn(decoded_content):
+            error_msg = f"Backup content validation failed for {backup_path}"
+            logger.error(f"[{operation_id}] {error_msg}")
+            raise ValueError(error_msg)
+
+    # Create backup of current file before restoring if requested
+    current_backup = None
+    if create_rollback_backup and filepath.exists():
+        current_backup = filepath.with_suffix(filepath.suffix + '.pre_rollback.bak')
+        try:
+            _atomic_backup(filepath, current_backup, operation_id)
+            logger.info(f"[{operation_id}] Created pre-rollback backup at {current_backup}")
+        except OSError as e:
+            error_msg = f"Failed to create pre-rollback backup at {current_backup}: {e}"
+            logger.error(f"[{operation_id}] {error_msg}")
+            raise OSError(error_msg) from e
+
+    # Determine write mode (binary or text based on content)
+    # Try to detect if it's text by attempting UTF-8 decode
+    try:
+        backup_content.decode('utf-8')
+        mode = 'w'
+        write_content = backup_content.decode('utf-8')
+    except UnicodeDecodeError:
+        mode = 'wb'
+        write_content = backup_content
+
+    # Restore using atomic write
+    logger.info(f"[{operation_id}] Restoring {filepath} from backup using mode {mode}")
+
+    try:
+        # Use the existing atomic_write implementation for safe restoration
+        atomic_write(
+            filepath,
+            write_content,
+            mode=mode,
+            create_backup=False,  # We already handled backup above
+            validate_fn=None,    # We already validated above
+            cleanup_verify=True,
+        )
+
+        logger.info(
+            f"[{operation_id}] Rollback completed successfully: {filepath} restored from {backup_path}",
+            extra={"filepath": str(filepath), "backup_path": str(backup_path), "operation_id": operation_id}
+        )
+
+        return backup_path
+
+    except Exception as e:
+        logger.error(
+            f"[{operation_id}] Rollback failed for {filepath}: {type(e).__name__}: {e}",
+            exc_info=True,
+            extra={"filepath": str(filepath), "operation_id": operation_id}
+        )
+        raise

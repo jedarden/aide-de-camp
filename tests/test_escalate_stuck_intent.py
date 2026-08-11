@@ -36,14 +36,6 @@ from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 # --- fixtures ---------------------------------------------------------------
 
 
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
 # --- Test Stuck Intent Classification -----------------------------------------
 
 

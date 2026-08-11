@@ -374,11 +374,11 @@ class TestCompletenessValidation:
         """Test that date gaps are detected."""
         base_date = datetime(2026, 7, 7, 12, 0, 0)
 
-        # Create data with a gap
+        # Create data with a gap - exactly 30 days but with a gap in the middle
         deployments = []
-        for i in range(15):  # Days 0-14
+        for i in range(15):  # Days 0-14 (15 days)
             deployments.append({"timestamp": (base_date + timedelta(days=i)).isoformat() + "Z"})
-        for i in range(16, 32):  # Days 16-31 (skip day 15)
+        for i in range(16, 31):  # Days 16-30 (15 days, skipping day 15) - total 30 days
             deployments.append({"timestamp": (base_date + timedelta(days=i)).isoformat() + "Z"})
 
         data = {
@@ -395,7 +395,13 @@ class TestCompletenessValidation:
         try:
             is_valid, errors = validate_deployment_file(temp_path)
             assert not is_valid, "Expected date gap to fail completeness"
-            assert any("Date gap detected" in error for error in errors)
+            # Check for enhanced error message components
+            assert len(errors) > 0, "Expected error messages"
+            # Verify the error contains gap information
+            error = errors[0]
+            assert "gap" in error.lower(), f"Expected 'gap' in error, got: {error}"
+            assert "ACTION:" in error, f"Expected actionable guidance in error, got: {error}"
+            assert "2026-07" in error, f"Expected date information in error, got: {error}"
         finally:
             Path(temp_path).unlink()
 
@@ -453,7 +459,7 @@ class TestMultipleErrors:
         # Create file with both invalid JSON and missing fields
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             temp_path = f.name
-            f.write('{"service": "test")  # Invalid JSON
+            f.write('{"service": "test"')  # Invalid JSON - missing closing brace
 
         try:
             is_valid, errors = validate_deployment_file(temp_path)

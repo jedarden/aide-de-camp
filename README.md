@@ -216,7 +216,7 @@ All prompts are hot-reloaded on every invocation. Edit these files to tune behav
 | Runtime | Used for |
 |---------|---------|
 | Realtime API | Voice model (persistent session, voice I/O) |
-| Configurable LLM backend | Intent router, synthesize strand |
+| ZAI proxy (via `ZAI_PROXY_URL`) | Intent router, synthesize strand |
 | Deterministic code | Fetch strand (kubectl/git execution), bead watcher |
 | Async worker fleet | UI-regen agent, self-modification agent, background analysis, task work items |
 

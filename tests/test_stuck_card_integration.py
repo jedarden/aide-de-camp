@@ -28,10 +28,6 @@ from src.session.store import SessionStore
 from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 
 
-@pytest.fixture
-
-@pytest.fixture
-
 @pytest.mark.asyncio
 async def test_stuck_card_complete_flow(store, broadcaster):
     """

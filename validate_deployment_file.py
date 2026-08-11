@@ -6,8 +6,10 @@ This module provides a simple validation function that checks if a deployment
 data file is valid and returns validation results.
 """
 
-from typing import Tuple, List
+from typing import Tuple, List, Dict, Any
 from pathlib import Path
+import json
+from src.validation.validate_completeness import validate_completeness
 
 
 def validate_deployment_file(file_path: str) -> Tuple[bool, List[str]]:
@@ -34,18 +36,52 @@ def validate_deployment_file(file_path: str) -> Tuple[bool, List[str]]:
     """
     try:
         # Basic file existence check
-        # This is a minimal implementation - additional validation steps to be added
         if not Path(file_path).exists():
             return False, [f"File not found: {file_path}"]
 
-        # Placeholder implementation for remaining validation steps
-        # TODO: Implement individual validation steps
-        # - JSON structure validation
-        # - Required fields validation
-        # - Data type validation
-        # - 30-day coverage validation
+        # Read and parse JSON
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            return False, [f"Invalid JSON: {e}"]
 
-        # Return placeholder values for now
+        # Validate structure and extract deployments data
+        deployments = None
+        errors = []
+
+        if isinstance(data, list):
+            # Direct list of deployments
+            deployments = data
+        elif isinstance(data, dict):
+            # Check if it has a 'deployments' key
+            if 'deployments' in data:
+                deployments = data['deployments']
+
+            # Validate required fields and types
+            required_fields = ['service', 'namespace', 'cluster']
+            for field in required_fields:
+                if field not in data:
+                    errors.append(f"Missing required field: {field}")
+                elif not isinstance(data[field], str):
+                    errors.append(f"Field '{field}' must be str, got {type(data[field]).__name__}")
+
+            # If we have errors, return them
+            if errors:
+                return False, errors
+
+            # If no deployments, valid for structure check
+            if deployments is None:
+                return True, []
+        else:
+            return False, ["Data must be a list or dictionary"]
+
+        # Validate 30-day completeness
+        if deployments is not None:
+            is_valid, error_message = validate_completeness(deployments)
+            if not is_valid:
+                return False, [error_message]
+
         return True, []
 
     except Exception as e:

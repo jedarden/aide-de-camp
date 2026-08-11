@@ -17,10 +17,6 @@ import pytest
 from src.session.store import SessionStore
 
 
-@pytest.fixture(scope="function")
-
-@pytest.fixture(scope="function")
-
 class TestCardCacheMigration:
     """Test card_cache table migration."""
 

@@ -98,6 +98,19 @@ def is_transient(error: Any) -> bool:
     if isinstance(error, OSError):
         return _is_os_error_transient(error)
 
+    # Handle Git-specific errors (from src.action.steps.git_validation)
+    # Check class name to avoid circular import
+    error_class_name = error.__class__.__name__
+    error_module = error.__class__.__module__
+
+    # GitNetworkError - transient (network issues)
+    if error_class_name == "GitNetworkError":
+        return True
+
+    # GitAuthenticationError, GitConflictError - permanent (do not retry)
+    if error_class_name in ("GitAuthenticationError", "GitConflictError"):
+        return False
+
     # Unknown error type - be conservative and treat as permanent
     return False
 

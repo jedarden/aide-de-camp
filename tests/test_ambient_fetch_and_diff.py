@@ -26,6 +26,9 @@ from src.session.store import SessionStore
 
 
 @pytest.fixture
+async def store():
+    """SessionStore fixture for tests."""
+    db_path = Path(tempfile.mkdtemp()) / "test_session.db"
     s = SessionStore(db_path)
     await s.initialize()
 
@@ -35,10 +38,6 @@ from src.session.store import SessionStore
     await s.close()
     db_path.unlink(missing_ok=True)
 
-
-@pytest.fixture
-
-@pytest.fixture
 
 # --- Tests ---------------------------------------------------------------------
 

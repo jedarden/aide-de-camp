@@ -39,6 +39,9 @@ from src.surface.router import SurfaceRouter, Surface, RouteDecision
 
 
 @pytest.fixture
+async def store():
+    """Fixture providing an in-memory SessionStore."""
+    db_path = Path(tempfile.mktemp(suffix=".db"))
     s = SessionStore(db_path)
     await s.initialize()
 
@@ -50,7 +53,10 @@ from src.surface.router import SurfaceRouter, Surface, RouteDecision
 
 
 @pytest.fixture
+def mock_router():
+    """Fixture providing a mocked SurfaceRouter with fallback behavior."""
     # Default: no active surfaces (fallback to Telegram)
+    router = AsyncMock(spec=SurfaceRouter)
     router.route_result = AsyncMock(return_value=RouteDecision(
         target_surfaces=[],
         fallback_used=True,
@@ -61,6 +67,30 @@ from src.surface.router import SurfaceRouter, Surface, RouteDecision
 
 
 @pytest.fixture
+def monitoring_config_file():
+    """Fixture providing a temporary monitoring config file."""
+    config_path = Path(tempfile.mktemp(suffix=".yaml"))
+    config_data = {
+        "tick_interval_seconds": 60,
+        "monitoring": {
+            "active_topics": [
+                {
+                    "topic_id": "test-topic",
+                    "project_slug": "test-project",
+                    "intent_type": "status",
+                    "check_interval": 30,
+                    "urgency": "high",
+                    "filters": [],
+                    "notification_threshold": "any_change"
+                }
+            ],
+            "exceptions": []
+        }
+    }
+
+    with open(config_path, 'w') as f:
+        yaml.dump(config_data, f)
+
     yield config_path
 
     # Cleanup

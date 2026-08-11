@@ -23,10 +23,6 @@ from src.intent.router import IntentRouter, RoutedIntent, IntentClassification, 
 from src.instrument.timings import DispatchTimings
 
 
-@pytest.fixture
-
-@pytest.fixture
-
 # --- E2E: Hot-path dispatch timing capture -----------------------------------
 
 
@@ -398,4 +394,3 @@ class TestE2EExistingTestsPass:
         assert percentiles["fetch_total_ms"]["count"] == 1
         assert "synthesize_total_ms" in percentiles  # id3, id4 have this
         assert percentiles["synthesize_total_ms"]["count"] == 2
-
