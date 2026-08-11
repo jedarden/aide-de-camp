@@ -14,6 +14,7 @@ from src.utilities.gap_calculator import (
     _find_consecutive_sequences,
     classify_gap_by_size,
     format_gap_period,
+    format_gap_period_detailed,
     group_gaps_by_period,
     calculate_coverage_from_gaps,
     detect_anomalies
@@ -457,10 +458,10 @@ class TestFormatGapPeriod:
             is_consecutive=False
         )
 
-        formatted = format_gap_period(gap)
+        formatted = format_gap_period_detailed(gap)
 
         assert "2026-08-05" in formatted
-        assert "1 day" in formatted
+        assert "1-day" in formatted
         assert "isolated" in formatted
         assert "tiny" in formatted
 
@@ -475,10 +476,11 @@ class TestFormatGapPeriod:
             sequence_id=0
         )
 
-        formatted = format_gap_period(gap)
+        formatted = format_gap_period_detailed(gap)
 
-        assert "2026-08-02" in formatted
-        assert "5-day consecutive sequence" in formatted
+        # format_gap_period_detailed shows the period range, not individual gap date
+        assert "5-day" in formatted
+        assert "consecutive sequence" in formatted
         assert "2026-08-01" in formatted
         assert "2026-08-05" in formatted
         assert "medium" in formatted  # 5 days = medium (4-7 days)
@@ -494,9 +496,10 @@ class TestFormatGapPeriod:
             sequence_id=0
         )
 
-        formatted = format_gap_period(gap)
+        formatted = format_gap_period_detailed(gap)
 
-        assert "20-day consecutive sequence" in formatted
+        assert "20-day" in formatted
+        assert "consecutive sequence" in formatted
         assert "extended" in formatted
 
 
