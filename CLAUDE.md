@@ -367,3 +367,126 @@ test_config = RetryConfig(
 )
 set_retry_config(test_config)
 ```
+
+## Playwright Browser Automation
+
+Playwright is available for headless browser automation and canvas verification.
+
+### Installation
+
+Playwright is listed in `pyproject.toml` under `dev` dependencies:
+```toml
+[project.optional-dependencies]
+dev = [
+    "playwright>=1.48.0",
+    # ... other dev dependencies
+]
+```
+
+Install the package and browser binaries:
+
+```bash
+# From /home/coding/aide-de-camp/
+.venv/bin/pip install -e ".[dev]"
+
+# Install browser binaries (chromium, firefox, webkit)
+.venv/bin/playwright install chromium
+```
+
+### Test Structure
+
+Two Playwright test modules are available:
+
+**`tests/integration_canvas_playwright.py`** — Basic integration tests
+- Foundational browser fixtures (`browser`, `browser_context`, `page`)
+- Smoke tests (page loads, renders, responds to viewport changes)
+- Use this for quick integration verification
+
+**`tests/test_canvas_playwright_verification.py`** — Comprehensive canvas verification
+- Advanced fixtures (API client, screenshot analysis)
+- Full canvas testing (SSE, staleness indicators, card dismissal)
+- Screenshot verification with distinct color counting
+- Use this for complete end-to-end canvas validation
+
+### Running Playwright Tests
+
+```bash
+# Run basic integration tests
+.venv/bin/pytest tests/integration_canvas_playwright.py -v
+
+# Run comprehensive canvas verification
+.venv/bin/pytest tests/test_canvas_playwright_verification.py -v
+
+# Run all Playwright tests
+.venv/bin/pytest tests/ -k playwright -v
+
+# Run with screenshots (saved to /tmp/adc_playwright_screenshots/)
+.venv/bin/pytest tests/integration_canvas_playwright.py -v -s
+```
+
+### Fixtures
+
+Common Playwright fixtures (available in both test modules):
+
+- `browser` — Headless Chromium browser instance
+- `browser_context` — Isolated browser context (separate cookies/storage)
+- `page` — Playwright page instance for navigation and interaction
+
+### Screenshot Verification
+
+The comprehensive verification suite includes screenshot analysis to prevent false positives:
+
+```python
+from PIL import Image
+
+def count_distinct_colors(image_path: Path, threshold: int = 10) -> int:
+    """Count distinct colors to verify real content is rendered."""
+    img = Image.open(image_path)
+    img_rgb = img.convert("RGB")
+    colors = set(pixel for pixel in img_rgb.getdata())
+    return len(colors)
+
+def verify_screenshot_has_content(image_path: Path, min_colors: int = 50) -> bool:
+    """Verify screenshot contains actual rendered content."""
+    distinct_colors = count_distinct_colors(image_path)
+    return distinct_colors >= min_colors
+```
+
+This prevents the broken-Pytest case where identical blank screenshots are produced when Playwright's rendering is broken.
+
+### API Client
+
+The ADC API client helper (`test_canvas_playwright_verification.py`) provides methods for test data injection:
+
+```python
+from tests.test_canvas_playwright_verification import ADCAPIClient
+
+client = ADCAPIClient()
+session = await client.create_session()
+topic_id = await client.create_topic(
+    session_id=session["session_id"],
+    label="Test Topic",
+    topic_type="project",
+)
+result_id = await client.create_result(
+    session_id=session["session_id"],
+    topic_id=topic_id,
+    summary="Test result",
+    data={"test": "data"},
+)
+```
+
+### Browser Binary Locations
+
+Playwright stores browser binaries in:
+```
+/home/coding/.cache/ms-playwright/
+├── chromium-1234/
+├── chromium_headless_shell-1234/
+└── ffmpeg-1011/
+```
+
+Update binaries when Playwright is upgraded:
+```bash
+.venv/bin/playwright install --force chromium
+```
