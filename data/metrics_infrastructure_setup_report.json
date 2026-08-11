@@ -1,0 +1,336 @@
+{
+  "setup_timestamp": "2026-08-07T08:38:15.210288",
+  "connection_tests": {
+    "test_timestamp": "2026-08-07T08:36:02.487785",
+    "prometheus": {
+      "status": "error",
+      "error": "Extra data: line 1 column 206 (char 205)",
+      "connection_success": false
+    },
+    "victorialogs": {
+      "status": "error",
+      "error": "[Errno -2] Name or service not known",
+      "connection_success": false
+    }
+  },
+  "metrics_validation": {
+    "validation_timestamp": "2026-08-07T08:36:06.171481",
+    "services": {
+      "pbx-web": {
+        "service": "pbx-web",
+        "namespace": "pbx-web",
+        "validation_timestamp": "2026-08-07T08:36:06.171489",
+        "metric_categories": {
+          "cpu": {
+            "available_metrics": [],
+            "unavailable_metrics": [
+              {
+                "query": "rate(container_cpu_usage_seconds_total{namespace=\"pbx-web\"}[5m])",
+                "error": "Extra data: line 1 column 5884 (char 5883)"
+              },
+              {
+                "query": "kube_pod_container_resource_requests{namespace=\"pbx-web\",resource=\"cpu\"}",
+                "error": "Extra data: line 1 column 1772 (char 1771)"
+              },
+              {
+                "query": "kube_pod_container_resource_limits{namespace=\"pbx-web\",resource=\"cpu\"}",
+                "error": "Extra data: line 1 column 1757 (char 1756)"
+              }
+            ],
+            "coverage_percent": 0.0
+          },
+          "memory": {
+            "available_metrics": [],
+            "unavailable_metrics": [
+              {
+                "query": "container_memory_usage_bytes{namespace=\"pbx-web\"}",
+                "error": "Extra data: line 1 column 6083 (char 6082)"
+              },
+              {
+                "query": "container_memory_working_set_bytes{namespace=\"pbx-web\"}",
+                "error": "Extra data: line 1 column 6143 (char 6142)"
+              },
+              {
+                "query": "kube_pod_container_resource_requests{namespace=\"pbx-web\",resource=\"memory\"}",
+                "error": "Extra data: line 1 column 1798 (char 1797)"
+              },
+              {
+                "query": "kube_pod_container_resource_limits{namespace=\"pbx-web\",resource=\"memory\"}",
+                "error": "Extra data: line 1 column 1793 (char 1792)"
+              }
+            ],
+            "coverage_percent": 0.0
+          },
+          "network": {
+            "available_metrics": [],
+            "unavailable_metrics": [
+              {
+                "query": "rate(container_network_receive_bytes_total{namespace=\"pbx-web\"}[5m])",
+                "error": "Extra data: line 1 column 1999 (char 1998)"
+              },
+              {
+                "query": "rate(container_network_transmit_bytes_total{namespace=\"pbx-web\"}[5m])",
+                "error": "Extra data: line 1 column 1998 (char 1997)"
+              }
+            ],
+            "coverage_percent": 0.0
+          },
+          "pod_status": {
+            "available_metrics": [],
+            "unavailable_metrics": [
+              {
+                "query": "kube_pod_status_phase{namespace=\"pbx-web\"}",
+                "error": "Extra data: line 1 column 5736 (char 5735)"
+              },
+              {
+                "query": "kube_pod_container_status_running{namespace=\"pbx-web\"}",
+                "error": "Extra data: line 1 column 1501 (char 1500)"
+              },
+              {
+                "query": "up{namespace=\"pbx-web\"}",
+                "error": "Extra data: line 1 column 64 (char 63)"
+              }
+            ],
+            "coverage_percent": 0.0
+          }
+        },
+        "overall_coverage": 0.0,
+        "total_metrics_checked": 12,
+        "total_metrics_available": 0
+      },
+      "whisper-stt": {
+        "service": "whisper-stt",
+        "namespace": "whisper-stt",
+        "validation_timestamp": "2026-08-07T08:36:54.551088",
+        "metric_categories": {
+          "cpu": {
+            "available_metrics": [],
+            "unavailable_metrics": [
+              {
+                "query": "rate(container_cpu_usage_seconds_total{namespace=\"whisper-stt\"}[5m])",
+                "error": "Extra data: line 1 column 3550 (char 3549)"
+              },
+              {
+                "query": "kube_pod_container_resource_requests{namespace=\"whisper-stt\",resource=\"cpu\"}",
+                "error": "Extra data: line 1 column 926 (char 925)"
+              },
+              {
+                "query": "kube_pod_container_resource_limits{namespace=\"whisper-stt\",resource=\"cpu\"}",
+                "error": "Extra data: line 1 column 922 (char 921)"
+              }
+            ],
+            "coverage_percent": 0.0
+          },
+          "memory": {
+            "available_metrics": [],
+            "unavailable_metrics": [
+              {
+                "query": "container_memory_usage_bytes{namespace=\"whisper-stt\"}",
+                "error": "Extra data: line 1 column 3685 (char 3684)"
+              },
+              {
+                "query": "container_memory_working_set_bytes{namespace=\"whisper-stt\"}",
+                "error": "Extra data: line 1 column 3721 (char 3720)"
+              },
+              {
+                "query": "kube_pod_container_resource_requests{namespace=\"whisper-stt\",resource=\"memory\"}",
+                "error": "Extra data: line 1 column 950 (char 949)"
+              },
+              {
+                "query": "kube_pod_container_resource_limits{namespace=\"whisper-stt\",resource=\"memory\"}",
+                "error": "Extra data: line 1 column 946 (char 945)"
+              }
+            ],
+            "coverage_percent": 0.0
+          },
+          "network": {
+            "available_metrics": [],
+            "unavailable_metrics": [
+              {
+                "query": "rate(container_network_receive_bytes_total{namespace=\"whisper-stt\"}[5m])",
+                "error": "Extra data: line 1 column 1356 (char 1355)"
+              },
+              {
+                "query": "rate(container_network_transmit_bytes_total{namespace=\"whisper-stt\"}[5m])",
+                "error": "Extra data: line 1 column 1355 (char 1354)"
+              }
+            ],
+            "coverage_percent": 0.0
+          },
+          "pod_status": {
+            "available_metrics": [],
+            "unavailable_metrics": [
+              {
+                "query": "kube_pod_status_phase{namespace=\"whisper-stt\"}",
+                "error": "Extra data: line 1 column 3880 (char 3879)"
+              },
+              {
+                "query": "kube_pod_container_status_running{namespace=\"whisper-stt\"}",
+                "error": "Extra data: line 1 column 803 (char 802)"
+              },
+              {
+                "query": "up{namespace=\"whisper-stt\"}",
+                "error": "Extra data: line 1 column 64 (char 63)"
+              }
+            ],
+            "coverage_percent": 0.0
+          }
+        },
+        "overall_coverage": 0.0,
+        "total_metrics_checked": 12,
+        "total_metrics_available": 0
+      }
+    },
+    "overall_summary": {
+      "total_services": 2,
+      "average_coverage_percent": 0.0,
+      "services_fully_covered": 0
+    }
+  },
+  "data_availability": {
+    "pbx-web": {
+      "service": "pbx-web",
+      "namespace": "pbx-web",
+      "verification_timestamp": "2026-08-07T08:38:15.210303",
+      "time_ranges": {
+        "1h": {
+          "query": "up{namespace=\"pbx-web\"}",
+          "time_range": "@now()-1h -> @now()",
+          "data_available": false,
+          "result_count": 0,
+          "status": "error"
+        },
+        "24h": {
+          "query": "up{namespace=\"pbx-web\"}",
+          "time_range": "@now()-24h -> @now()",
+          "data_available": false,
+          "result_count": 0,
+          "status": "error"
+        },
+        "7d": {
+          "query": "up{namespace=\"pbx-web\"}",
+          "time_range": "@now()-7d -> @now()",
+          "data_available": false,
+          "result_count": 0,
+          "status": "error"
+        },
+        "30d": {
+          "query": "up{namespace=\"pbx-web\"}",
+          "time_range": "@now()-30d -> @now()",
+          "data_available": false,
+          "result_count": 0,
+          "status": "error"
+        }
+      },
+      "thirty_day_data_available": false,
+      "continuous_coverage": false
+    },
+    "whisper-stt": {
+      "service": "whisper-stt",
+      "namespace": "whisper-stt",
+      "verification_timestamp": "2026-08-07T08:38:31.291138",
+      "time_ranges": {
+        "1h": {
+          "query": "up{namespace=\"whisper-stt\"}",
+          "time_range": "@now()-1h -> @now()",
+          "data_available": false,
+          "result_count": 0,
+          "status": "error"
+        },
+        "24h": {
+          "query": "up{namespace=\"whisper-stt\"}",
+          "time_range": "@now()-24h -> @now()",
+          "data_available": false,
+          "result_count": 0,
+          "status": "error"
+        },
+        "7d": {
+          "query": "up{namespace=\"whisper-stt\"}",
+          "time_range": "@now()-7d -> @now()",
+          "data_available": false,
+          "result_count": 0,
+          "status": "error"
+        },
+        "30d": {
+          "query": "up{namespace=\"whisper-stt\"}",
+          "time_range": "@now()-30d -> @now()",
+          "data_available": false,
+          "result_count": 0,
+          "status": "error"
+        }
+      },
+      "thirty_day_data_available": false,
+      "continuous_coverage": false
+    }
+  },
+  "metric_conventions": {
+    "documentation_timestamp": "2026-08-07T08:38:15.210204",
+    "metric_conventions": {
+      "prometheus_metrics": {
+        "cpu_metrics": {
+          "usage": "container_cpu_usage_seconds_total",
+          "rate": "rate(container_cpu_usage_seconds_total[5m])",
+          "requests": "kube_pod_container_resource_requests{resource=\"cpu\"}",
+          "limits": "kube_pod_container_resource_limits{resource=\"cpu\"}"
+        },
+        "memory_metrics": {
+          "usage": "container_memory_usage_bytes",
+          "working_set": "container_memory_working_set_bytes",
+          "cache": "container_memory_cache_bytes",
+          "requests": "kube_pod_container_resource_requests{resource=\"memory\"}",
+          "limits": "kube_pod_container_resource_limits{resource=\"memory\"}"
+        },
+        "network_metrics": {
+          "receive_rate": "rate(container_network_receive_bytes_total[5m])",
+          "transmit_rate": "rate(container_network_transmit_bytes_total[5m])",
+          "receive_total": "container_network_receive_bytes_total",
+          "transmit_total": "container_network_transmit_bytes_total"
+        },
+        "pod_metrics": {
+          "status": "kube_pod_status_phase",
+          "running": "kube_pod_container_status_running",
+          "up": "up"
+        }
+      },
+      "victorialogs_fields": {
+        "kubernetes_metadata": [
+          "namespace",
+          "pod_name",
+          "container_name",
+          "pod_id"
+        ],
+        "log_fields": [
+          "_time",
+          "_msg",
+          "stream",
+          "level"
+        ],
+        "latency_fields": [
+          "duration",
+          "processing_time",
+          "request_duration",
+          "response_time"
+        ]
+      },
+      "label_conventions": {
+        "kubernetes_labels": [
+          "namespace",
+          "pod",
+          "container",
+          "node"
+        ],
+        "resource_labels": [
+          "resource",
+          "device",
+          "interface"
+        ]
+      }
+    },
+    "query_examples": {
+      "pbx_web_cpu": "rate(container_cpu_usage_seconds_total{namespace=\"pbx-web\"}[5m])",
+      "pbx_web_memory": "container_memory_usage_bytes{namespace=\"pbx-web\"}",
+      "whisper_stt_network": "rate(container_network_receive_bytes_total{namespace=\"whisper-stt\"}[5m])",
+      "pod_status": "up{namespace=\"pbx-web\"}"
+    }
+  }
+}

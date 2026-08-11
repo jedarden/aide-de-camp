@@ -1,0 +1,97 @@
+{
+  "analysis_metadata": {
+    "generated_at": "2026-08-07T08:14:40.221934",
+    "period_days": 30,
+    "time_window_start": "2026-07-08T08:14:40.221934",
+    "time_window_end": "2026-08-07T08:14:40.221934",
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ]
+  },
+  "deployment_coverage": {
+    "pbx-web": {
+      "service": "pbx-web",
+      "total_deployments": 3,
+      "deployments_in_window": [],
+      "deployment_frequency_days": 0.0,
+      "time_coverage": {
+        "first_deployment": null,
+        "last_deployment": null,
+        "coverage_days": 0
+      },
+      "coverage_status": "no_data"
+    },
+    "whisper-stt": {
+      "service": "whisper-stt",
+      "total_deployments": 2,
+      "deployments_in_window": [],
+      "deployment_frequency_days": 0.0,
+      "time_coverage": {
+        "first_deployment": null,
+        "last_deployment": null,
+        "coverage_days": 0
+      },
+      "coverage_status": "no_data"
+    }
+  },
+  "resource_metrics_coverage": {
+    "cpu_metrics": "current_only",
+    "memory_metrics": "current_only",
+    "disk_metrics": "pvc_info_only",
+    "network_metrics": "unavailable"
+  },
+  "temporal_gaps": [
+    {
+      "type": "resource_metrics_historical",
+      "service": "both",
+      "period": "2026-07-08 to 2026-08-07",
+      "issue": "Historical resource usage metrics (CPU, memory, network) not available",
+      "cause": "Prometheus integration not accessible",
+      "impact": "Cannot analyze resource trends over time",
+      "available_alternatives": "Current resource usage snapshot available",
+      "severity": "high"
+    },
+    {
+      "type": "deployment_events",
+      "service": "pbx-web",
+      "period": "2026-07-08 to 2026-08-07",
+      "issue": "No deployment events found for pbx-web",
+      "cause": "Deployment data not available or parse error",
+      "impact": "Cannot correlate resource usage with deployments",
+      "available_alternatives": "Manual deployment tracking may be needed",
+      "severity": "medium"
+    },
+    {
+      "type": "deployment_events",
+      "service": "whisper-stt",
+      "period": "2026-07-08 to 2026-08-07",
+      "issue": "No deployment events found for whisper-stt",
+      "cause": "Deployment data not available or parse error",
+      "impact": "Cannot correlate resource usage with deployments",
+      "available_alternatives": "Manual deployment tracking may be needed",
+      "severity": "medium"
+    }
+  ],
+  "alignment_status": "partial",
+  "recommendations": [
+    {
+      "priority": "high",
+      "issue": "Historical resource metrics unavailable",
+      "recommendation": "Enable Prometheus integration or implement metrics collection pipeline",
+      "benefit": "Would enable trend analysis and capacity planning"
+    },
+    {
+      "priority": "medium",
+      "issue": "Deployment events missing for pbx-web",
+      "recommendation": "Verify deployment data collection and storage",
+      "benefit": "Would enable deployment-resource correlation"
+    },
+    {
+      "priority": "medium",
+      "issue": "Deployment events missing for whisper-stt",
+      "recommendation": "Verify deployment data collection and storage",
+      "benefit": "Would enable deployment-resource correlation"
+    }
+  ]
+}

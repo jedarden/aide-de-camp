@@ -1,0 +1,27 @@
+{
+  "facts": [
+    {
+      "text": "User lives in Berlin",
+      "category": "personal",
+      "confidence": 0.95,
+      "created_at": "2026-08-10T11:24:09.784587+00:00",
+      "last_referenced": "2026-08-10T11:24:09.784587+00:00"
+    },
+    {
+      "text": "Prefers dark mode interfaces",
+      "category": "preference",
+      "confidence": 0.9,
+      "created_at": "2026-08-10T11:24:09.787153+00:00",
+      "last_referenced": "2026-08-10T11:24:09.787153+00:00"
+    },
+    {
+      "text": "Working on Python project",
+      "category": "context",
+      "confidence": 0.85,
+      "created_at": "2026-08-10T11:24:09.789082+00:00",
+      "last_referenced": "2026-08-10T11:24:09.789082+00:00"
+    }
+  ],
+  "session_id": "test-session-d71df087",
+  "updated_at": "2026-08-10T11:24:09.789097+00:00"
+}

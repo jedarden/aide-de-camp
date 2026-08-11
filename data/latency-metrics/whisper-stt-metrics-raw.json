@@ -1,0 +1,12 @@
+{
+  "service": "whisper-stt",
+  "time_range": {
+    "start": "2026-07-08T00:00:00Z",
+    "end": "2026-08-07T23:59:59Z"
+  },
+  "raw_data": {
+    "latency_data": [],
+    "error_data": [],
+    "workflow_phases": {}
+  }
+}

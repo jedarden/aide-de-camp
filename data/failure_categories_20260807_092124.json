@@ -1,0 +1,258 @@
+{
+  "generated_at": "2026-08-07T09:21:24.091875",
+  "source_file": "/home/coding/aide-de-camp/data/failure_frequency_20260807_091617.json",
+  "classification_methodology": {
+    "connection_leak": {
+      "patterns": [
+        "connection pool",
+        "too many open files",
+        "connection timeout"
+      ],
+      "description": "Tests with connection pool exhaustion or too many open files"
+    },
+    "database_state": {
+      "patterns": [
+        "no such table",
+        "constraint",
+        "schema",
+        "foreign key"
+      ],
+      "description": "Tests with schema errors, constraint violations, or missing fixtures"
+    },
+    "race_condition": {
+      "patterns": [
+        "timeout",
+        "deadlock",
+        "order",
+        "timing",
+        "async"
+      ],
+      "description": "Tests with timing-dependent failures or order-dependent behavior"
+    },
+    "other": {
+      "patterns": [
+        "anything not matching above patterns"
+      ],
+      "description": "Tests with uncategorizable failures (e.g., syntax errors, import errors)"
+    }
+  },
+  "summary": {
+    "total_categorized_failures": 33,
+    "unique_failures_by_category": {
+      "connection_leak": 0,
+      "database_state": 0,
+      "race_condition": 4,
+      "other": 29
+    },
+    "categories_with_failures": [
+      "race_condition",
+      "other"
+    ]
+  },
+  "categorized_failures": {
+    "connection_leak": [],
+    "database_state": [],
+    "race_condition": [
+      {
+        "test_name": "tests/test_client_timings_api.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_dispatch_timings.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_dispatch_timings_e2e.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_e2e_dispatch_timing_verification.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      }
+    ],
+    "other": [
+      {
+        "test_name": "tests/e2e/test_canvas_navigation.py",
+        "error_type": "ModuleNotFoundError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_ambient_fetch_and_diff.py",
+        "error_type": "Failed",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_ambient_rule_engine.py",
+        "error_type": "IndentationError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_backend_stuck_failed_cards.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_bead_watcher_integration.py",
+        "error_type": "Failed",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_canvas_component_cards.py",
+        "error_type": "ImportError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_card_cache.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_card_dismissal_db_verification.py",
+        "error_type": "SyntaxError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_card_dismissal_helpers.py",
+        "error_type": "SyntaxError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_circuit_breaker.py",
+        "error_type": "IndentationError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_comprehensive_stuck_failed_flows.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_degraded_state_server_behavior.py",
+        "error_type": "IndentationError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_dispatch_instrumentation.py",
+        "error_type": "IndentationError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_escalate_handler_stuck_scenarios.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_escalate_stuck_intent.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_failed_card_integration.py",
+        "error_type": "Failed",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_monitoring_result_persistence.py",
+        "error_type": "IndentationError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_permission_and_registry_errors.py",
+        "error_type": "ImportError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_registry_hot_reload.py",
+        "error_type": "ImportError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_registry_hot_reload_new_infrastructure.py",
+        "error_type": "ImportError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_session_storage_verification.py",
+        "error_type": "IndentationError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_sse_broadcast_endpoint.py",
+        "error_type": "IndentationError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_sse_broadcast_from_test_endpoint.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_sse_broadcast_test_endpoint.py",
+        "error_type": "IndentationError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_sse_stuck_failed_broadcasts.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_stuck_card_integration.py",
+        "error_type": "Failed",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_stuck_failed_cards.py",
+        "error_type": "ValueError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_synthetic_dispatch_storage.py",
+        "error_type": "SyntaxError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      },
+      {
+        "test_name": "tests/test_utterance_linkage_verification.py",
+        "error_type": "SyntaxError",
+        "failure_count": 5,
+        "failure_rate": 100.0
+      }
+    ]
+  }
+}

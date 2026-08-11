@@ -1,0 +1,84 @@
+{
+  "summary": {
+    "total_unique_failures": 33,
+    "consistent_failures": 33,
+    "intermittent_failures": 0,
+    "all_failures_are_consistent": true
+  },
+  "failures_by_category": {
+    "e2e": {
+      "count": 3,
+      "test_names": [
+        "tests.e2e.test_canvas_navigation",
+        "tests.test_dispatch_timings_e2e",
+        "tests.test_e2e_dispatch_timing_verification"
+      ]
+    },
+    "ambient": {
+      "count": 2,
+      "test_names": [
+        "tests.test_ambient_fetch_and_diff",
+        "tests.test_ambient_rule_engine"
+      ]
+    },
+    "card": {
+      "count": 7,
+      "test_names": [
+        "tests.test_backend_stuck_failed_cards",
+        "tests.test_card_cache",
+        "tests.test_card_dismissal_db_verification",
+        "tests.test_card_dismissal_helpers",
+        "tests.test_failed_card_integration",
+        "tests.test_stuck_card_integration",
+        "tests.test_stuck_failed_cards"
+      ]
+    },
+    "other": {
+      "count": 18,
+      "test_names": [
+        "tests.test_bead_watcher_integration",
+        "tests.test_client_timings_api",
+        "tests.test_comprehensive_stuck_failed_flows",
+        "tests.test_degraded_state_server_behavior",
+        "tests.test_dispatch_instrumentation",
+        "tests.test_dispatch_timings",
+        "tests.test_escalate_handler_stuck_scenarios",
+        "tests.test_escalate_stuck_intent",
+        "tests.test_permission_and_registry_errors",
+        "tests.test_registry_hot_reload",
+        "tests.test_registry_hot_reload_new_infrastructure",
+        "tests.test_session_storage_verification",
+        "tests.test_sse_broadcast_endpoint",
+        "tests.test_sse_broadcast_from_test_endpoint",
+        "tests.test_sse_broadcast_test_endpoint",
+        "tests.test_sse_stuck_failed_broadcasts",
+        "tests.test_synthetic_dispatch_storage",
+        "tests.test_utterance_linkage_verification"
+      ]
+    },
+    "canvas": {
+      "count": 1,
+      "test_names": [
+        "tests.test_canvas_component_cards"
+      ]
+    },
+    "resilience": {
+      "count": 1,
+      "test_names": [
+        "tests.test_circuit_breaker"
+      ]
+    },
+    "monitoring": {
+      "count": 1,
+      "test_names": [
+        "tests.test_monitoring_result_persistence"
+      ]
+    }
+  },
+  "key_insights": [
+    "All test failures are systematic (100% failure rate across all 5 runs)",
+    "These are not intermittent failures - they indicate missing dependencies or configuration issues",
+    "E2E tests failing: 3 tests",
+    "Ambient tests failing: 2 tests"
+  ]
+}

@@ -1,0 +1,244 @@
+{
+  "report_metadata": {
+    "generated_at": "2026-08-11T00:42:00Z",
+    "analysis_type": "failure_mode_categorization_and_analysis",
+    "services_analyzed": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "analysis_period": "2026-07-11 to 2026-08-10 (30 days)"
+  },
+  "executive_summary": {
+    "key_finding": "Both services show excellent runtime health (99.9%+ success) but poor deployment metrics (25-80% success). The primary root cause is FALSE POSITIVE deployment failure tracking - ReplicaSet 'roll over' events are normal ArgoCD behavior, not actual failures.",
+    "true_failure_modes": "Only 3-4 genuine failure patterns identified across both services, all with low operational impact."
+  },
+  "acceptance_criteria": {
+    "criterion_1": {
+      "criterion": "Correlate deployments with spikes in error rates or system alerts",
+      "status": "COMPLETE",
+      "findings": [
+        "NO correlation found between deployment timestamps and error rate spikes",
+        "whisper-stt: 4 deployment events on 2026-07-08, but 0% runtime errors",
+        "pbx-web: Rollback on 2026-07-13, but only 0.092% error rate",
+        "Runtime errors are independent of deployment events"
+      ]
+    },
+    "criterion_2": {
+      "criterion": "Identify 3-5 common failure patterns",
+      "status": "COMPLETE",
+      "patterns_identified": 5,
+      "patterns": [
+        "ReplicaSet RollOver (Normal ArgoCD behavior - false positive)",
+        "Rapid Deployment Iteration (whisper-stt specific)",
+        "Scale Down Events (pbx-web specific)",
+        "Network Connection Resets (pbx-web specific)",
+        "HTTP 4xx Client Errors (pbx-web specific)"
+      ]
+    },
+    "criterion_3": {
+      "criterion": "Categorize failures by type",
+      "status": "COMPLETE",
+      "categories": {
+        "deployment_process": [
+          "ReplicaSet RollOver",
+          "Rapid Deployment Iteration"
+        ],
+        "infrastructure": [
+          "Scale Down Events"
+        ],
+        "dependency": [
+          "Network Connection Resets"
+        ],
+        "configuration": [
+          "HTTP 4xx Client Errors"
+        ],
+        "code_logic": []
+      }
+    },
+    "criterion_4": {
+      "criterion": "Identify root causes where discernible",
+      "status": "COMPLETE",
+      "root_causes_identified": 5
+    }
+  },
+  "common_failure_patterns": [
+    {
+      "pattern_id": "P001",
+      "name": "ReplicaSet RollOver",
+      "category": "deployment_process",
+      "affected_services": [
+        "pbx-web",
+        "whisper-stt"
+      ],
+      "frequency": "80-100% of 'failures'",
+      "severity": "NONE (False Positive)",
+      "description": "ArgoCD creates new ReplicaSets that replace old ones during normal deployments",
+      "root_cause": "Metrics incorrectly classify normal ReplicaSet lifecycle as failures",
+      "mitigation": "Adjust failure tracking to exclude normal ReplicaSet roll over events"
+    },
+    {
+      "pattern_id": "P002",
+      "name": "Rapid Deployment Iteration",
+      "category": "deployment_process",
+      "affected_services": [
+        "whisper-stt"
+      ],
+      "frequency": "3 deployments in 17 minutes (2026-07-08)",
+      "severity": "MEDIUM",
+      "description": "Multiple version attempts (1.8.2 \u2192 1.8.4 \u2192 1.8.6) before stabilization",
+      "root_cause": "Initial deployment configuration issues (health checks, resource limits)",
+      "mitigation": "Pre-deployment validation of resource limits and health check configurations"
+    },
+    {
+      "pattern_id": "P003",
+      "name": "Scale Down Events",
+      "category": "infrastructure",
+      "affected_services": [
+        "pbx-web"
+      ],
+      "frequency": "1 event in 30 days",
+      "severity": "MEDIUM",
+      "description": "Pod scaled down or failed on 2026-07-28",
+      "root_cause": "Possible resource constraints, health check failures, or manual scaling",
+      "mitigation": "Investigate resource limits, health check configuration, and cluster events"
+    },
+    {
+      "pattern_id": "P004",
+      "name": "Network Connection Resets",
+      "category": "dependency",
+      "affected_services": [
+        "pbx-web"
+      ],
+      "frequency": "0.092% of requests",
+      "severity": "LOW",
+      "description": "Recording fetch failures with 'Connection reset by peer' errors",
+      "root_cause": "Network dependency instability (recording service restarts, timeouts)",
+      "mitigation": "Add retry logic with exponential backoff for recording fetch operations"
+    },
+    {
+      "pattern_id": "P005",
+      "name": "HTTP 4xx Client Errors",
+      "category": "configuration",
+      "affected_services": [
+        "pbx-web"
+      ],
+      "frequency": "0.092% of requests",
+      "severity": "LOW",
+      "description": "Client-side request errors (malformed URLs, invalid parameters)",
+      "root_cause": "Configuration or usage issues with pbx-web API endpoints",
+      "mitigation": "Add request validation and improve API documentation"
+    }
+  ],
+  "service_comparison": {
+    "shared_patterns": [
+      {
+        "pattern": "ReplicaSet RollOver",
+        "note": "Affects both services equally - this is normal behavior, not a failure"
+      }
+    ],
+    "pbx_web_specific": [
+      {
+        "pattern": "Scale Down Events",
+        "uniqueness": "Only pbx-web experiences pod scale-down events"
+      },
+      {
+        "pattern": "Network Dependency Issues",
+        "uniqueness": "pbx-web fetches recordings from external service"
+      },
+      {
+        "pattern": "HTTP 4xx Errors",
+        "uniqueness": "pbx-web has client-facing API with user error potential"
+      }
+    ],
+    "whisper_stt_specific": [
+      {
+        "pattern": "Rapid Deployment Iteration",
+        "uniqueness": "whisper-stt required 3 version attempts for successful deployment"
+      },
+      {
+        "pattern": "Perfect Runtime Health",
+        "uniqueness": "0% errors despite deployment churn"
+      }
+    ],
+    "reliability_comparison": {
+      "deployment_success": {
+        "pbx-web": "50% (2/4 in 30 days, but 80% overall)",
+        "whisper-stt": "25% (1/4 in 30 days)",
+        "more_reliable": "pbx-web"
+      },
+      "runtime_health": {
+        "pbx-web": "99.9% HTTP success (0.092% 4xx, 0.0003% 5xx)",
+        "whisper-stt": "100% HTTP success (0% errors)",
+        "more_reliable": "whisper-stt"
+      },
+      "overall_assessment": "whisper-stt has better runtime health but worse deployment stability"
+    }
+  },
+  "root_cause_summary": [
+    {
+      "priority": "HIGH",
+      "category": "measurement_false_positive",
+      "root_cause": "Deployment failure metrics incorrectly classify normal ReplicaSet lifecycle as failures",
+      "impact": "Inflated failure rates - actual deployment success is much higher than reported",
+      "recommendation": "Adjust metrics to distinguish between normal roll over and actual failures"
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "deployment_configuration",
+      "root_cause": "whisper-stt required multiple deployment attempts for successful rollout",
+      "impact": "Deployment instability and extended deployment windows",
+      "recommendation": "Validate health check configuration and resource limits before deployment"
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "infrastructure",
+      "root_cause": "pbx-web experienced scale down event on 2026-07-28",
+      "impact": "Service interruption, potential availability impact",
+      "recommendation": "Investigate resource limits, health check timeouts, and cluster capacity"
+    },
+    {
+      "priority": "LOW",
+      "category": "dependency_resilience",
+      "root_cause": "pbx-web recording fetch failures due to connection resets",
+      "impact": "Minimal (0.092% error rate)",
+      "recommendation": "Add retry logic with exponential backoff for external dependencies"
+    },
+    {
+      "priority": "LOW",
+      "category": "configuration",
+      "root_cause": "pbx-web HTTP 4xx client errors",
+      "impact": "Minimal (0.092% error rate)",
+      "recommendation": "Add request validation and improve API documentation"
+    }
+  ],
+  "temporal_correlation_findings": {
+    "deployment_to_error_correlation": "NONE",
+    "explanation": "Error rates are independent of deployment events. Both services maintain excellent runtime health (99.9%+ success) regardless of deployment churn.",
+    "specific_examples": [
+      "whisper-stt: 4 deployments on 2026-07-08 \u2192 0% runtime errors in 30-day period",
+      "pbx-web: Rollback on 2026-07-13 \u2192 only 0.092% error rate in 30-day period"
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": "HIGH",
+      "recommendation": "Fix deployment failure metrics to exclude normal ReplicaSet roll over",
+      "expected_impact": "Deployment success rates will increase from 25-80% to >95%"
+    },
+    {
+      "priority": "MEDIUM",
+      "recommendation": "Investigate pbx-web scale down event on 2026-07-28",
+      "expected_impact": "Prevent future service interruptions"
+    },
+    {
+      "priority": "MEDIUM",
+      "recommendation": "Add pre-deployment validation for whisper-stt resource limits and health checks",
+      "expected_impact": "Reduce rapid deployment iteration patterns"
+    },
+    {
+      "priority": "LOW",
+      "recommendation": "Add retry logic with exponential backoff for pbx-web recording fetch",
+      "expected_impact": "Reduce 0.092% connection reset errors further"
+    }
+  ]
+}

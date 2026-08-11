@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-08-07T09:20:29.737807",
+  "tests": [
+    {
+      "test": "prometheus_health",
+      "status": "error",
+      "error": ""
+    },
+    {
+      "test": "namespace_discovery",
+      "status": "error",
+      "error": ""
+    },
+    {
+      "test": "basic_up_query",
+      "status": "error",
+      "error": ""
+    },
+    {
+      "test": "pbx_web_metrics",
+      "status": "error",
+      "error": ""
+    },
+    {
+      "test": "whisper_stt_metrics",
+      "status": "error",
+      "error": ""
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "collection_metadata": {
+    "collected_at": "2026-08-07T08:02:19.627311",
+    "collection_period_days": 30,
+    "time_window_start": "2026-07-08T08:02:19.627326",
+    "time_window_end": "2026-08-07T08:02:19.627333",
+    "services": [
+      "pbx-web",
+      "whisper-stt"
+    ],
+    "prometheus_instance": "10.43.253.70"
+  },
+  "services": {
+    "pbx-web": {
+      "service": "pbx-web",
+      "namespace": "pbx-web",
+      "collection_timestamp": "2026-08-07T08:02:19.627340",
+      "cpu_metrics": {
+        "current_cpu_usage": [],
+        "cpu_limit_utilization": [],
+        "cpu_requests_utilization": []
+      },
+      "memory_metrics": {
+        "current_memory_usage": [],
+        "memory_working_set": [],
+        "memory_cache": [],
+        "memory_limits": [],
+        "memory_requests": []
+      },
+      "disk_metrics": {
+        "disk_usage_bytes": [],
+        "volume_usage": [],
+        "pod_volumes": []
+      },
+      "network_metrics": {
+        "network_receive_bytes_total": [],
+        "network_transmit_bytes_total": [],
+        "network_receive_rate": [],
+        "network_transmit_rate": []
+      }
+    },
+    "whisper-stt": {
+      "service": "whisper-stt",
+      "namespace": "whisper-stt",
+      "collection_timestamp": "2026-08-07T08:02:56.314095",
+      "cpu_metrics": {
+        "current_cpu_usage": [],
+        "cpu_limit_utilization": [],
+        "cpu_requests_utilization": []
+      },
+      "memory_metrics": {
+        "current_memory_usage": [],
+        "memory_working_set": [],
+        "memory_cache": [],
+        "memory_limits": [],
+        "memory_requests": []
+      },
+      "disk_metrics": {
+        "disk_usage_bytes": [],
+        "volume_usage": [],
+        "pod_volumes": [
+          {
+            "pvc_name": "whisper-model-cache",
+            "storage_request": "10Gi",
+            "status": "Bound"
+          },
+          {
+            "pvc_name": "whisper-openai-model-cache",
+            "storage_request": "10Gi",
+            "status": "Bound"
+          },
+          {
+            "pvc_name": "whisper-stt-jobs",
+            "storage_request": "1Gi",
+            "status": "Bound"
+          }
+        ]
+      },
+      "network_metrics": {
+        "network_receive_bytes_total": [],
+        "network_transmit_bytes_total": [],
+        "network_receive_rate": [],
+        "network_transmit_rate": []
+      }
+    }
+  }
+}

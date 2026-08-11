@@ -1,0 +1,1765 @@
+{
+  "metadata": {
+    "timestamp": "2026-08-07T09:43:15.377088",
+    "total_runs": 5,
+    "requested_runs": 5,
+    "fail_fast": false
+  },
+  "runs": [
+    {
+      "run_number": 1,
+      "start_time": "2026-08-07T09:43:04.534022",
+      "end_time": "2026-08-07T09:43:06.673749",
+      "duration": 2.139727,
+      "total_tests": 43,
+      "passed": 42,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 97.67441860465115,
+      "test_results": [
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_topics_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.0045168958604335785,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_topic_queries_return_empty",
+          "passed": true,
+          "duration": 0.0035875863395631313,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_results_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.004269279073923826,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_result_queries_return_empty",
+          "passed": true,
+          "duration": 0.0041176932863891125,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_utterances_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.003485781606286764,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_utterance_access_by_wrong_session",
+          "passed": true,
+          "duration": 0.0016258428804576397,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_intents_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.004034323152154684,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_intent_queries_return_empty",
+          "passed": true,
+          "duration": 0.003772420808672905,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_full_cross_session_isolation",
+          "passed": true,
+          "duration": 0.005982883740216494,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_multiple_sessions_strict_isolation",
+          "passed": true,
+          "duration": 0.004032135009765625,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_deletion_does_not_affect_other_sessions",
+          "passed": true,
+          "duration": 0.006237628869712353,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_increment_decrement",
+          "passed": true,
+          "duration": 0.0002123061567544937,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_context_manager",
+          "passed": true,
+          "duration": 0.00019924389198422432,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_concurrent",
+          "passed": true,
+          "duration": 0.010429044719785452,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_single_connection",
+          "passed": true,
+          "duration": 0.003186027053743601,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_multiple_connections",
+          "passed": true,
+          "duration": 0.014480100944638252,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_leak_detection",
+          "passed": true,
+          "duration": 0.15188252599909902,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_passes",
+          "passed": true,
+          "duration": 0.0017521549016237259,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_with_allow_active",
+          "passed": true,
+          "duration": 0.0016577593050897121,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_get_active_connections",
+          "passed": true,
+          "duration": 0.0036303657107055187,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_stats_tracking",
+          "passed": true,
+          "duration": 0.043873731046915054,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_wait_for_connection_return_to_baseline",
+          "passed": true,
+          "duration": 0.20568078896030784,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_reset",
+          "passed": true,
+          "duration": 0.04257958568632603,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_session_store_no_leaks_after_operations",
+          "passed": true,
+          "duration": 0.0014371611177921295,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_repeated_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.12433822313323617,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_concurrent_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.019794967025518417,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_singleton",
+          "passed": true,
+          "duration": 0.0002163001336157322,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_reset",
+          "passed": true,
+          "duration": 0.00016033509746193886,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_exception_in_connection_block",
+          "passed": true,
+          "duration": 0.0010598371736705303,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_nested_connection_blocks",
+          "passed": true,
+          "duration": 0.001475444994866848,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_rapid_open_close_cycles",
+          "passed": true,
+          "duration": 0.05211903713643551,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestResourceExhaustionAlerting::test_resource_exhaustion_alert",
+          "passed": true,
+          "duration": 0.606211407110095,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.013162573333829641,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_isolation_between_tests",
+          "passed": true,
+          "duration": 0.01545089203864336,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_independent_sessions",
+          "passed": true,
+          "duration": 0.011495803017169237,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_session_id_fixture_provides_id",
+          "passed": true,
+          "duration": 0.0012934296391904354,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_connection_fixture",
+          "passed": true,
+          "duration": 0.00041523436084389687,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_complete_schema_initialization",
+          "passed": true,
+          "duration": 0.0011168201453983784,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_wal_mode_enabled",
+          "passed": true,
+          "duration": 0.00145681481808424,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_isolated_from_production_database",
+          "passed": true,
+          "duration": 0.001310841180384159,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_full_store_functionality",
+          "passed": true,
+          "duration": 0.01735121523961425,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.0010580369271337986,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_is_isolated_from_other_tests",
+          "passed": false,
+          "duration": 0.0011308947578072548,
+          "error_message": "tests/test_in_memory_db_isolation.py:39: in test_in_memory_db_store_is_isolated_from_other_tests\n    async with aiosqlite.connect(in_memory_db_store.db_path, uri=True) as conn:\n               ^^^^^^^^^\nE   NameError: name 'aiosqlite' is not defined"
+        }
+      ]
+    },
+    {
+      "run_number": 2,
+      "start_time": "2026-08-07T09:43:06.673798",
+      "end_time": "2026-08-07T09:43:08.794352",
+      "duration": 2.120554,
+      "total_tests": 43,
+      "passed": 42,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 97.67441860465115,
+      "test_results": [
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_topics_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.0036206203512847424,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_topic_queries_return_empty",
+          "passed": true,
+          "duration": 0.003756185993552208,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_results_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.005843186751008034,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_result_queries_return_empty",
+          "passed": true,
+          "duration": 0.004355556797236204,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_utterances_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.005047694779932499,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_utterance_access_by_wrong_session",
+          "passed": true,
+          "duration": 0.0074193417094647884,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_intents_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.016746819019317627,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_intent_queries_return_empty",
+          "passed": true,
+          "duration": 0.017792983911931515,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_full_cross_session_isolation",
+          "passed": true,
+          "duration": 0.029271272011101246,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_multiple_sessions_strict_isolation",
+          "passed": true,
+          "duration": 0.015459146816283464,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_deletion_does_not_affect_other_sessions",
+          "passed": true,
+          "duration": 0.012410419061779976,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_increment_decrement",
+          "passed": true,
+          "duration": 0.00031300168484449387,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_context_manager",
+          "passed": true,
+          "duration": 0.00032839318737387657,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_concurrent",
+          "passed": true,
+          "duration": 0.010700172744691372,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_single_connection",
+          "passed": true,
+          "duration": 0.0016495161689817905,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_multiple_connections",
+          "passed": true,
+          "duration": 0.017542297020554543,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_leak_detection",
+          "passed": true,
+          "duration": 0.1539659397676587,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_passes",
+          "passed": true,
+          "duration": 0.0045483349822461605,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_with_allow_active",
+          "passed": true,
+          "duration": 0.004400564823299646,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_get_active_connections",
+          "passed": true,
+          "duration": 0.0047100139781832695,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_stats_tracking",
+          "passed": true,
+          "duration": 0.04369775066152215,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_wait_for_connection_return_to_baseline",
+          "passed": true,
+          "duration": 0.20460511604323983,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_reset",
+          "passed": true,
+          "duration": 0.039697582833468914,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_session_store_no_leaks_after_operations",
+          "passed": true,
+          "duration": 0.0011710203252732754,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_repeated_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.11367537686601281,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_concurrent_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.026556427124887705,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_singleton",
+          "passed": true,
+          "duration": 0.00016382476314902306,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_reset",
+          "passed": true,
+          "duration": 0.00011874968186020851,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_exception_in_connection_block",
+          "passed": true,
+          "duration": 0.000978358555585146,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_nested_connection_blocks",
+          "passed": true,
+          "duration": 0.0018088067881762981,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_rapid_open_close_cycles",
+          "passed": true,
+          "duration": 0.039184441324323416,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestResourceExhaustionAlerting::test_resource_exhaustion_alert",
+          "passed": true,
+          "duration": 0.6056379270739853,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.005726456176489592,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_isolation_between_tests",
+          "passed": true,
+          "duration": 0.010320710949599743,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_independent_sessions",
+          "passed": true,
+          "duration": 0.017585082910954952,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_session_id_fixture_provides_id",
+          "passed": true,
+          "duration": 0.0012392699718475342,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_connection_fixture",
+          "passed": true,
+          "duration": 0.0003861398436129093,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_complete_schema_initialization",
+          "passed": true,
+          "duration": 0.001451945398002863,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_wal_mode_enabled",
+          "passed": true,
+          "duration": 0.0021874792873859406,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_isolated_from_production_database",
+          "passed": true,
+          "duration": 0.0012404918670654297,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_full_store_functionality",
+          "passed": true,
+          "duration": 0.036967186722904444,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.003822463098913431,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_is_isolated_from_other_tests",
+          "passed": false,
+          "duration": 0.0014212867245078087,
+          "error_message": "tests/test_in_memory_db_isolation.py:39: in test_in_memory_db_store_is_isolated_from_other_tests\n    async with aiosqlite.connect(in_memory_db_store.db_path, uri=True) as conn:\n               ^^^^^^^^^\nE   NameError: name 'aiosqlite' is not defined"
+        }
+      ]
+    },
+    {
+      "run_number": 3,
+      "start_time": "2026-08-07T09:43:08.794391",
+      "end_time": "2026-08-07T09:43:10.919456",
+      "duration": 2.125065,
+      "total_tests": 43,
+      "passed": 42,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 97.67441860465115,
+      "test_results": [
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_topics_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.0035894010215997696,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_topic_queries_return_empty",
+          "passed": true,
+          "duration": 0.005985837895423174,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_results_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.0048864539712667465,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_result_queries_return_empty",
+          "passed": true,
+          "duration": 0.008212240878492594,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_utterances_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.011676146183162928,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_utterance_access_by_wrong_session",
+          "passed": true,
+          "duration": 0.005274963099509478,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_intents_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.006913166958838701,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_intent_queries_return_empty",
+          "passed": true,
+          "duration": 0.006707875989377499,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_full_cross_session_isolation",
+          "passed": true,
+          "duration": 0.009747231844812632,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_multiple_sessions_strict_isolation",
+          "passed": true,
+          "duration": 0.003885278943926096,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_deletion_does_not_affect_other_sessions",
+          "passed": true,
+          "duration": 0.006693826988339424,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_increment_decrement",
+          "passed": true,
+          "duration": 0.00020097196102142334,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_context_manager",
+          "passed": true,
+          "duration": 0.00011637108400464058,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_concurrent",
+          "passed": true,
+          "duration": 0.010390523821115494,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_single_connection",
+          "passed": true,
+          "duration": 0.0012586982920765877,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_multiple_connections",
+          "passed": true,
+          "duration": 0.020093932282179594,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_leak_detection",
+          "passed": true,
+          "duration": 0.1535668158903718,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_passes",
+          "passed": true,
+          "duration": 0.004670972004532814,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_with_allow_active",
+          "passed": true,
+          "duration": 0.004465782083570957,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_get_active_connections",
+          "passed": true,
+          "duration": 0.005361633840948343,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_stats_tracking",
+          "passed": true,
+          "duration": 0.038957695942372084,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_wait_for_connection_return_to_baseline",
+          "passed": true,
+          "duration": 0.20351432776078582,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_reset",
+          "passed": true,
+          "duration": 0.04212848423048854,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_session_store_no_leaks_after_operations",
+          "passed": true,
+          "duration": 0.0029375297017395496,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_repeated_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.11329401703551412,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_concurrent_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.02628107275813818,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_singleton",
+          "passed": true,
+          "duration": 0.0004211519844830036,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_reset",
+          "passed": true,
+          "duration": 0.00032645324245095253,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_exception_in_connection_block",
+          "passed": true,
+          "duration": 0.0019361721351742744,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_nested_connection_blocks",
+          "passed": true,
+          "duration": 0.007258349098265171,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_rapid_open_close_cycles",
+          "passed": true,
+          "duration": 0.0864762831479311,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestResourceExhaustionAlerting::test_resource_exhaustion_alert",
+          "passed": true,
+          "duration": 0.6179307601414621,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.010760684963315725,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_isolation_between_tests",
+          "passed": true,
+          "duration": 0.01759672211483121,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_independent_sessions",
+          "passed": true,
+          "duration": 0.013598957099020481,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_session_id_fixture_provides_id",
+          "passed": true,
+          "duration": 0.0012538549490272999,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_connection_fixture",
+          "passed": true,
+          "duration": 0.00020009325817227364,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_complete_schema_initialization",
+          "passed": true,
+          "duration": 0.0032400302588939667,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_wal_mode_enabled",
+          "passed": true,
+          "duration": 0.0012022219598293304,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_isolated_from_production_database",
+          "passed": true,
+          "duration": 0.0012465459294617176,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_full_store_functionality",
+          "passed": true,
+          "duration": 0.024297799915075302,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.001689339056611061,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_is_isolated_from_other_tests",
+          "passed": false,
+          "duration": 0.0011901194229722023,
+          "error_message": "tests/test_in_memory_db_isolation.py:39: in test_in_memory_db_store_is_isolated_from_other_tests\n    async with aiosqlite.connect(in_memory_db_store.db_path, uri=True) as conn:\n               ^^^^^^^^^\nE   NameError: name 'aiosqlite' is not defined"
+        }
+      ]
+    },
+    {
+      "run_number": 4,
+      "start_time": "2026-08-07T09:43:10.919498",
+      "end_time": "2026-08-07T09:43:12.833578",
+      "duration": 1.91408,
+      "total_tests": 43,
+      "passed": 42,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 97.67441860465115,
+      "test_results": [
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_topics_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.003731643781065941,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_topic_queries_return_empty",
+          "passed": true,
+          "duration": 0.0036855279467999935,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_results_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.003968928009271622,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_result_queries_return_empty",
+          "passed": true,
+          "duration": 0.003893426153808832,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_utterances_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.0032296599820256233,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_utterance_access_by_wrong_session",
+          "passed": true,
+          "duration": 0.0019652387127280235,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_intents_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.005095937289297581,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_intent_queries_return_empty",
+          "passed": true,
+          "duration": 0.013512715697288513,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_full_cross_session_isolation",
+          "passed": true,
+          "duration": 0.029893910977989435,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_multiple_sessions_strict_isolation",
+          "passed": true,
+          "duration": 0.008659547194838524,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_deletion_does_not_affect_other_sessions",
+          "passed": true,
+          "duration": 0.006307348143309355,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_increment_decrement",
+          "passed": true,
+          "duration": 0.00013593491166830063,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_context_manager",
+          "passed": true,
+          "duration": 0.00012594694271683693,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_concurrent",
+          "passed": true,
+          "duration": 0.010478768032044172,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_single_connection",
+          "passed": true,
+          "duration": 0.0011787139810621738,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_multiple_connections",
+          "passed": true,
+          "duration": 0.013510963879525661,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_leak_detection",
+          "passed": true,
+          "duration": 0.15184767823666334,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_passes",
+          "passed": true,
+          "duration": 0.0009489720687270164,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_with_allow_active",
+          "passed": true,
+          "duration": 0.0009404770098626614,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_get_active_connections",
+          "passed": true,
+          "duration": 0.0009271269664168358,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_stats_tracking",
+          "passed": true,
+          "duration": 0.034593312069773674,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_wait_for_connection_return_to_baseline",
+          "passed": true,
+          "duration": 0.20197065500542521,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_reset",
+          "passed": true,
+          "duration": 0.03394464263692498,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_session_store_no_leaks_after_operations",
+          "passed": true,
+          "duration": 0.0011199628934264183,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_repeated_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.12119179405272007,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_concurrent_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.04240469681099057,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_singleton",
+          "passed": true,
+          "duration": 0.00020773569121956825,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_reset",
+          "passed": true,
+          "duration": 0.00019303476437926292,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_exception_in_connection_block",
+          "passed": true,
+          "duration": 0.0009766537696123123,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_nested_connection_blocks",
+          "passed": true,
+          "duration": 0.0017176209948956966,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_rapid_open_close_cycles",
+          "passed": true,
+          "duration": 0.03755033016204834,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestResourceExhaustionAlerting::test_resource_exhaustion_alert",
+          "passed": true,
+          "duration": 0.6097336648963392,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.007989195175468922,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_isolation_between_tests",
+          "passed": true,
+          "duration": 0.010028878226876259,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_independent_sessions",
+          "passed": true,
+          "duration": 0.00906832842156291,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_session_id_fixture_provides_id",
+          "passed": true,
+          "duration": 0.0012096301652491093,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_connection_fixture",
+          "passed": true,
+          "duration": 0.00043618492782115936,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_complete_schema_initialization",
+          "passed": true,
+          "duration": 0.0013238540850579739,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_wal_mode_enabled",
+          "passed": true,
+          "duration": 0.0012028082273900509,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_isolated_from_production_database",
+          "passed": true,
+          "duration": 0.0008541741408407688,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_full_store_functionality",
+          "passed": true,
+          "duration": 0.01605998771265149,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.0010572648607194424,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_is_isolated_from_other_tests",
+          "passed": false,
+          "duration": 0.0011685448698699474,
+          "error_message": "tests/test_in_memory_db_isolation.py:39: in test_in_memory_db_store_is_isolated_from_other_tests\n    async with aiosqlite.connect(in_memory_db_store.db_path, uri=True) as conn:\n               ^^^^^^^^^\nE   NameError: name 'aiosqlite' is not defined"
+        }
+      ]
+    },
+    {
+      "run_number": 5,
+      "start_time": "2026-08-07T09:43:12.833614",
+      "end_time": "2026-08-07T09:43:15.376860",
+      "duration": 2.543246,
+      "total_tests": 43,
+      "passed": 42,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0,
+      "success_rate": 97.67441860465115,
+      "test_results": [
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_topics_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.003715544007718563,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_topic_queries_return_empty",
+          "passed": true,
+          "duration": 0.0041810269467532635,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_results_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.014055246021598577,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_result_queries_return_empty",
+          "passed": true,
+          "duration": 0.012145164888352156,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_utterances_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.004437859170138836,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_utterance_access_by_wrong_session",
+          "passed": true,
+          "duration": 0.005332516971975565,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_a_intents_isolated_from_session_b",
+          "passed": true,
+          "duration": 0.01576358312740922,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_cross_session_intent_queries_return_empty",
+          "passed": true,
+          "duration": 0.01810293784365058,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_full_cross_session_isolation",
+          "passed": true,
+          "duration": 0.015200717840343714,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_multiple_sessions_strict_isolation",
+          "passed": true,
+          "duration": 0.010952197015285492,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_session_isolation.py::test_session_deletion_does_not_affect_other_sessions",
+          "passed": true,
+          "duration": 0.025546845979988575,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_increment_decrement",
+          "passed": true,
+          "duration": 0.0010230639018118382,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_context_manager",
+          "passed": true,
+          "duration": 0.0004997076466679573,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_concurrent",
+          "passed": true,
+          "duration": 0.010799658950418234,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_single_connection",
+          "passed": true,
+          "duration": 0.0014916998334228992,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_multiple_connections",
+          "passed": true,
+          "duration": 0.01790839061141014,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_leak_detection",
+          "passed": true,
+          "duration": 0.15323659498244524,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_passes",
+          "passed": true,
+          "duration": 0.0049284640699625015,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_with_allow_active",
+          "passed": true,
+          "duration": 0.00411785626783967,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_get_active_connections",
+          "passed": true,
+          "duration": 0.0023577846586704254,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_stats_tracking",
+          "passed": true,
+          "duration": 0.0347658540122211,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_wait_for_connection_return_to_baseline",
+          "passed": true,
+          "duration": 0.2018035389482975,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_reset",
+          "passed": true,
+          "duration": 0.03369176900014281,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_session_store_no_leaks_after_operations",
+          "passed": true,
+          "duration": 0.0014158268459141254,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_repeated_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.13455776404589415,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_concurrent_operations_no_accumulation",
+          "passed": true,
+          "duration": 0.037327995989471674,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_singleton",
+          "passed": true,
+          "duration": 0.0009591579437255859,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_reset",
+          "passed": true,
+          "duration": 0.0003760308027267456,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_exception_in_connection_block",
+          "passed": true,
+          "duration": 0.0020153308287262917,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_nested_connection_blocks",
+          "passed": true,
+          "duration": 0.006210753228515387,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_rapid_open_close_cycles",
+          "passed": true,
+          "duration": 0.042056520935148,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_connection_leaks.py::TestResourceExhaustionAlerting::test_resource_exhaustion_alert",
+          "passed": true,
+          "duration": 0.6051244959235191,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.0207911329343915,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_isolation_between_tests",
+          "passed": true,
+          "duration": 0.04271476622670889,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_independent_sessions",
+          "passed": true,
+          "duration": 0.02221985114738345,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_session_id_fixture_provides_id",
+          "passed": true,
+          "duration": 0.0013769310899078846,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_connection_fixture",
+          "passed": true,
+          "duration": 0.00037606898695230484,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_complete_schema_initialization",
+          "passed": true,
+          "duration": 0.0014749206602573395,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_wal_mode_enabled",
+          "passed": true,
+          "duration": 0.0012471992522478104,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_isolated_from_production_database",
+          "passed": true,
+          "duration": 0.0013418737798929214,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_full_store_functionality",
+          "passed": true,
+          "duration": 0.08465495985001326,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_creates_fresh_database",
+          "passed": true,
+          "duration": 0.005876801908016205,
+          "error_message": ""
+        },
+        {
+          "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_is_isolated_from_other_tests",
+          "passed": false,
+          "duration": 0.004703004378825426,
+          "error_message": "tests/test_in_memory_db_isolation.py:39: in test_in_memory_db_store_is_isolated_from_other_tests\n    async with aiosqlite.connect(in_memory_db_store.db_path, uri=True) as conn:\n               ^^^^^^^^^\nE   NameError: name 'aiosqlite' is not defined"
+        }
+      ]
+    }
+  ],
+  "flaky_tests": [
+    {
+      "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_is_isolated_from_other_tests",
+      "total_runs": 5,
+      "passed_runs": 0,
+      "failed_runs": 5,
+      "failure_rate": 100.0,
+      "failure_runs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_session_a_topics_isolated_from_session_b",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_cross_session_topic_queries_return_empty",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_session_a_results_isolated_from_session_b",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_cross_session_result_queries_return_empty",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_session_a_utterances_isolated_from_session_b",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_cross_session_utterance_access_by_wrong_session",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_session_a_intents_isolated_from_session_b",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_cross_session_intent_queries_return_empty",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_full_cross_session_isolation",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_multiple_sessions_strict_isolation",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_session_isolation.py::test_session_deletion_does_not_affect_other_sessions",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_increment_decrement",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_context_manager",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionCounter::test_counter_concurrent",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_single_connection",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_multiple_connections",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_leak_detection",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_passes",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_assert_no_leaks_with_allow_active",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_get_active_connections",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_connection_stats_tracking",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_wait_for_connection_return_to_baseline",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionMonitor::test_monitor_reset",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_session_store_no_leaks_after_operations",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_repeated_operations_no_accumulation",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestSessionStoreIntegration::test_concurrent_operations_no_accumulation",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_singleton",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestGlobalMonitor::test_global_monitor_reset",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_exception_in_connection_block",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_nested_connection_blocks",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestConnectionLeakScenarios::test_rapid_open_close_cycles",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_connection_leaks.py::TestResourceExhaustionAlerting::test_resource_exhaustion_alert",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_creates_fresh_database",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_isolation_between_tests",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_store_independent_sessions",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_session_id_fixture_provides_id",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_db_connection_fixture",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_complete_schema_initialization",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_wal_mode_enabled",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_isolated_from_production_database",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_database_isolation.py::TestDatabaseIsolationFixtures::test_full_store_functionality",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    },
+    {
+      "test_name": "tests/test_in_memory_db_isolation.py::test_in_memory_db_store_creates_fresh_database",
+      "total_runs": 5,
+      "passed_runs": 5,
+      "failed_runs": 0,
+      "failure_rate": 0.0,
+      "failure_runs": [],
+      "is_flaky": false
+    }
+  ]
+}

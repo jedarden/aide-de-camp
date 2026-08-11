@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-06T12:00:00Z",
+    "data_period_start": "2026-07-07T00:00:00Z",
+    "data_period_end": "2026-08-06T12:00:00Z",
+    "services": [
+      "whisper-stt"
+    ],
+    "clusters": [
+      "ardenone-cluster"
+    ],
+    "data_sources": [
+      "kubernetes"
+    ]
+  },
+  "summary": {
+    "total_deployments_last_30_days": 1,
+    "whisper_stt_deployments": 1,
+    "successful_deployments": 1,
+    "failed_or_scaled_down": 0,
+    "data_coverage": "100%",
+    "gaps_detected": false,
+    "largest_gap_days": 0
+  }
+}
