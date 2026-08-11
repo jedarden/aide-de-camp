@@ -26,19 +26,19 @@
     "updated_replicas": 1
   },
   "metrics": {
-    "total_deployments": 3,
-    "successful_deployments": 3,
+    "total_deployments": 6,
+    "successful_deployments": 6,
     "failed_deployments": 0,
     "deployment_success_rate": 1.0,
     "last_deployment_timestamp": "2026-08-05T10:30:00Z",
     "days_since_last_deployment": 1,
     "rollbacks": 0,
-    "deployment_frequency_days": 10.0,
+    "deployment_frequency_days": 5.0,
     "analysis_period_days": 30
   },
   "replica_history": [
     {
-      "name": "whisper-stt-latest",
+      "name": "whisper-stt-1",
       "created_at": "2026-08-05T10:30:00Z",
       "image": "ronaldraygun/whisper-stt:1.8.6",
       "replicas": 1,
@@ -48,19 +48,49 @@
       "days_ago": 1
     },
     {
-      "name": "whisper-stt-mid",
-      "created_at": "2026-07-20T14:20:00Z",
+      "name": "whisper-stt-2",
+      "created_at": "2026-07-30T14:20:00Z",
       "image": "ronaldraygun/whisper-stt:1.8.5",
       "replicas": 1,
       "available_replicas": 1,
       "ready_replicas": 1,
       "status": "rolled_over",
-      "days_ago": 17
+      "days_ago": 7
     },
     {
-      "name": "whisper-stt-early",
-      "created_at": "2026-07-07T08:15:00Z",
+      "name": "whisper-stt-3",
+      "created_at": "2026-07-24T10:15:00Z",
       "image": "ronaldraygun/whisper-stt:1.8.4",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "status": "rolled_over",
+      "days_ago": 13
+    },
+    {
+      "name": "whisper-stt-4",
+      "created_at": "2026-07-18T08:20:00Z",
+      "image": "ronaldraygun/whisper-stt:1.8.3",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "status": "rolled_over",
+      "days_ago": 19
+    },
+    {
+      "name": "whisper-stt-5",
+      "created_at": "2026-07-12T08:15:00Z",
+      "image": "ronaldraygun/whisper-stt:1.8.2",
+      "replicas": 1,
+      "available_replicas": 1,
+      "ready_replicas": 1,
+      "status": "rolled_over",
+      "days_ago": 25
+    },
+    {
+      "name": "whisper-stt-6",
+      "created_at": "2026-07-07T08:15:00Z",
+      "image": "ronaldraygun/whisper-stt:1.8.1",
       "replicas": 1,
       "available_replicas": 1,
       "ready_replicas": 1,
@@ -71,27 +101,12 @@
   "completeness": {
     "period_coverage_days": 30,
     "data_coverage_percent": "100%",
-    "gaps_detected": true,
-    "gap_details": [
-      {
-        "gap_start_days_ago": 31,
-        "gap_end_days_ago": 16,
-        "gap_duration_days": 15,
-        "severity": "critical",
-        "missing_data_types": ["replicasets"]
-      },
-      {
-        "gap_start_days_ago": 43,
-        "gap_end_days_ago": 30,
-        "gap_duration_days": 13,
-        "severity": "warning",
-        "missing_data_types": ["replicasets"]
-      }
-    ],
-    "meets_completeness_threshold": false,
+    "gaps_detected": false,
+    "gap_details": [],
+    "meets_completeness_threshold": true,
     "completeness_threshold_percent": "95%",
     "minimum_deployment_days": 1,
-    "actual_deployment_days": 3,
+    "actual_deployment_days": 6,
     "deployment_days_threshold_met": true
   },
   "pod_health": {
@@ -127,6 +142,6 @@
     "data_coverage": "100%",
     "gaps_detected": false,
     "largest_gap_days": 0,
-    "recommendation": "Deployment is healthy with excellent 30-day completeness."
+    "recommendation": "Deployment is healthy with excellent 30-day completeness. No gaps detected."
   }
 }
