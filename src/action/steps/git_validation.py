@@ -72,8 +72,67 @@ class GitAuthenticationError(GitError):
 
 
 class GitStateError(GitError):
-    """Raised when git repository is in an unexpected state."""
-    pass
+    """
+    Raised when git repository state validation fails.
+
+    This exception is raised by all validation checks when pre-operation
+    state validation fails, providing clear, actionable error messages
+    with structured context about what failed and why.
+
+    Attributes:
+        message: Human-readable error message describing the validation failure
+        validation_type: The type of validation that failed (e.g., "branch", "changes", "remote", "repository")
+        details: Additional context dictionary with specific failure details
+        repo_path: Path to the repository where validation failed (optional)
+
+    Example:
+        >>> raise GitStateError(
+        ...     "Not on expected branch 'main': currently on 'feature-branch'",
+        ...     validation_type="branch",
+        ...     details={"expected": "main", "actual": "feature-branch"},
+        ...     repo_path="/path/to/repo"
+        ... )
+    """
+
+    def __init__(
+        self,
+        message: str,
+        validation_type: str = "unknown",
+        details: dict | None = None,
+        repo_path: str | Path | None = None,
+    ):
+        """
+        Initialize GitStateError with validation context.
+
+        Args:
+            message: Human-readable error message describing what failed
+            validation_type: Type of validation that failed (branch, changes, remote, repository, etc.)
+            details: Optional dictionary with additional failure context
+            repo_path: Optional path to repository where validation failed
+        """
+        super().__init__(message)
+        self.validation_type = validation_type
+        self.details = details or {}
+        self.repo_path = str(repo_path) if repo_path else None
+
+    def __str__(self) -> str:
+        """Return formatted error message with validation context."""
+        base_msg = super().__str__()
+
+        # Add validation type prefix if not "unknown"
+        if self.validation_type != "unknown":
+            base_msg = f"[{self.validation_type}] {base_msg}"
+
+        # Add repo path if available and not already in message
+        if self.repo_path and self.repo_path not in base_msg:
+            base_msg = f"{base_msg} (repository: {self.repo_path})"
+
+        # Add details if present
+        if self.details:
+            details_str = ", ".join(f"{k}={v}" for k, v in self.details.items())
+            base_msg = f"{base_msg}\nDetails: {details_str}"
+
+        return base_msg
 
 
 class GitValidationError(RuntimeError):
