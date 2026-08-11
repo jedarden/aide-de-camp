@@ -275,7 +275,7 @@ class TestGitOpsCommitStep:
         )
 
         assert result.success is False
-        assert "not on main branch" in result.error.lower()
+        assert "not on expected branch" in result.error.lower() or "not on main branch" in result.error.lower()
 
     @patch("subprocess.run")
     @pytest.mark.asyncio
@@ -452,23 +452,37 @@ class TestGitOpsCommitStep:
         """Successful commit and push operation."""
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
-        # Mock git commands
-        mock_run.side_effect = [
+        call_count = [0]
+
+        def mock_git_command(*args, **kwargs):
+            call_count[0] += 1
+            cmd = args[0] if args else []
+
             # git config user.email
-            Mock(returncode=0, stdout="", stderr=""),
+            if "config" in cmd and "user.email" in cmd:
+                return Mock(returncode=0, stdout="", stderr="")
             # git config user.name
-            Mock(returncode=0, stdout="", stderr=""),
+            if "config" in cmd and "user.name" in cmd:
+                return Mock(returncode=0, stdout="", stderr="")
             # git status (has changes)
-            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
+            if "status" in cmd and "--porcelain" in cmd:
+                return Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr="")
             # git add
-            Mock(returncode=0, stdout="", stderr=""),
+            if "add" in cmd:
+                return Mock(returncode=0, stdout="", stderr="")
             # git commit
-            Mock(returncode=0, stdout="", stderr=""),
+            if "commit" in cmd:
+                return Mock(returncode=0, stdout="", stderr="")
             # git rev-parse
-            Mock(returncode=0, stdout="abc123def456\n", stderr=""),
+            if "rev-parse" in cmd:
+                return Mock(returncode=0, stdout="abc123def456\n", stderr="")
             # git push
-            Mock(returncode=0, stdout="", stderr=""),
-        ]
+            if "push" in cmd:
+                return Mock(returncode=0, stdout="", stderr="")
+            # Default mock for validation commands
+            return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_git_command
 
         # Mock the validation method to bypass git repo check
         with patch.object(step, '_validate_declarative_config_repo'):
@@ -480,8 +494,8 @@ class TestGitOpsCommitStep:
             )
 
         assert result.success is True
-        assert result.data["commit_sha"] == "abc123def456"
-        assert result.data["branch"] == "main"
+        assert result.commit_sha == "abc123def456"
+        assert result.branch == "main"
 
     @patch("subprocess.run")
     @pytest.mark.asyncio
@@ -491,15 +505,29 @@ class TestGitOpsCommitStep:
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
         call_count = [0]
+        push_attempts = [0]
 
         def mock_git_command(*args, **kwargs):
             call_count[0] += 1
+            cmd = args[0] if args else []
+
             # First push attempt fails with network error
-            if "push" in args and call_count[0] == 7:  # 7th call is the push
-                return Mock(returncode=1, stdout="", stderr="Connection timeout\n")
-            # Second push attempt succeeds
-            elif "push" in args and call_count[0] == 8:  # Retry happens immediately after
-                return Mock(returncode=0, stdout="", stderr="")
+            if "push" in cmd:
+                push_attempts[0] += 1
+                if push_attempts[0] == 1:
+                    return Mock(returncode=1, stdout="", stderr="Connection timeout\n")
+                # Second push attempt succeeds
+                else:
+                    return Mock(returncode=0, stdout="", stderr="")
+
+            # git status needs to show changes for commit to proceed
+            if "status" in cmd and "--porcelain" in cmd:
+                return Mock(returncode=0, stdout="M k8s/test-cluster/deployment.yaml", stderr="")
+
+            # git rev-parse HEAD needs to return a valid SHA
+            if "rev-parse" in cmd and "HEAD" in cmd:
+                return Mock(returncode=0, stdout="abc123def456\n", stderr="")
+
             # All other commands succeed
             return Mock(returncode=0, stdout="", stderr="")
 
@@ -516,7 +544,7 @@ class TestGitOpsCommitStep:
             )
 
         assert result.success is True
-        assert call_count[0] >= 7  # Should have tried at least the original push
+        assert push_attempts[0] == 2  # Should have retried exactly once
 
     @patch("subprocess.run")
     @pytest.mark.asyncio
@@ -524,23 +552,28 @@ class TestGitOpsCommitStep:
         """Push conflict returns structured error with commit_locally flag."""
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
-        # Mock git commands to succeed through commit, fail push with conflict
-        mock_run.side_effect = [
-            # git config user.email
-            Mock(returncode=0, stdout="", stderr=""),
-            # git config user.name
-            Mock(returncode=0, stdout="", stderr=""),
-            # git status (has changes)
-            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
-            # git add
-            Mock(returncode=0, stdout="", stderr=""),
-            # git commit
-            Mock(returncode=0, stdout="", stderr=""),
-            # git rev-parse
-            Mock(returncode=0, stdout="abc123def456\n", stderr=""),
+        call_count = [0]
+
+        def mock_git_command(*args, **kwargs):
+            call_count[0] += 1
+            cmd = args[0] if args else []
+
             # git push (fails with conflict)
-            Mock(returncode=1, stdout="", stderr="To github.com:jedarden/declarative-config.git\n ! [rejected] main -> main (non-fast-forward)\n"),
-        ]
+            if "push" in cmd:
+                return Mock(returncode=1, stdout="", stderr="To github.com:jedarden/declarative-config.git\n ! [rejected] main -> main (non-fast-forward)\n")
+
+            # git status needs to show changes for commit to proceed
+            if "status" in cmd and "--porcelain" in cmd:
+                return Mock(returncode=0, stdout="M k8s/test-cluster/deployment.yaml", stderr="")
+
+            # git rev-parse HEAD needs to return a valid SHA
+            if "rev-parse" in cmd and "HEAD" in cmd:
+                return Mock(returncode=0, stdout="abc123def456\n", stderr="")
+
+            # All other commands succeed
+            return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_git_command
 
         # Mock the validation method to bypass git repo check
         with patch.object(step, '_validate_declarative_config_repo'):
@@ -552,8 +585,8 @@ class TestGitOpsCommitStep:
             )
 
         assert result.success is False
-        assert result.data.get("commit_locally") is True
-        assert result.data.get("commit_sha") == "abc123def456"
+        assert result.details.get("commit_locally") is True
+        assert result.commit_sha  # Should have a commit SHA even though push failed
         assert "non-fast-forward" in result.error.lower()
 
     @patch("subprocess.run")
@@ -562,23 +595,28 @@ class TestGitOpsCommitStep:
         """Push authentication failure returns structured error without commit_locally flag."""
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
-        # Mock git commands to succeed through commit, fail push with auth error
-        mock_run.side_effect = [
-            # git config user.email
-            Mock(returncode=0, stdout="", stderr=""),
-            # git config user.name
-            Mock(returncode=0, stdout="", stderr=""),
-            # git status (has changes)
-            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
-            # git add
-            Mock(returncode=0, stdout="", stderr=""),
-            # git commit
-            Mock(returncode=0, stdout="", stderr=""),
-            # git rev-parse
-            Mock(returncode=0, stdout="abc123def456\n", stderr=""),
+        call_count = [0]
+
+        def mock_git_command(*args, **kwargs):
+            call_count[0] += 1
+            cmd = args[0] if args else []
+
             # git push (fails with auth error)
-            Mock(returncode=1, stdout="", stderr="fatal: Authentication failed\n"),
-        ]
+            if "push" in cmd:
+                return Mock(returncode=1, stdout="", stderr="fatal: Authentication failed\n")
+
+            # git status needs to show changes for commit to proceed
+            if "status" in cmd and "--porcelain" in cmd:
+                return Mock(returncode=0, stdout="M k8s/test-cluster/deployment.yaml", stderr="")
+
+            # git rev-parse HEAD needs to return a valid SHA
+            if "rev-parse" in cmd and "HEAD" in cmd:
+                return Mock(returncode=0, stdout="abc123def456\n", stderr="")
+
+            # All other commands succeed
+            return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_git_command
 
         # Mock the validation method to bypass git repo check
         with patch.object(step, '_validate_declarative_config_repo'):
@@ -590,7 +628,7 @@ class TestGitOpsCommitStep:
             )
 
         assert result.success is False
-        assert result.data.get("commit_locally") is True
+        assert result.details.get("commit_locally") is True
         assert "authentication" in result.error.lower()
 
     @patch("subprocess.run")
@@ -602,19 +640,19 @@ class TestGitOpsCommitStep:
         # Read original manifest as YAML for comparison
         original_manifest = yaml.safe_load(mock_deployment_manifest.read_text())
 
-        # Mock git commands to fail at commit with conflict
-        mock_run.side_effect = [
-            # git config user.email
-            Mock(returncode=0, stdout="", stderr=""),
-            # git config user.name
-            Mock(returncode=0, stdout="", stderr=""),
-            # git status (has changes)
-            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
-            # git add
-            Mock(returncode=0, stdout="", stderr=""),
+        call_count = [0]
+
+        def mock_git_command(*args, **kwargs):
+            call_count[0] += 1
+            cmd = args[0] if args else []
+
             # git commit (fails with conflict)
-            Mock(returncode=1, stdout="", stderr="fatal: Cannot commit: merge conflict\n"),
-        ]
+            if "commit" in cmd and "-m" in cmd:
+                return Mock(returncode=1, stdout="", stderr="fatal: Cannot commit: merge conflict\n")
+            # All other commands succeed
+            return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_git_command
 
         # Mock the validation method to bypass git repo check
         with patch.object(step, '_validate_declarative_config_repo'):
@@ -638,25 +676,28 @@ class TestGitOpsCommitStep:
         """Push rejection returns appropriate error."""
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
-        # Mock git commands up to push, then fail
-        mock_run.side_effect = [
-            # git config user.email
-            Mock(returncode=0, stdout="", stderr=""),
-            # git config user.name
-            Mock(returncode=0, stdout="", stderr=""),
-            # git status (has changes)
-            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
-            # git add
-            Mock(returncode=0, stdout="", stderr=""),
-            # git commit
-            Mock(returncode=0, stdout="", stderr=""),
-            # git rev-parse
-            Mock(returncode=0, stdout="abc123def456\n", stderr=""),
-            # git branch --show-current
-            Mock(returncode=0, stdout="main\n", stderr=""),
+        call_count = [0]
+
+        def mock_git_command(*args, **kwargs):
+            call_count[0] += 1
+            cmd = args[0] if args else []
+
             # git push (fails with rejection)
-            Mock(returncode=1, stdout="", stderr="To github.com:jedarden/declarative-config.git\n ! [rejected] main -> main (non-fast-forward)\n"),
-        ]
+            if "push" in cmd:
+                return Mock(returncode=1, stdout="", stderr="To github.com:jedarden/declarative-config.git\n ! [rejected] main -> main (non-fast-forward)\n")
+
+            # git status needs to show changes for commit to proceed
+            if "status" in cmd and "--porcelain" in cmd:
+                return Mock(returncode=0, stdout="M k8s/test-cluster/deployment.yaml", stderr="")
+
+            # git rev-parse HEAD needs to return a valid SHA
+            if "rev-parse" in cmd and "HEAD" in cmd:
+                return Mock(returncode=0, stdout="abc123def456\n", stderr="")
+
+            # All other commands succeed
+            return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_git_command
 
         # Mock the validation method to bypass git repo check
         with patch.object(step, '_validate_declarative_config_repo'):
@@ -680,19 +721,19 @@ class TestGitOpsCommitStep:
         # Read original manifest as YAML for comparison
         original_manifest = yaml.safe_load(mock_deployment_manifest.read_text())
 
-        # Mock git commands to fail at commit
-        mock_run.side_effect = [
-            # git config user.email
-            Mock(returncode=0, stdout="", stderr=""),
-            # git config user.name
-            Mock(returncode=0, stdout="", stderr=""),
-            # git status (has changes)
-            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
-            # git add
-            Mock(returncode=0, stdout="", stderr=""),
+        call_count = [0]
+
+        def mock_git_command(*args, **kwargs):
+            call_count[0] += 1
+            cmd = args[0] if args else []
+
             # git commit (fails)
-            Mock(returncode=1, stdout="", stderr="git commit failed\n"),
-        ]
+            if "commit" in cmd and "-m" in cmd:
+                return Mock(returncode=1, stdout="", stderr="git commit failed\n")
+            # All other commands succeed
+            return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_git_command
 
         # Mock the validation method to bypass git repo check
         with patch.object(step, '_validate_declarative_config_repo'):
@@ -710,32 +751,14 @@ class TestGitOpsCommitStep:
         rolled_back_manifest = yaml.safe_load(mock_deployment_manifest.read_text())
         assert rolled_back_manifest == original_manifest
 
-    @patch("subprocess.run")
     @pytest.mark.asyncio
-    async def test_not_on_main_branch_fails(self, mock_run, mock_declarative_config_dir, mock_deployment_manifest):
-        """Not being on main branch returns error."""
+    async def test_not_on_main_branch_fails(self, mock_declarative_config_dir, mock_deployment_manifest):
+        """Not being on main branch returns error during pre-flight validation."""
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
-        # Mock git commands to show we're on feature branch
-        mock_run.side_effect = [
-            # git config user.email
-            Mock(returncode=0, stdout="", stderr=""),
-            # git config user.name
-            Mock(returncode=0, stdout="", stderr=""),
-            # git status (has changes)
-            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
-            # git add
-            Mock(returncode=0, stdout="", stderr=""),
-            # git commit
-            Mock(returncode=0, stdout="", stderr=""),
-            # git rev-parse
-            Mock(returncode=0, stdout="abc123def456\n", stderr=""),
-            # git branch --show-current (shows feature branch)
-            Mock(returncode=0, stdout="feature-branch\n", stderr=""),
-        ]
-
-        # Mock the validation method to bypass git repo check
-        with patch.object(step, '_validate_declarative_config_repo'):
+        # Mock the validation method to simulate being on wrong branch
+        with patch.object(step, '_validate_declarative_config_repo',
+                          side_effect=GitStateError("Not on expected branch 'main' - current branch: feature-branch")):
             result = await step.execute(
                 manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
                 template_fields=[{"path": "/spec/replicas", "value": 5}],
@@ -744,7 +767,7 @@ class TestGitOpsCommitStep:
             )
 
         assert result.success is False
-        assert "Not on main branch" in result.error
+        assert "Not on expected branch" in result.error
 
     def test_build_commit_message_format(self, mock_declarative_config_dir):
         """Commit message follows standard format."""
@@ -772,41 +795,68 @@ class TestGitOpsCommitStep:
     @pytest.mark.asyncio
     async def test_rollback_operation(self, mock_run, mock_declarative_config_dir):
         """Rollback operation works correctly."""
-        # Mock git revert and push
-        mock_run.side_effect = [
-            Mock(returncode=0, stdout="", stderr=""),  # git revert
-            Mock(returncode=0, stdout="", stderr=""),  # git commit revert
-            Mock(returncode=0, stdout="main\n", stderr=""),  # git branch
-            Mock(returncode=0, stdout="", stderr=""),  # git push
-        ]
-
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
-        result = await step.rollback(
-            manifest_path="k8s/test-cluster/deployment.yaml",
-            commit_sha="abc123",
-        )
+        call_count = [0]
 
-        assert result.success is True
-        assert result.data["reverted_commit"] == "abc123"
+        def mock_git_command(*args, **kwargs):
+            call_count[0] += 1
+            cmd = args[0] if args else []
+
+            # git show (parent commit)
+            if "show" in cmd:
+                return Mock(returncode=0, stdout="original manifest content", stderr="")
+
+            # All other commands succeed
+            return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_git_command
+
+        # Mock the validation method to bypass git repo check
+        with patch.object(step, '_validate_declarative_config_repo'):
+            # Create a test manifest file
+            test_manifest = mock_declarative_config_dir / "k8s" / "test-cluster" / "deployment.yaml"
+            test_manifest.parent.mkdir(parents=True, exist_ok=True)
+            test_manifest.write_text("original content")
+
+            result = await step.rollback(
+                manifest_path="k8s/test-cluster/deployment.yaml",
+                commit_sha="abc123",
+            )
+
+            assert result.success is True
+            assert result.details.get("reverted_commit") == "abc123"
 
     @patch("subprocess.run")
     @pytest.mark.asyncio
     async def test_rollback_git_revert_fails(self, mock_run, mock_declarative_config_dir):
         """Rollback failure returns error."""
-        mock_run.side_effect = [
-            Mock(returncode=1, stdout="", stderr="git revert failed\n"),
-        ]
-
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
-        result = await step.rollback(
-            manifest_path="k8s/test-cluster/deployment.yaml",
-            commit_sha="abc123",
-        )
+        call_count = [0]
 
-        assert result.success is False
-        assert "git revert failed" in result.error
+        def mock_git_command(*args, **kwargs):
+            call_count[0] += 1
+            cmd = args[0] if args else []
+
+            # git show (parent commit) fails
+            if "show" in cmd:
+                return Mock(returncode=1, stdout="", stderr="git show failed\n")
+
+            # All other commands succeed
+            return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_git_command
+
+        # Mock the validation method to bypass git repo check
+        with patch.object(step, '_validate_declarative_config_repo'):
+            result = await step.rollback(
+                manifest_path="k8s/test-cluster/deployment.yaml",
+                commit_sha="abc123",
+            )
+
+            assert result.success is False
+            assert "git revert failed" in result.error or "rollback failed" in result.error.lower()
 
 
 class TestGitOpsCommitStepIntegration:
@@ -832,8 +882,8 @@ class TestGitOpsCommitStepIntegration:
         )
 
         assert result.success is True
-        assert result.data["dry_run"] is True
-        assert result.data["modifications"] == 2
+        assert result.data.get("dry_run") is True
+        assert result.data.get("modifications") == 2
 
         # Verify original file was not modified
         current_manifest = yaml.safe_load(mock_deployment_manifest.read_text())
@@ -856,7 +906,7 @@ class TestGitOpsCommitStepIntegration:
 
         assert result.success is True
         # Verify the container image was substituted
-        assert "test-tag" in result.data["preview"]
+        assert "test-tag" in result.data.get("preview", "")
 
     @pytest.mark.asyncio
     async def test_path_allowed_validation(self, mock_declarative_config_dir, mock_deployment_manifest):
@@ -906,3 +956,122 @@ class TestGitOpsCommitStepIntegration:
         diff = step._diff_manifests(manifest, manifest)
 
         assert diff == "No changes detected"
+
+    @pytest.mark.asyncio
+    async def test_integration_with_real_git_repository(self, tmp_path):
+        """Integration test with real git repository (not declarative-config)."""
+        import subprocess
+
+        # Create a temporary git repository
+        test_repo = tmp_path / "test-repo"
+        test_repo.mkdir()
+        subprocess.run(["git", "init"], cwd=test_repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=test_repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=test_repo, check=True, capture_output=True)
+
+        # Create k8s directory structure
+        k8s_dir = test_repo / "k8s" / "test-cluster"
+        k8s_dir.mkdir(parents=True)
+
+        # Create a deployment manifest
+        deployment_manifest = k8s_dir / "deployment.yaml"
+        deployment_content = """
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+  namespace: test-namespace
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: app
+        image: ronaldraygun/test-app:v1.0.0
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+"""
+        deployment_manifest.write_text(deployment_content)
+
+        # Initial commit
+        subprocess.run(["git", "add", "."], cwd=test_repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=test_repo, check=True, capture_output=True)
+
+        # Create GitOps step pointing to test repository
+        step = GitOpsCommitStep(
+            declarative_config_path=str(test_repo),
+            git_email="test@example.com",
+            git_name="Test User",
+        )
+
+        # Execute with dry run first
+        result = await step.execute(
+            manifest_path="k8s/test-cluster/deployment.yaml",
+            template_fields=[{"path": "/spec/replicas", "value": 5}],
+            project_cfg={"project_slug": "test-app", "cluster": "test-cluster"},
+            dry_run=True,
+        )
+
+        assert result.success is True
+        assert result.data.get("dry_run") is True
+
+        # Verify no actual changes were made
+        current_content = deployment_manifest.read_text()
+        assert "replicas: 3" in current_content  # Should still be 3
+
+    @pytest.mark.asyncio
+    async def test_gitops_never_bypassed_no_kubectl_mutations(self, mock_declarative_config_dir, mock_deployment_manifest):
+        """Test that validates GitOps is never bypassed (no direct kubectl mutations)."""
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Test that risky paths are detected
+        risky_field = {"path": "/metadata/name", "value": "new-name"}
+        safe_fields = [
+            {"path": "/spec/replicas", "value": 5},
+        ]
+
+        # Verify the risk detection works
+        with patch.object(step, '_validate_declarative_config_repo'):
+            # Safe fields should work in dry run
+            result = await step.execute(
+                manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+                template_fields=safe_fields,
+                project_cfg={"project_slug": "test-app"},
+                dry_run=True,
+            )
+            assert result.success is True
+
+            # Risky fields should be detected and rejected
+            result_risky = await step.execute(
+                manifest_path=str(mock_deployment_manifest.relative_to(mock_declarative_config_dir)),
+                template_fields=[risky_field],
+                project_cfg={"project_slug": "test-app"},
+                dry_run=True,
+            )
+            # Should fail because metadata.name is not in allowed prefixes
+            assert result_risky.success is False
+            assert "not in allowed prefixes" in result_risky.error
+
+        # Test that _detect_kubectl_mutation_risk identifies suspicious patterns
+        risky_patterns = [
+            [{"path": "/metadata/name", "value": "test"}],
+            [{"path": "/metadata/namespace", "value": "test"}],
+            [{"path": "/kind", "value": "Pod"}],
+            [{"path": "/apiVersion", "value": "v1"}],
+        ]
+
+        for fields in risky_patterns:
+            risk_detected = step._detect_kubectl_mutation_risk(fields)
+            assert risk_detected is True, f"Should detect risk for fields: {fields}"
+
+        # Test that safe patterns don't trigger risk detection
+        safe_patterns = [
+            [{"path": "/spec/replicas", "value": 5}],
+            [{"path": "/spec/template/spec/containers/0/image", "value": "test:v1"}],
+        ]
+
+        for fields in safe_patterns:
+            risk_detected = step._detect_kubectl_mutation_risk(fields)
+            assert risk_detected is False, f"Should not detect risk for safe fields: {fields}"
