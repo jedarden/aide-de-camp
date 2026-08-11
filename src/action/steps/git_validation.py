@@ -233,6 +233,70 @@ def check_current_branch(
         raise GitStateError("Git command not found - ensure git is installed")
 
 
+def validate_main_branch(
+    repo_path: str | Path,
+    expected_branch: str = "main",
+    timeout: int = 10,
+) -> bool:
+    """
+    Validate that the repository is on the main branch before operations.
+
+    This is a simplified validation function specifically for checking that the
+    repository is on the main branch. It prevents operations from running on
+    feature branches where they could cause conflicts.
+
+    Args:
+        repo_path: Path to the repository
+        expected_branch: Expected branch name (default: "main")
+        timeout: Timeout in seconds for git commands
+
+    Returns:
+        True if validation passes and repository is on the main branch
+
+    Raises:
+        GitStateError: If not on the expected branch with clear message
+        GitNetworkError: If git command times out
+        FileNotFoundError: If git is not installed
+
+    Example:
+        >>> validate_main_branch("/path/to/repo")
+        True
+        >>> validate_main_branch("/path/to/repo", "develop")  # custom branch
+        True
+    """
+    repo_path = Path(repo_path)
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_path), "branch", "--show-current"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=True,
+        )
+
+        current_branch = result.stdout.strip()
+
+        if current_branch != expected_branch:
+            raise GitStateError(
+                f"Not on expected branch '{expected_branch}': currently on '{current_branch}'. "
+                f"Please switch to {expected_branch} branch first.",
+                validation_type="branch",
+                details={"expected": expected_branch, "actual": current_branch},
+                repo_path=repo_path,
+            )
+
+        logger.debug(f"Repository is on expected branch: {current_branch}")
+        return True
+
+    except subprocess.TimeoutExpired:
+        raise GitNetworkError("Git branch check timed out")
+    except subprocess.CalledProcessError as e:
+        raise GitStateError(f"Failed to determine current branch: {e.stderr.strip()}")
+    except FileNotFoundError:
+        raise GitStateError("Git command not found - ensure git is installed")
+
+
 def check_uncommitted_changes(
     repo_path: str | Path,
     timeout: int = 10,
