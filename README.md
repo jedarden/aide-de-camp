@@ -247,3 +247,31 @@ POST /dispatch
 Version is in `pyproject.toml` only. No CI build — runs from source.
 
 Release: bump version in `pyproject.toml` → commit → `git tag vX.Y.Z` → push.
+
+---
+
+## Deployment Data & Research Artifacts
+
+### Validated Deployment Data Files
+
+The project maintains validated deployment data files for infrastructure analysis and reliability research. These files are periodically updated and committed to provide baselines for 30-day comparative analysis.
+
+#### whisper-stt Deployment Data
+
+**File:** `docs/research/deployment-data/whisper-stt-deployment-data-30days.json`
+
+**Purpose:** Validated 30-day deployment analysis dataset for the whisper-stt service on ardenone-cluster. Contains deployment history, current status, timestamps, image versions, replica states, resource configurations, and health conditions.
+
+**Origin:** Generated via kubectl read-only proxy against ardenone-cluster, covering the period 2026-07-07 to 2026-08-06. Validated against deployment data schema compliance (task adc-2uox8).
+
+**Usage:**
+- Baseline for 30-day deployment pattern analysis
+- Comparative reliability studies across services
+- Infrastructure deployment metrics and trend analysis
+- Schema validation reference for deployment data ingestion
+
+**Related Documentation:**
+- `docs/research/deployment-data/README.md` — Comprehensive deployment research documentation
+- `docs/deployment-data-validation-summary.md` — Validation methodology and results
+
+**Update cadence:** Regenerated every 30 days or after significant infrastructure changes.
