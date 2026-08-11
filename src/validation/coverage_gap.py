@@ -494,13 +494,22 @@ def validate_completeness_section(data: Dict[str, Any]) -> List[str]:
     if deployment_threshold_met is False and isinstance(deployment_threshold_met, bool):
         minimum_days = completeness.get("minimum_deployment_days", 1)
         actual_days = completeness.get("actual_deployment_days", 0)
+        shortfall = minimum_days - actual_days
+
         errors.append(
-            f"MISSING DEPLOYMENT DAYS: Service has only {actual_days} deployment day(s) but requires "
-            f"at least {minimum_days} deployment day(s) for meaningful analysis. "
-            f"ACTION: 1) Verify deployment events are being captured correctly, 2) Check if service "
-            f"has been deployed during the 30-day period, 3) Increase deployment frequency or extend "
-            f"the analysis period if service genuinely has low deployment cadence, 4) Review "
-            f"deployment_history_30_days to ensure all deployment events are recorded."
+            f"MISSING DEPLOYMENT DAYS IN 30-DAY PERIOD: Insufficient deployment activity detected. "
+            f"EXPECTED RANGE: Days 1-30 of analysis period. "
+            f"ACTUAL: {actual_days} distinct days with deployments vs REQUIRED: {minimum_days} minimum deployment days. "
+            f"SHORTFALL: {shortfall} deployment day(s) missing from the 30-day window. "
+            f"IDENTIFY MISSING DAYS: Review which specific days in the 1-30 range lack deployment events. "
+            f"CHECK REPLICA_HISTORY: Verify replica_history captures deployment events for all active days. "
+            f"ROOT CAUSES: 1) New deployment with limited history in the 30-day window, "
+            f"2) Deployment paused or inactive during specific days in 1-30 range, "
+            f"3) Insufficient replica_history coverage for some days. "
+            f"ACTION REQUIRED: 1) Add deployment data for the {shortfall} missing deployment day(s) in the 1-30 range, "
+            f"2) Check if deployment occurred on days not captured in replica_history, "
+            f"3) Extend analysis period to capture more deployment activity, "
+            f"4) Adjust minimum_deployment_days if deployment frequency is lower than expected for this service type."
         )
 
     return errors
