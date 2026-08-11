@@ -300,13 +300,16 @@ def validate_main_branch(
 def check_uncommitted_changes(
     repo_path: str | Path,
     timeout: int = 10,
-) -> None:
+) -> bool:
     """
     Verify the repository has no uncommitted changes.
 
     Args:
         repo_path: Path to the repository
         timeout: Timeout in seconds for git commands
+
+    Returns:
+        True if working tree is clean (no uncommitted changes)
 
     Raises:
         GitStateError: If repository has uncommitted changes
@@ -340,6 +343,9 @@ def check_uncommitted_changes(
                 f"Please commit or stash them first.\n"
                 f"Changes:\n{result.stdout.strip()}"
             )
+
+        # Working tree is clean
+        return True
 
     except subprocess.TimeoutExpired:
         raise GitNetworkError("Git status check timed out")
