@@ -38,12 +38,6 @@ from src.escalate.handler import handle_terminal_failure
 # --- fixtures ---------------------------------------------------------------
 
 
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
 # --- Test broadcaster.broadcast() is called on stuck card creation ---------
 
 

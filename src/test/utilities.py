@@ -666,7 +666,7 @@ async def create_synthetic_test_result(
         test_data: Optional custom test data
 
     Returns:
-        Synthetic result response dict
+        Synthetic test result dict
     """
     async with TestSessionClient(base_url=base_url) as client:
         return await client.create_synthetic_result(
@@ -674,6 +674,335 @@ async def create_synthetic_test_result(
             surface_id=surface_id,
             test_data=test_data,
         )
+
+
+class EndpointConnectivityResult:
+    """Structured result from endpoint connectivity test."""
+
+    def __init__(
+        self,
+        success: bool,
+        status_code: Optional[int] = None,
+        response_body: Optional[str] = None,
+        error_message: Optional[str] = None,
+        response_time_ms: Optional[float] = None,
+    ):
+        """
+        Initialize connectivity result.
+
+        Args:
+            success: Whether the connection was successful
+            status_code: HTTP status code (if applicable)
+            response_body: Response body text
+            error_message: Error message if connection failed
+            response_time_ms: Response time in milliseconds
+        """
+        self.success = success
+        self.status_code = status_code
+        self.response_body = response_body
+        self.error_message = error_message
+        self.response_time_ms = response_time_ms
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert result to dictionary."""
+        return {
+            "success": self.success,
+            "status_code": self.status_code,
+            "response_body": self.response_body,
+            "error_message": self.error_message,
+            "response_time_ms": self.response_time_ms,
+        }
+
+    def __repr__(self) -> str:
+        """String representation of result."""
+        if self.success:
+            return (
+                f"EndpointConnectivityResult(success=True, "
+                f"status_code={self.status_code}, "
+                f"response_time_ms={self.response_time_ms:.2f})"
+            )
+        else:
+            return (
+                f"EndpointConnectivityResult(success=False, "
+                f"error={self.error_message})"
+            )
+
+
+async def check_endpoint_connectivity(
+    endpoint_url: str,
+    timeout_seconds: float = 30.0,
+    method: str = "GET",
+    headers: Optional[Dict[str, str]] = None,
+    expected_status_codes: Optional[List[int]] = None,
+    verify_ssl: bool = True,
+) -> EndpointConnectivityResult:
+    """
+    Check connectivity to an HTTP endpoint with comprehensive error handling.
+
+    This function performs an HTTP request to the specified endpoint and returns
+    a structured result containing the status code, response body, and any errors
+    encountered. It includes timeout handling and is suitable for testing metrics
+    endpoints and other HTTP services.
+
+    Args:
+        endpoint_url: The URL to test (e.g., "http://localhost:9090/api/v1/query")
+        timeout_seconds: Maximum time to wait for response (default: 30.0)
+        method: HTTP method to use (default: "GET")
+        headers: Optional HTTP headers to include in the request
+        expected_status_codes: List of acceptable status codes (default: [200])
+        verify_ssl: Whether to verify SSL certificates (default: True)
+
+    Returns:
+        EndpointConnectivityResult object containing:
+        - success: Boolean indicating if connection was successful
+        - status_code: HTTP status code (if received)
+        - response_body: Response body text
+        - error_message: Error description if connection failed
+        - response_time_ms: Response time in milliseconds
+
+    Examples:
+        >>> # Basic metrics endpoint check
+        >>> result = await check_endpoint_connectivity(
+        ...     "http://localhost:9090/api/v1/query?query=up"
+        ... )
+        >>> if result.success:
+        ...     print(f"Status: {result.status_code}, Time: {result.response_time_ms}ms")
+        ... else:
+        ...     print(f"Error: {result.error_message}")
+
+        >>> # Check with custom timeout and headers
+        >>> result = await check_endpoint_connectivity(
+        ...     "http://prometheus:9090/metrics",
+        ...     timeout_seconds=10.0,
+        ...     headers={"Accept": "text/plain"}
+        ... )
+
+        >>> # Check for multiple acceptable status codes
+        >>> result = await check_endpoint_connectivity(
+        ...     "http://endpoint/health",
+        ...     expected_status_codes=[200, 202, 204]
+        ... )
+    """
+    import time
+
+    if expected_status_codes is None:
+        expected_status_codes = [200]
+
+    start_time = time.time()
+    client = None
+
+    try:
+        # Create HTTP client with timeout
+        client = httpx.AsyncClient(
+            timeout=timeout_seconds,
+            verify=verify_ssl,
+        )
+
+        # Prepare request parameters
+        request_kwargs = {
+            "method": method,
+            "url": endpoint_url,
+        }
+
+        if headers:
+            request_kwargs["headers"] = headers
+
+        # Perform the HTTP request
+        response = await client.request(**request_kwargs)
+
+        # Calculate response time
+        response_time_ms = (time.time() - start_time) * 1000
+
+        # Check if status code is acceptable
+        status_code = response.status_code
+        if status_code in expected_status_codes:
+            # Success - return response data
+            try:
+                response_body = response.text
+            except Exception:
+                response_body = None
+
+            return EndpointConnectivityResult(
+                success=True,
+                status_code=status_code,
+                response_body=response_body,
+                response_time_ms=response_time_ms,
+            )
+        else:
+            # Unexpected status code
+            return EndpointConnectivityResult(
+                success=False,
+                status_code=status_code,
+                response_body=response.text,
+                error_message=f"Unexpected status code: {status_code}",
+                response_time_ms=response_time_ms,
+            )
+
+    except httpx.TimeoutException as e:
+        # Timeout occurred
+        response_time_ms = (time.time() - start_time) * 1000
+        return EndpointConnectivityResult(
+            success=False,
+            error_message=f"Timeout after {timeout_seconds}s: {str(e)}",
+            response_time_ms=response_time_ms,
+        )
+
+    except httpx.ConnectError as e:
+        # Connection error (DNS, network, etc.)
+        response_time_ms = (time.time() - start_time) * 1000
+        return EndpointConnectivityResult(
+            success=False,
+            error_message=f"Connection error: {str(e)}",
+            response_time_ms=response_time_ms,
+        )
+
+    except httpx.HTTPStatusError as e:
+        # HTTP error (4xx, 5xx)
+        response_time_ms = (time.time() - start_time) * 1000
+        return EndpointConnectivityResult(
+            success=False,
+            status_code=e.response.status_code,
+            response_body=str(e.response.text),
+            error_message=f"HTTP status error: {str(e)}",
+            response_time_ms=response_time_ms,
+        )
+
+    except Exception as e:
+        # Any other error
+        response_time_ms = (time.time() - start_time) * 1000
+        return EndpointConnectivityResult(
+            success=False,
+            error_message=f"Unexpected error: {type(e).__name__}: {str(e)}",
+            response_time_ms=response_time_ms,
+        )
+
+    finally:
+        if client:
+            await client.aclose()
+
+
+async def check_metrics_endpoints(
+    endpoints: List[Dict[str, Any]],
+    timeout_seconds: float = 30.0,
+) -> Dict[str, EndpointConnectivityResult]:
+    """
+    Check connectivity to multiple metrics endpoints concurrently.
+
+    This function tests multiple endpoints in parallel and returns a dictionary
+    of results keyed by endpoint name. Useful for testing multiple services
+    (e.g., pbx-web and whisper-stt) simultaneously.
+
+    Args:
+        endpoints: List of endpoint dictionaries with keys:
+            - name: Unique identifier for the endpoint
+            - url: The endpoint URL to test
+            - method: HTTP method (default: "GET")
+            - headers: Optional HTTP headers
+            - expected_status_codes: Optional list of acceptable status codes
+        timeout_seconds: Maximum time to wait for each response
+
+    Returns:
+        Dictionary mapping endpoint names to EndpointConnectivityResult objects
+
+    Examples:
+        >>> endpoints = [
+        ...     {
+        ...         "name": "prometheus",
+        ...         "url": "http://localhost:9090/api/v1/query?query=up"
+        ...     },
+        ...     {
+        ...         "name": "pbx-web",
+        ...         "url": "http://localhost:9090/api/v1/query?query=up{namespace='pbx-web'}"
+        ...     }
+        ... ]
+        >>> results = await check_metrics_endpoints(endpoints)
+        >>> for name, result in results.items():
+        ...     print(f"{name}: {'OK' if result.success else 'FAILED'}")
+    """
+    import asyncio
+
+    async def check_single(endpoint: Dict[str, Any]) -> tuple[str, EndpointConnectivityResult]:
+        name = endpoint.get("name", "unknown")
+        url = endpoint.get("url")
+
+        if not url:
+            return name, EndpointConnectivityResult(
+                success=False,
+                error_message="Missing URL in endpoint configuration"
+            )
+
+        result = await check_endpoint_connectivity(
+            endpoint_url=url,
+            timeout_seconds=timeout_seconds,
+            method=endpoint.get("method", "GET"),
+            headers=endpoint.get("headers"),
+            expected_status_codes=endpoint.get("expected_status_codes"),
+            verify_ssl=endpoint.get("verify_ssl", True),
+        )
+
+        return name, result
+
+    # Run all checks concurrently
+    tasks = [check_single(endpoint) for endpoint in endpoints]
+    results_list = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Convert to dictionary
+    results = {}
+    for item in results_list:
+        if isinstance(item, Exception):
+            logger.error(f"Endpoint check failed with exception: {item}")
+            continue
+
+        name, result = item
+        results[name] = result
+
+    return results
+
+
+def check_endpoint_connectivity_sync(
+    endpoint_url: str,
+    timeout_seconds: float = 30.0,
+    method: str = "GET",
+    headers: Optional[Dict[str, str]] = None,
+    expected_status_codes: Optional[List[int]] = None,
+    verify_ssl: bool = True,
+) -> EndpointConnectivityResult:
+    """
+    Synchronous wrapper for checking endpoint connectivity.
+
+    This function provides a synchronous interface to the async
+    check_endpoint_connectivity function. Use this in non-async contexts
+    or when running from synchronous test code.
+
+    Args:
+        endpoint_url: The URL to test
+        timeout_seconds: Maximum time to wait for response (default: 30.0)
+        method: HTTP method to use (default: "GET")
+        headers: Optional HTTP headers
+        expected_status_codes: List of acceptable status codes (default: [200])
+        verify_ssl: Whether to verify SSL certificates (default: True)
+
+    Returns:
+        EndpointConnectivityResult object
+
+    Examples:
+        >>> result = check_endpoint_connectivity_sync(
+        ...     "http://localhost:9090/api/v1/query?query=up"
+        ... )
+        >>> print(f"Success: {result.success}, Status: {result.status_code}")
+    """
+    import asyncio
+
+    return asyncio.run(check_endpoint_connectivity(
+        endpoint_url=endpoint_url,
+        timeout_seconds=timeout_seconds,
+        method=method,
+        headers=headers,
+        expected_status_codes=expected_status_codes,
+        verify_ssl=verify_ssl,
+    ))
+
+
 # ---------------------------------------------------------------------------
 # Database cleanup helpers
 # ---------------------------------------------------------------------------

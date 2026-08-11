@@ -275,7 +275,8 @@ class TestGitOpsCommitStep:
         )
 
         assert result.success is False
-        assert "not on main branch" in result.error.lower()
+        assert "not on expected branch" in result.error.lower()
+        assert "main" in result.error.lower()
 
     @patch("subprocess.run")
     @pytest.mark.asyncio
@@ -452,23 +453,21 @@ class TestGitOpsCommitStep:
         """Successful commit and push operation."""
         step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
 
-        # Mock git commands
-        mock_run.side_effect = [
-            # git config user.email
-            Mock(returncode=0, stdout="", stderr=""),
-            # git config user.name
-            Mock(returncode=0, stdout="", stderr=""),
-            # git status (has changes)
-            Mock(returncode=0, stdout=" M k8s/test-cluster/deployment.yaml", stderr=""),
-            # git add
-            Mock(returncode=0, stdout="", stderr=""),
-            # git commit
-            Mock(returncode=0, stdout="", stderr=""),
-            # git rev-parse
-            Mock(returncode=0, stdout="abc123def456\n", stderr=""),
-            # git push
-            Mock(returncode=0, stdout="", stderr=""),
-        ]
+        call_count = []
+
+        def mock_subprocess(*args, **kwargs):
+            cmd = args[0] if args else []
+            call_count.append(cmd)
+            # git status --porcelain - has changes
+            if "status" in cmd and "--porcelain" in cmd:
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=" M k8s/test-cluster/deployment.yaml\n", stderr="")
+            # git rev-parse HEAD - return commit SHA
+            if "rev-parse" in cmd and "HEAD" in cmd:
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="abc123def456\n", stderr="")
+            # All other git commands succeed
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_subprocess
 
         # Mock the validation method to bypass git repo check
         with patch.object(step, '_validate_declarative_config_repo'):
@@ -493,15 +492,22 @@ class TestGitOpsCommitStep:
         call_count = [0]
 
         def mock_git_command(*args, **kwargs):
+            cmd = args[0] if args else []
             call_count[0] += 1
             # First push attempt fails with network error
-            if "push" in args and call_count[0] == 7:  # 7th call is the push
-                return Mock(returncode=1, stdout="", stderr="Connection timeout\n")
+            if "push" in cmd and call_count[0] == 7:  # 7th call is the push
+                return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="Connection timeout\n")
             # Second push attempt succeeds
-            elif "push" in args and call_count[0] == 8:  # Retry happens immediately after
-                return Mock(returncode=0, stdout="", stderr="")
+            elif "push" in cmd and call_count[0] == 8:  # Retry happens immediately after
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+            # git status --porcelain - has changes
+            if "status" in cmd and "--porcelain" in cmd:
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=" M k8s/test-cluster/deployment.yaml\n", stderr="")
+            # git rev-parse HEAD - return commit SHA
+            if "rev-parse" in cmd and "HEAD" in cmd:
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="abc123def456\n", stderr="")
             # All other commands succeed
-            return Mock(returncode=0, stdout="", stderr="")
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
 
         mock_run.side_effect = mock_git_command
 
@@ -906,3 +912,515 @@ class TestGitOpsCommitStepIntegration:
         diff = step._diff_manifests(manifest, manifest)
 
         assert diff == "No changes detected"
+
+
+class TestBranchValidationScenarios:
+    """Comprehensive tests for branch validation scenarios."""
+
+    @pytest.mark.asyncio
+    async def test_branch_validation_fails_on_non_main_branch(self, mock_declarative_config_dir, mock_deployment_manifest):
+        """Branch validation correctly fails when on a non-main branch."""
+        from src.action.steps.git_validation import validate_main_branch, GitStateError
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock being on feature branch
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="feature-branch\n", stderr="")
+
+            with pytest.raises(GitStateError) as exc_info:
+                validate_main_branch(mock_declarative_config_dir)
+
+            # Verify error message is clear and actionable
+            error_message = str(exc_info.value)
+            assert "Not on expected branch 'main'" in error_message
+            assert "currently on 'feature-branch'" in error_message
+            assert "Please switch to main branch first" in error_message
+            assert "[branch]" in error_message  # Validation type prefix
+            assert "Details:" in error_message  # Structured details
+
+    @pytest.mark.asyncio
+    async def test_branch_validation_passes_on_main_branch(self, mock_declarative_config_dir, mock_deployment_manifest):
+        """Branch validation correctly passes when on main branch."""
+        from src.action.steps.git_validation import validate_main_branch
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock being on main branch
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="main\n", stderr="")
+
+            result = validate_main_branch(mock_declarative_config_dir)
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_branch_validation_custom_branch_name(self, mock_declarative_config_dir):
+        """Branch validation works with custom branch name."""
+        from src.action.steps.git_validation import validate_main_branch
+
+        # Mock being on develop branch
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="develop\n", stderr="")
+
+            result = validate_main_branch(mock_declarative_config_dir, expected_branch="develop")
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_branch_validation_error_on_detached_head(self, mock_declarative_config_dir):
+        """Branch validation handles detached HEAD state."""
+        from src.action.steps.git_validation import validate_main_branch, GitStateError
+
+        # Mock detached HEAD (empty output from branch --show-current)
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
+
+            with pytest.raises(GitStateError) as exc_info:
+                validate_main_branch(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+            assert "Not on expected branch" in error_message
+
+
+class TestUncommittedChangesScenarios:
+    """Comprehensive tests for uncommitted changes detection scenarios."""
+
+    @pytest.mark.asyncio
+    async def test_uncommitted_changes_with_staged_files(self, mock_declarative_config_dir):
+        """Uncommitted changes detection correctly identifies staged files."""
+        from src.action.steps.git_validation import check_uncommitted_changes, GitStateError
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock git status output with staged changes
+        # "M " means modified in the working tree and staged for commit
+        staged_output = "M  k8s/test-cluster/deployment.yaml\n"
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout=staged_output, stderr="")
+
+            with pytest.raises(GitStateError) as exc_info:
+                check_uncommitted_changes(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+            assert "uncommitted changes" in error_message.lower()
+            assert "staged change(s)" in error_message.lower()
+            assert "commit or stash" in error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_uncommitted_changes_with_unstaged_files(self, mock_declarative_config_dir):
+        """Uncommitted changes detection correctly identifies unstaged files."""
+        from src.action.steps.git_validation import check_uncommitted_changes, GitStateError
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock git status output with unstaged changes
+        # " M" means modified in the working tree but not staged
+        unstaged_output = " M k8s/test-cluster/deployment.yaml\n"
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout=unstaged_output, stderr="")
+
+            with pytest.raises(GitStateError) as exc_info:
+                check_uncommitted_changes(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+            assert "uncommitted changes" in error_message.lower()
+            assert "unstaged change(s)" in error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_uncommitted_changes_with_mixed_staged_unstaged(self, mock_declarative_config_dir):
+        """Uncommitted changes detection handles mixed staged and unstaged files."""
+        from src.action.steps.git_validation import check_uncommitted_changes, GitStateError
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock git status with both staged and unstaged changes
+        mixed_output = """M  k8s/test-cluster/deployment.yaml
+ M k8s/test-cluster/service.yaml
+"""
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout=mixed_output, stderr="")
+
+            with pytest.raises(GitStateError) as exc_info:
+                check_uncommitted_changes(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+            assert "uncommitted changes" in error_message.lower()
+            # Should mention both types
+            assert "unstaged" in error_message.lower() or "staged" in error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_uncommitted_changes_with_new_files(self, mock_declarative_config_dir):
+        """Uncommitted changes detection correctly identifies new untracked files."""
+        from src.action.steps.git_validation import check_uncommitted_changes, GitStateError
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock git status with untracked files (?? prefix)
+        untracked_output = "?? k8s/test-cluster/new-file.yaml\n"
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout=untracked_output, stderr="")
+
+            with pytest.raises(GitStateError) as exc_info:
+                check_uncommitted_changes(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+            assert "uncommitted changes" in error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_validation_passes_on_clean_working_tree(self, mock_declarative_config_dir):
+        """Validation correctly passes when working tree is clean."""
+        from src.action.steps.git_validation import check_uncommitted_changes
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock clean working tree (empty git status --porcelain output)
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
+
+            result = check_uncommitted_changes(mock_declarative_config_dir)
+            assert result is True
+
+
+class TestPreflightValidationScenarios:
+    """Comprehensive tests for pre-flight validation scenarios."""
+
+    @pytest.mark.asyncio
+    async def test_preflight_validation_all_checks_pass(self, mock_declarative_config_dir):
+        """Preflight validation passes when all checks succeed."""
+        from src.action.steps.git_validation import PreflightGitValidation
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock all git commands to succeed with proper argument matching
+        with patch("subprocess.run") as mock_run:
+            def mock_git_command(command, *args, **kwargs):
+                # Branch check
+                if "branch" in command and "--show-current" in command:
+                    return Mock(returncode=0, stdout="main\n", stderr="")
+                # Status check (clean)
+                elif "status" in command and "--porcelain" in command:
+                    return Mock(returncode=0, stdout="", stderr="")
+                # Remote check
+                elif "remote" in command and "-v" in command:
+                    return Mock(returncode=0, stdout="origin\tgit@github.com:test/repo.git (fetch)\n", stderr="")
+                # All other commands
+                else:
+                    return Mock(returncode=0, stdout="", stderr="")
+
+            mock_run.side_effect = mock_git_command
+
+            validator = PreflightGitValidation(
+                repo_path=mock_declarative_config_dir,
+                expected_branch="main",
+                expected_remote_pattern=None,
+                timeout=10,
+                strict=True,
+            )
+
+            result = validator.validate_all()
+            assert result is True
+            assert len(validator.errors) == 0
+
+    @pytest.mark.asyncio
+    async def test_preflight_validation_fails_on_branch_mismatch(self, mock_declarative_config_dir):
+        """Preflight validation fails immediately on branch check failure."""
+        from src.action.steps.git_validation import PreflightGitValidation, GitStateError
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock branch check returning wrong branch
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="feature-branch\n", stderr="")
+
+            validator = PreflightGitValidation(
+                repo_path=mock_declarative_config_dir,
+                expected_branch="main",
+                strict=True,
+            )
+
+            with pytest.raises(GitStateError) as exc_info:
+                validator.validate_all()
+
+            error_message = str(exc_info.value)
+            assert "Not on expected branch" in error_message
+
+    @pytest.mark.asyncio
+    async def test_preflight_validation_strict_mode_stops_on_first_error(self, mock_declarative_config_dir):
+        """Strict mode validation stops on first error and raises."""
+        from src.action.steps.git_validation import PreflightGitValidation, GitStateError
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock branch check to fail
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="wrong-branch\n", stderr="")
+
+            validator = PreflightGitValidation(
+                repo_path=mock_declarative_config_dir,
+                expected_branch="main",
+                strict=True,  # Stop on first error
+            )
+
+            with pytest.raises(GitStateError):
+                validator.validate_all()
+
+            # Should have exactly one error (the branch check)
+            assert len(validator.errors) == 1
+
+    @pytest.mark.asyncio
+    async def test_preflight_validation_non_strict_mode_collects_all_errors(self, mock_declarative_config_dir):
+        """Non-strict mode collects all validation errors without raising."""
+        from src.action.steps.git_validation import PreflightGitValidation
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock branch check to return wrong branch
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="wrong-branch\n", stderr="")
+
+            validator = PreflightGitValidation(
+                repo_path=mock_declarative_config_dir,
+                expected_branch="main",
+                strict=False,  # Continue after errors
+            )
+
+            # Should not raise, just collect errors
+            result = validator.validate_all()
+            assert result is False
+            assert len(validator.errors) > 0
+
+    @pytest.mark.asyncio
+    async def test_preflight_validation_summary_includes_all_results(self, mock_declarative_config_dir):
+        """Validation summary includes all check results."""
+        from src.action.steps.git_validation import PreflightGitValidation
+
+        step = GitOpsCommitStep(declarative_config_path=str(mock_declarative_config_dir))
+
+        # Mock git commands to succeed
+        with patch("subprocess.run") as mock_run:
+            def mock_git_command(*args, **kwargs):
+                if "branch" in args and "--show-current" in args:
+                    return Mock(returncode=0, stdout="main\n", stderr="")
+                elif "status" in args and "--porcelain" in args:
+                    return Mock(returncode=0, stdout="", stderr="")
+                return Mock(returncode=0, stdout="", stderr="")
+
+            mock_run.side_effect = mock_git_command
+
+            validator = PreflightGitValidation(
+                repo_path=mock_declarative_config_dir,
+                expected_branch="main",
+                strict=False,
+            )
+
+            validator.validate_all()
+            summary = validator.get_summary()
+
+            assert summary["total_checks"] > 0
+            assert summary["passed"] >= 0
+            assert summary["failed"] >= 0
+            assert "results" in summary
+            assert len(summary["results"]) == summary["total_checks"]
+
+
+class TestValidationErrorMessages:
+    """Test validation error messages are clear and actionable."""
+
+    @pytest.mark.asyncio
+    async def test_branch_error_message_is_clear_and_actionable(self, mock_declarative_config_dir):
+        """Branch validation error message provides clear guidance."""
+        from src.action.steps.git_validation import validate_main_branch, GitStateError
+
+        # Mock being on wrong branch
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="feature-branch\n", stderr="")
+
+            with pytest.raises(GitStateError) as exc_info:
+                validate_main_branch(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+
+            # Error should include:
+            # 1. What's wrong
+            assert "Not on expected branch 'main'" in error_message
+            # 2. Current state
+            assert "currently on 'feature-branch'" in error_message
+            # 3. How to fix it
+            assert "Please switch to main branch first" in error_message
+            # 4. Structured details
+            assert "Details:" in error_message
+            assert "expected=main" in error_message
+            assert "actual=feature-branch" in error_message
+
+    @pytest.mark.asyncio
+    async def test_uncommitted_changes_error_message_is_detailed(self, mock_declarative_config_dir):
+        """Uncommitted changes error message provides file details."""
+        from src.action.steps.git_validation import check_uncommitted_changes, GitStateError
+
+        # Mock git status with changes
+        changes_output = """M  k8s/test-cluster/deployment.yaml
+ M k8s/test-cluster/service.yaml
+?? k8s/test-cluster/new-file.yaml
+"""
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout=changes_output, stderr="")
+
+            with pytest.raises(GitStateError) as exc_info:
+                check_uncommitted_changes(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+
+            # Error should mention the count of changes
+            assert "uncommitted changes" in error_message.lower()
+            # Should show the actual changes
+            assert "deployment.yaml" in error_message or "service.yaml" in error_message
+            # Should provide actionable guidance
+            assert "commit or stash" in error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_git_conflict_error_message_is_structured(self):
+        """Git conflict error provides structured information."""
+        from src.action.steps.git_validation import GitConflictError
+
+        conflict = GitConflictError(
+            "Merge conflict detected",
+            conflict_files=["file1.yaml", "file2.yaml"],
+            conflict_type="merge",
+            details={"operation": "push"}
+        )
+
+        error_message = str(conflict)
+
+        assert "Merge conflict detected" in error_message
+        assert "Conflicting files" in error_message
+        assert "file1.yaml" in error_message
+        assert "file2.yaml" in error_message
+        assert "Details:" in error_message
+
+    @pytest.mark.asyncio
+    async def test_git_state_error_includes_validation_context(self, mock_declarative_config_dir):
+        """GitStateError includes validation type and repository context."""
+        from src.action.steps.git_validation import GitStateError
+
+        error = GitStateError(
+            "Test validation failed",
+            validation_type="test_validation",
+            details={"test_param": "test_value"},
+            repo_path=mock_declarative_config_dir
+        )
+
+        error_message = str(error)
+
+        assert "[test_validation]" in error_message
+        assert "Test validation failed" in error_message
+        assert "repository:" in error_message
+        assert "Details:" in error_message
+        assert "test_param=test_value" in error_message
+
+
+class TestValidationEdgeCases:
+    """Test edge cases and unusual scenarios."""
+
+    @pytest.mark.asyncio
+    async def test_empty_repository_validation(self, tmp_path):
+        """Validation handles empty/new repository."""
+        from src.action.steps.git_validation import check_git_repository, GitStateError
+
+        # Create empty directory
+        empty_dir = tmp_path / "empty_repo"
+        empty_dir.mkdir()
+
+        with pytest.raises(GitStateError) as exc_info:
+            check_git_repository(empty_dir)
+
+        error_message = str(exc_info.value)
+        assert "Not a git repository" in error_message
+
+    @pytest.mark.asyncio
+    async def test_detached_head_validation(self, mock_declarative_config_dir):
+        """Validation handles detached HEAD state."""
+        from src.action.steps.git_validation import check_current_branch, GitStateError
+
+        # Mock detached HEAD (empty output from branch --show-current)
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
+
+            with pytest.raises(GitStateError) as exc_info:
+                check_current_branch(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+            assert "Not on expected branch" in error_message or "Failed to determine current branch" in error_message
+
+    @pytest.mark.asyncio
+    async def test_network_timeout_during_validation(self, mock_declarative_config_dir):
+        """Validation handles network timeouts gracefully."""
+        from src.action.steps.git_validation import check_current_branch, GitNetworkError
+        import subprocess
+
+        # Mock network timeout
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired("git", timeout=10)
+
+            with pytest.raises(GitNetworkError) as exc_info:
+                check_current_branch(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+            assert "timed out" in error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_git_command_not_found(self, mock_declarative_config_dir):
+        """Validation handles missing git command."""
+        from src.action.steps.git_validation import check_current_branch, GitStateError
+
+        # Mock git command not found
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("git not found")
+
+            with pytest.raises(GitStateError) as exc_info:
+                check_current_branch(mock_declarative_config_dir)
+
+            error_message = str(exc_info.value)
+            assert "Git command not found" in error_message
+
+    @pytest.mark.asyncio
+    async def test_merge_conflict_state_detection(self, tmp_path):
+        """Detection of merge conflict state works correctly."""
+        from src.action.steps.git_validation import detect_merge_conflicts
+
+        # Create a git repo with merge conflict markers
+        repo = tmp_path / "conflict_repo"
+        repo.mkdir()
+        git_dir = repo / ".git"
+        git_dir.mkdir()
+
+        # Create MERGE_HEAD to indicate merge state
+        merge_head = git_dir / "MERGE_HEAD"
+        merge_head.write_text("abc123\n")
+
+        # Mock git grep to find conflict markers
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                returncode=0,
+                stdout="k8s/test-cluster/deployment.yaml\n",
+                stderr=""
+            )
+
+            conflicts = detect_merge_conflicts(repo)
+            assert len(conflicts) > 0
+            assert "deployment.yaml" in conflicts[0]
+
+    @pytest.mark.asyncio
+    async def test_no_merge_conflict_when_clean(self, mock_declarative_config_dir):
+        """Conflict detection returns empty list when repository is clean."""
+        from src.action.steps.git_validation import detect_merge_conflicts
+
+        # Mock no merge state files
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
+
+            conflicts = detect_merge_conflicts(mock_declarative_config_dir)
+            assert len(conflicts) == 0

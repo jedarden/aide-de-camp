@@ -437,6 +437,63 @@ class TestTransientErrorClassifier:
         with pytest.raises(httpx.HTTPStatusError):
             await forbidden_operation()
 
+    @pytest.mark.asyncio
+    async def test_retries_git_network_error(self):
+        """Test that GitNetworkError is retried because is_transient returns True."""
+        from src.action.steps.git_validation import GitNetworkError
+
+        call_count = 0
+
+        @retry_with_exponential_backoff(max_retries=2, base_delay=0.01, max_delay=0.1)
+        async def git_operation():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise GitNetworkError("git fetch: connection timeout")
+            return "success"
+
+        result = await git_operation()
+        assert result == "success"
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_no_retry_git_authentication_error(self):
+        """Test that GitAuthenticationError is not retried because is_transient returns False."""
+        from src.action.steps.git_validation import GitAuthenticationError
+
+        call_count = 0
+
+        @retry_with_exponential_backoff(max_retries=3, base_delay=0.01, max_delay=0.1)
+        async def git_auth_operation():
+            nonlocal call_count
+            call_count += 1
+            raise GitAuthenticationError("git push: authentication failed")
+
+        with pytest.raises(GitAuthenticationError):
+            await git_auth_operation()
+
+        # Should only be called once (no retries for auth errors)
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_no_retry_git_conflict_error(self):
+        """Test that GitConflictError is not retried because is_transient returns False."""
+        from src.action.steps.git_validation import GitConflictError
+
+        call_count = 0
+
+        @retry_with_exponential_backoff(max_retries=3, base_delay=0.01, max_delay=0.1)
+        async def git_merge_operation():
+            nonlocal call_count
+            call_count += 1
+            raise GitConflictError("git merge: conflict in main.py")
+
+        with pytest.raises(GitConflictError):
+            await git_merge_operation()
+
+        # Should only be called once (no retries for conflict errors)
+        assert call_count == 1
+
 
 class TestRealWorldScenarios:
     """Test retry decorator with realistic scenarios."""
@@ -511,3 +568,447 @@ class TestRealWorldScenarios:
         result = await db_query()
         assert result == {"rows": 10}
         assert call_count == 3
+
+
+class TestIsTransientErrorPatternMatching:
+    """Test is_transient_error function with pattern matching."""
+
+    def test_transient_error_pattern_timeout(self):
+        """Test that timeout patterns are detected as transient."""
+        from src.utils.git_retry import is_transient_error
+
+        error = TimeoutError("Connection timeout")
+        assert is_transient_error(error) is True
+
+        error = Exception("Operation timed out")
+        assert is_transient_error(error) is True
+
+    def test_transient_error_pattern_connection(self):
+        """Test that connection patterns are detected as transient."""
+        from src.utils.git_retry import is_transient_error
+
+        error = Exception("Connection refused")
+        assert is_transient_error(error) is True
+
+        error = Exception("Network unreachable")
+        assert is_transient_error(error) is True
+
+        error = Exception("Connection reset by peer")
+        assert is_transient_error(error) is True
+
+    def test_transient_error_pattern_dns(self):
+        """Test that DNS patterns are detected as transient."""
+        from src.utils.git_retry import is_transient_error
+
+        error = Exception("DNS resolution failed")
+        assert is_transient_error(error) is True
+
+        error = Exception("Temporary DNS error")
+        assert is_transient_error(error) is True
+
+    def test_transient_error_subprocess_timeout(self):
+        """Test that subprocess.TimeoutExpired is detected as transient."""
+        from src.utils.git_retry import is_transient_error
+        import subprocess
+
+        error = subprocess.TimeoutExpired("git", 5)
+        assert is_transient_error(error) is True
+
+    def test_transient_error_subprocess_with_transient_stderr(self):
+        """Test that CalledProcessError with transient stderr is detected."""
+        from src.utils.git_retry import is_transient_error
+        import subprocess
+
+        error = subprocess.CalledProcessError(1, "git", stderr="Connection timed out")
+        assert is_transient_error(error) is True
+
+    def test_non_transient_error_patterns(self):
+        """Test that non-transient patterns are not detected as transient."""
+        from src.utils.git_retry import is_transient_error
+
+        error = Exception("Permission denied")
+        assert is_transient_error(error) is False
+
+        error = Exception("Invalid argument")
+        assert is_transient_error(error) is False
+
+    def test_git_network_error_is_transient(self):
+        """Test that GitNetworkError is always detected as transient."""
+        from src.utils.git_retry import is_transient_error
+        from src.action.steps.git_validation import GitNetworkError
+
+        error = GitNetworkError("Network error")
+        assert is_transient_error(error) is True
+
+
+class TestRetryOnTransientErrorDecorator:
+    """Test retry_on_transient_error decorator."""
+
+    def test_retry_on_transient_error_success_after_retries(self):
+        """Test that retry succeeds after transient errors."""
+        from src.utils.git_retry import retry_on_transient_error
+
+        call_count = 0
+
+        @retry_on_transient_error(max_retries=3, initial_delay=0.01)
+        def flaky_operation():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise Exception("Connection timeout")
+            return "success"
+
+        result = flaky_operation()
+        assert result == "success"
+        assert call_count == 3
+
+    def test_retry_on_transient_error_exhausted(self):
+        """Test that retry fails after max retries exhausted."""
+        from src.utils.git_retry import retry_on_transient_error
+
+        call_count = 0
+
+        @retry_on_transient_error(max_retries=2, initial_delay=0.01)
+        def failing_operation():
+            nonlocal call_count
+            call_count += 1
+            raise Exception("Connection timeout")
+
+        with pytest.raises(Exception, match="Connection timeout"):
+            failing_operation()
+
+        assert call_count == 3  # Initial + 2 retries
+
+    def test_retry_on_transient_error_no_retry_on_permanent(self):
+        """Test that permanent errors are not retried."""
+        from src.utils.git_retry import retry_on_transient_error
+
+        call_count = 0
+
+        @retry_on_transient_error(max_retries=3, initial_delay=0.01)
+        def permanent_error_operation():
+            nonlocal call_count
+            call_count += 1
+            raise Exception("Permission denied")
+
+        with pytest.raises(Exception, match="Permission denied"):
+            permanent_error_operation()
+
+        # Should only be called once (no retries for permanent errors)
+        assert call_count == 1
+
+    def test_retry_on_transient_error_with_specific_exception_types(self):
+        """Test retry with specific exception types."""
+        from src.utils.git_retry import retry_on_transient_error
+
+        call_count = 0
+
+        @retry_on_transient_error(
+            max_retries=3,
+            retry_on=(ValueError,),
+            initial_delay=0.01
+        )
+        def selective_operation():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ValueError("Retry this")
+            return "success"
+
+        result = selective_operation()
+        assert result == "success"
+        assert call_count == 2
+
+    def test_retry_on_transient_error_exponential_backoff(self):
+        """Test exponential backoff with custom backoff_factor."""
+        from src.utils.git_retry import retry_on_transient_error
+        import time
+
+        call_times = []
+
+        @retry_on_transient_error(
+            max_retries=3,
+            backoff_factor=2.0,
+            initial_delay=0.05
+        )
+        def timed_operation():
+            call_times.append(time.time())
+            raise Exception("Connection timeout")
+
+        with pytest.raises(Exception):
+            timed_operation()
+
+        # Verify exponential backoff timing
+        delays = [call_times[i] - call_times[i-1] for i in range(1, len(call_times))]
+        # With backoff_factor=2.0: 0.05, 0.1, 0.2
+        assert delays[0] >= 0.04  # ~0.05s
+        assert delays[1] >= 0.08  # ~0.1s
+
+    def test_retry_on_transient_error_no_retry_git_auth_error(self):
+        """Test that GitAuthenticationError is not retried."""
+        from src.utils.git_retry import retry_on_transient_error
+        from src.action.steps.git_validation import GitAuthenticationError
+
+        call_count = 0
+
+        @retry_on_transient_error(max_retries=3, initial_delay=0.01)
+        def auth_error_operation():
+            nonlocal call_count
+            call_count += 1
+            raise GitAuthenticationError("Authentication failed")
+
+        with pytest.raises(GitAuthenticationError):
+            auth_error_operation()
+
+        # Should only be called once (no retries for auth errors)
+        assert call_count == 1
+
+    def test_retry_on_transient_error_no_retry_git_conflict_error(self):
+        """Test that GitConflictError is not retried."""
+        from src.utils.git_retry import retry_on_transient_error
+        from src.action.steps.git_validation import GitConflictError
+
+        call_count = 0
+
+        @retry_on_transient_error(max_retries=3, initial_delay=0.01)
+        def conflict_error_operation():
+            nonlocal call_count
+            call_count += 1
+            raise GitConflictError("Merge conflict")
+
+        with pytest.raises(GitConflictError):
+            conflict_error_operation()
+
+        # Should only be called once (no retries for conflict errors)
+        assert call_count == 1
+
+
+class TestRetryOnTransientErrorAsync:
+    """Test retry_on_transient_error_async decorator."""
+
+    @pytest.mark.asyncio
+    async def test_async_retry_on_transient_error_success(self):
+        """Test async retry succeeds after transient errors."""
+        from src.utils.git_retry import retry_on_transient_error_async
+
+        call_count = 0
+
+        @retry_on_transient_error_async(max_retries=3, initial_delay=0.01)
+        async def flaky_operation():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise Exception("Connection timeout")
+            return "success"
+
+        result = await flaky_operation()
+        assert result == "success"
+        assert call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_async_retry_exhausted(self):
+        """Test async retry fails after max retries exhausted."""
+        from src.utils.git_retry import retry_on_transient_error_async
+
+        call_count = 0
+
+        @retry_on_transient_error_async(max_retries=2, initial_delay=0.01)
+        async def failing_operation():
+            nonlocal call_count
+            call_count += 1
+            raise Exception("Connection timeout")
+
+        with pytest.raises(Exception, match="Connection timeout"):
+            await failing_operation()
+
+        assert call_count == 3  # Initial + 2 retries
+
+    @pytest.mark.asyncio
+    async def test_async_retry_no_retry_on_permanent(self):
+        """Test async retry doesn't retry permanent errors."""
+        from src.utils.git_retry import retry_on_transient_error_async
+
+        call_count = 0
+
+        @retry_on_transient_error_async(max_retries=3, initial_delay=0.01)
+        async def permanent_error_operation():
+            nonlocal call_count
+            call_count += 1
+            raise Exception("Permission denied")
+
+        with pytest.raises(Exception, match="Permission denied"):
+            await permanent_error_operation()
+
+        # Should only be called once (no retries for permanent errors)
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_async_retry_exponential_backoff(self):
+        """Test async exponential backoff with mocked sleep."""
+        from src.utils.git_retry import retry_on_transient_error_async
+        from unittest.mock import patch
+
+        sleep_times = []
+
+        async def mock_sleep(duration):
+            sleep_times.append(duration)
+
+        @retry_on_transient_error_async(
+            max_retries=3,
+            backoff_factor=2.0,
+            initial_delay=0.1
+        )
+        async def failing_operation():
+            raise Exception("Connection timeout")
+
+        with patch('asyncio.sleep', side_effect=mock_sleep):
+            with pytest.raises(Exception):
+                await failing_operation()
+
+        # Should have slept 3 times (3 retries)
+        assert len(sleep_times) == 3
+
+        # Exponential backoff: 0.1, 0.2, 0.4 (backoff_factor=2.0)
+        assert sleep_times[0] == 0.1
+        assert sleep_times[1] == 0.2
+        assert sleep_times[2] == 0.4
+
+
+class TestRetryTracker:
+    """Test RetryTracker class for statistics tracking."""
+
+    def test_retry_tracker_initialization(self):
+        """Test RetryTracker initializes with zero values."""
+        from src.utils.git_retry import RetryTracker
+
+        tracker = RetryTracker()
+
+        assert tracker.total_attempts == 0
+        assert tracker.total_retries == 0
+        assert tracker.failed_operations == 0
+        assert tracker.successful_operations == 0
+        assert tracker.operation_history == []
+
+    def test_retry_tracker_record_attempt_success(self):
+        """Test recording a successful operation attempt."""
+        from src.utils.git_retry import RetryTracker
+
+        tracker = RetryTracker()
+        tracker.record_attempt("git_push", attempt=0, success=True)
+
+        assert tracker.total_attempts == 1
+        assert tracker.total_retries == 0
+        assert tracker.successful_operations == 1
+        assert tracker.failed_operations == 0
+        assert len(tracker.operation_history) == 1
+
+        history = tracker.operation_history[0]
+        assert history["operation"] == "git_push"
+        assert history["attempt"] == 0
+        assert history["success"] is True
+        assert history["error"] is None
+
+    def test_retry_tracker_record_retry(self):
+        """Test recording a retry attempt."""
+        from src.utils.git_retry import RetryTracker
+
+        tracker = RetryTracker()
+        tracker.record_attempt("git_push", attempt=1, success=False, error="Connection timeout")
+
+        assert tracker.total_attempts == 1
+        assert tracker.total_retries == 1  # attempt > 0 counts as retry
+        assert tracker.successful_operations == 0
+        assert tracker.failed_operations == 1
+
+        history = tracker.operation_history[0]
+        assert history["attempt"] == 1
+        assert history["success"] is False
+        assert history["error"] == "Connection timeout"
+
+    def test_retry_tracker_multiple_attempts(self):
+        """Test recording multiple attempts."""
+        from src.utils.git_retry import RetryTracker
+
+        tracker = RetryTracker()
+        tracker.record_attempt("git_push", attempt=0, success=False, error="Network error")
+        tracker.record_attempt("git_push", attempt=1, success=False, error="Network error")
+        tracker.record_attempt("git_push", attempt=2, success=True)
+
+        assert tracker.total_attempts == 3
+        assert tracker.total_retries == 2  # attempts 1 and 2
+        assert tracker.successful_operations == 1
+        assert tracker.failed_operations == 2
+        assert len(tracker.operation_history) == 3
+
+    def test_retry_tracker_get_statistics(self):
+        """Test getting retry statistics."""
+        from src.utils.git_retry import RetryTracker
+
+        tracker = RetryTracker()
+        tracker.record_attempt("git_push", attempt=0, success=False, error="Network error")
+        tracker.record_attempt("git_push", attempt=1, success=False, error="Network error")
+        tracker.record_attempt("git_push", attempt=2, success=True)
+
+        stats = tracker.get_statistics()
+
+        assert stats["total_attempts"] == 3
+        assert stats["total_retries"] == 2
+        assert stats["successful_operations"] == 1
+        assert stats["failed_operations"] == 2
+        assert stats["retry_rate"] == 2/3
+
+    def test_retry_tracker_zero_attempts_statistics(self):
+        """Test statistics with zero attempts."""
+        from src.utils.git_retry import RetryTracker
+
+        tracker = RetryTracker()
+        stats = tracker.get_statistics()
+
+        assert stats["retry_rate"] == 0  # No division by zero
+
+    def test_retry_tracker_reset(self):
+        """Test resetting tracker statistics."""
+        from src.utils.git_retry import RetryTracker
+
+        tracker = RetryTracker()
+        tracker.record_attempt("git_push", attempt=0, success=True)
+        tracker.record_attempt("git_push", attempt=1, success=False, error="Network error")
+
+        tracker.reset()
+
+        assert tracker.total_attempts == 0
+        assert tracker.total_retries == 0
+        assert tracker.successful_operations == 0
+        assert tracker.failed_operations == 0
+        assert tracker.operation_history == []
+
+    def test_global_retry_tracker(self):
+        """Test global retry tracker instance."""
+        from src.utils.git_retry import get_retry_tracker, RetryTracker
+
+        tracker = get_retry_tracker()
+        assert isinstance(tracker, RetryTracker)
+
+        # Should return the same instance
+        tracker2 = get_retry_tracker()
+        assert tracker is tracker2
+
+    def test_retry_tracker_multiple_operations(self):
+        """Test tracking different operation types."""
+        from src.utils.git_retry import RetryTracker
+
+        tracker = RetryTracker()
+        tracker.record_attempt("git_push", attempt=0, success=True)
+        tracker.record_attempt("git_fetch", attempt=0, success=False, error="Network error")
+        tracker.record_attempt("git_clone", attempt=1, success=True)
+
+        assert tracker.total_attempts == 3
+        assert tracker.total_retries == 1
+        assert tracker.successful_operations == 2
+        assert tracker.failed_operations == 1
+
+        # Verify operation names are preserved
+        operations = [h["operation"] for h in tracker.operation_history]
+        assert "git_push" in operations
+        assert "git_fetch" in operations
+        assert "git_clone" in operations

@@ -24,14 +24,6 @@ from src.surface.router import SurfaceRouter
 from src.watcher.daemon import BeadWatcher
 
 
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
 @pytest.mark.asyncio
 async def test_bead_close_creates_result_and_sse(
     test_db_store,

@@ -21,6 +21,7 @@ from ..escalate.llm import get_zai_client, ModelClass
 from ..freeze import ensure_unfrozen
 from ..utils.atomic_write import atomic_write
 from ..utils.git_retry import retry_on_transient_error, get_retry_tracker
+from ..action.steps.gitops import GitOperationResult, GitOperationStatus
 
 
 logger = getLogger(__name__)
@@ -28,14 +29,38 @@ logger = getLogger(__name__)
 
 # Git subprocess utilities
 
-@dataclass
-class GitResult:
-    """Result of a git command execution."""
-    success: bool
-    stdout: str
-    stderr: str
-    returncode: int
-    timed_out: bool = False
+def _extract_commit_sha(stdout: str, command: str) -> str | None:
+    """
+    Extract commit SHA from git command output.
+
+    Args:
+        stdout: Command output to parse
+        command: Git command that was run (for context)
+
+    Returns:
+        Commit SHA if found, None otherwise
+    """
+    if not stdout:
+        return None
+
+    stripped = stdout.strip()
+
+    # For rev-parse commands, the entire output is the SHA
+    if "rev-parse" in command:
+        # Extract first word as SHA (handles short and long SHAs)
+        parts = stripped.split()
+        return parts[0] if parts else None
+
+    # For commit commands, extract SHA from "commit <sha>" message
+    if stripped.startswith("["):
+        # e.g., "[main 8f3a2b1] Commit message"
+        parts = stripped.split()
+        for i, part in enumerate(parts):
+            if part.startswith("[") and i + 1 < len(parts):
+                # Next part after branch is usually the SHA
+                return parts[i + 1]
+
+    return None
 
 
 def _execute_git_command_internal(
@@ -43,7 +68,7 @@ def _execute_git_command_internal(
     cwd: Path,
     timeout: int,
     check: bool
-) -> GitResult:
+) -> GitOperationResult:
     """
     Internal implementation of git command execution.
 
@@ -60,12 +85,23 @@ def _execute_git_command_internal(
         check=check,
         timeout=timeout
     )
-    return GitResult(
-        success=result.returncode == 0,
-        stdout=result.stdout,
-        stderr=result.stderr,
-        returncode=result.returncode,
-        timed_out=False
+
+    # Convert subprocess result to GitOperationResult
+    success = result.returncode == 0
+    command_str = ' '.join(['git'] + args)
+    commit_sha = _extract_commit_sha(result.stdout, command_str) if success else None
+
+    return GitOperationResult(
+        commit_sha=commit_sha,
+        branch=None,  # Branch info added by caller if needed
+        manifest_path=None,  # Manifest path added by caller if needed
+        status=GitOperationStatus.SUCCESS if success else GitOperationStatus.FAILED,
+        error=result.stderr if result.returncode != 0 else None,
+        details={
+            'stdout': result.stdout,
+            'returncode': result.returncode,
+            'command': command_str
+        }
     )
 
 
@@ -75,7 +111,7 @@ def _run_git_command_with_retry(
     cwd: Path,
     timeout: int,
     check: bool
-) -> GitResult:
+) -> GitOperationResult:
     """
     Run a git command with automatic retry on transient network failures.
 
@@ -94,7 +130,7 @@ def _run_git_command_with_retry(
         check: If True, raise exception on non-zero exit
 
     Returns:
-        GitResult with success status, stdout, stderr, returncode, and timeout flag
+        GitOperationResult with status, commit SHA, error details, and command output
 
     Raises:
         subprocess.TimeoutExpired: On command timeout (after retries)
@@ -120,7 +156,7 @@ def run_git_command(
     timeout: int = 10,
     check: bool = False,
     retry_on_failure: bool = True
-) -> GitResult:
+) -> GitOperationResult:
     """
     Run a git command via subprocess and return structured output.
 
@@ -132,61 +168,67 @@ def run_git_command(
         retry_on_failure: If True, retry on transient network failures (default: True)
 
     Returns:
-        GitResult with success status, stdout, stderr, returncode, and timeout flag
+        GitOperationResult with status, commit SHA, error details, and command output
     """
     if cwd is None:
         cwd = Path("/home/coding/aide-de-camp")
 
     retry_tracker = get_retry_tracker()
+    command_str = f"git {' '.join(args)}"
 
     try:
         if retry_on_failure:
             # Use retry logic for network operations
             result = _run_git_command_with_retry(args, cwd, timeout, check)
-            retry_tracker.record_attempt(f"git {' '.join(args)}", 0, result.success)
+            retry_tracker.record_attempt(command_str, 0, result.status == GitOperationStatus.SUCCESS)
             return result
         else:
             # Direct execution without retry
             result = _execute_git_command_internal(args, cwd, timeout, check)
-            retry_tracker.record_attempt(f"git {' '.join(args)}", 0, result.success)
+            retry_tracker.record_attempt(command_str, 0, result.status == GitOperationStatus.SUCCESS)
             return result
 
     except subprocess.TimeoutExpired as e:
         retry_tracker.record_attempt(
-            f"git {' '.join(args)}", 0, False, f"Timeout: {e}"
+            command_str, 0, False, f"Timeout: {e}"
         )
-        return GitResult(
-            success=False,
-            stdout=e.stdout.decode() if e.stdout else "",
-            stderr=e.stderr.decode() if e.stderr else "Command timed out",
-            returncode=-1,
-            timed_out=True
+        return GitOperationResult(
+            status=GitOperationStatus.FAILED,
+            error=f"Command timed out: {e}",
+            details={
+                'stdout': e.stdout.decode() if e.stdout else "",
+                'stderr': e.stderr.decode() if e.stderr else "Command timed out",
+                'command': command_str,
+                'timed_out': True
+            }
         )
     except subprocess.CalledProcessError as e:
         retry_tracker.record_attempt(
-            f"git {' '.join(args)}", 0, False, f"Exit code {e.returncode}: {e.stderr}"
+            command_str, 0, False, f"Exit code {e.returncode}: {e.stderr}"
         )
-        return GitResult(
-            success=False,
-            stdout=e.stdout,
-            stderr=e.stderr,
-            returncode=e.returncode,
-            timed_out=False
+        return GitOperationResult(
+            status=GitOperationStatus.FAILED,
+            error=e.stderr or f"Command failed with exit code {e.returncode}",
+            details={
+                'stdout': e.stdout,
+                'returncode': e.returncode,
+                'command': command_str
+            }
         )
     except Exception as e:
         retry_tracker.record_attempt(
-            f"git {' '.join(args)}", 0, False, str(e)
+            command_str, 0, False, str(e)
         )
-        return GitResult(
-            success=False,
-            stdout="",
-            stderr=str(e),
-            returncode=-1,
-            timed_out=False
+        return GitOperationResult(
+            status=GitOperationStatus.FAILED,
+            error=str(e),
+            details={
+                'command': command_str
+            }
         )
 
 
-def git_status(cwd: Optional[Path] = None, short: bool = True) -> GitResult:
+def git_status(cwd: Optional[Path] = None, short: bool = True) -> GitOperationResult:
     """
     Run git status.
 
@@ -195,13 +237,13 @@ def git_status(cwd: Optional[Path] = None, short: bool = True) -> GitResult:
         short: If True, use --short format (default: True)
 
     Returns:
-        GitResult with status output
+        GitOperationResult with status output
     """
     args = ['status', '--short'] if short else ['status']
     return run_git_command(args, cwd=cwd)
 
 
-def git_add(paths: List[str], cwd: Optional[Path] = None) -> GitResult:
+def git_add(paths: List[str], cwd: Optional[Path] = None) -> GitOperationResult:
     """
     Stage files for commit.
 
@@ -210,13 +252,13 @@ def git_add(paths: List[str], cwd: Optional[Path] = None) -> GitResult:
         cwd: Working directory (defaults to aide-de-camp repo root)
 
     Returns:
-        GitResult with add output
+        GitOperationResult with add output
     """
     args = ['add'] + paths
     return run_git_command(args, cwd=cwd)
 
 
-def git_commit(message: str, paths: Optional[List[str]] = None, cwd: Optional[Path] = None) -> GitResult:
+def git_commit(message: str, paths: Optional[List[str]] = None, cwd: Optional[Path] = None) -> GitOperationResult:
     """
     Create a git commit.
 
@@ -226,15 +268,24 @@ def git_commit(message: str, paths: Optional[List[str]] = None, cwd: Optional[Pa
         cwd: Working directory (defaults to aide-de-camp repo root)
 
     Returns:
-        GitResult with commit output
+        GitOperationResult with commit output and commit SHA
     """
     args = ['commit', '-m', message]
     if paths is not None:
         args.extend(['--'] + paths)
-    return run_git_command(args, cwd=cwd)
+    result = run_git_command(args, cwd=cwd)
+
+    # Extract commit SHA if commit succeeded
+    if result.status == GitOperationStatus.SUCCESS:
+        # Get the commit SHA that was just created
+        sha_result = git_rev_parse('HEAD', short=True, cwd=cwd)
+        if sha_result.status == GitOperationStatus.SUCCESS and sha_result.commit_sha:
+            result.commit_sha = sha_result.commit_sha
+
+    return result
 
 
-def git_show(ref: str, cwd: Optional[Path] = None) -> GitResult:
+def git_show(ref: str, cwd: Optional[Path] = None) -> GitOperationResult:
     """
     Show git object content (e.g., 'HEAD:path/to/file').
 
@@ -243,12 +294,12 @@ def git_show(ref: str, cwd: Optional[Path] = None) -> GitResult:
         cwd: Working directory (defaults to aide-de-camp repo root)
 
     Returns:
-        GitResult with show output
+        GitOperationResult with show output
     """
     return run_git_command(['show', ref], cwd=cwd)
 
 
-def git_rev_parse(ref: str, short: bool = False, cwd: Optional[Path] = None) -> GitResult:
+def git_rev_parse(ref: str, short: bool = False, cwd: Optional[Path] = None) -> GitOperationResult:
     """
     Get git SHA for a reference.
 
@@ -258,7 +309,7 @@ def git_rev_parse(ref: str, short: bool = False, cwd: Optional[Path] = None) -> 
         cwd: Working directory (defaults to aide-de-camp repo root)
 
     Returns:
-        GitResult with SHA output
+        GitOperationResult with SHA output and commit SHA populated
     """
     args = ['rev-parse']
     if short:
@@ -272,7 +323,7 @@ def git_fetch(
     branch: Optional[str] = None,
     cwd: Optional[Path] = None,
     timeout: int = 30
-) -> GitResult:
+) -> GitOperationResult:
     """
     Fetch updates from a remote repository with automatic retry on network failures.
 
@@ -283,14 +334,14 @@ def git_fetch(
         timeout: Command timeout in seconds (default: 30)
 
     Returns:
-        GitResult with fetch output
+        GitOperationResult with fetch output
 
     Example:
         result = git_fetch("origin", "main")
-        if result.success:
+        if result.status == GitOperationStatus.SUCCESS:
             print("Fetch successful")
         else:
-            print(f"Fetch failed: {result.stderr}")
+            print(f"Fetch failed: {result.error}")
     """
     args = ['fetch', remote]
     if branch:
@@ -306,7 +357,7 @@ def git_push(
     cwd: Optional[Path] = None,
     timeout: int = 30,
     force: bool = False
-) -> GitResult:
+) -> GitOperationResult:
     """
     Push changes to a remote repository with automatic retry on network failures.
 
@@ -318,14 +369,14 @@ def git_push(
         force: If True, use force push (default: False, WARNING: use with caution)
 
     Returns:
-        GitResult with push output
+        GitOperationResult with push output and branch populated
 
     Example:
         result = git_push("origin", "main")
-        if result.success:
+        if result.status == GitOperationStatus.SUCCESS:
             print("Push successful")
         else:
-            print(f"Push failed: {result.stderr}")
+            print(f"Push failed: {result.error}")
     """
     args = ['push', remote, branch]
     if force:
@@ -333,7 +384,13 @@ def git_push(
         logger.warning(f"Force push requested to {remote}/{branch}")
 
     logger.info(f"Pushing to {remote}/{branch}")
-    return run_git_command(args, cwd=cwd, timeout=timeout)
+    result = run_git_command(args, cwd=cwd, timeout=timeout)
+
+    # Populate branch field on success
+    if result.status == GitOperationStatus.SUCCESS:
+        result.branch = branch
+
+    return result
 
 
 def git_pull(
@@ -341,7 +398,7 @@ def git_pull(
     branch: Optional[str] = None,
     cwd: Optional[Path] = None,
     timeout: int = 30
-) -> GitResult:
+) -> GitOperationResult:
     """
     Pull changes from a remote repository with automatic retry on network failures.
 
@@ -352,14 +409,14 @@ def git_pull(
         timeout: Command timeout in seconds (default: 30)
 
     Returns:
-        GitResult with pull output
+        GitOperationResult with pull output
 
     Example:
         result = git_pull("origin", "main")
-        if result.success:
+        if result.status == GitOperationStatus.SUCCESS:
             print("Pull successful")
         else:
-            print(f"Pull failed: {result.stderr}")
+            print(f"Pull failed: {result.error}")
     """
     args = ['pull', remote]
     if branch:
@@ -399,8 +456,8 @@ def generate_self_mod_commit_message(file_path: Path, cwd: Optional[Path] = None
     # This will be included in the commit message to show what we're building on
     head_result = git_rev_parse('HEAD', short=True, cwd=cwd)
 
-    if head_result.success and head_result.stdout.strip():
-        prev_commit_sha = head_result.stdout.strip()
+    if head_result.status == GitOperationStatus.SUCCESS and head_result.commit_sha:
+        prev_commit_sha = head_result.commit_sha
         return f"auto: self-mod write to {rel_path} [{prev_commit_sha}]"
     else:
         # No previous commit (e.g., initial commit or empty repo)
@@ -744,7 +801,7 @@ class SelfModificationAgent:
             print(f"Failed to apply diff: {e}")
             return False
 
-    def _commit_artifact_write(self, artifact_path: Path, artifact_type: ArtifactType) -> None:
+    def _commit_artifact_write(self, artifact_path: Path, artifact_type: ArtifactType) -> GitOperationResult:
         """
         Create a git commit for an artifact write.
 
@@ -754,6 +811,9 @@ class SelfModificationAgent:
         Args:
             artifact_path: Path to the artifact that was written
             artifact_type: Type of artifact (prompt/config)
+
+        Returns:
+            GitOperationResult with commit information
         """
         try:
             # Get the repo root directory
@@ -765,58 +825,57 @@ class SelfModificationAgent:
             # Verify the file exists before trying to stage it
             if not artifact_path.exists():
                 logger.error(f"Cannot commit artifact write: file does not exist at {artifact_path}")
-                return
+                return GitOperationResult.create_failure(
+                    error=f"File does not exist at {artifact_path}",
+                )
 
-            # Stage the file for commit
-            # This works for new files, modified files, and files that were deleted then recreated
-            add_result = subprocess.run(
-                ['git', 'add', str(rel_path)],
-                cwd=repo_root,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=10
-            )
+            # Stage the file for commit using git operation
+            add_result = git_add([str(rel_path)], cwd=repo_root)
 
-            if add_result.returncode != 0:
-                logger.error(f"git add failed: stderr={add_result.stderr}, stdout={add_result.stdout}, returncode={add_result.returncode}")
-                return
+            if add_result.status != GitOperationStatus.SUCCESS:
+                logger.error(f"git add failed: {add_result.error}")
+                return GitOperationResult.create_failure(
+                    error=f"git add failed: {add_result.error}",
+                )
 
             # Generate standardized commit message with previous commit SHA
             commit_msg = generate_self_mod_commit_message(rel_path, cwd=repo_root)
 
-            # Create the commit (file is now staged)
-            # Only commit staged changes, ignoring other unstaged changes
-            result = subprocess.run(
-                ['git', 'commit', '-m', commit_msg],
-                cwd=repo_root,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=10
-            )
+            # Create the commit using git operation
+            commit_result = git_commit(commit_msg, cwd=repo_root)
 
-            # Only log if commit was successful
-            if result.returncode == 0:
-                # Get the short SHA of the commit just created
-                sha_result = subprocess.run(
-                    ['git', 'rev-parse', '--short', 'HEAD'],
-                    cwd=repo_root,
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                    timeout=10
+            if commit_result.status != GitOperationStatus.SUCCESS:
+                logger.warning(f"Failed to create git commit: {commit_result.error}")
+                return GitOperationResult.create_failure(
+                    error=f"git commit failed: {commit_result.error}",
                 )
 
-                short_sha = sha_result.stdout.strip()
-                logger.info(f"Created git commit {short_sha} for {artifact_type.value} write to {rel_path}")
-            else:
-                logger.warning(f"Failed to create git commit: stdout={result.stdout}, stderr={result.stderr}, returncode={result.returncode}")
+            # Get the short SHA of the commit just created
+            sha_result = git_rev_parse('HEAD', short=True, cwd=repo_root)
 
-        except subprocess.TimeoutExpired:
-            logger.error("Git command timed out")
+            if sha_result.status == GitOperationStatus.SUCCESS and sha_result.commit_sha:
+                short_sha = sha_result.commit_sha
+                logger.info(f"Created git commit {short_sha} for {artifact_type.value} write to {rel_path}")
+
+                return GitOperationResult.create_success(
+                    commit_sha=short_sha,
+                    branch="main",
+                    manifest_path=str(rel_path),
+                )
+            else:
+                # Commit succeeded but couldn't get SHA - still a success
+                logger.warning(f"Commit succeeded but couldn't extract SHA: {sha_result.error}")
+                return GitOperationResult.create_success(
+                    commit_sha="unknown",
+                    branch="main",
+                    manifest_path=str(rel_path),
+                )
+
         except Exception as e:
             logger.error(f"Failed to create git commit for artifact write: {e}")
+            return GitOperationResult.create_failure(
+                error=f"Exception during commit: {e}",
+            )
 
     def _write_prompt(self, diff: ArtifactDiff) -> bool:
         """Write updated prompt file."""
@@ -876,33 +935,49 @@ class SelfModificationAgent:
             except ValueError:
                 pass
 
-    def rollback(self, artifact_name: str, artifact_type: ArtifactType) -> bool:
+    def rollback(self, artifact_name: str, artifact_type: ArtifactType) -> GitOperationResult:
         """
         Rollback an artifact to its previous version.
 
         For prompts/configs: read from git history
         For components: use component version history
+
+        Returns:
+            GitOperationResult with rollback information
         """
         with self._artifact_write_lock:
             if artifact_type == ArtifactType.COMPONENT:
-                return self._rollback_component(artifact_name)
+                success = self._rollback_component(artifact_name)
+                return GitOperationResult.create_success(
+                    commit_sha="component",
+                    branch="main",
+                    manifest_path=f"component/{artifact_name}",
+                ) if success else GitOperationResult.create_failure(
+                    error=f"Component rollback failed for {artifact_name}",
+                )
 
             # For prompts/configs, use git to get previous version
-            import subprocess
             try:
                 artifact = self.reload_mgr._artifacts.get(artifact_name)
                 if not artifact:
-                    return False
+                    return GitOperationResult.create_failure(
+                        error=f"Artifact not found: {artifact_name}",
+                    )
 
-                # Get previous version from git
-                result = subprocess.run(
-                    ['git', 'show', f'HEAD:{artifact.path.name}'],
-                    capture_output=True,
-                    text=True,
-                    cwd=artifact.path.parent
-                )
+                # Get previous version from git using git_show
+                # Reference format: HEAD:path/to/file
+                ref = f"HEAD:{artifact.path.name}"
+                result = git_show(ref, cwd=artifact.path.parent)
 
-                if result.returncode == 0:
+                if result.status == GitOperationStatus.SUCCESS:
+                    # Extract file content from details
+                    file_content = result.details.get('stdout', '')
+
+                    if not file_content:
+                        return GitOperationResult.create_failure(
+                            error=f"git show succeeded but returned no content for {artifact_name}",
+                        )
+
                     # P1 compare-and-swap boundary: the write lock prevents a
                     # concurrent apply/rollback from replacing this artifact.
                     logger.info(
@@ -910,17 +985,28 @@ class SelfModificationAgent:
                         artifact_name,
                         artifact.path,
                     )
-                    atomic_write(artifact.path, result.stdout)
+                    atomic_write(artifact.path, file_content)
                     self.reload_mgr.force_reload(artifact_name)
                     logger.info(
                         "Rollback atomic write completed for artifact %s",
                         artifact_name,
                     )
-                    return True
+
+                    return GitOperationResult.create_success(
+                        commit_sha="rollback",
+                        branch="main",
+                        manifest_path=str(artifact.path),
+                    )
+                else:
+                    return GitOperationResult.create_failure(
+                        error=f"git show failed: {result.error}",
+                    )
+
             except Exception as e:
                 logger.exception("Rollback failed for artifact %s: %s", artifact_name, e)
-
-        return False
+                return GitOperationResult.create_failure(
+                    error=f"Rollback failed with exception: {e}",
+                )
 
     def _rollback_component(self, component_id: str) -> bool:
         """Rollback a component using its version history."""

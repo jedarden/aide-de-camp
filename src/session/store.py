@@ -1420,7 +1420,7 @@ class SessionStore:
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     result_id, intent_id, topic_id, session_id, summary, json.dumps(data),
-                    urgency, result_type, 1 if card_fallback else 0, now, now,
+                    urgency, result_type, 1 if card_fallback else 0, now, None,
                     previous_result_id, diff_summary,
                     json.dumps(diff_data) if diff_data else None
                 )

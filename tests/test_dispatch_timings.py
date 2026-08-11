@@ -34,10 +34,6 @@ from src.instrument.timings import (
 # --- fixtures ---------------------------------------------------------------
 
 
-@pytest.fixture
-
-@pytest.fixture
-
 # --- Schema verification tests ----------------------------------------------
 
 

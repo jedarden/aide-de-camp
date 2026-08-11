@@ -27,6 +27,8 @@ dev = [
     "Pillow>=10.0.0",
     # Data analysis for deployment log parsing (bead adc-en94p):
     "pandas>=2.0.0",
+    # Headless browser automation for canvas verification (bead adc-jr35):
+    "playwright>=1.48.0",
 ]
 
 [project.scripts]

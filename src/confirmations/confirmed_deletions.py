@@ -90,22 +90,24 @@ def document_confirmed_deletion(
         "status": "confirmed" if user_response.lower() == "yes" or user_response == pod_name else "rejected"
     }
 
-    # Ensure directory exists
-    CONFIRMED_DELETIONS_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Append to log file (one JSON record per line)
-    # Note: Append mode is appropriate for log files. Each line is a self-contained JSON record.
-    # The single write() call is atomic for reasonable content sizes. For concurrent access,
-    # application-level single-writer guarantees are assumed.
+    # Append to log file atomically (one JSON record per line)
+    # Note: Uses atomic_append utility to prevent partial writes and corruption
+    # The atomic_append ensures complete writes even during crashes or concurrent access
     try:
-        with open(CONFIRMED_DELETIONS_LOG, "a") as f:
-            f.write(json.dumps(deletion_record) + "\n")
-            f.flush()  # Ensure data is written to OS buffer
-            os.fsync(f.fileno())  # Ensure data is written to disk
+        atomic_append(
+            CONFIRMED_DELETIONS_LOG,
+            json.dumps(deletion_record) + "\n",
+            mode='a'
+        )
         logger.info(f"Documented confirmed deletion: pod={pod_name}, response={user_response}, timestamp={timestamp}")
-    except IOError as e:
-        logger.error(f"Failed to write confirmed deletion to log: {e}")
-        raise
+    except (OSError, PermissionError) as e:
+        # Handle atomic append failures with specific error types
+        logger.error(f"Atomic append failed for confirmed deletion log {CONFIRMED_DELETIONS_LOG}: {type(e).__name__}: {e}")
+        raise IOError(f"Failed to document confirmed deletion in log: {e}") from e
+    except (TypeError, ValueError) as e:
+        # Handle JSON serialization errors
+        logger.error(f"JSON serialization failed for confirmed deletion record: {e}")
+        raise ValueError(f"Invalid deletion record format: {e}") from e
 
     return deletion_record
 

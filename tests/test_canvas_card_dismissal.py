@@ -162,10 +162,6 @@ def _failed_card_data(
     }
 
 
-@pytest.fixture
-
-@pytest.fixture
-
 # --- DOM-based dismissal tests -----------------------------------------------
 
 

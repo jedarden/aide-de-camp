@@ -288,7 +288,7 @@ def retry_on_transient_error(
     return decorator
 
 
-async def retry_on_transient_error_async(
+def retry_on_transient_error_async(
     max_retries: int = 3,
     backoff_factor: float = 1.5,
     initial_delay: float = 1.0,

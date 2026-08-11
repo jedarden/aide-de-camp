@@ -39,12 +39,6 @@ from src.escalate.handler import handle_terminal_failure
 # --- Fixtures ------------------------------------------------------------------
 
 
-@pytest.fixture
-
-@pytest.fixture
-
-@pytest.fixture
-
 # --- 1. SSE Broadcast on Fence Event ------------------------------------------
 
 
