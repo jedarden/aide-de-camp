@@ -3,6 +3,9 @@ Tests for retry logic with exponential backoff.
 
 Verifies that the retry utility correctly handles transient failures with
 exponential backoff and proper logging.
+
+Tests use actual transient errors (TimeoutError, ConnectionError) that are
+correctly classified by is_transient().
 """
 import asyncio
 import logging
@@ -11,11 +14,123 @@ from unittest.mock import Mock, patch
 import pytest
 
 from src.utilities.retry import (
+    calculate_delay_with_backoff,
     retry_with_exponential_backoff,
     retry_async,
     retry_sync,
     RetryContext,
 )
+
+
+class TestCalculateDelayWithBackoff:
+    """Tests for calculate_delay_with_backoff function."""
+
+    def test_exponential_backoff_calculation(self):
+        """Test that exponential backoff formula is correctly calculated."""
+        # attempt 0: base_delay * (2 ** 0) = 1.0 * 1 = 1.0
+        delay = calculate_delay_with_backoff(
+            attempt=0, base_delay=1.0, max_delay=60.0, jitter_factor=0.0
+        )
+        # Should be approximately 1.0 (no jitter)
+        assert 0.9 <= delay <= 1.1
+
+        # attempt 1: base_delay * (2 ** 1) = 1.0 * 2 = 2.0
+        delay = calculate_delay_with_backoff(
+            attempt=1, base_delay=1.0, max_delay=60.0, jitter_factor=0.0
+        )
+        assert 1.9 <= delay <= 2.1
+
+        # attempt 2: base_delay * (2 ** 2) = 1.0 * 4 = 4.0
+        delay = calculate_delay_with_backoff(
+            attempt=2, base_delay=1.0, max_delay=60.0, jitter_factor=0.0
+        )
+        assert 3.9 <= delay <= 4.1
+
+        # attempt 3: base_delay * (2 ** 3) = 1.0 * 8 = 8.0
+        delay = calculate_delay_with_backoff(
+            attempt=3, base_delay=1.0, max_delay=60.0, jitter_factor=0.0
+        )
+        assert 7.9 <= delay <= 8.1
+
+    def test_max_delay_capping(self):
+        """Test that delay is capped at max_delay parameter."""
+        # With base_delay=1.0, attempt 10 would be 1024 seconds without cap
+        delay = calculate_delay_with_backoff(
+            attempt=10, base_delay=1.0, max_delay=60.0, jitter_factor=0.0
+        )
+        # Should be capped at 60.0
+        assert delay == 60.0
+
+        # With base_delay=0.5, attempt 8 would be 128 seconds without cap
+        delay = calculate_delay_with_backoff(
+            attempt=8, base_delay=0.5, max_delay=30.0, jitter_factor=0.0
+        )
+        # Should be capped at 30.0
+        assert delay == 30.0
+
+    def test_jitter_application(self):
+        """Test that jitter is correctly applied to delay."""
+        # With jitter_factor=0.25, delay should vary by ±25%
+        delays = []
+        for _ in range(100):
+            delay = calculate_delay_with_backoff(
+                attempt=0, base_delay=10.0, max_delay=100.0, jitter_factor=0.25
+            )
+            delays.append(delay)
+
+        # Average should be close to base delay (10.0)
+        average_delay = sum(delays) / len(delays)
+        assert 9.0 <= average_delay <= 11.0
+
+        # Some delays should be below base, some above
+        assert any(d < 10.0 for d in delays)
+        assert any(d > 10.0 for d in delays)
+
+        # All delays should be non-negative
+        assert all(d >= 0.0 for d in delays)
+
+    def test_jitter_factor_zero(self):
+        """Test that jitter_factor=0 results in no jitter."""
+        delay = calculate_delay_with_backoff(
+            attempt=2, base_delay=5.0, max_delay=60.0, jitter_factor=0.0
+        )
+        # Should be exactly 20.0 (5.0 * 2^2 = 20.0) with no jitter
+        assert delay == 20.0
+
+    def test_combined_behavior(self):
+        """Test combined behavior: backoff + cap + jitter."""
+        # High attempt number to trigger cap
+        # base_delay=2.0, attempt=5 would be 64 seconds (2 * 2^5)
+        # But capped at max_delay=30.0
+        delays = []
+        for _ in range(50):
+            delay = calculate_delay_with_backoff(
+                attempt=5, base_delay=2.0, max_delay=30.0, jitter_factor=0.2
+            )
+            delays.append(delay)
+
+        # All delays should be capped around 30.0 with jitter
+        # With jitter_factor=0.2, should vary between 24.0 and 36.0
+        assert all(24.0 <= d <= 36.0 for d in delays)
+
+    def test_delay_sequence_consistency(self):
+        """Test that delay sequence follows exponential backoff pattern."""
+        delays = []
+        for attempt in range(5):
+            delay = calculate_delay_with_backoff(
+                attempt=attempt,
+                base_delay=1.0,
+                max_delay=100.0,
+                jitter_factor=0.0
+            )
+            delays.append(delay)
+
+        # Sequence should be: 1, 2, 4, 8, 16
+        assert delays[0] == 1.0
+        assert delays[1] == 2.0
+        assert delays[2] == 4.0
+        assert delays[3] == 8.0
+        assert delays[4] == 16.0
 
 
 class TestRetryDecorator:
@@ -45,13 +160,13 @@ class TestRetryDecorator:
             max_retries=3,
             base_delay=0.01,
             max_delay=0.1,
-            exceptions=(ValueError,)
+            exceptions=(TimeoutError,)
         )
         async def flaky_operation():
             nonlocal call_count
             call_count += 1
             if call_count < 3:
-                raise ValueError("Transient error")
+                raise TimeoutError("Transient error")
             return "success"
 
         result = await flaky_operation()
@@ -67,14 +182,14 @@ class TestRetryDecorator:
             max_retries=2,
             base_delay=0.01,
             max_delay=0.1,
-            exceptions=(ValueError,)
+            exceptions=(TimeoutError,)
         )
         async def failing_operation():
             nonlocal call_count
             call_count += 1
-            raise ValueError("Persistent error")
+            raise TimeoutError("Persistent error")
 
-        with pytest.raises(ValueError, match="Persistent error"):
+        with pytest.raises(TimeoutError, match="Persistent error"):
             await failing_operation()
 
         assert call_count == 3  # Initial attempt + 2 retries
@@ -88,15 +203,15 @@ class TestRetryDecorator:
             max_retries=2,
             base_delay=0.01,
             max_delay=0.1,
-            exceptions=(ValueError,)
+            exceptions=(TimeoutError,)
         )
         async def failing_operation():
             nonlocal call_count
             call_count += 1
-            raise ValueError("Test error")
+            raise TimeoutError("Test error")
 
         with patch('src.utilities.retry.logger') as mock_logger:
-            with pytest.raises(ValueError):
+            with pytest.raises(TimeoutError):
                 await failing_operation()
 
             # Verify warning logs for retry attempts
@@ -114,14 +229,14 @@ class TestRetryDecorator:
             base_delay=0.1,
             max_delay=1.0,
             jitter_factor=0.0,  # Disable jitter for predictable timing
-            exceptions=(ValueError,)
+            exceptions=(TimeoutError,)
         )
         async def timed_failing_operation():
             call_times.append(time.time())
-            raise ValueError("Test error")
+            raise TimeoutError("Test error")
 
         start_time = time.time()
-        with pytest.raises(ValueError):
+        with pytest.raises(TimeoutError):
             await timed_failing_operation()
 
         # Verify exponential backoff timing

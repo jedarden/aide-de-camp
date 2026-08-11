@@ -7,6 +7,9 @@ transiently due to network issues, file locks, or other intermittent problems.
 Supports configurable defaults via environment variables (ADC_MAX_RETRIES,
 ADC_RETRY_BASE_DELAY, ADC_RETRY_MAX_DELAY, ADC_RETRY_JITTER_FACTOR) with
 per-decorator override capability.
+
+Integrates with transient_errors.py to automatically determine if an error
+is transient (retry-eligible) or permanent (fail immediately).
 """
 import asyncio
 import functools
@@ -14,9 +17,59 @@ import logging
 import random
 from typing import Callable, Type, Tuple, Any, Optional, TypeVar
 
+from src.errors.transient_errors import is_transient
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
+
+
+def calculate_delay_with_backoff(
+    attempt: int,
+    base_delay: float,
+    max_delay: float,
+    jitter_factor: float
+) -> float:
+    """
+    Calculate retry delay with exponential backoff and jitter.
+
+    Uses exponential backoff formula: delay = base_delay * (2 ** attempt)
+    The delay is capped at max_delay to prevent excessively long waits.
+    Jitter is added to prevent the thundering herd problem when multiple
+    processes retry simultaneously.
+
+    Args:
+        attempt: Current retry attempt number (0-indexed: 0, 1, 2, ...)
+        base_delay: Initial delay in seconds (e.g., 1.0)
+        max_delay: Maximum delay cap in seconds (e.g., 60.0)
+        jitter_factor: Jitter as a fraction of delay, 0 to 1 (e.g., 0.25 for ±25%)
+
+    Returns:
+        float: Final delay value in seconds with exponential backoff and jitter applied
+
+    Examples:
+        >>> calculate_delay_with_backoff(0, 1.0, 60.0, 0.25)  # First retry
+        ~1.0  # base_delay * 2^0 = 1.0, then jitter ±0.25
+
+        >>> calculate_delay_with_backoff(1, 1.0, 60.0, 0.25)  # Second retry
+        ~2.0  # base_delay * 2^1 = 2.0, then jitter ±0.5
+
+        >>> calculate_delay_with_backoff(10, 1.0, 60.0, 0.25)  # Cap at max
+        ~60.0  # base_delay * 2^10 = 1024, capped at 60.0, then jitter ±15.0
+    """
+    # Calculate exponential backoff: base_delay * (2 ** attempt)
+    delay = base_delay * (2 ** attempt)
+
+    # Cap at max_delay to prevent excessive delays
+    if delay > max_delay:
+        delay = max_delay
+
+    # Add jitter: delay ± (delay * jitter_factor)
+    jitter = delay * jitter_factor
+    final_delay = delay + random.uniform(-jitter, jitter)
+
+    # Ensure delay is non-negative (jitter could theoretically make it negative)
+    return max(0.0, final_delay)
 
 
 def _apply_jitter(delay: float, jitter_factor: float) -> float:
@@ -109,6 +162,16 @@ def retry_with_exponential_backoff(
                 except exceptions as e:
                     last_exception = e
 
+                    # Only check transience for network-related exceptions
+                    # Generic exceptions (ValueError, etc.) should always be retried if specified
+                    network_error_types = (httpx.HTTPError, aiohttp.ClientError, OSError, TimeoutError)
+                    if isinstance(e, network_error_types) and not is_transient(e):
+                        logger.error(
+                            f"Non-transient error in {func.__name__} - failing immediately. "
+                            f"Error: {str(e)[:100]}"
+                        )
+                        raise
+
                     if attempt < effective_max_retries:
                         # Calculate delay with exponential backoff
                         delay = min(effective_base_delay * (2 ** attempt), effective_max_delay)
@@ -152,6 +215,16 @@ def retry_with_exponential_backoff(
                     return func(*args, **kwargs)
                 except exceptions as e:
                     last_exception = e
+
+                    # Only check transience for network-related exceptions
+                    # Generic exceptions (ValueError, etc.) should always be retried if specified
+                    network_error_types = (httpx.HTTPError, aiohttp.ClientError, OSError, TimeoutError)
+                    if isinstance(e, network_error_types) and not is_transient(e):
+                        logger.error(
+                            f"Non-transient error in {func.__name__} - failing immediately. "
+                            f"Error: {str(e)[:100]}"
+                        )
+                        raise
 
                     if attempt < effective_max_retries:
                         # Calculate delay with exponential backoff
@@ -249,6 +322,16 @@ async def retry_async(
         except exceptions as e:
             last_exception = e
 
+            # Only check transience for network-related exceptions
+            # Generic exceptions (ValueError, etc.) should always be retried if specified
+            network_error_types = (httpx.HTTPError, aiohttp.ClientError, OSError, TimeoutError)
+            if isinstance(e, network_error_types) and not is_transient(e):
+                logger.error(
+                    f"Non-transient error in {func.__name__} - failing immediately. "
+                    f"Error: {str(e)[:100]}"
+                )
+                raise
+
             if attempt < effective_max_retries:
                 delay = min(effective_base_delay * (2 ** attempt), effective_max_delay)
                 delay = _apply_jitter(delay, effective_jitter)
@@ -333,6 +416,14 @@ def retry_sync(
         except exceptions as e:
             last_exception = e
 
+            # Check if error is transient before retrying
+            if not is_transient(e):
+                logger.error(
+                    f"Non-transient error in {func.__name__} - failing immediately. "
+                    f"Error: {str(e)[:100]}"
+                )
+                raise
+
             if attempt < effective_max_retries:
                 delay = min(effective_base_delay * (2 ** attempt), effective_max_delay)
                 delay = _apply_jitter(delay, effective_jitter)
@@ -416,6 +507,14 @@ class RetryContext:
                 return result
             except self.exceptions as e:
                 self.last_exception = e
+
+                # Check if error is transient before retrying
+                if not is_transient(e):
+                    logger.error(
+                        f"Non-transient error in {func.__name__} - failing immediately. "
+                        f"Error: {str(e)[:100]}"
+                    )
+                    raise
 
                 if self.attempt_count < self.max_retries:
                     delay = min(self.base_delay * (2 ** self.attempt_count), self.max_delay)
