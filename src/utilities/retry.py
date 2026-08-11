@@ -17,6 +17,9 @@ import logging
 import random
 from typing import Callable, Type, Tuple, Any, Optional, TypeVar
 
+import httpx
+import aiohttp
+
 from src.errors.transient_errors import is_transient
 
 logger = logging.getLogger(__name__)
@@ -173,10 +176,13 @@ def retry_with_exponential_backoff(
                         raise
 
                     if attempt < effective_max_retries:
-                        # Calculate delay with exponential backoff
-                        delay = min(effective_base_delay * (2 ** attempt), effective_max_delay)
-                        # Apply jitter to prevent thundering herd
-                        delay = _apply_jitter(delay, effective_jitter)
+                        # Calculate delay with exponential backoff and jitter
+                        delay = calculate_delay_with_backoff(
+                            attempt=attempt,
+                            base_delay=effective_base_delay,
+                            max_delay=effective_max_delay,
+                            jitter_factor=effective_jitter
+                        )
 
                         logger.warning(
                             f"Retry attempt {attempt + 1}/{effective_max_retries} "
@@ -227,10 +233,13 @@ def retry_with_exponential_backoff(
                         raise
 
                     if attempt < effective_max_retries:
-                        # Calculate delay with exponential backoff
-                        delay = min(effective_base_delay * (2 ** attempt), effective_max_delay)
-                        # Apply jitter to prevent thundering herd
-                        delay = _apply_jitter(delay, effective_jitter)
+                        # Calculate delay with exponential backoff and jitter
+                        delay = calculate_delay_with_backoff(
+                            attempt=attempt,
+                            base_delay=effective_base_delay,
+                            max_delay=effective_max_delay,
+                            jitter_factor=effective_jitter
+                        )
 
                         logger.warning(
                             f"Retry attempt {attempt + 1}/{effective_max_retries} "
@@ -333,8 +342,12 @@ async def retry_async(
                 raise
 
             if attempt < effective_max_retries:
-                delay = min(effective_base_delay * (2 ** attempt), effective_max_delay)
-                delay = _apply_jitter(delay, effective_jitter)
+                delay = calculate_delay_with_backoff(
+                    attempt=attempt,
+                    base_delay=effective_base_delay,
+                    max_delay=effective_max_delay,
+                    jitter_factor=effective_jitter
+                )
 
                 logger.warning(
                     f"Retry attempt {attempt + 1}/{effective_max_retries} "
@@ -416,8 +429,10 @@ def retry_sync(
         except exceptions as e:
             last_exception = e
 
-            # Check if error is transient before retrying
-            if not is_transient(e):
+            # Only check transience for network-related exceptions
+            # Generic exceptions (ValueError, etc.) should always be retried if specified
+            network_error_types = (httpx.HTTPError, aiohttp.ClientError, OSError, TimeoutError)
+            if isinstance(e, network_error_types) and not is_transient(e):
                 logger.error(
                     f"Non-transient error in {func.__name__} - failing immediately. "
                     f"Error: {str(e)[:100]}"
@@ -425,8 +440,12 @@ def retry_sync(
                 raise
 
             if attempt < effective_max_retries:
-                delay = min(effective_base_delay * (2 ** attempt), effective_max_delay)
-                delay = _apply_jitter(delay, effective_jitter)
+                delay = calculate_delay_with_backoff(
+                    attempt=attempt,
+                    base_delay=effective_base_delay,
+                    max_delay=effective_max_delay,
+                    jitter_factor=effective_jitter
+                )
 
                 logger.warning(
                     f"Retry attempt {attempt + 1}/{effective_max_retries} "
@@ -508,8 +527,10 @@ class RetryContext:
             except self.exceptions as e:
                 self.last_exception = e
 
-                # Check if error is transient before retrying
-                if not is_transient(e):
+                # Only check transience for network-related exceptions
+                # Generic exceptions (ValueError, etc.) should always be retried if specified
+                network_error_types = (httpx.HTTPError, aiohttp.ClientError, OSError, TimeoutError)
+                if isinstance(e, network_error_types) and not is_transient(e):
                     logger.error(
                         f"Non-transient error in {func.__name__} - failing immediately. "
                         f"Error: {str(e)[:100]}"
@@ -517,8 +538,12 @@ class RetryContext:
                     raise
 
                 if self.attempt_count < self.max_retries:
-                    delay = min(self.base_delay * (2 ** self.attempt_count), self.max_delay)
-                    delay = _apply_jitter(delay, self.jitter_factor)
+                    delay = calculate_delay_with_backoff(
+                        attempt=self.attempt_count,
+                        base_delay=self.base_delay,
+                        max_delay=self.max_delay,
+                        jitter_factor=self.jitter_factor
+                    )
 
                     logger.warning(
                         f"Retry attempt {self.attempt_count + 1}/{self.max_retries} "
@@ -549,8 +574,12 @@ class RetryContext:
                 self.last_exception = e
 
                 if self.attempt_count < self.max_retries:
-                    delay = min(self.base_delay * (2 ** self.attempt_count), self.max_delay)
-                    delay = _apply_jitter(delay, self.jitter_factor)
+                    delay = calculate_delay_with_backoff(
+                        attempt=self.attempt_count,
+                        base_delay=self.base_delay,
+                        max_delay=self.max_delay,
+                        jitter_factor=self.jitter_factor
+                    )
 
                     logger.warning(
                         f"Retry attempt {self.attempt_count + 1}/{self.max_retries} "
