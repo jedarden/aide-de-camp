@@ -903,7 +903,31 @@ Running command: `uvicorn src.main:app --host 0.0.0.0 --port 8000`
 
 **Stage A process model — exactly one process, by design.** The command above is the complete process inventory. The bead watcher (which also hosts ambient monitoring and the async-path circuit breaker — see Bead Watcher) is **not** a second command an operator must remember: FastAPI's lifespan startup spawns the watcher loop as an asyncio background task inside this same uvicorn process. A separately documented daemon is exactly the step that gets skipped, and its absence is silent — closures never surface, SLAs never fire, monitoring never ticks, while every test still passes (the "verified-in-tests, dead live" pattern). Startup-spawning makes that failure impossible; liveness is still checked, not assumed: `GET /health` reports `watcher.alive` / `watcher.last_tick_at` (see Bead Watcher), and the pre-demo seeding runbook verifies it in item (3).
 
-No container, no CI, no ArgoCD. Managed as a long-running process (see CLAUDE.md for restart commands).
+**Managed by systemd user service.** The service is configured via `deploy/aide-de-camp.service` with:
+- Working directory: `/home/coding/aide-de-camp`
+- ExecStart: `/home/coding/aide-de-camp/.venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000`
+- Restart: `on-failure` with 5-second backoff
+- Logs: `/tmp/adc.log` (StandardOutput/StandardError)
+- Environment: `PATH=/home/coding/.local/bin:/usr/bin:/bin`, `HOME=/home/coding`
+
+Setup (one-time):
+```bash
+mkdir -p ~/.config/systemd/user
+ln -sT $(pwd)/deploy/aide-de-camp.service ~/.config/systemd/user/aide-de-camp.service
+systemctl --user daemon-reload
+systemctl --user enable aide-de-camp  # auto-start on login
+```
+
+Operations:
+```bash
+systemctl --user start aide-de-camp    # start
+systemctl --user restart aide-de-camp  # restart (graceful SIGINT)
+systemctl --user stop aide-de-camp     # stop
+systemctl --user status aide-de-camp   # check status
+journalctl --user -u aide-de-camp -f   # view logs
+```
+
+No container, no CI, no ArgoCD.
 
 ### Release flow (Deploy Stage A)
 
