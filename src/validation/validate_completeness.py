@@ -10,6 +10,15 @@ Validates:
 
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Tuple
+from src.utilities.gap_calculator import (
+    GapPeriod,
+    format_gap_error_message,
+    format_gap_period_detailed,
+    format_gap_summary,
+    format_consecutive_sequence_gaps,
+    detect_anomalies,
+    calculate_gap_periods
+)
 
 
 def validate_completeness(data: List[Dict[str, Any]]) -> Tuple[bool, str]:
@@ -75,6 +84,7 @@ def validate_completeness(data: List[Dict[str, Any]]) -> Tuple[bool, str]:
     timestamps.sort()
 
     # Check for gaps in the date sequence
+    gaps = []
     for i in range(len(timestamps) - 1):
         current_date = timestamps[i].date()
         next_date = timestamps[i + 1].date()
@@ -82,7 +92,49 @@ def validate_completeness(data: List[Dict[str, Any]]) -> Tuple[bool, str]:
 
         if next_date != expected_next_date:
             days_diff = (next_date - current_date).days
-            return False, f"Date gap detected: {current_date} to {next_date} ({days_diff} days, expected 1)"
+            # Add each missing date individually
+            for day_offset in range(1, days_diff):
+                missing_date = (current_date + timedelta(days=day_offset)).isoformat()
+                gaps.append({"date": missing_date})
+
+    if gaps:
+        # Use gap calculator to generate detailed error messages for ALL gaps
+        start_analysis = timestamps[0]
+        end_analysis = timestamps[-1]
+        gap_periods, summary = calculate_gap_periods(gaps, start_analysis, end_analysis)
+
+        if gap_periods:
+            # Build comprehensive error message with all gaps
+            gap_messages = []
+
+            # Add summary line
+            gap_messages.append(format_gap_summary(gap_periods, summary))
+
+            # Add individual gap details (consolidate consecutive sequences)
+            consolidated_gaps = format_consecutive_sequence_gaps(gap_periods)
+            for gap_msg in consolidated_gaps:
+                gap_messages.append(f"  - {gap_msg}")
+
+            # Add actionable guidance based on gap size
+            gap_messages.append("\nACTION:")
+            longest_gap = max(gap_periods, key=lambda gp: gp.size_days)
+            if longest_gap.size_days == 1:
+                gap_messages.append("  Verify deployment occurred on this date. Check pipeline logs or re-run deployment for this day.")
+            elif longest_gap.size_days <= 3:
+                gap_messages.append(f"  Review deployment pipeline for {longest_gap.size_days}-day period. Check for service downtime or data collection failures.")
+            elif longest_gap.size_days <= 7:
+                gap_messages.append(f"  Investigate {longest_gap.size_days}-day outage. Verify infrastructure availability and data retention policies.")
+            else:
+                gap_messages.append(f"  Critical {longest_gap.size_days}-day gap detected. Review data collection infrastructure and consider extending analysis period to exclude this gap.")
+
+            # Add anomaly-specific guidance if applicable
+            anomalies = detect_anomalies(gap_periods, summary)
+            if anomalies:
+                gap_messages.append("\nADDITIONAL ANOMALIES:")
+                for anomaly in anomalies:
+                    gap_messages.append(f"  {anomaly}")
+
+            return False, "\n".join(gap_messages)
 
     return True, ""
 
@@ -167,7 +219,8 @@ def validate_completeness_with_details(data: List[Dict[str, Any]]) -> Dict[str, 
     result["date_range"] = (earliest.isoformat(), latest.isoformat())
     result["coverage_days"] = (latest - earliest).days + 1
 
-    # Check for gaps
+    # Check for gaps and build gap list
+    gaps = []
     for i in range(len(timestamps) - 1):
         current_date = timestamps[i].date()
         next_date = timestamps[i + 1].date()
@@ -175,7 +228,51 @@ def validate_completeness_with_details(data: List[Dict[str, Any]]) -> Dict[str, 
 
         if next_date != expected_next_date:
             days_diff = (next_date - current_date).days
-            result["error_message"] = f"Date gap detected: {current_date} to {next_date} ({days_diff} days, expected 1)"
+            # Add each missing date individually
+            for day_offset in range(1, days_diff):
+                missing_date = (current_date + timedelta(days=day_offset)).isoformat()
+                gaps.append({"date": missing_date})
+
+    if gaps:
+        # Use gap calculator to generate detailed error messages for ALL gaps
+        start_analysis = timestamps[0]
+        end_analysis = timestamps[-1]
+        gap_periods, summary = calculate_gap_periods(gaps, start_analysis, end_analysis)
+
+        if gap_periods:
+            # Build comprehensive error message with all gaps
+            gap_messages = []
+
+            # Add summary line
+            gap_messages.append(format_gap_summary(gap_periods, summary))
+
+            # Add individual gap details (consolidate consecutive sequences)
+            consolidated_gaps = format_consecutive_sequence_gaps(gap_periods)
+            for gap_msg in consolidated_gaps:
+                gap_messages.append(f"  - {gap_msg}")
+
+            # Add actionable guidance based on gap size
+            gap_messages.append("\nACTION:")
+            longest_gap = max(gap_periods, key=lambda gp: gp.size_days)
+            if longest_gap.size_days == 1:
+                gap_messages.append("  Verify deployment occurred on this date. Check pipeline logs or re-run deployment for this day.")
+            elif longest_gap.size_days <= 3:
+                gap_messages.append(f"  Review deployment pipeline for {longest_gap.size_days}-day period. Check for service downtime or data collection failures.")
+            elif longest_gap.size_days <= 7:
+                gap_messages.append(f"  Investigate {longest_gap.size_days}-day outage. Verify infrastructure availability and data retention policies.")
+            else:
+                gap_messages.append(f"  Critical {longest_gap.size_days}-day gap detected. Review data collection infrastructure and consider extending analysis period to exclude this gap.")
+
+            # Add anomaly-specific guidance if applicable
+            anomalies = detect_anomalies(gap_periods, summary)
+            if anomalies:
+                gap_messages.append("\nADDITIONAL ANOMALIES:")
+                for anomaly in anomalies:
+                    gap_messages.append(f"  {anomaly}")
+
+            result["error_message"] = "\n".join(gap_messages)
+            result["gaps_detected"] = len(gaps)
+            result["gap_summary"] = summary
             return result
 
     result["is_valid"] = True
