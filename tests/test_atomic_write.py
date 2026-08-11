@@ -610,3 +610,445 @@ class TestAtomicWriteLogging:
                    'readonly' in record.message or
                    'error' in record.message.lower()
                    for record in caplog.records)
+
+
+class TestConcurrentAtomicWrite:
+    """Test concurrent access to atomic_write function."""
+
+    def test_concurrent_writes_do_not_corrupt_data(self, tmp_path):
+        """Test that concurrent writes do not corrupt data."""
+        filepath = tmp_path / "concurrent_test.txt"
+        num_writers = 10
+        errors = []
+        successful_writes = []
+
+        def writer(writer_id: int):
+            try:
+                content = f"Writer {writer_id} content " * 100  # Substantial content
+                atomic_write(filepath, content)
+                successful_writes.append(writer_id)
+            except Exception as e:
+                errors.append((writer_id, e))
+
+        # Launch all writers concurrently
+        threads = []
+        for i in range(num_writers):
+            t = threading.Thread(target=writer, args=(i,))
+            threads.append(t)
+            t.start()
+
+        # Wait for all to complete
+        for t in threads:
+            t.join(timeout=5)
+
+        # Verify no errors occurred
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+
+        # Verify file exists and has content from exactly one writer
+        assert filepath.exists(), "File should exist after concurrent writes"
+        final_content = filepath.read_text()
+
+        # Content should be complete and from exactly one writer
+        assert len(final_content) > 0, "File should have content"
+
+        # Verify content matches one of the writers' expected patterns
+        valid_content = False
+        for writer_id in range(num_writers):
+            expected_pattern = f"Writer {writer_id} content " * 100
+            if final_content == expected_pattern:
+                valid_content = True
+                break
+
+        assert valid_content, f"Final content does not match any writer's expected pattern. Length: {len(final_content)}"
+
+        # Verify exactly one writer won (all completed, but file has only one content)
+        # This is validated by the content check above - atomicity ensures one complete write
+
+    def test_one_writer_wins_under_contention(self, tmp_path):
+        """Test that one writer wins cleanly under contention."""
+        filepath = tmp_path / "contention_test.txt"
+        num_writers = 20
+        write_barrier = threading.Barrier(num_writers)
+        errors = []
+        completion_order = []
+
+        def writer(writer_id: int):
+            try:
+                # Synchronize all writers to start simultaneously
+                write_barrier.wait(timeout=5)
+
+                content = f"Winner-{writer_id}:" + "x" * 1000
+                atomic_write(filepath, content)
+                completion_order.append(writer_id)
+            except Exception as e:
+                errors.append((writer_id, e))
+
+        # Launch all writers simultaneously
+        threads = []
+        for i in range(num_writers):
+            t = threading.Thread(target=writer, args=(i,))
+            threads.append(t)
+            t.start()
+
+        # Wait for all to complete
+        for t in threads:
+            t.join(timeout=10)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+
+        # Verify file has exactly one writer's content
+        assert filepath.exists(), "File should exist"
+        final_content = filepath.read_text()
+
+        # Extract which writer won from content pattern
+        winner_match = None
+        for writer_id in range(num_writers):
+            expected_prefix = f"Winner-{writer_id}:"
+            if final_content.startswith(expected_prefix):
+                winner_match = writer_id
+                break
+
+        assert winner_match is not None, f"Could not identify winner from content: {final_content[:100]}"
+
+        # Verify content is complete
+        expected_content = f"Winner-{winner_match}:" + "x" * 1000
+        assert final_content == expected_content, "Content should be complete from winning writer"
+
+        # Verify exactly one winner (content integrity check above ensures this)
+        # The atomic replace guarantees one complete content wins
+
+    def test_locking_serializes_writes(self, tmp_path):
+        """Test that locking mechanism properly serializes write operations."""
+        filepath = tmp_path / "serialized_test.txt"
+        num_writers = 5
+        write_count = [0]  # Use list to share across threads
+        lock = threading.Lock()
+        in_write_zone = threading.Event()
+        ready_to_exit = threading.Event()
+        errors = []
+
+        def tracked_writer(writer_id: int):
+            try:
+                # First writer enters zone and signals
+                with lock:
+                    my_turn = write_count[0]
+                    write_count[0] += 1
+
+                # Only the first writer waits in the critical zone
+                if my_turn == 0:
+                    in_write_zone.set()
+                    # Hold while others try to acquire
+                    ready_to_exit.wait(timeout=5)
+                else:
+                    # Others wait for first to signal it's in zone
+                    in_write_zone.wait(timeout=2)
+
+                # Now perform the actual write
+                atomic_write(filepath, f"Write {writer_id}")
+
+            except Exception as e:
+                errors.append((writer_id, e))
+
+        # Start first writer
+        t1 = threading.Thread(target=tracked_writer, args=(0,))
+        t1.start()
+
+        # Wait for first writer to enter zone
+        assert in_write_zone.wait(timeout=2), "First writer should signal it's in write zone"
+
+        # Start remaining writers while first is holding
+        threads = [t1]
+        for i in range(1, num_writers):
+            t = threading.Thread(target=tracked_writer, args=(i,))
+            threads.append(t)
+            t.start()
+
+        # Give other writers time to queue up on the lock
+        import time
+        time.sleep(0.2)
+
+        # Release first writer
+        ready_to_exit.set()
+
+        # Wait for all to complete
+        for t in threads:
+            t.join(timeout=5)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+
+        # Verify final state is consistent (one writer won)
+        assert filepath.exists()
+        final_content = filepath.read_text()
+        assert final_content.startswith("Write ")  # Valid content pattern
+
+    def test_high_contention_stress_test(self, tmp_path):
+        """Test atomic write under high contention with many concurrent writers."""
+        filepath = tmp_path / "stress_test.txt"
+        num_writers = 50
+        errors = []
+        success_count = [0]
+
+        def stress_writer(writer_id: int):
+            try:
+                # Each writer attempts multiple times
+                for attempt in range(3):
+                    content = f"S{writer_id}-A{attempt}:" + "y" * 500
+                    atomic_write(filepath, content)
+                    success_count[0] += 1
+                    import time
+                    time.sleep(0.001)  # Small delay to increase contention
+            except Exception as e:
+                errors.append((writer_id, attempt, e))
+
+        # Launch all writers
+        threads = []
+        for i in range(num_writers):
+            t = threading.Thread(target=stress_writer, args=(i,))
+            threads.append(t)
+            t.start()
+
+        # Wait for completion
+        for t in threads:
+            t.join(timeout=15)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors occurred during stress test: {errors}"
+
+        # Verify all writes succeeded
+        assert success_count[0] == num_writers * 3, f"Expected {num_writers * 3} writes, got {success_count[0]}"
+
+        # Verify final file is valid
+        assert filepath.exists()
+        final_content = filepath.read_text()
+
+        # Verify content is complete (not truncated or corrupted)
+        assert len(final_content) > 500, "Content should be substantial"
+        assert final_content.endswith("y" * 500), "Content should end with expected pattern"
+
+    def test_concurrent_writes_with_backup(self, tmp_path):
+        """Test concurrent writes with backup creation."""
+        filepath = tmp_path / "backup_concurrent.txt"
+        num_writers = 8
+        errors = []
+
+        def backup_writer(writer_id: int):
+            try:
+                content = f"Backup-{writer_id}:" + "z" * 200
+                atomic_write(filepath, content, create_backup=True)
+            except Exception as e:
+                errors.append((writer_id, e))
+
+        # Create initial file
+        filepath.write_text("Initial content")
+
+        # Launch concurrent writers with backup
+        threads = []
+        for i in range(num_writers):
+            t = threading.Thread(target=backup_writer, args=(i,))
+            threads.append(t)
+            t.start()
+
+        # Wait for completion
+        for t in threads:
+            t.join(timeout=5)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+
+        # Verify final state
+        assert filepath.exists()
+        final_content = filepath.read_text()
+
+        # Should have content from one writer
+        valid_content = False
+        for writer_id in range(num_writers):
+            expected = f"Backup-{writer_id}:" + "z" * 200
+            if final_content == expected:
+                valid_content = True
+                break
+
+        assert valid_content, "Final content should match one writer's pattern"
+
+
+class TestConcurrentAtomicAppend:
+    """Test concurrent access to atomic_append function."""
+
+    def test_concurrent_appends_record_all_data(self, tmp_path):
+        """Test that concurrent appends record all data without loss."""
+        filepath = tmp_path / "concurrent_append.log"
+        num_appenders = 10
+        records_per_appender = 5
+        errors = []
+
+        def appender(appender_id: int):
+            try:
+                for i in range(records_per_appender):
+                    record = f"appender-{appender_id}-record-{i}\n"
+                    atomic_append(filepath, record)
+            except Exception as e:
+                errors.append((appender_id, e))
+
+        # Launch all appenders concurrently
+        threads = []
+        for i in range(num_appenders):
+            t = threading.Thread(target=appender, args=(i,))
+            threads.append(t)
+            t.start()
+
+        # Wait for completion
+        for t in threads:
+            t.join(timeout=5)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+
+        # Verify all records were written
+        assert filepath.exists()
+        lines = filepath.read_text().splitlines()
+
+        # Should have all records (order may vary due to locking)
+        expected_count = num_appenders * records_per_appender
+        assert len(lines) == expected_count, f"Expected {expected_count} lines, got {len(lines)}"
+
+        # Verify all records are present and complete
+        for appender_id in range(num_appenders):
+            for record_id in range(records_per_appender):
+                expected_line = f"appender-{appender_id}-record-{record_id}"
+                assert expected_line in lines, f"Missing record: {expected_line}"
+
+    def test_concurrent_append_with_existing_content(self, tmp_path):
+        """Test concurrent appends preserve existing content."""
+        filepath = tmp_path / "append_existing.txt"
+        initial_lines = ["initial-1", "initial-2", "initial-3"]
+        filepath.write_text("\n".join(initial_lines) + "\n")
+
+        num_appenders = 5
+        errors = []
+
+        def appender(appender_id: int):
+            try:
+                record = f"appended-{appender_id}\n"
+                atomic_append(filepath, record)
+            except Exception as e:
+                errors.append((appender_id, e))
+
+        # Launch concurrent appenders
+        threads = []
+        for i in range(num_appenders):
+            t = threading.Thread(target=appender, args=(i,))
+            threads.append(t)
+            t.start()
+
+        # Wait for completion
+        for t in threads:
+            t.join(timeout=5)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+
+        # Verify initial content is preserved
+        lines = filepath.read_text().splitlines()
+        for initial_line in initial_lines:
+            assert initial_line in lines, f"Initial line lost: {initial_line}"
+
+        # Verify all appended records are present
+        assert len(lines) == len(initial_lines) + num_appenders
+
+    def test_high_contention_append_stress(self, tmp_path):
+        """Test atomic_append under high contention."""
+        filepath = tmp_path / "append_stress.log"
+        num_appenders = 20
+        records_per_appender = 10
+        errors = []
+        barrier = threading.Barrier(num_appenders)
+
+        def stress_appender(appender_id: int):
+            try:
+                # Synchronize start
+                barrier.wait(timeout=5)
+
+                for i in range(records_per_appender):
+                    record = f"S{appender_id}-R{i}\n"
+                    atomic_append(filepath, record)
+            except Exception as e:
+                errors.append((appender_id, e))
+
+        # Launch all appenders
+        threads = []
+        for i in range(num_appenders):
+            t = threading.Thread(target=stress_appender, args=(i,))
+            threads.append(t)
+            t.start()
+
+        # Wait for completion
+        for t in threads:
+            t.join(timeout=15)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+
+        # Verify all records present
+        lines = filepath.read_text().splitlines()
+        expected_count = num_appenders * records_per_appender
+        assert len(lines) == expected_count, f"Expected {expected_count} records, got {len(lines)}"
+
+
+class TestMixedConcurrentOperations:
+    """Test mixed concurrent atomic_write and atomic_append operations."""
+
+    def test_concurrent_write_and_append_do_not_corrupt(self, tmp_path):
+        """Test that concurrent writes and appends maintain data integrity."""
+        filepath = tmp_path / "mixed_operations.txt"
+        num_writers = 5
+        num_appenders = 5
+        errors = []
+
+        # Initialize with content
+        filepath.write_text("initial\n")
+
+        def writer(writer_id: int):
+            try:
+                content = f"writer-{writer_id}\n"
+                atomic_write(filepath, content)
+            except Exception as e:
+                errors.append(("writer", writer_id, e))
+
+        def appender(appender_id: int):
+            try:
+                content = f"appender-{appender_id}\n"
+                atomic_append(filepath, content)
+            except Exception as e:
+                errors.append(("appender", appender_id, e))
+
+        # Launch mixed operations
+        threads = []
+        for i in range(num_writers):
+            t = threading.Thread(target=writer, args=(i,))
+            threads.append(t)
+            t.start()
+
+        for i in range(num_appenders):
+            t = threading.Thread(target=appender, args=(i,))
+            threads.append(t)
+            t.start()
+
+        # Wait for completion
+        for t in threads:
+            t.join(timeout=10)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+
+        # Verify file is valid and not corrupted
+        assert filepath.exists()
+        content = filepath.read_text()
+        lines = content.splitlines()
+
+        # Should have at least one line
+        assert len(lines) > 0, "File should have content"
+
+        # All lines should be valid (no partial or corrupted records)
+        for line in lines:
+            assert line.startswith(("writer-", "appender-", "initial")), f"Invalid line: {line}"
