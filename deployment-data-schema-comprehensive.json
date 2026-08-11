@@ -1,0 +1,929 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aide-de-camp.ardenone.com/schemas/deployment-data-comprehensive.json",
+  "title": "Comprehensive Deployment Data Schema with 30-Day Completeness Validation",
+  "description": "Complete schema for validating deployment data with 30-day completeness requirements, structural validation, temporal validation, data quality validation, and completeness validation. This schema implements validation rules SV-001 through CV-004 as specified in the 30-day completeness validation specification.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "argo_workflows",
+    "argo_cd",
+    "cluster_deployments",
+    "summary"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Metadata section - Required for all deployment data files. Contains generation timestamps, data period coverage, source systems, and scope information. (Validation Rule: SV-002 - Metadata Structure)",
+      "required": [
+        "generated_at",
+        "data_period_start",
+        "data_period_end",
+        "services",
+        "clusters",
+        "data_sources"
+      ],
+      "properties": {
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when this deployment data was generated. Must be in ISO 8601 format (e.g., '2026-08-06T09:30:00Z'). Used to validate data freshness and determine if data needs refresh. (Validation Rule: TV-002 - Timestamp Validity, TV-003 - Timestamp Consistency)",
+          "example": "2026-08-06T09:30:00Z"
+        },
+        "data_period_start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start of the 30-day analysis window in ISO 8601 format. Defines the beginning of the coverage period for completeness validation. Must be at least 28 days before data_period_end. (Validation Rule: TV-001 - 30-Day Coverage, TV-003 - Timestamp Consistency)",
+          "example": "2026-07-06T00:00:00Z"
+        },
+        "data_period_end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "End of the 30-day analysis window in ISO 8601 format. Defines the coverage period boundary. Must be before or equal to generated_at. (Validation Rule: TV-001 - 30-Day Coverage, TV-003 - Timestamp Consistency)",
+          "example": "2026-08-06T09:30:00Z"
+        },
+        "services": {
+          "type": "array",
+          "description": "List of services covered in this deployment data. Must include at least one service. For whisper-stt validation, must contain 'whisper-stt'. Used to scope validation to specific services. (Validation Rule: SV-002 - Metadata Structure)",
+          "items": {
+            "type": "string",
+            "description": "Service name identifier"
+          },
+          "minItems": 1,
+          "contains": {
+            "const": "whisper-stt",
+            "description": "Must contain whisper-stt service for 30-day completeness validation"
+          },
+          "example": ["whisper-stt"]
+        },
+        "clusters": {
+          "type": "array",
+          "description": "List of Kubernetes clusters queried for deployment data. Each cluster should be accessible and contain the deployment history. Must include at least one cluster. (Validation Rule: SV-002 - Metadata Structure)",
+          "items": {
+            "type": "string",
+            "description": "Cluster name identifier (e.g., 'ardenone-cluster')"
+          },
+          "minItems": 1,
+          "example": ["ardenone-cluster"]
+        },
+        "data_sources": {
+          "type": "array",
+          "description": "Data sources used to compile deployment information. Each source contributes different aspects of deployment data. At least one source required. (Validation Rule: SV-002 - Metadata Structure)",
+          "items": {
+            "type": "string",
+            "description": "Data source identifier",
+            "enum": [
+              "kubernetes_replicasets",
+              "argo_workflows",
+              "argo_cd",
+              "git_history",
+              "pod_monitoring"
+            ],
+            "enumDescriptions": {
+              "kubernetes_replicasets": "ReplicaSet history from Kubernetes API - provides deployment timestamps, images, and replica counts",
+              "argo_workflows": "CI/CD pipeline execution data from Argo Workflows - provides build timestamps and pipeline success/failure",
+              "argo_cd": "Application sync and health status from ArgoCD - provides current deployment state and sync status",
+              "git_history": "Git commit history - provides deployment commits and change metadata",
+              "pod_monitoring": "Pod health and runtime metrics - provides current pod status and resource usage"
+            }
+          },
+          "minItems": 1,
+          "example": ["kubernetes_replicasets", "argo_workflows", "argo_cd"]
+        }
+      }
+    },
+    "argo_workflows": {
+      "type": "object",
+      "description": "Argo Workflows section - Optional but recommended. Contains CI/CD pipeline execution data for build workflows. Provides deployment pipeline success rates and build timestamps. (Validation Rule: SV-001 - Top-Level Structure - optional section)",
+      "properties": {
+        "whisper_stt_build": {
+          "type": "object",
+          "description": "whisper-stt build workflow template and execution data. Contains template metadata and run history. Optional if no Argo Workflows are configured.",
+          "required": [
+            "template_name",
+            "template_created",
+            "workflow_runs_last_30_days",
+            "workflow_runs"
+          ],
+          "properties": {
+            "template_name": {
+              "type": "string",
+              "description": "Name of the Argo WorkflowTemplate used for whisper-stt builds. Identifies the pipeline template in the Argo Workflows system.",
+              "example": "whisper-stt-build"
+            },
+            "template_created": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the workflow template was created. Used to track pipeline configuration age and changes.",
+              "example": "2026-05-27T02:26:47Z"
+            },
+            "workflow_runs_last_30_days": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of workflow runs in the 30-day period. Indicates CI/CD activity level. Zero may indicate manual deployments or missing data.",
+              "example": 0
+            },
+            "workflow_runs": {
+              "type": "array",
+              "description": "Detailed list of workflow runs with timestamps, status, and duration. Provides execution history for success/failure analysis.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "workflow_name": {
+                    "type": "string",
+                    "description": "Unique name of this workflow run instance"
+                  },
+                  "started_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Workflow start timestamp in ISO 8601 format"
+                  },
+                  "finished_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Workflow completion timestamp in ISO 8601 format"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["Succeeded", "Failed", "Error", "Running"],
+                    "description": "Final workflow execution status. Succeeded indicates successful build, Failed/Error indicate build failures.",
+                    "enumDescriptions": {
+                      "Succeeded": "Workflow completed successfully",
+                      "Failed": "Workflow failed during execution",
+                      "Error": "Workflow encountered a system error",
+                      "Running": "Workflow is currently executing"
+                    }
+                  },
+                  "duration_seconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Workflow execution duration in seconds. Used for performance analysis and trend detection."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "argo_cd": {
+      "type": "object",
+      "description": "ArgoCD section - Optional but recommended. Contains ArgoCD application deployment state, sync status, and health information. Provides current GitOps deployment state. (Validation Rule: SV-001 - Top-Level Structure - optional section)",
+      "properties": {
+        "whisper-stt": {
+          "type": "object",
+          "description": "ArgoCD applications for whisper-stt service. Contains application discovery and status information. Optional if ArgoCD is not used for this service.",
+          "required": ["application_found", "applications"],
+          "properties": {
+            "application_found": {
+              "type": "boolean",
+              "description": "Whether whisper-stt ArgoCD application was found in the cluster. False indicates manual deployment or missing ArgoCD configuration.",
+              "example": false
+            },
+            "applications": {
+              "type": "array",
+              "description": "List of ArgoCD applications for whisper-stt. Empty array if application_found is false. Populated with application details if found.",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "namespace",
+                  "project",
+                  "sync_status",
+                  "health_status"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "ArgoCD application name identifier"
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Kubernetes namespace where the application is deployed"
+                  },
+                  "project": {
+                    "type": "string",
+                    "description": "ArgoCD project name for grouping applications"
+                  },
+                  "sync_status": {
+                    "type": "string",
+                    "enum": ["Synced", "OutOfSync", "Unknown"],
+                    "description": "ArgoCD sync status indicates if deployed resources match Git repository. Synced is desired state.",
+                    "enumDescriptions": {
+                      "Synced": "Application is in sync with Git repository",
+                      "OutOfSync": "Application differs from Git repository",
+                      "Unknown": "Sync status could not be determined"
+                    }
+                  },
+                  "health_status": {
+                    "type": "string",
+                    "enum": ["Healthy", "Progressing", "Degraded", "Missing", "Unknown"],
+                    "description": "ArgoCD health status indicates application operational state. Healthy is desired state.",
+                    "enumDescriptions": {
+                      "Healthy": "Application is healthy and operational",
+                      "Progressing": "Application is transitioning to a new state",
+                      "Degraded": "Application is operational but degraded",
+                      "Missing": "Application resources are not found",
+                      "Unknown": "Health status could not be determined"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "cluster_deployments": {
+      "type": "object",
+      "description": "Cluster Deployments section - Required. Contains Kubernetes deployment data from ReplicaSet analysis. This is the primary data source for 30-day completeness validation. (Validation Rule: SV-001, SV-003 - Service-Specific Structure)",
+      "properties": {
+        "whisper-stt": {
+          "type": "object",
+          "description": "whisper-stt deployment information. Contains deployment metadata, replica history, and version information. Required for 30-day completeness validation. (Validation Rule: SV-003 - Service-Specific Structure, DQ-001 - Required Fields Presence)",
+          "required": [
+            "namespace",
+            "deployment_name",
+            "created_at",
+            "current_image",
+            "current_replicas",
+            "deployments_last_30_days",
+            "successful_deployments",
+            "failed_deployments",
+            "deployment_versions"
+          ],
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "description": "Kubernetes namespace where whisper-stt is deployed. Critical field for cluster resource identification. (Validation Rule: DQ-001 - Required Fields Presence)",
+              "example": "whisper-stt"
+            },
+            "deployment_name": {
+              "type": "string",
+              "description": "Kubernetes deployment resource name. Critical field for deployment tracking. (Validation Rule: DQ-001 - Required Fields Presence)",
+              "example": "whisper-stt"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Initial deployment creation timestamp. Indicates when the service was first deployed to the cluster.",
+              "example": "2026-05-01T17:26:49Z"
+            },
+            "current_image": {
+              "type": "string",
+              "description": "Current container image in use. Must match pattern registry/name:tag. Critical field for version tracking. (Validation Rule: DQ-001 - Required Fields Presence)",
+              "pattern": "^[a-z0-9-]+/[a-z0-9-]+:[\\w.+]+$",
+              "patternDescription": "Container image format: registry/repository:tag (e.g., ronaldraygun/whisper-stt:1.8.6)",
+              "example": "ronaldraygun/whisper-stt:1.8.6"
+            },
+            "current_replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Current number of running replicas for this deployment. Must be non-negative. (Validation Rule: DQ-002 - Numeric Field Ranges)",
+              "example": 1
+            },
+            "last_updated": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Most recent deployment update timestamp. Used to determine deployment freshness and activity.",
+              "example": "2026-07-12T16:54:57Z"
+            },
+            "replica_history": {
+              "type": "array",
+              "description": "Historical ReplicaSet data for the 30-day period. Primary data source for completeness validation. Contains all deployment attempts with timestamps, images, and outcomes. (Validation Rule: CV-001 - Minimum Deployment Days, CV-002 - Gap Detection, CV-003 - Replica History Completeness)",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "created_at",
+                  "image",
+                  "replicas",
+                  "status",
+                  "days_ago"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "ReplicaSet name identifier. Kubernetes-generated name with unique hash suffix."
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "ReplicaSet creation timestamp. Critical for temporal analysis and gap detection. Must be within 30-day window for completeness. (Validation Rule: TV-001 - 30-Day Coverage)"
+                  },
+                  "image": {
+                    "type": "string",
+                    "description": "Container image used in this ReplicaSet. Must match registry/name:tag pattern."
+                  },
+                  "replicas": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of replicas requested for this ReplicaSet. Must be non-negative. (Validation Rule: DQ-002 - Numeric Field Ranges)"
+                  },
+                  "available_replicas": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "nullable": true,
+                    "description": "Number of available replicas for this ReplicaSet. Null if scaled down to zero. Must be non-negative if not null."
+                  },
+                  "ready_replicas": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "nullable": true,
+                    "description": "Number of ready replicas for this ReplicaSet. Null if scaled down to zero. Must be non-negative if not null."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["successful", "rolled_over", "scaled_down_or_failed", "failed"],
+                    "description": "ReplicaSet deployment outcome. Used for success/failure analysis and deployment reliability metrics. (Validation Rule: DQ-003 - Enum Field Validity)",
+                    "enumDescriptions": {
+                      "successful": "ReplicaSet deployed successfully and is running",
+                      "rolled_over": "ReplicaSet was replaced by a newer deployment",
+                      "scaled_down_or_failed": "ReplicaSet failed or was scaled down",
+                      "failed": "ReplicaSet deployment failed"
+                    }
+                  },
+                  "days_ago": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 30,
+                    "description": "Days since this ReplicaSet was created, relative to data generation time. Value of 0 means created today, 30 means created 30 days ago. Used for temporal analysis and coverage calculation. (Validation Rule: TV-001 - 30-Day Coverage)"
+                  }
+                }
+              },
+              "minItems": 5,
+              "minItemsDescription": "Minimum 5 replica history entries required for 30-day completeness validation. Fewer entries indicate insufficient deployment activity or missing data. (Validation Rule: CV-001 - Minimum Deployment Days: requires 5 distinct deployment days)"
+            },
+            "deployments_last_30_days": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of deployments in the 30-day period. Includes successful, failed, and rolled-over deployments. Must be non-negative. (Validation Rule: DQ-002 - Numeric Field Ranges, CV-004 - Summary Metrics Consistency)",
+              "example": 4
+            },
+            "successful_deployments": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of successful deployments in the 30-day period. Deployments with status 'successful' or 'rolled_over'. Must be non-negative. (Validation Rule: DQ-002 - Numeric Field Ranges)",
+              "example": 1
+            },
+            "failed_deployments": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of failed or scaled-down deployments in the 30-day period. Deployments with status 'failed' or 'scaled_down_or_failed'. Must be non-negative. (Validation Rule: DQ-002 - Numeric Field Ranges)",
+              "example": 3
+            },
+            "deployment_versions": {
+              "type": "array",
+              "description": "List of image versions deployed in the 30-day period. Each version must match semantic version pattern. Used to track version churn and rollout patterns. (Validation Rule: DQ-003 - Enum/Pattern Field Validity)",
+              "items": {
+                "type": "string",
+                "pattern": "^[\\d.]+$",
+                "patternDescription": "Semantic version pattern (e.g., '1.8.6', '2.0.0')"
+              },
+              "minItems": 1,
+              "minItemsDescription": "At least one deployment version must be present in the 30-day period.",
+              "example": ["1.8.6", "1.8.4", "1.8.2"]
+            },
+            "all_versions_in_history": {
+              "type": "array",
+              "description": "Complete list of all versions ever deployed for this service. Includes versions outside the 30-day window. Provides deployment history context. Each version must match semantic version pattern.",
+              "items": {
+                "type": "string",
+                "pattern": "^[\\d.]+$",
+                "patternDescription": "Semantic version pattern"
+              },
+              "minItems": 1,
+              "minItemsDescription": "At least one version must be present in complete deployment history.",
+              "example": ["1.2.5", "1.3.0", "1.3.1", "1.4.1", "1.5.1", "1.6.0", "1.7.0", "1.8.2", "1.8.4", "1.8.6"]
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Summary section - Required. Contains aggregated statistics for the 30-day deployment period. Provides high-level metrics and coverage indicators. (Validation Rule: SV-001, CV-004 - Summary Metrics Consistency)",
+      "required": [
+        "total_deployments_last_30_days",
+        "whisper_stt_deployments",
+        "successful_deployments",
+        "failed_or_scaled_down",
+        "data_coverage",
+        "gaps_detected",
+        "largest_gap_days"
+      ],
+      "properties": {
+        "total_deployments_last_30_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total deployments across all services in the 30-day period. Must match cluster_deployments totals. (Validation Rule: CV-004 - Summary Metrics Consistency, DQ-002 - Numeric Field Ranges)",
+          "example": 4
+        },
+        "whisper_stt_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of whisper-stt deployments in the 30-day period. Must be non-negative. (Validation Rule: DQ-002 - Numeric Field Ranges)",
+          "example": 4
+        },
+        "successful_deployments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of successful deployments across all services. Must be non-negative. (Validation Rule: DQ-002 - Numeric Field Ranges)",
+          "example": 1
+        },
+        "failed_or_scaled_down": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failed or scaled-down deployments across all services. Must be non-negative. (Validation Rule: DQ-002 - Numeric Field Ranges)",
+          "example": 3
+        },
+        "data_coverage": {
+          "type": "string",
+          "pattern": "^\\d+%$",
+          "patternDescription": "Percentage format (e.g., '100%', '95%')",
+          "description": "Percentage of data coverage in the 30-day period. Calculated as (days_covered / 30) * 100. Values below 93% (28/30) indicate insufficient coverage. (Validation Rule: TV-001 - 30-Day Coverage)",
+          "example": "100%"
+        },
+        "gaps_detected": {
+          "type": "boolean",
+          "description": "Whether data gaps were detected in the 30-day period. True indicates missing deployment days, false indicates continuous coverage. Critical for completeness validation. (Validation Rule: CV-002 - Gap Detection, CV-004 - Summary Metrics Consistency)",
+          "example": false
+        },
+        "largest_gap_days": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30,
+          "description": "Size of the largest gap in days. Value of 0 means no gaps. Values >= 14 indicate critical coverage issues. (Validation Rule: CV-002 - Gap Detection)",
+          "example": 0
+        }
+      }
+    },
+    "pod_health": {
+      "type": "object",
+      "description": "Pod Health section - Optional but recommended. Contains current pod status and runtime metrics. Provides operational health snapshot. (Validation Rule: SV-001 - Top-Level Structure - optional section)",
+      "required": ["current_pods", "pod_metrics"],
+      "properties": {
+        "current_pods": {
+          "type": "array",
+          "description": "List of currently running pods with detailed status. Used for operational monitoring and troubleshooting.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "created",
+              "age_days",
+              "status",
+              "containers"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Pod name identifier"
+              },
+              "created": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Pod creation timestamp"
+              },
+              "age_days": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Pod age in days since creation"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["Running", "Pending", "Failed", "Succeeded", "Unknown"],
+                "description": "Current pod phase status"
+              },
+              "containers": {
+                "type": "array",
+                "description": "Container status within the pod",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "name",
+                    "image",
+                    "ready",
+                    "restartCount"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Container name"
+                    },
+                    "image": {
+                      "type": "string",
+                      "description": "Container image"
+                    },
+                    "ready": {
+                      "type": "boolean",
+                      "description": "Whether container is ready"
+                    },
+                    "restartCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Number of container restarts"
+                    },
+                    "started": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Container start timestamp"
+                    }
+                  }
+                }
+              },
+              "totalRestartCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total restarts across all containers in the pod"
+              },
+              "node": {
+                "type": "string",
+                "description": "Node where the pod is running"
+              }
+            }
+          }
+        },
+        "pod_metrics": {
+          "type": "object",
+          "description": "Aggregate pod health metrics across all pods",
+          "required": [
+            "total_pods",
+            "running_pods",
+            "total_containers",
+            "total_restarts",
+            "crashloops",
+            "oomkills",
+            "failed_pods",
+            "pending_pods"
+          ],
+          "properties": {
+            "total_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of pods"
+            },
+            "running_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of running pods"
+            },
+            "total_containers": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of containers across all pods"
+            },
+            "total_restarts": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total container restarts"
+            },
+            "crashloops": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of pods in CrashLoopBackOff"
+            },
+            "oomkills": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of OOMKilled containers"
+            },
+            "failed_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of failed pods"
+            },
+            "pending_pods": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of pending pods"
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Resources section - Optional. Contains CPU and memory allocation and limits for the deployment. Used for capacity planning and resource analysis.",
+      "properties": {
+        "whisper-stt": {
+          "type": "object",
+          "description": "Resource specifications for whisper-stt deployment",
+          "required": ["requests", "limits"],
+          "properties": {
+            "requests": {
+              "type": "object",
+              "description": "Resource requests - guaranteed minimum allocation",
+              "required": ["cpu", "memory"],
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[\\d]+m?$|^\\d+$",
+                  "patternDescription": "CPU format: cores (e.g., '1') or millicores (e.g., '100m' = 0.1 cores)",
+                  "example": "1"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+                  "patternDescription": "Memory format: Kubernetes units (e.g., '4Gi', '512Mi')",
+                  "example": "4Gi"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "description": "Resource limits - maximum allowed allocation",
+              "required": ["cpu", "memory"],
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[\\d]+m?$|^\\d+$",
+                  "patternDescription": "CPU format: cores (e.g., '8') or millicores (e.g., '8000m')",
+                  "example": "8"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+                  "patternDescription": "Memory format: Kubernetes units (e.g., '8Gi', '16384Mi')",
+                  "example": "8Gi"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "description": "Storage section - Optional. Contains PVC and volume information for persistent storage. Used for capacity planning and storage analysis.",
+      "properties": {
+        "whisper-model-cache": {
+          "type": "object",
+          "description": "ML model cache storage details",
+          "required": [
+            "capacity",
+            "storage_class",
+            "status",
+            "age_days"
+          ],
+          "properties": {
+            "capacity": {
+              "type": "string",
+              "pattern": "^[\\d]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+              "patternDescription": "Storage capacity: Kubernetes units (e.g., '10Gi')",
+              "example": "10Gi"
+            },
+            "storage_class": {
+              "type": "string",
+              "description": "Kubernetes storage class name"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["Bound", "Pending", "Lost", "Available"],
+              "description": "PVC binding status"
+            },
+            "age_days": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Storage age in days since creation"
+            }
+          }
+        }
+      }
+    },
+    "error_incidents": {
+      "type": "object",
+      "description": "Error Incidents section - Optional. Contains error incidents and failures recorded during the 30-day period. Used for reliability analysis and failure pattern detection.",
+      "required": [
+        "total_incidents",
+        "critical_incidents",
+        "warning_incidents",
+        "incident_details"
+      ],
+      "properties": {
+        "total_incidents": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of error incidents recorded"
+        },
+        "critical_incidents": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of critical severity incidents"
+        },
+        "warning_incidents": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of warning severity incidents"
+        },
+        "incident_details": {
+          "type": "array",
+          "description": "Detailed incident reports with timestamps, severity, and resolution",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Incident occurrence timestamp"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["critical", "warning", "info"],
+                "description": "Incident severity level"
+              },
+              "error_type": {
+                "type": "string",
+                "description": "Type of error or failure"
+              },
+              "description": {
+                "type": "string",
+                "description": "Detailed incident description"
+              },
+              "affected_components": {
+                "type": "array",
+                "description": "List of affected components",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "resolution": {
+                "type": "string",
+                "description": "Resolution details, if resolved"
+              }
+            }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "description": "Notes section - Optional. Contains additional observations, context, and analysis notes about the deployment data. Used to document findings and provide context.",
+      "items": {
+        "type": "string",
+        "description": "Individual note string with observation or context"
+      },
+      "example": [
+        "No Argo Workflow runs found for whisper-stt in the last 30 days",
+        "Deployments appear to be managed via ArgoCD or manual kubectl operations"
+      ]
+    }
+  },
+  "definitions": {
+    "thirtyDayCoverage": {
+      "type": "object",
+      "description": "Validation definition for 30-day data completeness requirements. Ensures deployment data spans sufficient time for operational analysis.",
+      "properties": {
+        "data_period_start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start of analysis period"
+        },
+        "data_period_end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "End of analysis period"
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "data_coverage": {
+              "type": "string",
+              "pattern": "^(100|[1-9]?[0-9])%$",
+              "description": "Coverage percentage (0-100%)"
+            },
+            "gaps_detected": {
+              "type": "boolean",
+              "description": "Whether gaps exist in coverage"
+            },
+            "largest_gap_days": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Size of largest gap in days"
+            }
+          },
+          "required": ["data_coverage", "gaps_detected", "largest_gap_days"]
+        }
+      },
+      "required": ["data_period_start", "data_period_end", "summary"]
+    },
+    "validationRules": {
+      "description": "Complete validation rule catalog with IDs and descriptions",
+      "structural_validation": {
+        "SV-001": {
+          "name": "Top-Level Structure",
+          "description": "Validates presence of required top-level sections (metadata, cluster_deployments, summary)",
+          "severity": "CRITICAL",
+          "impact": "Deployment data is incomplete without required sections"
+        },
+        "SV-002": {
+          "name": "Metadata Structure",
+          "description": "Validates metadata field presence, types, and non-empty array requirements",
+          "severity": "CRITICAL",
+          "impact": "Cannot validate data period or scope without complete metadata"
+        },
+        "SV-003": {
+          "name": "Service-Specific Structure",
+          "description": "Validates service deployment data structure and required fields",
+          "severity": "CRITICAL",
+          "impact": "Cannot perform completeness analysis without service data"
+        }
+      },
+      "temporal_validation": {
+        "TV-001": {
+          "name": "30-Day Coverage",
+          "description": "Validates deployment data covers minimum 28 days (recommended 30) within analysis period. Checks replica_history timestamps span sufficient time for analysis.",
+          "severity": "CRITICAL if < 28 days, WARNING if < 30 days",
+          "thresholds": {
+            "critical": "Less than 28 days covered",
+            "warning": "28-29 days covered",
+            "pass": "30 days covered"
+          },
+          "impact": "Insufficient data for trend analysis and pattern detection"
+        },
+        "TV-002": {
+          "name": "Timestamp Validity",
+          "description": "Validates all timestamp fields are in ISO 8601 format, not in the future, and not unreasonably old",
+          "severity": "CRITICAL",
+          "impact": "Cannot perform temporal analysis with invalid timestamps"
+        },
+        "TV-003": {
+          "name": "Timestamp Consistency",
+          "description": "Validates timestamp relationships: start < end, end <= generated_at",
+          "severity": "CRITICAL",
+          "impact": "Inconsistent timestamps indicate data generation errors"
+        }
+      },
+      "data_quality_validation": {
+        "DQ-001": {
+          "name": "Required Fields Presence",
+          "description": "Validates critical fields are present and non-null: namespace, deployment_name, current_image, replica_history",
+          "severity": "CRITICAL",
+          "impact": "Missing critical fields prevents deployment analysis"
+        },
+        "DQ-002": {
+          "name": "Numeric Field Ranges",
+          "description": "Validates numeric fields are non-negative and aggregate consistency (successful + failed <= total)",
+          "severity": "CRITICAL",
+          "impact": "Invalid numeric values indicate data corruption"
+        },
+        "DQ-003": {
+          "name": "Enum Field Validity",
+          "description": "Validates status fields contain only allowed enum values",
+          "severity": "WARNING",
+          "impact": "Invalid status values may indicate data collection errors"
+        }
+      },
+      "completeness_validation": {
+        "CV-001": {
+          "name": "Minimum Deployment Days",
+          "description": "Validates minimum 5 distinct deployment days (recommended 10) in replica_history. Ensures sufficient deployment activity for analysis.",
+          "severity": "CRITICAL if < 5 days, WARNING if < 10 days",
+          "thresholds": {
+            "critical": "Less than 5 distinct deployment days",
+            "warning": "5-9 distinct deployment days",
+            "pass": "10+ distinct deployment days"
+          },
+          "impact": "Insufficient deployment activity for reliability analysis"
+        },
+        "CV-002": {
+          "name": "Gap Detection",
+          "description": "Detects significant gaps between consecutive deployments (>= 7 days warning, >= 14 days critical). Identifies missing deployment data or service inactivity.",
+          "severity": "WARNING if gap >= 7 days, CRITICAL if gap >= 14 days",
+          "thresholds": {
+            "warning": "Gap of 7-13 days",
+            "critical": "Gap of 14+ days"
+          },
+          "impact": "Gaps indicate missing data or service downtime affecting analysis completeness"
+        },
+        "CV-003": {
+          "name": "Replica History Completeness",
+          "description": "Validates replica_history is not empty and contains sufficient records for 30-day analysis",
+          "severity": "CRITICAL",
+          "minimum_records": 5,
+          "impact": "Empty replica history prevents all deployment analysis"
+        },
+        "CV-004": {
+          "name": "Summary Metrics Consistency",
+          "description": "Validates summary metrics match cluster deployment data: total_deployments_last_30_days, gaps_detected consistency",
+          "severity": "WARNING",
+          "impact": "Inconsistent summary metrics indicate data aggregation errors"
+        }
+      },
+      "cross_service_validation": {
+        "CSV-001": {
+          "name": "Data Period Alignment",
+          "description": "Validates all services use the same global data period for multi-service comparison",
+          "severity": "WARNING",
+          "impact": "Misaligned periods prevent cross-service analysis"
+        },
+        "CSV-002": {
+          "name": "Multi-Service Comparison",
+          "description": "Validates data structure supports multiple services for comparative analysis",
+          "severity": "INFO",
+          "impact": "Single-service data cannot be compared across services"
+        }
+      }
+    }
+  }
+}
