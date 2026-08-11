@@ -126,21 +126,21 @@ def retry_with_exponential_backoff(
         Decorator function that wraps the target function with retry logic
 
     Example:
-        # Use configured defaults
+        # Async function - use configured defaults
         @retry_with_exponential_backoff()
         async def fetch_data():
             ...
 
-        # Override specific parameters
+        # Sync function - decorator automatically detects and handles sync
         @retry_with_exponential_backoff(max_retries=5, base_delay=2.0)
-        async def fetch_data():
+        def read_file():
             ...
 
-        # Override with exceptions
+        # Override with exceptions (works for both sync and async)
         @retry_with_exponential_backoff(
             exceptions=(sqlite3.OperationalError, asyncio.TimeoutError)
         )
-        async def fetch_data():
+        async def database_operation():
             ...
     """
     # Import here to avoid circular dependency
