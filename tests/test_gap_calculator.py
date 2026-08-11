@@ -678,7 +678,7 @@ class TestDetectAnomalies:
 
         anomalies = detect_anomalies(gap_periods, summary)
         assert len(anomalies) == 1
-        assert "consecutive gaps dominate" in anomalies[0].lower()
+        assert "consecutive gap dominance" in anomalies[0].lower()
         assert "8/10" in anomalies[0]
 
     def test_multiple_anomalies_detected(self):
