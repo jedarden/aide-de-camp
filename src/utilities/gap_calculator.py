@@ -373,10 +373,10 @@ def detect_anomalies(
     summary: Dict[str, Any]
 ) -> List[str]:
     """
-    Detect anomalies in gap patterns.
+    Detect anomalies in gap patterns with actionable guidance.
 
     Returns:
-        List of anomaly descriptions
+        List of anomaly descriptions with remediation steps
     """
     anomalies = []
 
@@ -386,15 +386,23 @@ def detect_anomalies(
     # Check for extended gaps (> 14 days)
     extended_gaps = [gp for gp in gap_periods if gp.size_days > 14]
     if extended_gaps:
+        impact_pct = round((summary['longest_gap_days'] / summary.get('total_analysis_days', 30)) * 100)
         anomalies.append(
-            f"Found {len(extended_gaps)} extended gap(s) (>14 days): "
-            f"longest is {summary['longest_gap_days']} days"
+            f"CRITICAL: Found {len(extended_gaps)} extended gap(s) (>14 days): "
+            f"longest is {summary['longest_gap_days']} days ({impact_pct}% of analysis period). "
+            f"ACTION: Review data collection infrastructure for failures. "
+            f"Expected: continuous coverage across days 1-30. "
+            f"Fill missing deployment data from backup sources or extend analysis period to exclude gap."
         )
 
     # Check for high gap intensity (> 0.5 = gap every other day)
     if summary['gap_intensity'] > 0.5:
+        intensity_pct = summary['gap_intensity'] * 100
         anomalies.append(
-            f"High gap intensity: {summary['gap_intensity']:.2%} of days have gaps"
+            f"HIGH GAP INTENSITY: {summary['gap_intensity']:.2%} ({intensity_pct:.0f}%) of days have gaps. "
+            f"Expected: <50% gap intensity for reliable analysis. "
+            f"ACTION: Investigate systematic data collection issues. "
+            f"Verify deployment pipeline is operational and logs are being captured consistently."
         )
 
     # Check if consecutive gaps dominate (> 70% of gaps are in consecutive sequences)
@@ -403,8 +411,11 @@ def detect_anomalies(
         consecutive_ratio = consecutive_gap_count / summary['total_gaps']
         if consecutive_ratio > 0.7 and summary['total_gaps'] > 5:
             anomalies.append(
-                f"Consecutive gaps dominate: {consecutive_gap_count}/{summary['total_gaps']} "
-                f"gaps ({consecutive_ratio:.1%}) are in consecutive sequences"
+                f"CONSECUTIVE GAP DOMINANCE: {consecutive_gap_count}/{summary['total_gaps']} "
+                f"gaps ({consecutive_ratio:.1%}) are in consecutive sequences. "
+                f"Expected: isolated gaps rather than consecutive outages. "
+                f"ACTION: Check for extended data collection failures or service downtime periods. "
+                f"Review infrastructure logs during: {summary.get('longest_gap_start', 'unknown')} to {summary.get('longest_gap_end', 'unknown')}."
             )
 
     return anomalies
