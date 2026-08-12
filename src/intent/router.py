@@ -911,31 +911,22 @@ class IntentRouter:
         timings.record("router_ms", routed_intent.router_ms)
         timings.record("json_parse_ms", routed_intent.json_parse_ms)  # Track JSON parsing time
 
-        # Honesty guards for unimplemented intents
+        # Execute action intents via ActionRunner
         if classification.intent_type == IntentType.ACTION:
-            # Action executor is NOT BUILT — broadcast design-only card
-            handler = get_degraded_state_handler()
-            await handler.broadcast_action_design_only(
-                utterance=routed_intent.utterance,
+            from ..action.runner import get_action_runner
+
+            runner = get_action_runner()
+            result = await runner.execute_action_intent(
                 intent_id=routed_intent.intent_id,
                 session_id=routed_intent.session_id,
+                utterance=routed_intent.utterance,
                 project_slug=classification.project_slug,
             )
 
-            # Update intent status to reflect the design-only state
-            store = await self._get_store()
-            await store.update_intent_status(
-                routed_intent.intent_id,
-                "resolved",
-                "Action execution is design-only — executor not built",
-            )
+            # Add timing information
+            timings.record("action_total_ms", result.get("duration_ms", 0))
 
-            return {
-                "intent_id": routed_intent.intent_id,
-                "intent_type": classification.intent_type.value,
-                "status": "design_only",
-                "message": "Action execution is not yet available",
-            }
+            return result
 
         if classification.intent_type == IntentType.REMINDER:
             # Reminders are NOT YET IMPLEMENTED — broadcast clarification card
