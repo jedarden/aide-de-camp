@@ -911,22 +911,14 @@ class IntentRouter:
         timings.record("router_ms", routed_intent.router_ms)
         timings.record("json_parse_ms", routed_intent.json_parse_ms)  # Track JSON parsing time
 
-        # Execute action intents via ActionRunner
+        # Gate removed: ACTION intents now flow through fetch+synthesize path
+        # Previously routed to ActionRunner directly (bypassed fetch strand)
+        # Now action intents follow normal dispatch: fetch → synthesize → result
         if classification.intent_type == IntentType.ACTION:
-            from ..action.runner import get_action_runner
-
-            runner = get_action_runner()
-            result = await runner.execute_action_intent(
-                intent_id=routed_intent.intent_id,
-                session_id=routed_intent.session_id,
-                utterance=routed_intent.utterance,
-                project_slug=classification.project_slug,
+            logger.info(
+                f"ACTION intent {routed_intent.intent_id} flowing through fetch+synthesize path "
+                f"(project_slug: {classification.project_slug})"
             )
-
-            # Add timing information
-            timings.record("action_total_ms", result.get("duration_ms", 0))
-
-            return result
 
         if classification.intent_type == IntentType.REMINDER:
             # Reminders are NOT YET IMPLEMENTED — broadcast clarification card
