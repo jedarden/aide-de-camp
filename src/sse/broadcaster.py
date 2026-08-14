@@ -426,7 +426,10 @@ class EventType:
 
     # Action workflow events
     ACTION_WORKFLOW_STARTED = "action_workflow_started"
+    ACTION_WORKFLOW_PROGRESS = "action_workflow_progress"
     ACTION_STEP_STARTED = "action_step_started"
+    ACTION_STEP_PROGRESS = "action_step_progress"
+    ACTION_STEP_FAILED = "action_step_failed"
     ACTION_STEP_COMPLETED = "action_step_completed"
     ACTION_WORKFLOW_COMPLETED = "action_workflow_completed"
     ACTION_WORKFLOW_FAILED = "action_workflow_failed"

@@ -20,6 +20,10 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "pytest-repeat>=0.9.4",
     "ruff>=0.8.0",
+    # Headless browser automation for canvas verification (bead adc-jr35):
+    # Playwright provides browser automation for testing canvas rendering, SSE,
+    # staleness indicators, and card dismissal. Screenshots verified via Pillow.
+    "playwright>=1.48.0",
     # Objective screenshot analysis for the canvas browser suites (bead adc-jr35):
     # counts distinct rendered colours so a screenshot can be verified to contain
     # real content — not the identical-blank captures the old suite produced when

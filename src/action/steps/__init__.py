@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 from .gitops import GitOperationResult, GitOperationStatus, GitOpsCommitStep, StepResult
 from .read import CIStatusStep, ImageTagStep, PodStatusStep
+from .argocd import ArgoCDSyncStatusStep, SyncStatus, HealthStatus, ArgoCDApplicationStatus
 
 __all__ = [
     "CIStatusStep",
@@ -32,6 +33,10 @@ __all__ = [
     "GitOperationResult",
     "GitOperationStatus",
     "StepResult",
+    "ArgoCDSyncStatusStep",
+    "SyncStatus",
+    "HealthStatus",
+    "ArgoCDApplicationStatus",
 ]
 
 from ..models import ExecutionContext

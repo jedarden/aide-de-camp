@@ -667,9 +667,9 @@ component_usage_patterns (
 
 ```
 aide-de-camp/
-├── adc                      ← CLI entry point (shell script or Python package)
 ├── README.md                ← operational/configuration reference (env vars, configuration table — the file ADR-1 cites)
 ├── README-PHASE4.md         ← Phase 4 verification evidence (cited by Implementation Phases)
+├── pyproject.toml           ← package version and dependencies
 ├── config/
 │   ├── clusters.yaml         ← cluster → ArgoCD endpoint mapping (see Fetch Strand)
 │   ├── confirmations.yaml    ← destructive-operation confirmation settings
@@ -702,18 +702,6 @@ aide-de-camp/
 │   └── escalate/            ← escalate/task-profile prompts
 │       └── task-profile.md
 ├── src/
-│   ├── _version.py           ← package version metadata
-│   ├── calculate_deployment_metrics.py ← deployment metrics utility
-│   ├── categorize_events.py  ← event categorization utility
-│   ├── confirmations.py      ← confirmation helpers
-│   ├── freeze.py             ← self-modification kill switch
-│   ├── main.py               ← FastAPI app entry point
-│   ├── metrics_client.py     ← metrics client
-│   ├── metrics_query_client.py ← metrics query client
-│   ├── parse_log.py          ← log parsing utility
-│   ├── registry.py           ← project registry loader
-│   ├── victorialogs_latency_queries.py ← VictoriaLogs latency queries
-│   ├── victorialogs_queries.py ← VictoriaLogs queries
 │   ├── action/               ← action execution strand (design and step implementations)
 │   │   ├── executor.py
 │   │   ├── manifest_template.py
@@ -777,15 +765,16 @@ aide-de-camp/
 │   │   ├── clusters.py
 │   │   ├── commands.py
 │   │   └── orchestrator.py
-│   ├── instrument/           ← timing instrumentation
-│   │   └── timings.py
 │   ├── intent/               ← intent router and comparison tools
 │   │   ├── comparison.py
 │   │   ├── deterministic_router.py
 │   │   ├── router.py
 │   │   └── unified_comparison.py
+│   ├── instrument/           ← timing instrumentation
+│   │   └── timings.py
 │   ├── llm/                  ← LLM response helpers
 │   │   └── response_parser.py
+│   ├── main.py               ← FastAPI app entry point
 │   ├── memory/               ← memory store and extraction
 │   │   ├── extraction.py
 │   │   └── store.py

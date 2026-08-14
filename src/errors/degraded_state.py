@@ -486,6 +486,173 @@ class DegradedStateHandler:
 
         return await self._get_broadcaster().broadcast(event)
 
+    async def broadcast_action_missing_project(
+        self,
+        utterance: str,
+        intent_id: str,
+        session_id: str,
+    ) -> int:
+        """
+        Broadcast action_missing_project error event.
+
+        Fired when an action intent is received without a project_slug.
+        Action intents require a project to look up workflow definitions.
+
+        Args:
+            utterance: The original utterance
+            intent_id: Intent ID for tracking
+            session_id: Session ID for targeting
+
+        Returns:
+            Number of connections the event was sent to
+        """
+        event = SSEEvent(
+            event_type=EventType.ACTION_WORKFLOW_FAILED,
+            data={
+                "utterance": utterance,
+                "intent_id": intent_id,
+                "error": "missing_project_slug",
+                "message": "Action intents require a project context",
+                "timestamp": datetime.now().isoformat(),
+            },
+            target_session_id=session_id,
+        )
+
+        logger.info(
+            f"Broadcasting action_missing_project for intent {intent_id}"
+        )
+
+        return await self._get_broadcaster().broadcast(event)
+
+    async def broadcast_action_no_workflows(
+        self,
+        utterance: str,
+        intent_id: str,
+        session_id: str,
+        project_slug: str,
+    ) -> int:
+        """
+        Broadcast action_no_workflows error event.
+
+        Fired when the specified project has no workflows defined.
+
+        Args:
+            utterance: The original utterance
+            intent_id: Intent ID for tracking
+            session_id: Session ID for targeting
+            project_slug: Project slug that has no workflows
+
+        Returns:
+            Number of connections the event was sent to
+        """
+        event = SSEEvent(
+            event_type=EventType.ACTION_WORKFLOW_FAILED,
+            data={
+                "utterance": utterance,
+                "intent_id": intent_id,
+                "project_slug": project_slug,
+                "error": "no_workflows",
+                "message": f"No workflows defined for project '{project_slug}'",
+                "timestamp": datetime.now().isoformat(),
+            },
+            target_session_id=session_id,
+        )
+
+        logger.info(
+            f"Broadcasting action_no_workflows for intent {intent_id}: "
+            f"project={project_slug}"
+        )
+
+        return await self._get_broadcaster().broadcast(event)
+
+    async def broadcast_action_invalid_workflow(
+        self,
+        utterance: str,
+        intent_id: str,
+        session_id: str,
+        project_slug: str,
+        validation_error: str,
+    ) -> int:
+        """
+        Broadcast action_invalid_workflow error event.
+
+        Fired when the workflow definition fails validation.
+
+        Args:
+            utterance: The original utterance
+            intent_id: Intent ID for tracking
+            session_id: Session ID for targeting
+            project_slug: Project slug
+            validation_error: Validation error message
+
+        Returns:
+            Number of connections the event was sent to
+        """
+        event = SSEEvent(
+            event_type=EventType.ACTION_WORKFLOW_FAILED,
+            data={
+                "utterance": utterance,
+                "intent_id": intent_id,
+                "project_slug": project_slug,
+                "error": "workflow_validation_failed",
+                "validation_error": validation_error,
+                "message": f"Workflow validation failed for '{project_slug}'",
+                "timestamp": datetime.now().isoformat(),
+            },
+            target_session_id=session_id,
+        )
+
+        logger.info(
+            f"Broadcasting action_invalid_workflow for intent {intent_id}: "
+            f"project={project_slug}"
+        )
+
+        return await self._get_broadcaster().broadcast(event)
+
+    async def broadcast_action_execution_failed(
+        self,
+        utterance: str,
+        intent_id: str,
+        session_id: str,
+        project_slug: str | None,
+        error_reason: str,
+    ) -> int:
+        """
+        Broadcast action_execution_failed error event.
+
+        Fired when action execution fails unexpectedly.
+
+        Args:
+            utterance: The original utterance
+            intent_id: Intent ID for tracking
+            session_id: Session ID for targeting
+            project_slug: Project slug (if available)
+            error_reason: Error message describing the failure
+
+        Returns:
+            Number of connections the event was sent to
+        """
+        event = SSEEvent(
+            event_type=EventType.ACTION_WORKFLOW_FAILED,
+            data={
+                "utterance": utterance,
+                "intent_id": intent_id,
+                "project_slug": project_slug,
+                "error": "execution_failed",
+                "error_reason": error_reason,
+                "message": f"Action execution failed: {error_reason}",
+                "timestamp": datetime.now().isoformat(),
+            },
+            target_session_id=session_id,
+        )
+
+        logger.info(
+            f"Broadcasting action_execution_failed for intent {intent_id}: "
+            f"{error_reason}"
+        )
+
+        return await self._get_broadcaster().broadcast(event)
+
 
 # Global degraded state handler instance
 _degraded_state_handler: Optional[DegradedStateHandler] = None

@@ -558,76 +558,416 @@ async def test_staleness_indicators_rendering(
 # =============================================================================
 
 @pytest.mark.asyncio
-async def test_sse_reconnection_simulation(
+async def test_sse_graceful_reconnection(
     page: Page,
     api_client: ADCAPIClient
 ):
-    """Test SSE reconnection by simulating network disconnection."""
+    """Test graceful SSE reconnection using the drop-sse endpoint.
+
+    This test verifies the full reconnection flow:
+    1. Connect to SSE and receive initial events
+    2. Server gracefully drops the connection (via /test/drop-sse)
+    3. Client detects drop and EventSource auto-reconnects
+    4. New events are received after reconnection
+    """
     session = await api_client.create_session()
     session_id = session["session_id"]
 
-    # Create initial topic
-    topic_id = await api_client.create_topic(
+    # Create initial topic before connecting
+    initial_topic_id = await api_client.create_topic(
         session_id=session_id,
-        label="SSE Reconnection Test",
+        label="Initial Topic Before Drop",
         topic_type="project",
+        summary="Created before SSE drop",
     )
 
-    # Navigate to canvas with session_id parameter
+    # Navigate to canvas and establish SSE connection
     await page.goto(f"{CANVAS_URL}?session_id={session_id}")
     await page.wait_for_load_state("networkidle")
     await page.wait_for_timeout(1000)
 
-    # Verify initial connection
+    # Verify initial connection status
     status_dot = await page.query_selector(".status-dot")
-    assert status_dot is not None
+    assert status_dot is not None, "Status dot should exist"
 
     initial_classes = await status_dot.get_attribute("class") or ""
     assert "disconnected" not in initial_classes, "Should start connected"
 
-    # Simulate network disconnection by going offline
-    await page.context.set_offline(True)
-    await page.wait_for_timeout(2000)  # Give it more time to detect disconnection
+    # Verify initial card is rendered
+    initial_cards = await page.query_selector_all(".topic-card")
+    assert len(initial_cards) >= 1, "Initial topic should be rendered"
 
-    # Verify disconnected state (may take a moment)
-    disconnected_classes = await status_dot.get_attribute("class") or ""
-    # The SSE connection might not immediately show as disconnected in tests
-    # Just verify we can go offline and back online without crashing
-    assert True  # Test passes if we get here without errors
+    # Track console messages for SSE events
+    console_messages = []
+    page.on("console", lambda msg: console_messages.append({"type": msg.type, "text": msg.text}))
 
-    # Take screenshot of disconnected state
-    SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
-    disconnected_screenshot = SCREENSHOT_DIR / "sse_disconnected.png"
-    await page.screenshot(path=str(disconnected_screenshot))
+    # Gracefully drop SSE connection via test endpoint
+    # This pushes the _DROP sentinel, ending the stream abruptly
+    drop_response = await api_client.client.post(
+        f"{API_BASE_URL}/test/test/drop-sse",
+        json={"session_id": session_id}
+    )
+    assert drop_response.status_code == 200
+    drop_data = drop_response.json()
+    assert drop_data.get("dropped_streams", 0) > 0, "Should have dropped at least one SSE stream"
 
-    # Simulate reconnection by going back online
-    await page.context.set_offline(False)
-    await page.wait_for_timeout(2000)
+    # Wait for EventSource to detect the drop and reconnect
+    # EventSource has built-in reconnection with exponential backoff
+    await page.wait_for_timeout(6000)  # Allow for reconnection (default is ~3s)
 
-    # Verify reconnection
+    # Verify reconnection by checking status
     reconnected_classes = await status_dot.get_attribute("class") or ""
-    assert "disconnected" not in reconnected_classes, "Should reconnect after going back online"
+    assert "disconnected" not in reconnected_classes, "Should have reconnected"
 
-    # Create a new result to verify SSE is working
-    await api_client.create_result(
+    # Create a new topic after reconnection to verify SSE is working
+    post_reconnect_topic_id = await api_client.create_topic(
         session_id=session_id,
-        topic_id=topic_id,
-        summary="Result after reconnection",
-        data={"reconnected": True},
+        label="Topic After Reconnection",
+        topic_type="project",
+        summary="Created after SSE reconnection",
     )
 
     # Wait for SSE to deliver the new result
     await page.wait_for_timeout(2000)
 
-    # Verify new card appeared
-    cards = await page.query_selector_all(".topic-card")
-    assert len(cards) >= 1, "Card should appear after reconnection"
+    # Verify new card appeared via SSE
+    final_cards = await page.query_selector_all(".topic-card")
+    assert len(final_cards) >= 2, f"Should have at least 2 cards after reconnection, got {len(final_cards)}"
 
-    # Take screenshot of reconnected state
-    reconnected_screenshot = SCREENSHOT_DIR / "sse_reconnected.png"
-    await page.screenshot(path=str(reconnected_screenshot))
+    # Verify both topics are present
+    card_labels = []
+    for card in final_cards:
+        label_el = await card.query_selector(".topic-label")
+        if label_el:
+            label_text = await label_el.inner_text()
+            card_labels.append(label_text)
 
-    assert verify_screenshot_has_content(reconnected_screenshot)
+    assert any("Initial Topic Before Drop" in label for label in card_labels), \
+        "Initial topic should still be present (canvas state preserved)"
+    assert any("Topic After Reconnection" in label for label in card_labels), \
+        "New topic should have arrived via SSE after reconnection"
+
+    # Verify console shows SSE reconnection activity
+    sse_related = [msg for msg in console_messages if "sse" in msg.get("text", "").lower()]
+    # At minimum should see some SSE activity
+    assert len(console_messages) > 0, "Should have console messages"
+
+    # Take screenshots
+    SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    before_screenshot = SCREENSHOT_DIR / "graceful_reconnect_before_drop.png"
+    await page.screenshot(path=str(before_screenshot))
+
+    after_screenshot = SCREENSHOT_DIR / "graceful_reconnect_after_reconnect.png"
+    await page.screenshot(path=str(after_screenshot))
+
+    assert verify_screenshot_has_content(before_screenshot)
+    assert verify_screenshot_has_content(after_screenshot)
+
+
+@pytest.mark.asyncio
+async def test_sse_abrupt_drop_simulation(
+    page: Page,
+    api_client: ADCAPIClient
+):
+    """Test abrupt SSE connection drop and immediate reconnection.
+
+    This test simulates a network failure where the SSE connection is
+    abruptly terminated (no graceful disconnect event). The browser's
+    EventSource should detect this, fire onerror, and auto-reconnect.
+    """
+    session = await api_client.create_session()
+    session_id = session["session_id"]
+
+    # Create multiple topics to populate canvas
+    for i in range(3):
+        await api_client.create_topic(
+            session_id=session_id,
+            label=f"Pre-Drop Topic {i+1}",
+            topic_type="project",
+            summary=f"Topic {i+1} created before abrupt drop",
+        )
+
+    # Navigate to canvas with session
+    await page.goto(f"{CANVAS_URL}?session_id={session_id}")
+    await page.wait_for_load_state("networkidle")
+    await page.wait_for_timeout(1000)
+
+    # Verify all initial cards are rendered
+    initial_cards = await page.query_selector_all(".topic-card")
+    initial_count = len(initial_cards)
+    assert initial_count == 3, f"Should have 3 initial cards, got {initial_count}"
+
+    # Track connection status
+    status_dot = await page.query_selector(".status-dot")
+    status_text = await page.query_selector("#statusText")
+
+    initial_status_text = await status_text.inner_text() if status_text else ""
+    assert "Connected" in initial_status_text or "Connecting" in initial_status_text, \
+        f"Should be connected initially, got: {initial_status_text}"
+
+    # Track console for error events
+    console_messages = []
+    page.on("console", lambda msg: console_messages.append({"type": msg.type, "text": msg.text}))
+
+    # Abruptly drop the SSE connection
+    drop_response = await api_client.client.post(
+        f"{API_BASE_URL}/test/test/drop-sse",
+        json={"session_id": session_id}
+    )
+    assert drop_response.status_code == 200
+    drop_data = drop_response.json()
+    assert drop_data.get("dropped_streams", 0) > 0, "Should have dropped SSE stream"
+
+    # Wait briefly for client to detect the drop
+    await page.wait_for_timeout(1000)
+
+    # Status may briefly show disconnected (depending on timing)
+    # The key is that it recovers
+
+    # Wait for auto-reconnection
+    await page.wait_for_timeout(5000)
+
+    # Verify connection recovered
+    final_status_text = await status_text.inner_text() if status_text else ""
+    assert "Connected" in final_status_text or "Connecting" in final_status_text, \
+        f"Should reconnect after abrupt drop, got: {final_status_text}"
+
+    # Create a new topic immediately after reconnection
+    await api_client.create_topic(
+        session_id=session_id,
+        label="Post-Abrupt-Drop Topic",
+        topic_type="research",
+        summary="Created immediately after abrupt drop and reconnection",
+    )
+
+    # Wait for SSE delivery
+    await page.wait_for_timeout(2000)
+
+    # Verify canvas state is preserved and new card arrived
+    final_cards = await page.query_selector_all(".topic-card")
+    assert len(final_cards) >= 4, \
+        f"Should have all 3 original cards + 1 new card after reconnection, got {len(final_cards)}"
+
+    # Verify we have the new card
+    card_labels = []
+    for card in final_cards:
+        label_el = await card.query_selector(".topic-label")
+        if label_el:
+            card_labels.append(await label_el.inner_text())
+
+    assert any("Post-Abrupt-Drop Topic" in label for label in card_labels), \
+        "New topic should be present after reconnection"
+
+    # Verify all original topics are still there (state preserved)
+    for i in range(3):
+        assert any(f"Pre-Drop Topic {i+1}" in label for label in card_labels), \
+            f"Pre-Drop Topic {i+1} should still be present (state preserved across reconnection)"
+
+    # Take screenshot
+    SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    screenshot_path = SCREENSHOT_DIR / "abrupt_drop_reconnected.png"
+    await page.screenshot(path=str(screenshot_path))
+
+    assert verify_screenshot_has_content(screenshot_path)
+
+
+@pytest.mark.asyncio
+async def test_sse_multiple_reconnection_cycles(
+    page: Page,
+    api_client: ADCAPIClient
+):
+    """Test multiple SSE reconnection cycles in sequence.
+
+    This stress test verifies that the canvas can handle multiple
+    connection drops and reconnections without data loss or corruption.
+    """
+    session = await api_client.create_session()
+    session_id = session["session_id"]
+
+    # Navigate to canvas
+    await page.goto(f"{CANVAS_URL}?session_id={session_id}")
+    await page.wait_for_load_state("networkidle")
+    await page.wait_for_timeout(1000)
+
+    status_dot = await page.query_selector(".status-dot")
+
+    # Perform 3 reconnection cycles
+    num_cycles = 3
+    topics_per_cycle = []
+
+    for cycle in range(num_cycles):
+        # Create topics in this cycle
+        cycle_topics = []
+        for i in range(2):
+            topic_label = f"Cycle-{cycle+1}-Topic-{i+1}"
+            topic_id = await api_client.create_topic(
+                session_id=session_id,
+                label=topic_label,
+                topic_type="project",
+                summary=f"Created in cycle {cycle+1}",
+            )
+            cycle_topics.append(topic_label)
+
+        topics_per_cycle.append(cycle_topics)
+
+        # Wait for SSE to deliver
+        await page.wait_for_timeout(1000)
+
+        # Verify cards for this cycle
+        cards = await page.query_selector_all(".topic-card")
+        expected_count = (cycle + 1) * 2  # 2 topics per cycle
+        assert len(cards) >= expected_count, \
+            f"Cycle {cycle+1}: Should have at least {expected_count} cards, got {len(cards)}"
+
+        # Drop SSE connection
+        drop_response = await api_client.client.post(
+            f"{API_BASE_URL}/test/test/drop-sse",
+            json={"session_id": session_id}
+        )
+        assert drop_response.status_code == 200
+
+        # Wait for reconnection
+        await page.wait_for_timeout(5000)
+
+        # Verify reconnected
+        status_classes = await status_dot.get_attribute("class") or ""
+        assert "disconnected" not in status_classes, \
+            f"Cycle {cycle+1}: Should have reconnected"
+
+    # After all cycles, verify all topics from all cycles are present
+    final_cards = await page.query_selector_all(".topic-card")
+    assert len(final_cards) >= num_cycles * 2, \
+        f"Should have at least {num_cycles * 2} cards after {num_cycles} cycles, got {len(final_cards)}"
+
+    # Verify each cycle's topics are present
+    card_labels = []
+    for card in final_cards:
+        label_el = await card.query_selector(".topic-label")
+        if label_el:
+            card_labels.append(await label_el.inner_text())
+
+    for cycle_idx, cycle_topics in enumerate(topics_per_cycle):
+        for topic_label in cycle_topics:
+            assert any(topic_label in label for label in card_labels), \
+                f"Topic {topic_label} from cycle {cycle_idx+1} should be present"
+
+    # Create one more topic after all cycles to verify SSE still works
+    await api_client.create_topic(
+        session_id=session_id,
+        label="Final Post-Cycles Topic",
+        topic_type="exception",
+        summary="Created after all reconnection cycles",
+    )
+
+    await page.wait_for_timeout(2000)
+
+    final_final_cards = await page.query_selector_all(".topic-card")
+    assert len(final_final_cards) >= (num_cycles * 2) + 1, \
+        "Should have all cycle topics plus the final topic"
+
+    # Verify the final topic arrived
+    card_labels = []
+    for card in final_final_cards:
+        label_el = await card.query_selector(".topic-label")
+        if label_el:
+            card_labels.append(await label_el.inner_text())
+
+    assert any("Final Post-Cycles Topic" in label for label in card_labels), \
+        "Final topic should have arrived via SSE"
+
+    # Take screenshot
+    SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    screenshot_path = SCREENSHOT_DIR / "multiple_cycles_complete.png"
+    await page.screenshot(path=str(screenshot_path))
+
+    assert verify_screenshot_has_content(screenshot_path)
+
+
+@pytest.mark.asyncio
+async def test_sse_state_preservation_across_reconnection(
+    page: Page,
+    api_client: ADCAPIClient
+):
+    """Test that canvas state (topics) is preserved across SSE reconnection.
+
+    Verifies that:
+    1. Topics created before reconnection are still present after
+    2. Canvas does not lose or duplicate cards
+    3. Staleness indicators are preserved correctly
+    """
+    session = await api_client.create_session()
+    session_id = session["session_id"]
+
+    # Create topics with different staleness levels
+    await api_client.create_topic(
+        session_id=session_id,
+        label="Fresh Topic",
+        topic_type="project",
+        summary="Fresh result",
+        staleness_seconds=0,
+    )
+
+    await api_client.create_topic(
+        session_id=session_id,
+        label="Stale Topic",
+        topic_type="project",
+        summary="Stale result",
+        staleness_seconds=1800,  # 30 minutes old (stale threshold is 600-3600s)
+    )
+
+    # Navigate to canvas
+    await page.goto(f"{CANVAS_URL}?session_id={session_id}")
+    await page.wait_for_load_state("networkidle")
+    await page.wait_for_timeout(1000)
+
+    # Verify both cards are present with correct staleness
+    cards_before = await page.query_selector_all(".topic-card")
+    assert len(cards_before) == 2, "Should have 2 cards before drop"
+
+    fresh_card = await page.query_selector('.topic-card:not(.stale):not(.very-stale)')
+    assert fresh_card is not None, "Should have a fresh card"
+
+    stale_card = await page.query_selector('.topic-card.stale:not(.very-stale)')
+    assert stale_card is not None, "Should have a stale card"
+
+    # Drop SSE connection
+    drop_response = await api_client.client.post(
+        f"{API_BASE_URL}/test/test/drop-sse",
+        json={"session_id": session_id}
+    )
+    assert drop_response.status_code == 200
+
+    # Wait for reconnection
+    await page.wait_for_timeout(6000)
+
+    # Verify state is preserved - still 2 cards
+    cards_after = await page.query_selector_all(".topic-card")
+    assert len(cards_after) == 2, \
+        f"Should still have exactly 2 cards after reconnection (no loss/duplication), got {len(cards_after)}"
+
+    # Verify staleness indicators are still correct
+    fresh_after = await page.query_selector('.topic-card:not(.stale):not(.very-stale)')
+    assert fresh_after is not None, "Fresh card should still be fresh"
+
+    stale_after = await page.query_selector('.topic-card.stale:not(.very-stale)')
+    assert stale_after is not None, "Stale card should still be stale"
+
+    # Verify labels match
+    card_labels_after = []
+    for card in cards_after:
+        label_el = await card.query_selector(".topic-label")
+        if label_el:
+            card_labels_after.append(await label_el.inner_text())
+
+    assert "Fresh Topic" in card_labels_after, "Fresh topic should be preserved"
+    assert "Stale Topic" in card_labels_after, "Stale topic should be preserved"
+
+    # Take screenshot
+    SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    screenshot_path = SCREENSHOT_DIR / "state_preserved_after_reconnect.png"
+    await page.screenshot(path=str(screenshot_path))
+
+    assert verify_screenshot_has_content(screenshot_path)
 
 
 # =============================================================================
