@@ -287,12 +287,14 @@ class ActionExecutor:
         )
 
         # Initialize action result
+        start_time = time.time()
         result = ActionResult(
             intent_id=intent_id,
             session_id=session_id,
             project_slug=project_slug,
             workflow_name=workflow_name,
             status="running",
+            started_at=start_time,
         )
 
         # Get project configuration
@@ -334,6 +336,11 @@ class ActionExecutor:
         for i, step_name in enumerate(steps):
             logger.info(f"Executing step {i+1}/{len(steps)}: {step_name}")
 
+            # Broadcast workflow progress
+            await self._broadcast_workflow_progress(
+                result, session_id, current_step=i+1, total_steps=len(steps)
+            )
+
             step_result = await self._execute_step(
                 step_name=step_name,
                 intent_id=intent_id,
@@ -345,8 +352,11 @@ class ActionExecutor:
 
             result.add_step(step_result)
 
-            # Broadcast step completion
-            await self._broadcast_step_completed(step_result, session_id)
+            # Broadcast step completion or failure
+            if step_result.status == StepStatus.FAILED:
+                await self._broadcast_step_failed(step_result, session_id)
+            else:
+                await self._broadcast_step_completed(step_result, session_id)
 
             # Check if step failed - halt workflow
             if step_result.status == StepStatus.FAILED:
@@ -397,15 +407,15 @@ class ActionExecutor:
         Returns:
             StepResult with execution outcome
         """
+        step_start = time.time()
         step_result = StepResult(
             step_name=step_name,
             status=StepStatus.IN_PROGRESS,
+            started_at=step_start,
         )
 
         # Broadcast step started
         await self._broadcast_step_started(step_result, session_id)
-
-        step_start = time.time()
 
         try:
             # Get step executor
@@ -432,12 +442,34 @@ class ActionExecutor:
                 f"Step '{step_name}' completed in {step_result.duration_ms:.0f}ms"
             )
 
+            # Broadcast step progress with final result
+            await self._broadcast_step_progress(
+                step_name=step_name,
+                progress_data={
+                    "status": "completed",
+                    "duration_ms": step_result.duration_ms,
+                    "output": output,
+                },
+                session_id=session_id,
+            )
+
         except Exception as e:
             logger.exception(f"Step '{step_name}' failed with exception")
             step_result.status = StepStatus.FAILED
             step_result.error = str(e)
             step_result.completed_at = time.time()
             step_result.duration_ms = (step_result.completed_at - step_start) * 1000
+
+            # Broadcast step progress with error
+            await self._broadcast_step_progress(
+                step_name=step_name,
+                progress_data={
+                    "status": "failed",
+                    "error": str(e),
+                    "duration_ms": step_result.duration_ms,
+                },
+                session_id=session_id,
+            )
 
         return step_result
 
@@ -657,6 +689,30 @@ class ActionExecutor:
             )
         )
 
+    async def _broadcast_workflow_progress(
+        self,
+        result: ActionResult,
+        session_id: str,
+        current_step: int,
+        total_steps: int,
+    ) -> None:
+        """Broadcast workflow progress event to canvas."""
+        broadcaster = get_broadcaster()
+        await broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.ACTION_WORKFLOW_PROGRESS,
+                data={
+                    "intent_id": result.intent_id,
+                    "workflow_name": result.workflow_name,
+                    "current_step": current_step,
+                    "total_steps": total_steps,
+                    "progress_percent": int((current_step / total_steps) * 100),
+                    "timestamp": time.time(),
+                },
+                target_session_id=session_id,
+            )
+        )
+
     async def _broadcast_step_started(
         self,
         step: StepResult,
@@ -672,6 +728,41 @@ class ActionExecutor:
                     "status": step.status.value,
                     "started_at": step.started_at,
                 },
+                target_session_id=session_id,
+            )
+        )
+
+    async def _broadcast_step_progress(
+        self,
+        step_name: str,
+        progress_data: dict[str, Any],
+        session_id: str,
+    ) -> None:
+        """Broadcast step progress event with incremental updates."""
+        broadcaster = get_broadcaster()
+        await broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.ACTION_STEP_PROGRESS,
+                data={
+                    "step_name": step_name,
+                    "progress": progress_data,
+                    "timestamp": time.time(),
+                },
+                target_session_id=session_id,
+            )
+        )
+
+    async def _broadcast_step_failed(
+        self,
+        step: StepResult,
+        session_id: str,
+    ) -> None:
+        """Broadcast step failed event to canvas."""
+        broadcaster = get_broadcaster()
+        await broadcaster.broadcast(
+            SSEEvent(
+                event_type=EventType.ACTION_STEP_FAILED,
+                data=step.to_dict(),
                 target_session_id=session_id,
             )
         )

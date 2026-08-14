@@ -23,6 +23,7 @@ from .registry import (
     validate_all_workflows,
     WorkflowValidationError,
 )
+from .runner import ActionRunner, get_action_runner
 from .steps import (
     GitOperationResult,
     GitOperationStatus,
@@ -42,6 +43,9 @@ __all__ = [
     "ActionExecutor",
     "StepExecutor",
     "get_action_executor",
+    # Runner
+    "ActionRunner",
+    "get_action_runner",
     # Models
     "ActionResult",
     "ExecutionContext",
