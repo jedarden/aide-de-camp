@@ -1,27 +1,32 @@
 {
   "active_root": {
-    "path": "objects/gen-7948aaa348ffa51b7f87303b5f76eba1.jsonl",
-    "sha256": "eb98987e96a2902b0fa81b0280f2ba69aa67f087f3727793e4490614666f345f"
+    "path": "objects/gen-772af7b47f077772b33a1f609c72742b.jsonl",
+    "sha256": "f0f53af2c0a7d5665af89fe09c1a65434b9e799eeef59bdd9cf8c5c3dbe0d45e"
   },
   "added_paths": [
-    "objects/gen-7948aaa348ffa51b7f87303b5f76eba1.jsonl"
+    "objects/gen-772af7b47f077772b33a1f609c72742b.jsonl"
   ],
-  "created_at": "2026-08-17T02:53:35.274155968Z",
+  "created_at": "2026-08-19T15:17:53.071351761Z",
   "deleted_paths": [
     "current.json",
     "objects/gen-0a10fea790f730419fa5a3ae5d668bd7.jsonl",
+    "objects/gen-13ab65a461e443719c9fdcf3ed7b9e1c.jsonl",
     "objects/gen-37586aea9ca088ffd08dafa93f38e240.jsonl",
+    "objects/gen-59dac5ca3445215c445c263899debb78.jsonl",
+    "objects/gen-7948aaa348ffa51b7f87303b5f76eba1.jsonl",
     "objects/gen-815ddb331c86a66472333c7803b8e53b.jsonl",
+    "objects/gen-81e5e6d5e045a719cfca5529b1c010a5.jsonl",
     "objects/gen-94392b56fb8ad0b1ad6d2f01196cb418.jsonl",
     "objects/gen-a48ba95cf5875d84874c9ce5db11d9b5.jsonl",
     "objects/gen-b0d363aa35009e85e28a6b1ef6893155.jsonl",
     "objects/gen-b6badc9eedd3e01c33e2b131ac28d46c.jsonl",
     "objects/gen-c1b66705515b077c72bd5feb79ec385f.jsonl",
     "objects/gen-f0ec692de7bb5199997211fed09dbf53.jsonl",
-    "objects/gen-f3acba63f319004c8eacab89478962c6.jsonl"
+    "objects/gen-f3acba63f319004c8eacab89478962c6.jsonl",
+    "objects/gen-ffb41761b3bec8531dd1d6b9793190db.jsonl"
   ],
-  "event_count": 2709,
-  "generation_id": "gen-7948aaa348ffa51b7f87303b5f76eba1",
+  "event_count": 2717,
+  "generation_id": "gen-772af7b47f077772b33a1f609c72742b",
   "issue_count": 1388,
   "mode": "monolithic",
   "receipt_count": 0,
@@ -30,7 +35,7 @@
     "previous.json"
   ],
   "schema_version": 1,
-  "snapshot_sequence": 2709,
+  "snapshot_sequence": 2717,
   "store_uuid": "aac78fdd-32b9-1537-8b6f-bf55516e74e2",
-  "total_record_count": 4097
+  "total_record_count": 4105
 }
