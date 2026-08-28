@@ -380,5 +380,270 @@ class TestBridgeStateEdgeCases:
         assert state.is_reachable == initial_reachable
 
 
+class TestBridgeStateResetFailureCount:
+    """Test reset_failure_count() method behavior."""
+
+    def test_reset_failure_count_clears_counter(self):
+        """Test that reset_failure_count() sets counter to zero."""
+        state = BridgeState()
+
+        # Add some failures
+        state.mark_as_unreachable(datetime.now())
+        state.mark_as_unreachable(datetime.now())
+        state.mark_as_unreachable(datetime.now())
+        assert state.failure_count == 3
+
+        # Reset the counter
+        state.reset_failure_count()
+
+        # Counter should be zero
+        assert state.failure_count == 0
+
+    def test_reset_failure_count_preserves_reachability(self):
+        """Test that reset_failure_count() preserves reachability state."""
+        state = BridgeState()
+
+        # Mark as unreachable with failures
+        state.mark_as_unreachable(datetime.now())
+        state.mark_as_unreachable(datetime.now())
+        assert state.is_reachable is False
+        assert state.failure_count == 2
+
+        # Reset the counter
+        state.reset_failure_count()
+
+        # Should still be unreachable, but with zero count
+        assert state.is_reachable is False
+        assert state.failure_count == 0
+
+    def test_reset_failure_count_preserves_last_failure_time(self):
+        """Test that reset_failure_count() preserves last failure timestamp."""
+        state = BridgeState()
+        failure_time = datetime.now()
+
+        # Mark as unreachable
+        state.mark_as_unreachable(failure_time)
+        assert state.last_failure_time == failure_time
+
+        # Reset the counter
+        state.reset_failure_count()
+
+        # Last failure time should be preserved
+        assert state.last_failure_time == failure_time
+
+    def test_reset_failure_count_when_already_zero(self):
+        """Test that reset_failure_count() works when count is already zero."""
+        state = BridgeState()
+
+        # Initially zero
+        assert state.failure_count == 0
+
+        # Reset should be safe even when already zero
+        state.reset_failure_count()
+        assert state.failure_count == 0
+
+    def test_reset_failure_count_multiple_calls(self):
+        """Test that reset_failure_count() can be called multiple times safely."""
+        state = BridgeState()
+
+        # Add failures
+        state.mark_as_unreachable(datetime.now())
+        state.mark_as_unreachable(datetime.now())
+        assert state.failure_count == 2
+
+        # Reset multiple times
+        state.reset_failure_count()
+        state.reset_failure_count()
+        state.reset_failure_count()
+
+        # Should still be zero
+        assert state.failure_count == 0
+
+
+class TestBridgeStateGetFailureSummary:
+    """Test get_failure_summary() method behavior."""
+
+    def test_get_failure_summary_when_reachable(self):
+        """Test that get_failure_summary() returns reachable message when bridge is reachable."""
+        state = BridgeState()
+
+        # Initially reachable
+        summary = state.get_failure_summary()
+        assert summary == "Bridge reachable"
+
+    def test_get_failure_summary_after_failure(self):
+        """Test that get_failure_summary() returns duration and count after failure."""
+        state = BridgeState()
+        failure_time = datetime.now()
+
+        # Mark as unreachable
+        state.mark_as_unreachable(failure_time)
+
+        summary = state.get_failure_summary()
+
+        # Should indicate unreachable state
+        assert "Bridge unreachable" in summary
+        assert "consecutive failure" in summary
+        assert "1" in summary  # Should show 1 failure
+
+    def test_get_failure_summary_duration_seconds(self):
+        """Test that get_failure_summary() shows duration in seconds for recent failures."""
+        state = BridgeState()
+        failure_time = datetime.now()
+
+        # Mark as unreachable
+        state.mark_as_unreachable(failure_time)
+
+        summary = state.get_failure_summary()
+
+        # Should show duration in seconds
+        assert "second" in summary.lower()
+
+    def test_get_failure_summary_duration_minutes(self):
+        """Test that get_failure_summary() shows duration in minutes for older failures."""
+        state = BridgeState()
+        # Use a timestamp 2 minutes ago
+        failure_time = datetime.now() - timedelta(minutes=2)
+
+        # Mark as unreachable
+        state.mark_as_unreachable(failure_time)
+
+        summary = state.get_failure_summary()
+
+        # Should show duration in minutes
+        assert "minute" in summary.lower()
+
+    def test_get_failure_summary_duration_hours(self):
+        """Test that get_failure_summary() shows duration in hours for longer failures."""
+        state = BridgeState()
+        # Use a timestamp 3 hours ago
+        failure_time = datetime.now() - timedelta(hours=3)
+
+        # Mark as unreachable
+        state.mark_as_unreachable(failure_time)
+
+        summary = state.get_failure_summary()
+
+        # Should show duration in hours
+        assert "hour" in summary.lower()
+
+    def test_get_failure_summary_duration_days(self):
+        """Test that get_failure_summary() shows duration in days for very long failures."""
+        state = BridgeState()
+        # Use a timestamp 5 days ago
+        failure_time = datetime.now() - timedelta(days=5)
+
+        # Mark as unreachable
+        state.mark_as_unreachable(failure_time)
+
+        summary = state.get_failure_summary()
+
+        # Should show duration in days
+        assert "day" in summary.lower()
+
+    def test_get_failure_summary_multiple_failures(self):
+        """Test that get_failure_summary() shows correct failure count for multiple failures."""
+        state = BridgeState()
+
+        # Add multiple failures
+        for i in range(5):
+            state.mark_as_unreachable(datetime.now())
+
+        summary = state.get_failure_summary()
+
+        # Should show all 5 failures
+        assert "5" in summary
+        assert "consecutive failure" in summary
+
+    def test_get_failure_summary_after_recovery(self):
+        """Test that get_failure_summary() returns reachable message after recovery."""
+        state = BridgeState()
+
+        # Mark as unreachable
+        state.mark_as_unreachable(datetime.now())
+        assert "Bridge unreachable" in state.get_failure_summary()
+
+        # Mark as reachable
+        state.mark_as_reachable()
+
+        # Should now return reachable message
+        summary = state.get_failure_summary()
+        assert summary == "Bridge reachable"
+
+    def test_get_failure_summary_no_timestamp(self):
+        """Test that get_failure_summary() handles missing timestamp gracefully."""
+        state = BridgeState()
+
+        # Manually set unreachable state without a proper timestamp
+        # (This shouldn't happen in normal usage, but test handles edge case)
+        state._state_lock.acquire()
+        try:
+            state._is_reachable = False
+            state._last_failure_time = None
+            state._failure_count = 1
+        finally:
+            state._state_lock.release()
+
+        summary = state.get_failure_summary()
+
+        # Should indicate unreachable without timestamp info
+        assert "Bridge unreachable" in summary
+        assert "no failure timestamp" in summary.lower()
+
+
+class TestBridgeStateFailureCountCapping:
+    """Test failure count capping at MAX_FAILURE_COUNT."""
+
+    def test_failure_count_capped_at_max(self):
+        """Test that failure count is capped at MAX_FAILURE_COUNT (9999)."""
+        state = BridgeState()
+
+        # Add more failures than MAX_FAILURE_COUNT
+        for i in range(15000):  # Way more than 9999
+            state.mark_as_unreachable(datetime.now())
+
+        # Should be capped at MAX_FAILURE_COUNT
+        assert state.failure_count == BridgeState.MAX_FAILURE_COUNT
+        assert state.failure_count == 9999
+
+    def test_failure_count_increments_until_cap(self):
+        """Test that failure count increments normally until reaching the cap."""
+        state = BridgeState()
+
+        # Increment normally until we reach the cap
+        for i in range(BridgeState.MAX_FAILURE_COUNT):
+            state.mark_as_unreachable(datetime.now())
+            expected = min(i + 1, BridgeState.MAX_FAILURE_COUNT)
+            assert state.failure_count == expected
+
+        # At this point, we should be at the cap
+        assert state.failure_count == BridgeState.MAX_FAILURE_COUNT
+
+        # Adding more failures should not increase beyond the cap
+        state.mark_as_unreachable(datetime.now())
+        state.mark_as_unreachable(datetime.now())
+        state.mark_as_unreachable(datetime.now())
+
+        assert state.failure_count == BridgeState.MAX_FAILURE_COUNT
+
+    def test_failure_count_reset_after_cap(self):
+        """Test that reset_failure_count() works even when count is capped."""
+        state = BridgeState()
+
+        # Cap the failure count
+        for i in range(20000):
+            state.mark_as_unreachable(datetime.now())
+
+        assert state.failure_count == BridgeState.MAX_FAILURE_COUNT
+
+        # Reset should work even when capped
+        state.reset_failure_count()
+        assert state.failure_count == 0
+
+        # Should be able to increment again after reset
+        state.mark_as_unreachable(datetime.now())
+        assert state.failure_count == 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
