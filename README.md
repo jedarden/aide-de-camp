@@ -151,8 +151,9 @@ adc --help
 | `OPENAI_API_KEY` | OpenAI key — required for voice/Realtime API | _(none; voice disabled without it)_ |
 | `ZAI_PROXY_URL` | Canonical ZAI proxy endpoint for LLM routing and synthesis | `https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages` |
 | `ADC_SERVER_URL` | Server URL used by the `adc` CLI | `http://localhost:8000` |
-| `ADC_TELEGRAM_BOT_TOKEN` | Telegram bot token for direct Bot API integration — required for Telegram fallback notifications | _(none; Telegram disabled without it)_ |
+| `ADC_TELEGRAM_BOT_TOKEN` | Telegram bot token for direct Bot API integration — retrieved from OpenBao path `secret/ardenone-cluster/aide-de-camp/telegram_bot_token` | _(none; Telegram disabled without it)_ |
 | `ADC_TELEGRAM_CHAT_ID` | Telegram chat ID for the fallback notification destination | _(none; Telegram disabled without it)_ |
+| `ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS` | Minimum spacing (seconds) between repeated-failure DEBUG summaries | `300` |
 | `ADC_WHISPER_STT_URL` | Whisper STT service URL for browser speech-to-text fallback | `https://whisper.ardenone.com` |
 | `ADC_SYNTHESIZE_CONCURRENCY_LIMIT` | Maximum concurrent synthesize LLM calls to the ZAI proxy | `8` |
 
@@ -160,8 +161,9 @@ The canonical LLM backend for intent routing and synthesis is configured via the
 
 **Telegram Bot API integration.** Per ADR-1 (2026-07-20), aide-de-camp uses a direct Telegram Bot API integration for fallback notifications — not coupled to telegram-claude-bridge. The integration requires:
 
-1. **Bot token (`ADC_TELEGRAM_BOT_TOKEN`)**: Create a bot via [@BotFather](https://t.me/botfather) on Telegram, obtain the token, and set it as an environment variable.
-2. **Chat ID (`ADC_TELEGRAM_CHAT_ID`)**: Start a conversation with your bot, visit `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` to find your chat ID in the `message.chat.id` field, and set it as an environment variable.
+1. **Bot token (`ADC_TELEGRAM_BOT_TOKEN`)**: Retrieved from OpenBao path `secret/ardenone-cluster/aide-de-camp/telegram_bot_token` on the `ardenone-cluster` OpenBao instance (`http://traefik-ardenone-cluster:8200`). The token is provisioned once via BotFather and stored in OpenBao — the application reads it at runtime via the environment variable, which is populated from OpenBao (e.g., via an ExternalSecret or systemd environment file). Never store the token value directly in code or documentation.
+
+2. **Chat ID (`ADC_TELEGRAM_CHAT_ID`)**: Your Telegram chat ID for the fallback notification destination. Start a conversation with your bot, visit `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` to find your chat ID in the `message.chat.id` field, and set it as an environment variable.
 
 Once configured, the Telegram integration delivers:
 - Exception-class results (urgency: critical/high) when no canvas is active
