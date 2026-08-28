@@ -46,10 +46,41 @@ class TelegramFallback:
     ):
         import os
         # Telegram bot token. Resolution order:
-        # constructor arg → ADC_TELEGRAM_BOT_TOKEN env var → None.
-        # None (default) means all push methods gracefully no-op with a WARNING
-        # rather than hard-failing, preserving the pre-config behavior.
-        self.bot_token = bot_token or os.getenv("ADC_TELEGRAM_BOT_TOKEN") or None
+        # 1. constructor arg (direct value)
+        # 2. ADC_TELEGRAM_BOT_TOKEN env var (direct value)
+        # 3. TELEGRAM_BOT_TOKEN_PATH env var (OpenBao path)
+        # 4. None (graceful no-op with WARNING)
+        #
+        # The OpenBao path approach allows the token to be retrieved from
+        # OpenBao at runtime without exposing the value in environment
+        # variables or logs, following security best practices.
+        token_path = os.getenv("TELEGRAM_BOT_TOKEN_PATH")
+
+        if bot_token:
+            self.bot_token = bot_token
+        elif os.getenv("ADC_TELEGRAM_BOT_TOKEN"):
+            self.bot_token = os.getenv("ADC_TELEGRAM_BOT_TOKEN")
+        elif token_path:
+            # Retrieve from OpenBao at runtime
+            try:
+                from src.openbao import get_openbao_client
+                client = get_openbao_client()
+                self.bot_token = client.get_secret(token_path, field="token")
+                if self.bot_token:
+                    logger.info(f"Retrieved Telegram bot token from OpenBao path: {token_path}")
+                else:
+                    logger.warning(
+                        f"Failed to retrieve Telegram bot token from OpenBao path: {token_path}. "
+                        f"Telegram integration will be disabled."
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error initializing OpenBao client for Telegram token: {e}. "
+                    f"Telegram integration will be disabled."
+                )
+                self.bot_token = None
+        else:
+            self.bot_token = None
 
         # Telegram chat ID for the single user of this personal app (plan.md
         # Tech Stack: "single-user app"). There is intentionally NO multi-user
@@ -454,10 +485,17 @@ class TelegramFallback:
         error_params = {}
         if error is not None:
             # Capture common exception attributes for context
-            if hasattr(error, 'request'):
-                error_params['request_method'] = getattr(error.request, 'method', 'UNKNOWN')
-            if hasattr(error, 'response'):
-                error_params['response_status'] = getattr(error.response, 'status_code', 'UNKNOWN')
+            # Use try-except because hasattr on httpx exception properties can raise RuntimeError
+            try:
+                if hasattr(error, 'request') and error.request is not None:
+                    error_params['request_method'] = getattr(error.request, 'method', 'UNKNOWN')
+            except (RuntimeError, AttributeError):
+                pass
+            try:
+                if hasattr(error, 'response') and error.response is not None:
+                    error_params['response_status'] = getattr(error.response, 'status_code', 'UNKNOWN')
+            except (RuntimeError, AttributeError):
+                pass
 
         # Build URL context string for logging
         url_context = f" URL: {url_attempted}" if url_attempted else ""
@@ -567,6 +605,9 @@ class TelegramFallback:
             # Re-arm per-type dedup so the next failure (even of a previously
             # seen type) is treated as a fresh first occurrence.
             self._seen_failure_types.clear()
+            # Reset the state tracker's logged flag so the next failure
+            # is treated as a fresh failure streak
+            self._state_tracker._last_failure_logged = False
 
     def reset_failure_count(self) -> None:
         """Reset the bridge state tracker's failure counter.
