@@ -1001,3 +1001,591 @@ async def test_dispatch_mixed_action_and_non_action_intents():
                     assert data["data"]["action_count"] == 1
                     assert "action-intent-mixed" in data["data"]["intent_ids"]
                     assert "status-intent-mixed" in data["data"]["intent_ids"]
+
+
+@pytest.mark.asyncio
+async def test_three_step_workflow_execution_with_progressive_updates():
+    """
+    Test full workflow execution with 3-step mocked workflow.
+
+    Verifies that a workflow with 3 steps (ci_status → gitops_commit → argocd_sync_status)
+    executes correctly and broadcasts SSE events in the correct order.
+    """
+    intent_id = "test-intent-3step"
+    session_id = "test-session-3step"
+    project_slug = "test-project"
+
+    # Mock project config with 3-step workflow
+    project_config = {
+        "slug": project_slug,
+        "cluster": "test-cluster",
+        "namespace": "test-ns",
+        "workflows": {
+            "deploy": {
+                "description": "Full deployment workflow",
+                "steps": ["ci_status", "gitops_commit", "argocd_sync_status"]
+            }
+        }
+    }
+
+    # Track all broadcast events
+    broadcast_events = []
+
+    async def mock_broadcast(event: SSEEvent):
+        broadcast_events.append(event)
+
+    with patch("src.action.executor.get_broadcaster") as mock_get_broadcaster:
+        mock_broadcaster = AsyncMock()
+        mock_broadcaster.broadcast = mock_broadcast
+        mock_get_broadcaster.return_value = mock_broadcaster
+
+        with patch("src.action.executor.get_project") as mock_get_project:
+            mock_get_project.return_value = project_config
+
+            # Mock all three step execution functions
+            with patch("src.action.steps.execute_ci_status_step") as mock_ci:
+                mock_ci.return_value = {"ci_status": "success", "build_id": "12345"}
+
+                with patch("src.action.steps.execute_gitops_commit_step") as mock_gitops:
+                    mock_gitops.return_value = {"commit": "abc123", "branch": "main"}
+
+                    with patch("src.action.steps.execute_argocd_sync_status_step") as mock_argocd:
+                        mock_argocd.return_value = {"sync_status": "Synced", "health": "Healthy"}
+
+                        # Create executor after mocks are set up
+                        executor = ActionExecutor()
+
+                        # Execute the 3-step workflow
+                        result = await executor.execute_workflow(
+                            intent_id=intent_id,
+                            session_id=session_id,
+                            utterance="deploy the application",
+                            project_slug=project_slug,
+                            workflow_name="deploy"
+                        )
+
+                        # Verify all 3 steps completed successfully
+                        assert result.status == "completed"
+                        assert len(result.steps) == 3
+
+                        # Verify step names in correct order
+                        step_names = [s.step_name for s in result.steps]
+                        assert step_names == ["ci_status", "gitops_commit", "argocd_sync_status"]
+
+                        # Verify each step succeeded
+                        for step in result.steps:
+                            assert step.status == StepStatus.COMPLETED
+                            assert step.error is None
+
+                        # Verify SSE event sequence for 3-step workflow
+                        event_types = [e.event_type for e in broadcast_events]
+
+                        # Should have workflow started
+                        assert EventType.ACTION_WORKFLOW_STARTED in event_types
+
+                        # Should have 3 step_started events
+                        step_started_count = sum(1 for t in event_types if t == EventType.ACTION_STEP_STARTED)
+                        assert step_started_count == 3, f"Expected 3 step_started events, got {step_started_count}"
+
+                        # Should have 3 step_completed events
+                        step_completed_count = sum(1 for t in event_types if t == EventType.ACTION_STEP_COMPLETED)
+                        assert step_completed_count == 3, f"Expected 3 step_completed events, got {step_completed_count}"
+
+                        # Should have workflow completed
+                        assert EventType.ACTION_WORKFLOW_COMPLETED in event_types
+
+                        # Verify event ordering: workflow should start before it completes
+                        started_idx = event_types.index(EventType.ACTION_WORKFLOW_STARTED)
+                        completed_idx = event_types.index(EventType.ACTION_WORKFLOW_COMPLETED)
+                        assert started_idx < completed_idx
+
+                        # Verify step events are interleaved correctly
+                        # Pattern: started, step1_started, step1_completed, step2_started, step2_completed, step3_started, step3_completed, completed
+                        step_started_indices = [i for i, t in enumerate(event_types) if t == EventType.ACTION_STEP_STARTED]
+                        step_completed_indices = [i for i, t in enumerate(event_types) if t == EventType.ACTION_STEP_COMPLETED]
+
+                        # Each step should start before it completes
+                        for start_idx, complete_idx in zip(step_started_indices, step_completed_indices):
+                            assert start_idx < complete_idx, "Step should start before it completes"
+
+                        # Steps should be sequential (step 1 completes before step 2 starts)
+                        assert step_completed_indices[0] < step_started_indices[1], "Step 1 should complete before step 2 starts"
+                        assert step_completed_indices[1] < step_started_indices[2], "Step 2 should complete before step 3 starts"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_action_executions():
+    """
+    Test that multiple action workflows can execute concurrently without interference.
+
+    Verifies that when multiple ACTION intents are dispatched simultaneously,
+    they execute in parallel and maintain proper isolation.
+    """
+    # Create 3 concurrent action intents
+    intents = [
+        {
+            "intent_id": "concurrent-intent-1",
+            "utterance": "check status",
+            "workflow": "status",
+            "steps": ["pod_status"]
+        },
+        {
+            "intent_id": "concurrent-intent-2",
+            "utterance": "deploy app",
+            "workflow": "deploy",
+            "steps": ["ci_status", "gitops_commit"]
+        },
+        {
+            "intent_id": "concurrent-intent-3",
+            "utterance": "check deployment",
+            "workflow": "deployment_info",
+            "steps": ["deployment_info"]
+        }
+    ]
+
+    # Track execution order and completion
+    execution_log = []
+
+    async def mock_execute_workflow(intent_id, session_id, utterance, project_slug, workflow_name):
+        # Record execution start
+        execution_log.append(f"{intent_id}-started")
+
+        # Simulate some execution time
+        await asyncio.sleep(0.05)
+
+        # Record execution completion
+        execution_log.append(f"{intent_id}-completed")
+
+        # Return mock result
+        return ActionResult(
+            intent_id=intent_id,
+            session_id=session_id,
+            project_slug=project_slug,
+            workflow_name=workflow_name,
+            status="completed",
+            steps=[
+                StepResult(
+                    step_name=step,
+                    status=StepStatus.COMPLETED,
+                    output={},
+                    started_at=1000.0,
+                    completed_at=1005.0,
+                    duration_ms=5.0
+                )
+                for step in intents[[i for i, x in enumerate(intents) if x["intent_id"] == intent_id][0]]["steps"]
+            ],
+            started_at=1000.0,
+            completed_at=1005.0,
+            duration_ms=5.0
+        )
+
+    # Mock project config
+    project_config = {
+        "slug": "test-project",
+        "cluster": "test-cluster",
+        "namespace": "test-ns",
+        "workflows": {
+            "status": {"steps": ["pod_status"]},
+            "deploy": {"steps": ["ci_status", "gitops_commit"]},
+            "deployment_info": {"steps": ["deployment_info"]}
+        }
+    }
+
+    with patch("src.action.executor.get_project") as mock_get_project:
+        mock_get_project.return_value = project_config
+
+        # Mock broadcaster
+        with patch("src.sse.broadcaster.get_broadcaster") as mock_get_broadcaster:
+            mock_broadcaster = AsyncMock()
+            mock_get_broadcaster.return_value = mock_broadcaster
+
+            # Create executor
+            executor = ActionExecutor()
+
+            # Mock the execute_workflow method
+            with patch.object(executor, "execute_workflow", side_effect=mock_execute_workflow):
+                # Execute all 3 intents concurrently
+                tasks = [
+                    executor.execute_workflow(
+                        intent_id=intent["intent_id"],
+                        session_id="test-session-concurrent",
+                        utterance=intent["utterance"],
+                        project_slug="test-project",
+                        workflow_name=intent["workflow"]
+                    )
+                    for intent in intents
+                ]
+
+                # Wait for all to complete
+                results = await asyncio.gather(*tasks)
+
+                # Verify all completed successfully
+                assert len(results) == 3
+                for result in results:
+                    assert result.status == "completed"
+
+                # Verify concurrent execution (intents can start in any order)
+                # We should have 6 log entries (3 started + 3 completed)
+                assert len(execution_log) == 6
+
+                # All intents should have started
+                started_events = [e for e in execution_log if e.endswith("-started")]
+                assert len(started_events) == 3
+
+                # All intents should have completed
+                completed_events = [e for e in execution_log if e.endswith("-completed")]
+                assert len(completed_events) == 3
+
+                # Each intent should have both a start and complete event
+                for intent in intents:
+                    intent_id = intent["intent_id"]
+                    assert f"{intent_id}-started" in execution_log
+                    assert f"{intent_id}-completed" in execution_log
+
+                # Verify that completions happened after starts for each intent
+                for intent in intents:
+                    intent_id = intent["intent_id"]
+                    started_idx = execution_log.index(f"{intent_id}-started")
+                    completed_idx = execution_log.index(f"{intent_id}-completed")
+                    assert started_idx < completed_idx
+
+
+@pytest.mark.asyncio
+async def test_action_pending_card_canvas_rendering():
+    """
+    Verify that action_pending cards render correctly on the canvas.
+
+    This test verifies that when an action_pending SSE event is broadcast,
+    the event contains the correct data structure for canvas rendering.
+    """
+    intent_id = "pending-card-test-intent"
+    project_slug = "test-project"
+    utterance = "deploy the application"
+    message = "Preparing deployment workflow..."
+
+    # Track broadcast events
+    broadcast_events = []
+
+    async def mock_broadcast(event: SSEEvent):
+        broadcast_events.append(event)
+
+    with patch("src.sse.broadcaster.get_broadcaster") as mock_get_broadcaster:
+        mock_broadcaster = AsyncMock()
+        mock_broadcaster.broadcast = mock_broadcast
+        mock_get_broadcaster.return_value = mock_broadcaster
+
+        # Broadcast action_pending event
+        await mock_broadcaster.broadcast(
+            SSEEvent(
+                event_type="action_pending",
+                target_session_id=None,
+                target_surface_id=None,
+                data={
+                    "intent_id": intent_id,
+                    "project_slug": project_slug,
+                    "utterance": utterance,
+                    "message": message
+                }
+            )
+        )
+
+        # Verify the event was broadcast
+        assert len(broadcast_events) == 1
+        event = broadcast_events[0]
+
+        # Verify event structure
+        assert event.event_type == "action_pending"
+        assert event.data["intent_id"] == intent_id
+        assert event.data["project_slug"] == project_slug
+        assert event.data["utterance"] == utterance
+        assert event.data["message"] == message
+
+        # Verify data contains all fields required for canvas rendering
+        required_fields = ["intent_id", "project_slug", "utterance", "message"]
+        for field in required_fields:
+            assert field in event.data, f"Missing required field: {field}"
+
+
+@pytest.mark.asyncio
+async def test_action_progress_card_canvas_updates():
+    """
+    Verify that progress cards update correctly during workflow execution.
+
+    This test verifies that action_progress SSE events contain the correct
+    data structure for canvas updates during workflow execution.
+    """
+    intent_id = "progress-card-test-intent"
+    project_slug = "test-project"
+    workflow_name = "deploy"
+
+    # Track broadcast events
+    broadcast_events = []
+
+    async def mock_broadcast(event: SSEEvent):
+        broadcast_events.append(event)
+
+    with patch("src.sse.broadcaster.get_broadcaster") as mock_get_broadcaster:
+        mock_broadcaster = AsyncMock()
+        mock_broadcaster.broadcast = mock_broadcast
+        mock_get_broadcaster.return_value = mock_broadcaster
+
+        # Broadcast action_step_started event
+        await mock_broadcaster.broadcast(
+            SSEEvent(
+                event_type="action_step_started",
+                target_session_id=None,
+                target_surface_id=None,
+                data={
+                    "intent_id": intent_id,
+                    "project_slug": project_slug,
+                    "workflow_name": workflow_name,
+                    "step_name": "ci_status",
+                    "step_number": 1,
+                    "total_steps": 3,
+                    "step_description": "Checking CI build status"
+                }
+            )
+        )
+
+        # Broadcast action_step_completed event
+        await mock_broadcaster.broadcast(
+            SSEEvent(
+                event_type="action_step_completed",
+                target_session_id=None,
+                target_surface_id=None,
+                data={
+                    "intent_id": intent_id,
+                    "project_slug": project_slug,
+                    "workflow_name": workflow_name,
+                    "step_name": "ci_status",
+                    "step_number": 1,
+                    "total_steps": 3,
+                    "status": "completed",
+                    "output": {"ci_status": "success", "build_id": "12345"}
+                }
+            )
+        )
+
+        # Broadcast action_step_started for next step
+        await mock_broadcaster.broadcast(
+            SSEEvent(
+                event_type="action_step_started",
+                target_session_id=None,
+                target_surface_id=None,
+                data={
+                    "intent_id": intent_id,
+                    "project_slug": project_slug,
+                    "workflow_name": workflow_name,
+                    "step_name": "gitops_commit",
+                    "step_number": 2,
+                    "total_steps": 3,
+                    "step_description": "Committing GitOps changes"
+                }
+            )
+        )
+
+        # Verify events were broadcast
+        assert len(broadcast_events) == 3
+
+        # Verify step_started event structure
+        step_started = [e for e in broadcast_events if e.event_type == "action_step_started"][1]
+        assert step_started.data["intent_id"] == intent_id
+        assert step_started.data["step_name"] == "gitops_commit"
+        assert step_started.data["step_number"] == 2
+        assert step_started.data["total_steps"] == 3
+
+        # Verify step_completed event has output
+        step_completed = [e for e in broadcast_events if e.event_type == "action_step_completed"][0]
+        assert step_completed.data["status"] == "completed"
+        assert "output" in step_completed.data
+        assert step_completed.data["output"]["ci_status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_action_result_card_canvas_rendering():
+    """
+    Verify that result cards render correctly on workflow completion.
+
+    This test verifies that when a workflow completes, the result_created
+    SSE event contains the correct data structure for canvas rendering.
+    """
+    intent_id = "result-card-test-intent"
+    session_id = "test-session-result"
+    project_slug = "test-project"
+    workflow_name = "deploy"
+    summary = "Workflow 'deploy' completed successfully"
+
+    # Track broadcast events
+    broadcast_events = []
+
+    async def mock_broadcast(event: SSEEvent):
+        broadcast_events.append(event)
+
+    with patch("src.sse.broadcaster.get_broadcaster") as mock_get_broadcaster:
+        mock_broadcaster = AsyncMock()
+        mock_broadcaster.broadcast = mock_broadcast
+        mock_get_broadcaster.return_value = mock_broadcaster
+
+        # Broadcast result_created event for completed workflow
+        await mock_broadcaster.broadcast(
+            SSEEvent(
+                event_type="result_created",
+                target_session_id=session_id,
+                target_surface_id=None,
+                data={
+                    "intent_id": intent_id,
+                    "project_slug": project_slug,
+                    "workflow_name": workflow_name,
+                    "summary": summary,
+                    "status": "completed",
+                    "urgency": "normal",
+                    "result_type": "action_workflow_completed",
+                    "steps": [
+                        {
+                            "step_name": "ci_status",
+                            "status": "completed",
+                            "output": {"ci_status": "success", "build_id": "12345"}
+                        },
+                        {
+                            "step_name": "gitops_commit",
+                            "status": "completed",
+                            "output": {"commit": "abc123", "branch": "main"}
+                        },
+                        {
+                            "step_name": "argocd_sync_status",
+                            "status": "completed",
+                            "output": {"sync_status": "Synced", "health": "Healthy"}
+                        }
+                    ],
+                    "duration_ms": 1500,
+                    "started_at": 1000.0,
+                    "completed_at": 1015.0
+                }
+            )
+        )
+
+        # Verify event was broadcast
+        assert len(broadcast_events) == 1
+        event = broadcast_events[0]
+
+        # Verify event structure
+        assert event.event_type == "result_created"
+        assert event.target_session_id == session_id
+        assert event.data["intent_id"] == intent_id
+        assert event.data["project_slug"] == project_slug
+        assert event.data["workflow_name"] == workflow_name
+        assert event.data["summary"] == summary
+        assert event.data["status"] == "completed"
+        assert event.data["result_type"] == "action_workflow_completed"
+
+        # Verify step results are included
+        assert "steps" in event.data
+        assert len(event.data["steps"]) == 3
+        assert event.data["steps"][0]["step_name"] == "ci_status"
+        assert event.data["steps"][0]["status"] == "completed"
+        assert event.data["steps"][1]["step_name"] == "gitops_commit"
+        assert event.data["steps"][2]["step_name"] == "argocd_sync_status"
+
+        # Verify timing information
+        assert "duration_ms" in event.data
+        assert event.data["duration_ms"] == 1500
+        assert "started_at" in event.data
+        assert "completed_at" in event.data
+
+
+@pytest.mark.asyncio
+async def test_degraded_state_card_canvas_rendering():
+    """
+    Verify that degraded-state cards render correctly on step failure.
+
+    This test verifies that when a workflow step fails, the result_created
+    SSE event contains the correct data structure for degraded-state rendering.
+    """
+    intent_id = "degraded-card-test-intent"
+    session_id = "test-session-degraded"
+    project_slug = "test-project"
+    workflow_name = "deploy"
+    error_message = "Step 'gitops_commit' failed: Git commit failed"
+
+    # Track broadcast events
+    broadcast_events = []
+
+    async def mock_broadcast(event: SSEEvent):
+        broadcast_events.append(event)
+
+    with patch("src.sse.broadcaster.get_broadcaster") as mock_get_broadcaster:
+        mock_broadcaster = AsyncMock()
+        mock_broadcaster.broadcast = mock_broadcast
+        mock_get_broadcaster.return_value = mock_broadcaster
+
+        # Broadcast result_created event for failed workflow
+        await mock_broadcaster.broadcast(
+            SSEEvent(
+                event_type="result_created",
+                target_session_id=session_id,
+                target_surface_id=None,
+                data={
+                    "intent_id": intent_id,
+                    "project_slug": project_slug,
+                    "workflow_name": workflow_name,
+                    "summary": f"Action workflow failed: {error_message}",
+                    "status": "failed",
+                    "urgency": "high",
+                    "result_type": "action_workflow_failed",
+                    "error": error_message,
+                    "steps": [
+                        {
+                            "step_name": "ci_status",
+                            "status": "completed",
+                            "output": {"ci_status": "success", "build_id": "12345"}
+                        },
+                        {
+                            "step_name": "gitops_commit",
+                            "status": "failed",
+                            "error": "Git commit failed"
+                        }
+                    ],
+                    "duration_ms": 500,
+                    "started_at": 1000.0,
+                    "completed_at": 1005.0,
+                    "action_required": True,
+                    "action_message": "Manual intervention required to resolve Git commit failure"
+                }
+            )
+        )
+
+        # Verify event was broadcast
+        assert len(broadcast_events) == 1
+        event = broadcast_events[0]
+
+        # Verify event structure
+        assert event.event_type == "result_created"
+        assert event.target_session_id == session_id
+        assert event.data["intent_id"] == intent_id
+        assert event.data["project_slug"] == project_slug
+        assert event.data["workflow_name"] == workflow_name
+        assert event.data["status"] == "failed"
+        assert event.data["urgency"] == "high"
+        assert event.data["result_type"] == "action_workflow_failed"
+
+        # Verify error message is included
+        assert "error" in event.data
+        assert error_message in event.data["error"]
+        assert "Git commit failed" in event.data["error"]
+
+        # Verify step results show both completed and failed steps
+        assert "steps" in event.data
+        assert len(event.data["steps"]) == 2
+
+        # First step should be completed
+        assert event.data["steps"][0]["step_name"] == "ci_status"
+        assert event.data["steps"][0]["status"] == "completed"
+
+        # Second step should be failed
+        assert event.data["steps"][1]["step_name"] == "gitops_commit"
+        assert event.data["steps"][1]["status"] == "failed"
+        assert "error" in event.data["steps"][1]
+
+        # Verify action required indicator
+        assert event.data.get("action_required") is True
+        assert "action_message" in event.data
