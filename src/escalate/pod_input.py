@@ -171,6 +171,112 @@ class PodInputCollector:
 
         return "\n".join(lines)
 
+    def confirm_pod_deletion(self, pod_name: str) -> bool:
+        """
+        Request explicit user confirmation for pod deletion.
+
+        Displays a warning message and prompts the user with "Delete <pod>? (y/n)".
+        Only returns True if the user explicitly confirms with 'y' or 'yes'.
+
+        Args:
+            pod_name: The pod name to confirm deletion for.
+
+        Returns:
+            True if user confirms deletion (y/yes), False otherwise.
+            Returns False on 'n/no', EOFError, KeyboardInterrupt, or any exception.
+
+        Behavior:
+            - Shows clear warning about deletion being irreversible
+            - Explains automatic recreation for managed pods
+            - Loops until valid input (y/n) or cancellation
+            - Handles keyboard interrupts gracefully
+        """
+        print(f"\n⚠️  Confirm Deletion")
+        print(f"=" * 50)
+        print(f"You are about to delete pod: {pod_name}")
+        print(f"\nThis action cannot be undone.")
+        print(f"If the pod is managed by a Deployment or ReplicaSet,")
+        print(f"it will be automatically recreated after deletion.")
+
+        while True:
+            try:
+                response = input(f"\nDelete '{pod_name}'? (y/n): ").strip().lower()
+
+                if response in ('y', 'yes'):
+                    print(f"\n✅ Confirmed deletion of pod: {pod_name}")
+                    return True
+                elif response in ('n', 'no'):
+                    print(f"\n❌ Deletion cancelled for pod: {pod_name}")
+                    return False
+                else:
+                    print(f"\n⚠️  Please enter 'y' or 'n'.")
+
+            except (EOFError, KeyboardInterrupt):
+                print(f"\n\n⏹️  Deletion cancelled for pod: {pod_name}")
+                return False
+            except Exception as e:
+                print(f"\n❌ Error reading input: {e}", file=sys.stderr)
+                return False
+
+    def collect_and_confirm_pod_name(
+        self,
+        prompt_message: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Collect pod name from user and request explicit deletion confirmation.
+
+        This is the complete flow: list pods, get selection, validate, and
+        confirm deletion before proceeding. This method implements the full
+        acceptance criteria for pod deletion confirmation.
+
+        Acceptance Criteria:
+            1. User is presented with the pod list and asked to specify ✅
+            2. User provides a specific pod name ✅
+            3. Pod name is validated against the available pods list ✅
+            4. Target pod is confirmed with explicit user confirmation ✅
+
+        Args:
+            prompt_message: Optional custom prompt message. If not provided,
+                          uses a default prompt that references the pod list.
+
+        Returns:
+            The validated and confirmed pod name, or None if user cancels
+            at any point (selection or confirmation). Returns None if:
+            - No pods available for selection
+            - User enters 'cancel' or empty input during selection
+            - User rejects confirmation (n/no)
+            - User cancels via EOFError or KeyboardInterrupt
+            - Any exception occurs during input
+
+        Behavior:
+            - Step 1: Calls collect_pod_name() to display list and get selection
+            - Step 2: Calls confirm_pod_deletion() for explicit confirmation
+            - Step 3: Returns pod name if both steps succeed, None otherwise
+            - Clears _selected_pod if confirmation is rejected
+
+        Example:
+            >>> collector.set_available_pods(pods_list)
+            >>> confirmed_pod = collector.collect_and_confirm_pod_name()
+            >>> if confirmed_pod:
+            >>>     # Proceed with deletion
+            >>> else:
+            >>>     # User cancelled
+        """
+        # Step 1: Collect and validate pod name
+        selected_pod = self.collect_pod_name(prompt_message)
+
+        # Step 2: Request explicit confirmation
+        if selected_pod:
+            if self.confirm_pod_deletion(selected_pod):
+                return selected_pod
+            else:
+                # User cancelled confirmation
+                with self._state_lock:
+                    self._selected_pod = None
+                return None
+
+        return None
+
     def get_selected_pod(self) -> Optional[str]:
         """
         Get the currently selected pod name.
@@ -222,6 +328,28 @@ def collect_pod_name_interactive(
     return collector.collect_pod_name(prompt_message)
 
 
+def collect_and_confirm_pod_interactive(
+    available_pods: List[Dict],
+    prompt_message: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Convenience function to collect pod name and confirm deletion.
+
+    Creates a collector, sets available pods, collects input, and confirms
+    deletion before proceeding.
+
+    Args:
+        available_pods: List of available pod dictionaries.
+        prompt_message: Optional custom prompt message.
+
+    Returns:
+        The validated and confirmed pod name, or None if cancelled at any point.
+    """
+    collector = get_pod_input_collector()
+    collector.set_available_pods(available_pods)
+    return collector.collect_and_confirm_pod_name(prompt_message)
+
+
 if __name__ == "__main__":
     # Demo with sample pods from the previous task
     sample_pods = [
@@ -264,13 +392,20 @@ if __name__ == "__main__":
 
     print("🧪 Pod Input Collector Demo")
     print("=" * 50)
+    print("\nThis demo shows the complete pod selection and confirmation flow.")
 
-    selected = collect_pod_name_interactive(sample_pods)
+    # Use the new collect_and_confirm_pod_interactive function
+    selected = collect_and_confirm_pod_interactive(sample_pods)
 
     if selected:
-        print(f"\n✅ Successfully selected pod: {selected}")
+        print(f"\n✅ Successfully selected and confirmed pod: {selected}")
         print(f"   Ready for deletion processing.")
+        print(f"\nNext steps:")
+        print(f"   1. Check pod ownership (Deployment/ReplicaSet)")
+        print(f"   2. Execute kubectl delete pod")
+        print(f"   3. Handle recreation warning if managed")
     else:
-        print("\n⏹️  No pod selected.")
+        print("\n⏹️  Pod selection or confirmation cancelled.")
+        print(f"   No pod will be deleted.")
 
     sys.exit(0 if selected else 1)
