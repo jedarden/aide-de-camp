@@ -37,6 +37,8 @@ __all__ = [
     "SyncStatus",
     "HealthStatus",
     "ArgoCDApplicationStatus",
+    "execute_pod_logs_step",
+    "execute_argocd_events_step",
 ]
 
 from ..models import ExecutionContext
@@ -581,6 +583,169 @@ async def execute_argocd_sync_status_step(
 
     except Exception as e:
         raise RuntimeError(f"Failed to poll ArgoCD sync status: {e}")
+
+
+async def execute_pod_logs_step(
+    intent_id: str,
+    session_id: str,
+    project_slug: str | None,
+    project_cfg: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Execute pod_logs step: get recent pod logs.
+
+    Returns:
+        Dict with recent pod logs
+    """
+    logger.info(f"Executing pod_logs step for project '{project_slug}'")
+
+    namespace = project_cfg.get("namespace")
+    cluster = project_cfg.get("cluster")
+
+    if not namespace:
+        raise ValueError(f"Project '{project_slug}' has no namespace configured")
+
+    proxy_url = _get_cluster_proxy(cluster)
+    if not proxy_url:
+        raise ValueError(f"Cluster '{cluster}' has no proxy configured")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Get pods first to find pod names
+            pods_response = await client.get(
+                f"{proxy_url}/api/v1/namespaces/{namespace}/pods",
+                headers={"Accept": "application/json"}
+            )
+            pods_response.raise_for_status()
+            pods_data = pods_response.json()
+            pods = pods_data.get("items", [])
+
+            if not pods:
+                return {
+                    "logs": [],
+                    "pod_count": 0,
+                    "namespace": namespace,
+                    "cluster": cluster,
+                    "message": "No pods found in namespace",
+                }
+
+            # Get logs from the first few pods (limit to avoid overwhelming output)
+            pod_logs = []
+            max_pods = 3  # Limit to first 3 pods
+            tail_lines = 50
+
+            for pod in pods[:max_pods]:
+                pod_name = pod.metadata.name
+                try:
+                    logs_response = await client.get(
+                        f"{proxy_url}/api/v1/namespaces/{namespace}/pods/{pod_name}/log",
+                        params={"tailLines": str(tail_lines)},
+                        headers={"Accept": "text/plain"}
+                    )
+                    logs_response.raise_for_status()
+                    logs = logs_response.text
+
+                    pod_logs.append({
+                        "pod_name": pod_name,
+                        "logs": logs.split("\n")[-tail_lines:],  # Get last N lines
+                        "line_count": len(logs.split("\n")),
+                    })
+
+                except httpx.HTTPError as e:
+                    logger.warning(f"Failed to get logs for pod {pod_name}: {e}")
+                    pod_logs.append({
+                        "pod_name": pod_name,
+                        "logs": [],
+                        "error": str(e),
+                    })
+
+            return {
+                "pod_logs": pod_logs,
+                "pod_count": len(pod_logs),
+                "namespace": namespace,
+                "cluster": cluster,
+            }
+
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"Failed to get pod logs: {e}")
+
+
+async def execute_argocd_events_step(
+    intent_id: str,
+    session_id: str,
+    project_slug: str | None,
+    project_cfg: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Execute argocd_events step: get recent ArgoCD events.
+
+    Returns:
+        Dict with recent ArgoCD events
+    """
+    logger.info(f"Executing argocd_events step for project '{project_slug}'")
+
+    cluster = project_cfg.get("cluster")
+    argocd_app = project_cfg.get("argocd_app", project_slug)
+
+    argocd_base_url = _get_argocd_base_url()
+    if not argocd_base_url:
+        raise RuntimeError("ArgoCD base URL not configured")
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            # Get application details to find events
+            response = await client.get(
+                f"{argocd_base_url}/api/v1/applications/{argocd_app}",
+                headers={"Accept": "application/json"}
+            )
+            response.raise_for_status()
+
+            app_data = response.json()
+
+            # Extract recent events from application status
+            # ArgoCD stores events in the status field
+            events = []
+            app_status = app_data.get("status", {})
+
+            # Get operation state if available
+            operation_state = app_status.get("operationState", {})
+            if operation_state:
+                events.append({
+                    "type": "operation",
+                    "phase": operation_state.get("phase"),
+                    "message": operation_state.get("message", ""),
+                    "started_at": operation_state.get("startedAt"),
+                    "finished_at": operation_state.get("finishedAt"),
+                })
+
+            # Get sync status history
+            sync_status = app_status.get("sync", {})
+            if sync_status:
+                events.append({
+                    "type": "sync",
+                    "status": sync_status.get("status"),
+                    "revision": sync_status.get("revision"),
+                    "synced_at": sync_status.get("startedAt"),
+                })
+
+            # Get health status
+            health_status = app_status.get("health", {})
+            if health_status:
+                events.append({
+                    "type": "health",
+                    "status": health_status.get("status"),
+                    "message": health_status.get("message", ""),
+                })
+
+            return {
+                "events": events,
+                "application": argocd_app,
+                "cluster": cluster,
+                "event_count": len(events),
+            }
+
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"Failed to get ArgoCD events: {e}")
 
 
 def _get_cluster_proxy(cluster: str | None) -> str | None:
