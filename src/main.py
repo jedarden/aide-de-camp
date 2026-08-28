@@ -2869,10 +2869,20 @@ async def api_v1_telegram_bridge_status():
     including availability status, last check time, and failure tracking.
     Integrates with the reachability state from startup checks and ongoing
     send operations.
+
+    Returns HTTP 503 when the bridge is unreachable, HTTP 200 when reachable.
     """
     try:
         telegram_fallback = get_telegram_fallback()
         status = telegram_fallback.get_status()
+
+        # Return HTTP 503 when bridge is unreachable
+        if status.get("reachable") is False:
+            return JSONResponse(
+                status_code=503,
+                content=status
+            )
+
         return status
     except Exception as e:
         logger.error(f"Error getting Telegram bridge status: {e}")

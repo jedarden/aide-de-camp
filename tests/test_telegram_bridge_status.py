@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.telegram.fallback import TelegramFallback, get_telegram_fallback
+from fastapi.testclient import TestClient
 
 
 class TestTelegramBridgeStatus:
@@ -173,8 +174,7 @@ class TestTelegramBridgeStatus:
 class TestBridgeStatusAPI:
     """Test the bridge status API endpoint."""
 
-    @pytest.mark.asyncio
-    async def test_api_v1_telegram_bridge_status(self):
+    def test_api_v1_telegram_bridge_status(self):
         """Test the GET /api/v1/status/telegram_bridge endpoint."""
         # Test the status method directly instead of importing the full app
         fallback = TelegramFallback(bot_token="test_token")
@@ -188,6 +188,79 @@ class TestBridgeStatusAPI:
         assert status["reachable"] is True
         assert status["bot_configured"] is True  # bot_token is set
         assert status["failure_count"] == 5
+
+    def test_api_v1_telegram_bridge_status_http_503_when_unreachable(self, test_client: TestClient):
+        """Test that the API returns HTTP 503 when bridge is unreachable."""
+        # Mock the telegram fallback to return unreachable state
+        with patch("src.main.get_telegram_fallback") as mock_get_fallback:
+            mock_fallback = MagicMock()
+            mock_fallback.get_status.return_value = {
+                "reachable": False,
+                "last_check_time": "2024-01-01T12:00:00Z",
+                "last_failure_time": "2024-01-01T12:00:00Z",
+                "failure_count": 5,
+                "bot_configured": True,
+                "chat_id_configured": False,
+                "chat_id": None,
+            }
+            mock_get_fallback.return_value = mock_fallback
+
+            response = test_client.get("/api/v1/status/telegram_bridge")
+
+            # Should return HTTP 503 when unreachable
+            assert response.status_code == 503
+            data = response.json()
+            assert data["reachable"] is False
+            assert data["failure_count"] == 5
+
+    def test_api_v1_telegram_bridge_status_http_200_when_reachable(self, test_client: TestClient):
+        """Test that the API returns HTTP 200 when bridge is reachable."""
+        # Mock the telegram fallback to return reachable state
+        with patch("src.main.get_telegram_fallback") as mock_get_fallback:
+            mock_fallback = MagicMock()
+            mock_fallback.get_status.return_value = {
+                "reachable": True,
+                "last_check_time": "2024-01-01T12:00:00Z",
+                "last_failure_time": None,
+                "failure_count": 0,
+                "bot_configured": True,
+                "chat_id_configured": True,
+                "chat_id": "123456789",
+            }
+            mock_get_fallback.return_value = mock_fallback
+
+            response = test_client.get("/api/v1/status/telegram_bridge")
+
+            # Should return HTTP 200 when reachable
+            assert response.status_code == 200
+            data = response.json()
+            assert data["reachable"] is True
+            assert data["failure_count"] == 0
+
+    def test_api_v1_telegram_bridge_status_fields(self, test_client: TestClient):
+        """Test that the API returns all required status fields."""
+        # Mock the telegram fallback
+        with patch("src.main.get_telegram_fallback") as mock_get_fallback:
+            mock_fallback = MagicMock()
+            mock_fallback.get_status.return_value = {
+                "reachable": True,
+                "last_check_time": "2024-01-01T12:00:00Z",
+                "last_failure_time": None,
+                "failure_count": 0,
+                "bot_configured": True,
+                "chat_id_configured": True,
+                "chat_id": "123456789",
+            }
+            mock_get_fallback.return_value = mock_fallback
+
+            response = test_client.get("/api/v1/status/telegram_bridge")
+            data = response.json()
+
+            # Verify all required fields are present
+            assert "reachable" in data
+            assert "last_check_time" in data
+            assert "last_failure_time" in data
+            assert "failure_count" in data
 
 
 if __name__ == "__main__":
