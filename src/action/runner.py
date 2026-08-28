@@ -98,6 +98,128 @@ class ActionRunner:
         """Initialize the ActionRunner with an ActionExecutor instance."""
         self._executor = ActionExecutor()
 
+    async def execute_action_intent(
+        self,
+        intent_id: str,
+        session_id: str,
+        utterance: str,
+        project_slug: Optional[str],
+    ) -> dict:
+        """
+        Execute an ACTION intent by determining and running the appropriate workflow.
+
+        This method determines which workflow to execute based on the project
+        configuration and intent classification, then executes the workflow and
+        returns a dict result compatible with the dispatch system.
+
+        Args:
+            intent_id: Intent ID for tracking and SSE targeting
+            session_id: Session ID for SSE targeting
+            utterance: Original user utterance that triggered the workflow
+            project_slug: Project slug for registry lookup (None = no project)
+
+        Returns:
+            Dict with workflow execution result for dispatch integration
+        """
+        logger.info(
+            f"ActionRunner executing ACTION intent for project '{project_slug}' "
+            f"(intent {intent_id[:8]})"
+        )
+
+        # Handle missing project_slug gracefully
+        if not project_slug:
+            error_msg = "Project slug is required for ACTION intents"
+            logger.error(error_msg)
+            return {
+                "intent_id": intent_id,
+                "intent_type": "action",
+                "session_id": session_id,
+                "status": "failed",
+                "error": error_msg,
+                "project_slug": project_slug,
+                "workflow_name": None,
+                "duration_ms": 0,
+                "steps": [],
+            }
+
+        # Determine workflow name from project configuration
+        workflow_name = "status"  # Default workflow
+
+        try:
+            project_cfg = get_project(project_slug)
+            if project_cfg:
+                workflows = project_cfg.get("workflows", {})
+                if workflows:
+                    # Use the first available workflow
+                    workflow_name = list(workflows.keys())[0]
+                    logger.info(f"Using workflow '{workflow_name}' for project '{project_slug}'")
+                else:
+                    error_msg = f"No workflows defined for project '{project_slug}'"
+                    logger.error(error_msg)
+                    return {
+                        "intent_id": intent_id,
+                        "intent_type": "action",
+                        "session_id": session_id,
+                        "status": "failed",
+                        "error": error_msg,
+                        "project_slug": project_slug,
+                        "workflow_name": None,
+                        "duration_ms": 0,
+                        "steps": [],
+                    }
+            else:
+                error_msg = f"Project '{project_slug}' not found in registry"
+                logger.error(error_msg)
+                return {
+                    "intent_id": intent_id,
+                    "intent_type": "action",
+                    "session_id": session_id,
+                    "status": "failed",
+                    "error": error_msg,
+                    "project_slug": project_slug,
+                    "workflow_name": None,
+                    "duration_ms": 0,
+                    "steps": [],
+                }
+        except Exception as e:
+            error_msg = f"Failed to load workflows for project '{project_slug}': {e}"
+            logger.error(error_msg)
+            return {
+                "intent_id": intent_id,
+                "intent_type": "action",
+                "session_id": session_id,
+                "status": "failed",
+                "error": error_msg,
+                "project_slug": project_slug,
+                "workflow_name": None,
+                "duration_ms": 0,
+                "steps": [],
+            }
+
+        # Execute the workflow
+        result = await self._executor.execute_workflow(
+            intent_id=intent_id,
+            session_id=session_id,
+            utterance=utterance,
+            project_slug=project_slug,
+            workflow_name=workflow_name,
+        )
+
+        # Convert ActionResult to dict for dispatch integration
+        return {
+            "intent_id": intent_id,
+            "intent_type": "action",
+            "session_id": session_id,
+            "status": result.status,
+            "workflow_name": result.workflow_name,
+            "project_slug": project_slug,
+            "duration_ms": result.duration_ms,
+            "steps": [step.to_dict() for step in result.steps],
+            "error": result.error,
+            "started_at": result.started_at,
+            "completed_at": result.completed_at,
+        }
+
     async def execute_workflow(
         self,
         intent_id: str,
