@@ -28,6 +28,7 @@ from .steps import (
     GitOperationResult,
     GitOperationStatus,
     execute_argocd_apps_step,
+    execute_argocd_events_step,
     execute_argocd_sync_status_step,
     execute_ci_status_step,
     execute_deployment_info_step,
@@ -35,6 +36,7 @@ from .steps import (
     execute_gitops_commit_step,
     execute_image_tag_step,
     execute_open_beads_step,
+    execute_pod_logs_step,
     execute_pod_status_step,
 )
 
@@ -64,6 +66,7 @@ __all__ = [
     "WorkflowValidationError",
     # Step executors
     "execute_argocd_apps_step",
+    "execute_argocd_events_step",
     "execute_argocd_sync_status_step",
     "execute_ci_status_step",
     "execute_deployment_info_step",
@@ -71,6 +74,7 @@ __all__ = [
     "execute_gitops_commit_step",
     "execute_image_tag_step",
     "execute_open_beads_step",
+    "execute_pod_logs_step",
     "execute_pod_status_step",
 ]
 

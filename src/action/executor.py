@@ -253,7 +253,10 @@ class ActionExecutor:
             "gitops_commit": self._execute_gitops_commit,
             # Read-only steps
             "argocd_sync_status": self._execute_argocd_sync_status,
+            "argocd_sync": self._execute_argocd_sync_status,  # Alias for argocd_sync_status
             "pod_status": self._execute_pod_status,
+            "pod_logs": self._execute_pod_logs,
+            "argocd_events": self._execute_argocd_events,
             "deployment_info": self._execute_deployment_info,
             "git_log": self._execute_git_log,
             "argocd_apps": self._execute_argocd_apps,
@@ -660,6 +663,42 @@ class ActionExecutor:
         from .steps import execute_open_beads_step
 
         return await execute_open_beads_step(
+            intent_id=intent_id,
+            session_id=session_id,
+            project_slug=project_slug,
+            project_cfg=project_cfg,
+        )
+
+    async def _execute_pod_logs(
+        self,
+        intent_id: str,
+        session_id: str,
+        project_slug: str | None,
+        project_cfg: dict[str, Any],
+        workflow_name: str,
+    ) -> dict[str, Any]:
+        """Execute pod_logs step: get recent pod logs."""
+        from .steps import execute_pod_logs_step
+
+        return await execute_pod_logs_step(
+            intent_id=intent_id,
+            session_id=session_id,
+            project_slug=project_slug,
+            project_cfg=project_cfg,
+        )
+
+    async def _execute_argocd_events(
+        self,
+        intent_id: str,
+        session_id: str,
+        project_slug: str | None,
+        project_cfg: dict[str, Any],
+        workflow_name: str,
+    ) -> dict[str, Any]:
+        """Execute argocd_events step: get recent ArgoCD events."""
+        from .steps import execute_argocd_events_step
+
+        return await execute_argocd_events_step(
             intent_id=intent_id,
             session_id=session_id,
             project_slug=project_slug,
