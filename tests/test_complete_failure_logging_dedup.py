@@ -223,6 +223,9 @@ class TestStateReset:
         client = fake_httpx_client._orig_client()
         fallback = TelegramFallback(bot_token="test_token")
 
+        # Set client to fail mode
+        client.set_failure(Exception("Network error"))
+
         # First, trigger failures
         with caplog.at_level("WARNING"):
             for i in range(3):
