@@ -631,6 +631,67 @@ function createErrorCard(data) {
 // ---------------------------------------------------------------------------
 
 /**
+ * @typedef {Object} ActionPendingCardData
+ * @property {string} intent_id - The intent ID for the action workflow
+ * @property {string} project_slug - The project slug
+ * @property {string} utterance - The original user utterance
+ * @property {string} message - Status message for the pending action
+ */
+
+/**
+ * Build an action pending card for workflow execution.
+ *
+ * @param {ActionPendingCardData} data - Action pending card data structure
+ * @returns {HTMLElement} a .action-pending-card element (data-builtin="action_pending")
+ */
+function createActionPendingCard(data) {
+    data = data || {};
+
+    const card = el('div', 'builtin-card action-pending-card');
+    card.dataset.builtin = 'action_pending';
+    card.dataset.pendingId = String(data.intent_id || '');
+    if (data.project_slug) card.dataset.projectSlug = String(data.project_slug);
+
+    // Header with icon and title
+    card.appendChild(el('div', 'builtin-header', [
+        el('span', 'builtin-icon', ['⚙️']),
+        el('span', 'builtin-title', ['Action Workflow Executing'])
+    ]));
+
+    // Status message
+    const message = data.message || 'Action workflow executing in background';
+    card.appendChild(el('p', 'action-pending-message', [message]));
+
+    // Echo the utterance so the user knows what's being executed
+    if (data.utterance) {
+        card.appendChild(el('div', 'action-utterance-wrap', [
+            el('span', 'action-utterance-label', ['Executing: ']),
+            el('span', 'action-utterance', ['"' + data.utterance + '"'])
+        ]));
+    }
+
+    // Project badge if available
+    if (data.project_slug) {
+        card.appendChild(el('div', 'action-project-badge', [
+            el('span', 'action-project-label', ['Project: ']),
+            el('span', 'action-project-name', [data.project_slug])
+        ]));
+    }
+
+    // Progress indicator (animated)
+    const progressIndicator = el('div', 'action-progress-indicator');
+    progressIndicator.innerHTML = '<div class="action-spinner"></div>';
+    card.appendChild(progressIndicator);
+
+    // Elapsed time footer (will be updated by ticker)
+    const elapsedFooter = el('div', 'action-elapsed-footer', ['Just started']);
+    elapsedFooter.dataset.createdAt = String(Date.now());
+    card.appendChild(elapsedFooter);
+
+    return card;
+}
+
+/**
  * @typedef {Object} StuckCardData
  * @property {string} bead_id - The bead reference ID that is stuck
  * @property {string} stuck_reason - The reason why the bead is stuck (refusal reason)
@@ -1091,6 +1152,7 @@ if (typeof window !== 'undefined') {
     window.buildContainerChildren = buildContainerChildren;
     window._setProgress = _setProgress;
     window.el = el;  // DOM helper for pending cards
+    window.createActionPendingCard = createActionPendingCard;  // Action pending card renderer for action_pending events
     window.createErrorCard = createErrorCard;  // Error card renderer for SSE error events
     window.createStuckCard = createStuckCard;  // Stuck card renderer for task_stuck events
     window.createFailedCard = createFailedCard;  // Failed card renderer for task_failed events

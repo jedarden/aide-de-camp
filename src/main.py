@@ -56,6 +56,7 @@ from .feedback.background_analysis import get_background_processor
 from .intent.router import get_router as get_intent_router
 from .escalate import escalate_intent, EscalateRequest
 from .escalate.llm import warmup_zai_connections
+from .action.runner import get_action_runner
 from .test.router import router as test_router, session_router
 from .environment.discovery import (
     scan_environment, set_registry,
@@ -342,6 +343,96 @@ async def get_store():
         _store = await session_store_get_store(DB_PATH)
         await _store.initialize()
     return _store
+
+
+async def _execute_action_intent_background(routed_intent, surface_id: str):
+    """
+    Execute an ACTION intent in the background without blocking the dispatch response.
+
+    This function runs as a fire-and-forget asyncio task for each ACTION intent.
+    It executes the workflow via ActionRunner and broadcasts results via SSE.
+
+    Args:
+        routed_intent: The routed ACTION intent to execute
+        surface_id: Surface ID for SSE targeting
+    """
+    from .action.runner import get_action_runner
+
+    intent_id = routed_intent.intent_id
+    session_id = routed_intent.session_id
+
+    try:
+        logger.info(
+            f"Background action execution started for intent {intent_id[:8]} "
+            f"(project: {routed_intent.classification.project_slug})"
+        )
+
+        # Execute action intent (includes workflow execution and result storage)
+        action_runner = get_action_runner()
+        result = await action_runner.execute_action_intent(
+            intent_id=intent_id,
+            session_id=session_id,
+            utterance=routed_intent.utterance,
+            project_slug=routed_intent.classification.project_slug,
+        )
+
+        # Broadcast result_created so canvas reloads topics
+        if _broadcaster and surface_id:
+            emit_start = time.monotonic()
+            sse_data = {
+                "intent_id": intent_id,
+                "topic_id": result.get("topic_id"),
+                "summary": result.get("summary"),
+                "urgency": result.get("urgency"),
+            }
+            if result.get("component_id") is not None:
+                sse_data["component_id"] = result["component_id"]
+            if result.get("card_fallback") is not None:
+                sse_data["card_fallback"] = result["card_fallback"]
+
+            await _broadcaster.broadcast(
+                SSEEvent(
+                    event_type="result_created",
+                    target_surface_id=surface_id,
+                    data=sse_data,
+                    rendered_html=result.get("rendered_html"),
+                )
+            )
+
+            # Record SSE emit timing
+            try:
+                await store.record_dispatch_timings(
+                    intent_id,
+                    session_id=session_id,
+                    sse_emit_ms=int((time.monotonic() - emit_start) * 1000),
+                )
+            except Exception as te:
+                logger.warning(f"sse_emit timing not recorded for {intent_id}: {te}")
+
+        logger.info(
+            f"Background action execution completed for intent {intent_id[:8]} "
+            f"(status: {result.get('status')}, workflow: {result.get('workflow_name')})"
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Background action execution failed for intent {intent_id}: {e}",
+            exc_info=True
+        )
+
+        # Emit degraded-state card on error
+        try:
+            from .errors.degraded_state import get_degraded_state_handler
+            handler = get_degraded_state_handler()
+            await handler.broadcast_action_execution_failed(
+                utterance=routed_intent.utterance,
+                intent_id=intent_id,
+                session_id=session_id,
+                project_slug=routed_intent.classification.project_slug,
+                error_reason=str(e),
+            )
+        except Exception as broadcast_error:
+            logger.error(f"Failed to broadcast action execution error: {broadcast_error}")
 
 
 @app.get("/health")
@@ -1066,9 +1157,10 @@ async def dispatch_intent(request: DispatchRequest) -> DispatchResponse:
 
     Phase 0 core query loop:
     1. Routes utterance to intents via intent router
-    2. For each intent, runs fetch + synthesize strands in parallel
-    3. Streams results via SSE to active canvas
-    4. Returns acknowledgment with intent IDs
+    2. For ACTION intents, launches async ActionRunner workflow execution
+    3. For other intents, runs fetch + synthesize strands in parallel
+    4. Streams results via SSE to active canvas
+    5. Returns acknowledgment with intent IDs
 
     Returns acknowledgment immediately with intent IDs for tracking.
     Results are streamed via SSE to connected canvas surfaces.
@@ -1109,6 +1201,7 @@ async def dispatch_intent(request: DispatchRequest) -> DispatchResponse:
         # Create intent records and process in parallel
         intent_tasks = []
         intent_ids = []
+        action_count = 0  # Track ACTION intents for response message
 
         for routed_intent in routed_intents:
             # Create intent record in store
@@ -1122,7 +1215,44 @@ async def dispatch_intent(request: DispatchRequest) -> DispatchResponse:
             )
             intent_ids.append(routed_intent.intent_id)
 
-            # Create task for parallel processing
+            # Check if this is an ACTION intent - launch background ActionRunner task
+            if classification.intent_type.value == "action":
+                action_count += 1
+
+                # Broadcast action_pending card immediately for user feedback
+                if _broadcaster and surface_id:
+                    try:
+                        await _broadcaster.broadcast(
+                            SSEEvent(
+                                event_type="action_pending",
+                                target_surface_id=surface_id,
+                                data={
+                                    "intent_id": routed_intent.intent_id,
+                                    "project_slug": classification.project_slug,
+                                    "utterance": routed_intent.utterance,
+                                    "message": "Action workflow executing in background",
+                                },
+                            )
+                        )
+                        logger.info(
+                            f"Broadcast action_pending for intent {routed_intent.intent_id[:8]}"
+                        )
+                    except Exception as broadcast_error:
+                        logger.warning(f"Failed to broadcast action_pending: {broadcast_error}")
+                        # Non-fatal: continue with background execution
+
+                # Launch fire-and-forget background task for action execution
+                asyncio.create_task(
+                    _execute_action_intent_background(
+                        routed_intent=routed_intent,
+                        surface_id=surface_id,
+                    ),
+                    name=f"action_{routed_intent.intent_id[:8]}"
+                )
+                # ACTION intents run in background, don't add to intent_tasks
+                continue
+
+            # Create task for parallel processing (non-ACTION intents)
             task = asyncio.create_task(
                 router.process_intent(routed_intent),
                 name=f"process_{routed_intent.intent_id[:8]}"
@@ -1134,6 +1264,7 @@ async def dispatch_intent(request: DispatchRequest) -> DispatchResponse:
             """Process intents and stream results to SSE."""
             results = []
 
+            # Process non-ACTION intents first
             for intent_id, task in intent_tasks:
                 try:
                     result = await task
@@ -1190,13 +1321,18 @@ async def dispatch_intent(request: DispatchRequest) -> DispatchResponse:
         asyncio.create_task(stream_results())
 
         # Return structured acknowledgment with DispatchResponse model
+        message = f"Dispatched {len(intent_ids)} intents for parallel processing"
+        if action_count > 0:
+            message = f"Dispatched {len(intent_ids)} intents ({action_count} action workflows executing in background)"
+
         return DispatchResponse(
             success=True,
-            message=f"Dispatched {len(intent_ids)} intents for parallel processing",
+            message=message,
             data={
                 "utterance_id": utterance_id,
                 "session_id": session_id,
                 "intent_count": len(intent_ids),
+                "action_count": action_count,
                 "intent_ids": intent_ids,
                 "status": "dispatched",
                 "utterance_confirmation": utterance[:100] + ("..." if len(utterance) > 100 else ""),
