@@ -12,6 +12,7 @@ dependencies = [
     "aiosqlite>=0.20.0",
     "orjson>=3.10.0",  # Faster JSON parsing (2-3x speedup vs standard json)
     "aiohttp>=3.10.0",  # Async HTTP client for ambient monitoring fetches
+    "hvac>=2.0.0",  # OpenBao client for secret retrieval at runtime
 ]
 
 [project.optional-dependencies]
