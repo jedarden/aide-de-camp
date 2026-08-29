@@ -297,7 +297,7 @@ class DemoSeedVerifier:
             from src.context.warmer import get_context_warmer
             from src.session.store import get_store
 
-            store = get_store()
+            store = await get_store()
             warmer = get_context_warmer()
 
             # Create or find cross-session topics for scripted projects
