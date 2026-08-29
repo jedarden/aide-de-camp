@@ -1,160 +1,267 @@
 # Telegram Bot Provisioning Status
 
-**Last Updated:** 2026-08-29  
 **Bead:** aidedeca-73d9fe27  
-**Status:** 🔒 AWAITING MANUAL OWNER PROVISIONING
+**Status:** 🔧 **BLOCKED - REQUIRES HUMAN ACTION**  
+**Date:** 2026-08-29
 
 ---
 
-## Summary
+## Current State Assessment
 
-All infrastructure for Telegram bot integration is complete and ready. The remaining steps require manual human intervention (BotFather interaction, OpenBao authentication) that cannot be performed by worker agents.
+### ✅ What's Ready (Infrastructure Complete)
 
----
+- **OpenBao Integration:** Fully implemented and accessible
+  - Client: `src/openbao/client.py`
+  - Endpoint: `http://traefik-ardenone-cluster:8200`
+  - Authentication: Working (AppRole token in service file)
 
-## ✅ Infrastructure Complete (Ready)
+- **Telegram Integration Code:** Fully implemented
+  - Module: `src/telegram/fallback.py`
+  - Features: Direct Bot API integration, message sending, reachability checks
+  - Endpoint: `/api/v1/status/telegram` (health check)
 
-### Code Implementation
-- **File:** `src/telegram/fallback.py`
-- **Status:** Fully implemented with OpenBao integration
-- **Features:** 
-  - Direct Telegram Bot API integration (per ADR-1)
-  - OpenBao runtime token retrieval
-  - Graceful degradation when credentials missing
-  - Comprehensive failure tracking and logging
+- **Provisioning Tools:** Ready to use
+  - Script: `scripts/provision_telegram_credentials.py` (fully automated)
+  - Alternative: `scripts/extract_telegram_chat_id.py` (chat ID extraction only)
+  - Verification: `scripts/verify_telegram_send.py` (end-to-end test)
 
-### Testing
-- **Test suite:** 60+ tests passing
-- **Coverage:** 
-  - OpenBao integration
-  - Telegram API contract
-  - Failure state tracking
-  - End-to-end logging verification
+- **Documentation:** Complete
+  - Provisioning guide: `TELEGRAM_PROVISIONING.md`
+  - ADR-1 decision: `docs/notes/adr-1-telegram-bot-decision.md`
+  - Memory records: [[telegram-bot-decision-and-configuration]]
 
-### Documentation
-- **Provisioning guide:** `docs/notes/telegram-bot-api-provisioning.md`
-- **OpenBao storage:** `docs/notes/openbao-telegram-token-storage.md`
-- **Environment config:** `docs/notes/telegram-bot-environment-configuration.md`
-- **Decision record:** Memory documented (create dedicated bot)
+### ❌ What's Missing (Requires Human Action)
 
-### Scripts
-- **Setup script:** `scripts/complete_telegram_setup.sh`
-- **Chat ID extraction:** `scripts/extract_telegram_chat_id.py`
-- **Verification:** `scripts/verify_telegram_send.py`
+1. **Bot Token NOT in OpenBao**
+   - Expected path: `secret/ardenone-cluster/aide-de-camp/telegram_bot_token`
+   - Status: Path does not exist (verified via OpenBao client)
+   - Owner action: Create bot via @BotFather, store token
 
-### Service Configuration
-- **File:** `deploy/aide-de-camp.service`
-- **Status:** Environment placeholders configured
-- **Needs:** OPENBAO_TOKEN and ADC_TELEGRAM_CHAT_ID values
+2. **Chat ID NOT in OpenBao**
+   - Expected path: `secret/ardenone-cluster/aide-de-camp/telegram_chat_id`
+   - Status: Path does not exist (verified via OpenBao client)
+   - Owner action: Extract chat ID via getUpdates API, store in OpenBao
 
-### OpenBao Path
-- **Bot token:** `secret/ardenone-cluster/aide-de-camp/telegram_bot_token` (field: `token`)
-- **Chat ID:** `secret/ardenone-cluster/aide-de-camp/telegram_chat_id` (field: `chat_id`)
-- **Instance:** `http://traefik-ardenone-cluster:8200` (ardenone-cluster)
+3. **Environment Variable NOT Set**
+   - File: `deploy/aide-de-camp.service`
+   - Missing: `Environment=ADC_TELEGRAM_CHAT_ID=<your-chat-id>`
+   - Status: Currently commented out (line 34)
+   - Owner action: Uncomment and set after provisioning
 
 ---
 
-## 🔒 Manual Owner Steps Required
+## Why This Task Is Blocked
 
-### Step 1: Create Bot via BotFather
-1. Open Telegram and search for `@BotFather`
+This task is **explicitly marked as owner-only** in the bead description:
+
+> "Owner-only steps (workers must not work this bead)"
+> 1) Create the dedicated bot via BotFather  
+> 2) Capture the personal chat id  
+> 3) Store credentials per workspace conventions
+
+These steps require:
+- **Interactive BotFather session** (human Telegram interaction)
+- **Personal chat ID** (your private Telegram identifier)
+- **Secure credential storage** (OpenBao write access)
+
+Agents/NEEDLE workers cannot perform these steps safely.
+
+---
+
+## Owner Action Required
+
+### Quick Start (Automated - Recommended)
+
+```bash
+cd /home/coding/aide-de-camp
+
+# The provisioning script guides you through everything
+.venv/bin/python3 scripts/provision_telegram_credentials.py
+```
+
+This script:
+✅ Checks current state  
+✅ Guides you through @BotFather steps  
+✅ Stores bot token securely (never in logs)  
+✅ Extracts your chat ID automatically  
+✅ Stores chat ID in OpenBao  
+✅ Verifies everything works
+
+### Manual Process (If Script Fails)
+
+#### Step 1: Create Bot via @BotFather
+
+1. Open Telegram, search for `@BotFather`
 2. Send `/newbot`
-3. Follow prompts to create your bot
-4. Copy the bot token (format: `***REMOVED***`)
+3. Follow prompts:
+   - Name: "aide-de-camp-notifications" (or your choice)
+   - Username: "adc_notifications_bot" (must end in 'bot')
+4. **Copy the bot token** (format: `1234567890:ABCDEF...`)
 
-### Step 2: Get OpenBao Token
-```bash
-bao login -address=http://traefik-ardenone-cluster:8200 <method>
-bao token lookup -address=http://traefik-ardenone-cluster:8200
-```
+#### Step 2: Get Your Chat ID
 
-### Step 3: Store Bot Token in OpenBao
-```bash
-# CRITICAL: Use stdin to avoid token appearing in logs
-echo -n "<YOUR_BOT_TOKEN>" | \
-  bao kv put -address=http://traefik-ardenone-cluster:8200 \
-  secret/ardenone-cluster/aide-de-camp/telegram_bot_token token=-
-```
-
-### Step 4: Get Chat ID
-1. Start conversation with your bot in Telegram
+1. Find your bot in Telegram
 2. Send `/start` or any message
-3. Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
-4. Find `message.chat.id` in the JSON response
+3. Visit: `https://api.telegram.org/bot<BOT_TOKEN>/getUpdates`
+4. Find `chat.id` in the JSON response (usually 9-10 digit number)
 
-### Step 5: Store Chat ID in OpenBao
+#### Step 3: Store Credentials in OpenBao
+
 ```bash
-echo -n "<YOUR_CHAT_ID>" | \
-  bao kv put -address=http://traefik-ardenone-cluster:8200 \
-  secret/ardenone-cluster/aide-de-camp/telegram_chat_id chat_id=-
+# Set OpenBao environment
+export BAO_ADDR="http://traefik-ardenone-cluster:8200"
+export OPENBAO_TOKEN="***REMOVED***"
+
+# Store bot token (piped via stdin - never in argv)
+echo -n "YOUR_BOT_TOKEN" | bao kv put secret/ardenone-cluster/aide-de-camp/telegram_bot_token token=-
+
+# Store chat ID
+bao kv put secret/ardenone-cluster/aide-de-camp/telegram_chat_id chat_id=YOUR_CHAT_ID
+
+# Verify (metadata only - no values exposed)
+bao kv metadata get secret/ardenone-cluster/aide-de-camp/telegram_bot_token
+bao kv metadata get secret/ardenone-cluster/aide-de-camp/telegram_chat_id
 ```
 
-### Step 6: Update Service Configuration
-Edit `deploy/aide-de-camp.service`:
+#### Step 4: Configure Service File
+
+Edit `~/.config/systemd/user/aide-de-camp.service`:
+
 ```ini
-Environment=OPENBAO_TOKEN=<your-openbao-token>
-Environment=ADC_TELEGRAM_CHAT_ID=<your-chat-id>
+[Service]
+# ... existing config ...
+Environment=ADC_TELEGRAM_CHAT_ID=YOUR_CHAT_ID
+# Bot token will be fetched from OpenBao at runtime
+# (TELEGRAM_BOT_TOKEN_PATH is already set in the file)
 ```
 
-### Step 7: Restart Service
+#### Step 5: Restart and Verify
+
 ```bash
+# Reload systemd
 systemctl --user daemon-reload
+
+# Restart aide-de-camp
 systemctl --user restart aide-de-camp
-```
 
-### Step 8: Verify Integration
-```bash
-# Check status endpoint
+# Check status
+systemctl --user status aide-de-camp
+
+# Verify Telegram integration
 curl -s http://localhost:8000/api/v1/status/telegram | jq .
-
-# Run verification script
-python3 scripts/verify_telegram_send.py
 ```
 
----
+Expected response:
+```json
+{
+  "reachable": true,
+  "bot_configured": true,
+  "chat_id_configured": true,
+  "chat_id": "123456789",
+  "last_check_time": "2026-08-29T...",
+  ...
+}
+```
 
-## 🔍 Verification Checklist
+### End-to-End Test
 
-Once manual steps are complete, verify:
+```bash
+export OPENBAO_TOKEN="***REMOVED***"
+export ADC_TELEGRAM_CHAT_ID="your-chat-id"
 
-- [ ] OpenBao metadata shows both secrets exist
-- [ ] `/api/v1/status/telegram` returns `reachable: true`
-- [ ] `/api/v1/status/telegram` shows `bot_configured: true`
-- [ ] `/api/v1/status/telegram` shows `chat_id_configured: true`
-- [ ] Test message arrives in Telegram
-- [ ] Exception-class results are delivered when no canvas active
+.venv/bin/python3 scripts/verify_telegram_send.py
+```
 
----
-
-## 📋 Related Documentation
-
-- **ADR-1:** `docs/notes/adr-1-telegram-bot-decision.md` - Complete decision analysis
-- **Provisioning:** `docs/notes/telegram-bot-api-provisioning.md` - BotFather walkthrough
-- **Storage:** `docs/notes/openbao-telegram-token-storage.md` - Secure storage procedures
-- **Environment:** `docs/notes/telegram-bot-environment-configuration.md` - Environment setup
-- **README:** Configuration table with all environment variables
-
----
-
-## 🎯 Next Steps
-
-1. Complete manual owner steps above
-2. Verify integration with status endpoint and test script
-3. Test end-to-end delivery (fallback-rewrite bead can validate)
-4. Consider provisioning complete when server reads both values successfully
+This sends a test message to your Telegram chat.
 
 ---
 
-## ⚠️ Security Notes
+## What Happens After Provisioning
 
-- **NEVER** pass bot token as command-line argument
-- **NEVER** let token appear in logs, stdout, or session transcript
-- **ALWAYS** use stdin input (`token=-`) or file input (`@file.txt`)
-- **ALWAYS** verify storage using `bao kv metadata get` (doesn't read value)
-- **NEVER** commit actual token values to git
+Once credentials are provisioned and configured:
 
-The infrastructure enforces these rules - the code retrieves tokens securely from OpenBao at runtime.
+1. **Exception-class results** → Delivered to Telegram when no canvas active
+2. **Workload summaries** → Periodic async task completion updates
+3. **Bead closure notifications** → Results from NEEDLE watcher
+
+The integration is automatic - no manual intervention required after setup.
 
 ---
 
-**Worker agents cannot complete this bead due to owner-only constraints. Bead released to unassigned status awaiting manual provisioning.**
+## Security Notes
+
+✅ **Best Practices Followed:**
+- Bot token piped via stdin (never in command-line args)
+- Credentials never appear in logs, shell history, or transcripts
+- OpenBao provides audit trail of access
+- Reference-only in code (paths, not values)
+
+❌ **Never Do:**
+- Paste bot token in command-line arguments
+- Store token in git repos
+- Log token values
+- Use `:latest` image tags
+
+---
+
+## OpenBao Paths
+
+| Credential | OpenBao Path | Purpose |
+|------------|--------------|---------|
+| Bot Token | `secret/ardenone-cluster/aide-de-camp/telegram_bot_token` | Telegram Bot API authentication |
+| Chat ID | `secret/ardenone-cluster/aide-de-camp/telegram_chat_id` | Target chat for fallback notifications |
+
+---
+
+## Environment Variables (deploy/aide-de-camp.service)
+
+| Variable | Status | Purpose |
+|----------|--------|---------|
+| `OPENBAO_URL` | ✅ Set | OpenBao server address |
+| `OPENBAO_TOKEN` | ✅ Set | OpenBao authentication token |
+| `TELEGRAM_BOT_TOKEN_PATH` | ✅ Set | Path to bot token in OpenBao |
+| `ADC_TELEGRAM_CHAT_ID` | ❌ Missing | Target chat ID (needs to be set) |
+
+---
+
+## Related Documentation
+
+- **Provisioning Guide:** `TELEGRAM_PROVISIONING.md` (detailed steps)
+- **ADR-1:** `docs/notes/adr-1-telegram-bot-decision.md` (decision analysis)
+- **Memory:** [[telegram-bot-decision-and-configuration]] (decision record)
+- **Memory:** [[telegram-bot-token-openbao-path]] (OpenBao path documentation)
+
+---
+
+## Troubleshooting
+
+### Bot Token Invalid
+**Symptom:** `reachable: false` in status endpoint  
+**Fix:** Verify with `https://api.telegram.org/bot<TOKEN>/getMe`
+
+### Chat ID Not Found
+**Symptom:** Messages fail despite `reachable: true`  
+**Fix:** Re-run getUpdates after sending a new message to bot
+
+### OpenBao Permission Denied
+**Symptom:** 403 errors when storing credentials  
+**Fix:** Ensure your OpenBao token has write permissions to the aide-de-camp path
+
+### Service Won't Start
+**Symptom:** aide-de-camp service fails after configuration  
+**Fix:** Check journalctl: `journalctl --user -u aide-de-camp -f`
+
+---
+
+## Next Steps After Completion
+
+Once credentials are provisioned:
+
+1. ✅ Verify `/api/v1/status/telegram` shows `reachable: true`
+2. ✅ Run end-to-end test with `scripts/verify_telegram_send.py`
+3. ✅ Confirm test message arrives in Telegram
+4. ✅ Close bead `aidedeca-73d9fe27` with confirmation
+
+---
+
+**This is a one-time setup.** Once credentials are stored, the Telegram integration works automatically with no further manual intervention required.
