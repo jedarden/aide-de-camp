@@ -611,8 +611,9 @@ class ZAIClient:
             raise LLMError(f"LLM streaming request failed: {e}") from e
 
 
-# Global ZAI client instance
+# Global ZAI client instances
 _client: Optional[ZAIClient] = None
+_router_client: Optional[ZAIClient] = None
 
 
 def get_zai_client(
@@ -637,17 +638,27 @@ def get_router_zai_client(
     timeout: float = 8.0,
 ) -> ZAIClient:
     """
-    Get or create a dedicated ZAI client instance for router requests.
+    Get or create the dedicated ZAI client instance for router requests.
 
     Uses more aggressive connection pooling and shorter timeout for fail-fast behavior.
     Router requests are latency-sensitive and need rapid failure detection.
+
+    The client instance is cached as a singleton to enable connection reuse across
+    multiple router calls. This eliminates TLS handshake overhead on subsequent
+    requests (typically 200-500ms savings per call).
+
+    The timeout parameter is only respected on the first call; subsequent calls
+    return the cached instance with the originally configured timeout.
     """
-    # Create a dedicated router client with optimized settings
-    return ZAIClient(
-        proxy_url=proxy_url,
-        default_model=default_model,
-        timeout=timeout,
-    )
+    global _router_client
+    if _router_client is None:
+        _router_client = ZAIClient(
+            proxy_url=proxy_url,
+            default_model=default_model,
+            timeout=timeout,
+        )
+        logger.info(f"Created cached router ZAI client with {timeout}s timeout")
+    return _router_client
 
 
 async def warmup_zai_connections() -> None:
