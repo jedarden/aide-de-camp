@@ -20,14 +20,16 @@ Environment=HOME=/home/coding
 # OpenBao server URL (ardenone-cluster instance)
 Environment=OPENBAO_URL=http://traefik-ardenone-cluster:8200
 # OpenBao token - REQUIRED for secret retrieval
-# Retrieve via: bao token lookup -address=http://traefik-ardenone-cluster:8200
-# Or set via k8s pod mount in production deployments
-# Environment=OPENBAO_TOKEN=<your-openbao-token>
+# Retrieve via AppRole: .venv/bin/python3 scripts/get_openbao_token.py
+# This token is obtained automatically via AppRole authentication
+Environment=OPENBAO_TOKEN=***REMOVED***
 # Telegram bot token storage path in OpenBao
+# The bot token will be retrieved from OpenBao at runtime using the path below
 Environment=TELEGRAM_BOT_TOKEN_PATH=secret/ardenone-cluster/aide-de-camp/telegram_bot_token
 # Telegram bot name (for identification/logging purposes)
 Environment=TELEGRAM_BOT_NAME=aide_de_camp_bot
 # Telegram chat ID for fallback notifications - REQUIRED
+# ⚠️ MUST BE SET: See TELEGRAM_PROVISIONING.md for setup instructions
 # Obtain via: Start conversation with bot, then call getUpdates API
 # Environment=ADC_TELEGRAM_CHAT_ID=<your-telegram-chat-id>
 # Optional: Failure log interval (default: 300 seconds)
