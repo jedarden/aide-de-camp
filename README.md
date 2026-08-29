@@ -144,6 +144,21 @@ adc --help
 
 ## Configuration
 
+### ⚠️ Telegram Setup Required
+
+**The Telegram integration requires one-time provisioning.** See [TELEGRAM_PROVISIONING.md](TELEGRAM_PROVISIONING.md) for complete setup instructions.
+
+Quick status check:
+```bash
+curl -s http://localhost:8000/api/v1/status/telegram | jq .
+```
+
+The provisioning guide covers:
+- Bot creation via @BotFather
+- Chat ID extraction
+- Secure credential storage in OpenBao
+- Environment configuration
+
 ### Environment variables
 
 | Variable | Purpose | Default |
