@@ -445,7 +445,7 @@ class TestPromptAndWiring:
 
     @pytest.mark.asyncio
     async def test_model_and_temperature_are_pinned(self, strand):
-        """Synthesis uses SONNET at temperature 0.5 for consistent output."""
+        """Synthesis uses SONNET at temperature 0.3 for consistent, fast output."""
         captured = {}
 
         async def fake_call(system_prompt, user_message, model, max_tokens, temperature):
@@ -456,5 +456,5 @@ class TestPromptAndWiring:
         strand._zai_client.call_simple = fake_call
         await strand.synthesize(_request(_fetched_context()))
         assert captured["model"] == "claude-sonnet-4-20250514"
-        assert captured["temperature"] == 0.5
-        assert captured["max_tokens"] == 4096
+        assert captured["temperature"] == 0.3
+        assert captured["max_tokens"] == 1024
