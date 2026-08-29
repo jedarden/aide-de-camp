@@ -338,12 +338,16 @@ class IntentRouter:
         return self._zai_client
 
     async def _get_router_zai_client(self):
-        """Get or create dedicated ZAI client for router with optimized settings for low latency."""
+        """Get or create dedicated ZAI client for router with optimized settings for low latency.
+
+        Router latency budget: 500ms target for LLM fallback path (deterministic fast-path handles ~70-80%).
+        Timeout breakdown: ~500ms connection + ~1.5s inference + ~500ms parsing = 2.5s fail-fast timeout.
+        """
         if self._router_zai_client is None:
             from ..escalate.llm import get_router_zai_client
             # Router needs fail-fast behavior with aggressive timeout
-            # 8-second timeout allows: ~2s connection + ~4-5s inference + ~1s parsing
-            self._router_zai_client = get_router_zai_client(timeout=8.0)
+            # 2.5-second timeout for 500ms target: ~500ms connection + ~1.5s inference + ~500ms parsing
+            self._router_zai_client = get_router_zai_client(timeout=2.5)
         return self._router_zai_client
 
     def _get_utterance_hash(self, utterance: str) -> str:
@@ -611,7 +615,7 @@ class IntentRouter:
                 system_prompt=system_prompt,
                 user_message=user_message,
                 model=ModelClass.SONNET.value,  # Fastest model for routing per llm.py benchmarks
-                max_tokens=100,  # ADC-25SN9: Optimized to 100 (middle ground between 80 and 128)
+                max_tokens=80,  # ADC-121b8e45: Reduced to 80 for faster generation (500ms target)
                 temperature=0.0,
                 return_timing=True,  # Request timing breakdown from LLM client
             )
