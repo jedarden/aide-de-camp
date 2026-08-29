@@ -368,29 +368,134 @@ class EscalateHandler:
         """
         Execute kubectl delete pod command with Deployment recreation warning.
 
+        Handles two cases:
+        1. User specifies pod name: proceeds directly to deletion
+        2. User doesn't specify pod name: lists pods and requests selection
+
         Args:
             request: The escalate request
 
         Returns:
             Execution result dict. Returns confirmation_required status
-            if pod is managed by Deployment/ReplicaSet.
+            if pod is managed by Deployment/ReplicaSet, or pod_selection_required
+            if user needs to select a pod.
         """
         executor = get_kubectl_executor()
 
-        # Parse utterance to extract pod name and namespace
-        params = executor.parse_delete_pod_utterance(
-            utterance=request.utterance,
-            project_slug=request.project_slug,
+        try:
+            # Try to parse utterance to extract pod name and namespace
+            params = executor.parse_delete_pod_utterance(
+                utterance=request.utterance,
+                project_slug=request.project_slug,
+            )
+
+            # Pod name was specified, proceed with deletion
+            # Check if user has confirmed deletion despite warning
+            # (e.g., via metadata flag)
+            skip_warning = request.metadata.get("skip_deployment_warning", False)
+
+            # Execute the delete command (will return confirmation_required if managed)
+            result = await executor.execute_delete_pod(
+                pod_name=params["pod_name"],
+                namespace=params["namespace"],
+                project_slug=request.project_slug,
+                skip_warning=skip_warning,
+            )
+
+            # Handle confirmation_required status
+            if result.get("status") == "confirmation_required":
+                logger.info(
+                    f"Confirmation required for pod deletion: {params['pod_name']} "
+                    f"(managed by {result.get('data', {}).get('owner_kind')})"
+                )
+                # Return the confirmation_required result as-is
+                # The surface layer will display this to the user for confirmation
+                return result
+
+            return result
+
+        except CommandExecutionError as e:
+            # Parsing failed - user didn't specify a pod name
+            if "Could not parse kubectl delete pod command" in str(e):
+                logger.info(f"No pod name specified in utterance, listing pods for selection")
+
+                # Resolve cluster proxy and namespace
+                cluster_proxy = executor._resolve_cluster_proxy(request.project_slug)
+                namespace = executor._resolve_namespace(request.project_slug)
+
+                # List available pods
+                try:
+                    pods = await executor.list_pods(
+                        namespace=namespace,
+                        cluster_proxy=cluster_proxy,
+                    )
+
+                    # Return pod selection required response
+                    return {
+                        "status": "pod_selection_required",
+                        "summary": f"Please select a pod to delete from namespace '{namespace}'",
+                        "data": {
+                            "action": "kubectl_delete_pod",
+                            "namespace": namespace,
+                            "cluster_proxy": cluster_proxy,
+                            "available_pods": pods,
+                            "project_slug": request.project_slug,
+                            "selection_instruction": "Enter the exact pod name from the list above to confirm deletion",
+                        },
+                        "urgency": "normal",
+                    }
+                except Exception as list_error:
+                    logger.error(f"Failed to list pods for selection: {list_error}")
+                    return {
+                        "status": "failed",
+                        "summary": f"Failed to list available pods: {str(list_error)}",
+                        "data": {
+                            "action": "kubectl_delete_pod",
+                            "error": str(list_error),
+                        },
+                        "urgency": "normal",
+                    }
+            else:
+                # Some other parsing error
+                raise
+
+    async def _execute_delete_pod_with_selection(
+        self,
+        request: EscalateRequest,
+        selected_pod_name: str,
+    ) -> dict:
+        """
+        Execute kubectl delete pod after user has selected a pod from the list.
+
+        This method is called when the user has selected a specific pod after
+        being presented with a list of available pods.
+
+        Args:
+            request: The original escalate request
+            selected_pod_name: The pod name selected by the user
+
+        Returns:
+            Execution result dict
+        """
+        executor = get_kubectl_executor()
+
+        # Resolve cluster proxy and namespace
+        cluster_proxy = executor._resolve_cluster_proxy(request.project_slug)
+        namespace = executor._resolve_namespace(request.project_slug)
+
+        logger.info(
+            f"Executing deletion for selected pod: {selected_pod_name} "
+            f"in namespace: {namespace}"
         )
 
         # Check if user has confirmed deletion despite warning
-        # (e.g., via metadata flag)
         skip_warning = request.metadata.get("skip_deployment_warning", False)
 
-        # Execute the delete command (will return confirmation_required if managed)
+        # Execute the delete command
         result = await executor.execute_delete_pod(
-            pod_name=params["pod_name"],
-            namespace=params["namespace"],
+            pod_name=selected_pod_name,
+            namespace=namespace,
+            cluster_proxy=cluster_proxy,
             project_slug=request.project_slug,
             skip_warning=skip_warning,
         )
@@ -398,12 +503,16 @@ class EscalateHandler:
         # Handle confirmation_required status
         if result.get("status") == "confirmation_required":
             logger.info(
-                f"Confirmation required for pod deletion: {params['pod_name']} "
+                f"Confirmation required for pod deletion: {selected_pod_name} "
                 f"(managed by {result.get('data', {}).get('owner_kind')})"
             )
-            # Return the confirmation_required result as-is
-            # The surface layer will display this to the user for confirmation
+            # Add context that this was from user selection
+            result["data"]["selected_pod_name"] = selected_pod_name
             return result
+
+        # Add context that this was from user selection
+        if result.get("status") == "completed":
+            result["data"]["selected_pod_name"] = selected_pod_name
 
         return result
 

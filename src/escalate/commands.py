@@ -129,6 +129,86 @@ class KubernetesCommandExecutor:
             "namespace": namespace,
         }
 
+    async def list_pods(
+        self,
+        namespace: str,
+        cluster_proxy: str,
+    ) -> list:
+        """
+        List available pods in a namespace.
+
+        Args:
+            namespace: Kubernetes namespace
+            cluster_proxy: Proxy URL for kubectl access
+
+        Returns:
+            List of pod dictionaries with name, status, ready, and age information
+        """
+        import httpx
+
+        pods = []
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{cluster_proxy}/api/v1/namespaces/{namespace}/pods",
+                    headers={"Accept": "application/json"}
+                )
+                response.raise_for_status()
+
+                pod_list_data = response.json()
+
+                for pod in pod_list_data.get("items", []):
+                    pod_name = pod.get("metadata", {}).get("name", "")
+                    if not pod_name:
+                        continue
+
+                    # Get pod status
+                    phase = pod.get("status", {}).get("phase", "Unknown")
+
+                    # Get ready status
+                    container_statuses = pod.get("status", {}).get("containerStatuses", [])
+                    ready_count = sum(1 for cs in container_statuses if cs.get("ready", False))
+                    ready = f"{ready_count}/{len(container_statuses)}"
+
+                    # Get pod age
+                    start_time = pod.get("status", {}).get("startTime")
+                    if start_time:
+                        from datetime import datetime, timezone
+                        try:
+                            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                            age_seconds = (datetime.now(timezone.utc) - start_dt).total_seconds()
+                            if age_seconds < 60:
+                                age = f"{int(age_seconds)}s"
+                            elif age_seconds < 3600:
+                                age = f"{int(age_seconds / 60)}m"
+                            elif age_seconds < 86400:
+                                age = f"{int(age_seconds / 3600)}h"
+                            else:
+                                age = f"{int(age_seconds / 86400)}d"
+                        except:
+                            age = "Unknown"
+                    else:
+                        age = "Unknown"
+
+                    pods.append({
+                        "name": pod_name,
+                        "namespace": namespace,
+                        "status": phase,
+                        "ready": ready,
+                        "age": age,
+                    })
+
+                logger.info(f"Listed {len(pods)} pods in namespace {namespace}")
+                return pods
+
+        except httpx.HTTPError as e:
+            logger.error(f"Failed to list pods: {e}")
+            raise CommandExecutionError(f"Failed to list pods: {e}")
+        except Exception as e:
+            logger.error(f"Error listing pods: {e}")
+            raise CommandExecutionError(f"Error listing pods: {e}")
+
     async def check_pod_ownership(
         self,
         pod_name: str,
