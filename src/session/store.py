@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE TABLE IF NOT EXISTS surfaces (
     id              TEXT PRIMARY KEY,
     session_id      TEXT NOT NULL,
-    type            TEXT NOT NULL CHECK(type IN ('canvas', 'telegram', 'audio')),
+    type            TEXT NOT NULL CHECK(type IN ('canvas', 'audio')),
     state           TEXT NOT NULL CHECK(state IN ('active', 'idle', 'disconnected')) DEFAULT 'active',
     always_available INTEGER DEFAULT 0 CHECK(always_available IN (0, 1)),
     last_seen       INTEGER NOT NULL,
@@ -457,6 +457,11 @@ class SessionStore:
         # lets session deletion remove routed thread timing rows atomically.
         await SessionStore._migrate_dispatch_timings_session_id(db)
 
+        # Migrate surfaces table to remove 'telegram' from type CHECK constraint
+        # Per ADR-1: Telegram is no longer a surface type - it's a direct Bot API
+        # integration with fixed chat_id delivery
+        await SessionStore._migrate_surfaces_remove_telegram_type(db)
+
         await db.commit()
 
     @staticmethod
@@ -789,6 +794,73 @@ class SessionStore:
                 "CREATE INDEX IF NOT EXISTS idx_dispatch_timings_session "
                 "ON dispatch_timings(session_id)"
             )
+
+    @staticmethod
+    async def _migrate_surfaces_remove_telegram_type(db: aiosqlite.Connection) -> None:
+        """Migrate surfaces table to remove 'telegram' from type CHECK constraint.
+
+        Per ADR-1 (2026-07-20): Telegram is no longer a surface type - it's a
+        direct Bot API integration with fixed chat_id delivery, not a session-bound
+        surface. The surfaces table now only supports 'canvas' and 'audio' types.
+
+        SQLite doesn't support ALTER CONSTRAINT, so we recreate the table.
+        """
+        # Check if migration is needed by inspecting the surfaces table schema
+        async with db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='surfaces'"
+        ) as cur:
+            table_sql = await cur.fetchone()
+            if not table_sql:
+                return  # Table doesn't exist yet
+
+            # If 'telegram' is not in the CHECK constraint, skip migration
+            if "'telegram'" not in table_sql[0]:
+                # Already migrated
+                return
+
+        # Migration needed: recreate table without telegram in the type constraint
+        logger.info("Migrating surfaces.type CHECK constraint to remove 'telegram'")
+
+        # Begin transaction for data migration
+        await db.execute("BEGIN IMMEDIATE TRANSACTION")
+
+        try:
+            # Create new table with updated constraint (only 'canvas' and 'audio')
+            await db.execute("""
+                CREATE TABLE surfaces_new (
+                    id              TEXT PRIMARY KEY,
+                    session_id      TEXT NOT NULL,
+                    type            TEXT NOT NULL CHECK(type IN ('canvas', 'audio')),
+                    state           TEXT NOT NULL CHECK(state IN ('active', 'idle', 'disconnected')) DEFAULT 'active',
+                    always_available INTEGER DEFAULT 0 CHECK(always_available IN (0, 1)),
+                    last_seen       INTEGER NOT NULL,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+                )
+            """)
+
+            # Copy data from old table to new table (excluding any telegram-type rows)
+            await db.execute("""
+                INSERT INTO surfaces_new
+                SELECT * FROM surfaces WHERE type IN ('canvas', 'audio')
+            """)
+
+            # Recreate indexes
+            await db.execute("DROP INDEX IF EXISTS idx_surfaces_session")
+            await db.execute("DROP INDEX IF EXISTS idx_surfaces_state")
+
+            await db.execute("CREATE INDEX idx_surfaces_session ON surfaces_new(session_id)")
+            await db.execute("CREATE INDEX idx_surfaces_state ON surfaces_new(state)")
+
+            # Drop old table and rename new table
+            await db.execute("DROP TABLE surfaces")
+            await db.execute("ALTER TABLE surfaces_new RENAME TO surfaces")
+
+            await db.commit()
+            logger.info("Migration complete: surfaces.type CHECK constraint no longer includes 'telegram'")
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Failed to migrate surfaces.type: {e}")
+            raise
 
     async def close(self) -> None:
         """Checkpoint SQLite WAL state with bounded, retryable shutdown."""

@@ -440,8 +440,8 @@ async def health_check():
     """Health check endpoint.
 
     Returns overall service status, watcher liveness block (alive, last_tick_at,
-    tick_count, interval), and recent latency percentiles for router/fetch/synthesize
-    stages. Watcher alive is true only while the task is running
+    tick_count, interval), Telegram reachability status, and recent latency percentiles
+    for router/fetch/synthesize stages. Watcher alive is true only while the task is running
     AND last_tick_at is within 2x the poll interval. If _bead_watcher is None
     (failed start), watcher.alive is false.
     """
@@ -458,6 +458,27 @@ async def health_check():
             "last_tick_at": None,
             "tick_count": 0,
             "interval": 0,
+        }
+
+    # Add Telegram reachability status
+    try:
+        telegram_fallback = get_telegram_fallback()
+        telegram_status = telegram_fallback.get_status()
+        response["telegram"] = {
+            "reachable": telegram_status.get("reachable"),
+            "bot_configured": telegram_status.get("bot_configured"),
+            "chat_id_configured": telegram_status.get("chat_id_configured"),
+            "last_check_time": telegram_status.get("last_check_time"),
+        }
+    except Exception as e:
+        # Telegram status is optional - don't fail health check if unavailable
+        logger.warning(f"Failed to fetch Telegram status for health check: {e}")
+        response["telegram"] = {
+            "reachable": None,
+            "bot_configured": False,
+            "chat_id_configured": False,
+            "last_check_time": None,
+            "error": str(e),
         }
 
     # Add recent latency percentiles (last hour = 3600 seconds ago)

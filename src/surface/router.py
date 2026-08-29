@@ -5,7 +5,10 @@ Routing priority:
 1. Origin surface (if still connected)
 2. Most recently active connected surface
 3. Any connected surface
-4. Always-available fallback (Telegram)
+
+Note: Telegram fallback is NOT a surface type. It's a direct Bot API
+integration that delivers to a fixed chat_id, independent of surface
+registration. See src/telegram/fallback.py for Telegram delivery.
 """
 
 from dataclasses import dataclass
@@ -80,22 +83,11 @@ class SurfaceRouter:
 
         # Priority 2: Most recently active connected surface
         if recently_active:
-            # Sort by last_seen descending, pick the first non-telegram unless all are telegram
+            # Sort by last_seen descending, pick the most recently active
             recently_active.sort(key=lambda s: s["last_seen"], reverse=True)
-
-            # Prefer non-telegram surfaces for non-critical results
-            if urgency not in ("critical", "high"):
-                for surface in recently_active:
-                    if surface["type"] != "telegram":
-                        return RouteDecision(
-                            target_surfaces=[Surface(**surface)],
-                            reason="most-recent-active",
-                        )
-
-            # For high urgency or if only telegram available
             return RouteDecision(
                 target_surfaces=[Surface(**recently_active[0])],
-                reason="most-recent-active-or-fallback",
+                reason="most-recent-active",
             )
 
         # Priority 3: Any connected surface (including idle)
@@ -104,15 +96,6 @@ class SurfaceRouter:
             return RouteDecision(
                 target_surfaces=[Surface(**active_surfaces[0])],
                 reason="any-connected",
-            )
-
-        # Priority 4: Always-available fallback (Telegram)
-        fallback = await self.store.get_fallback_surface()
-        if fallback:
-            return RouteDecision(
-                target_surfaces=[Surface(**fallback)],
-                reason="always-available-fallback",
-                fallback_used=True,
             )
 
         # No surface available - result will wait in queue
