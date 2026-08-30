@@ -12,3 +12,8 @@
 
 # Journals
 *.journal
+
+# Worker transcripts are runtime artifacts and can contain command output,
+# environment details, or credentials. Keep them local; the durable bead state
+# lives in checkpoint/ and events.jsonl.
+traces/
