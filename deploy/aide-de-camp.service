@@ -2,27 +2,23 @@
 Description=Aide-de-Camp Voice/Text to Agent Server
 After=network-online.target
 Wants=network-online.target
+StartLimitBurst=3
+StartLimitIntervalSec=60
 
 [Service]
 Type=simple
 WorkingDirectory=/home/coding/aide-de-camp
 ExecStart=/home/coding/aide-de-camp/.venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
-ExecStop=/bin/kill -2 $MAINPID
 Restart=on-failure
 RestartSec=5
-StartLimitBurst=3
-StartLimitIntervalSec=60
 StandardOutput=append:/tmp/adc.log
 StandardError=append:/tmp/adc.log
 Environment=PATH=/home/coding/.local/bin:/usr/bin:/bin
 Environment=HOME=/home/coding
 # OpenBao configuration for secret retrieval
-# OpenBao server URL (ardenone-cluster instance)
-Environment=OPENBAO_URL=http://traefik-ardenone-cluster:8200
-# OpenBao token - REQUIRED for secret retrieval
-# Retrieve via AppRole: .venv/bin/python3 scripts/get_openbao_token.py
-# This token is obtained automatically via AppRole authentication
-Environment=OPENBAO_TOKEN=***REMOVED***
+# Provision OPENBAO_TOKEN into this untracked, mode-600 file via AppRole.
+EnvironmentFile=-/home/coding/.config/aide-de-camp/openbao.env
+Environment=OPENBAO_URL=https://openbao-v2-ardenone-cluster.ardenone.com
 # Telegram bot token storage path in OpenBao
 # The bot token will be retrieved from OpenBao at runtime using the path below
 Environment=TELEGRAM_BOT_TOKEN_PATH=secret/ardenone-cluster/aide-de-camp/telegram_bot_token
