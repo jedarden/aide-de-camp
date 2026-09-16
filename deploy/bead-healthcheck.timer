@@ -1,0 +1,15 @@
+[Unit]
+Description=Automated Bead Ready Frontier Health Check Timer
+Documentation=https://github.com/jedarden/aide-de-camp
+Requires=bead-healthcheck.service
+
+[Timer]
+# Run every 15 minutes
+OnCalendar=*:0,15,30,45
+# Run on startup if the last run was missed
+Persistent=true
+# Randomize start time by up to 60 seconds to avoid thundering herd
+AccuracySec=60s
+
+[Install]
+WantedBy=timers.target

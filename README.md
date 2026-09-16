@@ -166,7 +166,9 @@ The provisioning guide covers:
 | `OPENAI_API_KEY` | OpenAI key — required for voice/Realtime API | _(none; voice disabled without it)_ |
 | `ZAI_PROXY_URL` | Canonical ZAI proxy endpoint for LLM routing and synthesis | `https://zai-proxy-mcp-apexalgo-iad-ts.ardenone.com:8444/v1/messages` |
 | `ADC_SERVER_URL` | Server URL used by the `adc` CLI | `http://localhost:8000` |
-| `ADC_TELEGRAM_BOT_TOKEN` | Telegram bot token for direct Bot API integration — retrieved from OpenBao path `secret/ardenone-cluster/aide-de-camp/telegram_bot_token` | _(none; Telegram disabled without it)_ |
+| `ADC_TELEGRAM_BOT_TOKEN` | Direct bot token value — bypasses the runtime delivery below | _(none; Telegram disabled without a token)_ |
+| `TELEGRAM_BOT_TOKEN_FILE` | Mode-600 file the server reads the bot token from at startup, delivered by the unit's `ExecStartPre` (`deploy/fetch_runtime_secrets.sh`) from OpenBao path `secret/ardenone-cluster/aide-de-camp/telegram_bot_token` | _(none; set in the systemd unit)_ |
+| `TELEGRAM_BOT_TOKEN_PATH` | OpenBao path — consumed by the `ExecStartPre` fetch (primary) and the dormant direct hvac read (fallback) | `secret/ardenone-cluster/aide-de-camp/telegram_bot_token` |
 | `ADC_TELEGRAM_CHAT_ID` | Telegram chat ID for the fallback notification destination | _(none; Telegram disabled without it)_ |
 | `ADC_TELEGRAM_FAILURE_LOG_INTERVAL_SECONDS` | Minimum spacing (seconds) between repeated-failure DEBUG summaries | `300` |
 | `ADC_WHISPER_STT_URL` | Whisper STT service URL for browser speech-to-text fallback | `https://whisper.ardenone.com` |
@@ -176,7 +178,7 @@ The canonical LLM backend for intent routing and synthesis is configured via the
 
 **Telegram Bot API integration.** Per ADR-1 (2026-07-20), aide-de-camp uses a direct Telegram Bot API integration for fallback notifications — not coupled to telegram-claude-bridge. The integration requires:
 
-1. **Bot token (`ADC_TELEGRAM_BOT_TOKEN`)**: Retrieved from OpenBao path `secret/ardenone-cluster/aide-de-camp/telegram_bot_token` on the `ardenone-cluster` OpenBao instance (`http://traefik-ardenone-cluster:8200`). The token is provisioned once via BotFather and stored in OpenBao — the application reads it at runtime via the environment variable, which is populated from OpenBao (e.g., via an ExternalSecret or systemd environment file). Never store the token value directly in code or documentation.
+1. **Bot token (runtime delivery, primary)**: Stored once in OpenBao at `secret/ardenone-cluster/aide-de-camp/telegram_bot_token` (openbao-v2 instance). The systemd unit's `ExecStartPre` (`deploy/fetch_runtime_secrets.sh`) pipes the value into a mode-600 file under `/run/user/$UID/` before the server starts, and the server reads it via `TELEGRAM_BOT_TOKEN_FILE` — the consuming process fetches its own secret, so no agent or human needs read access to the path (this retired the "OpenBao permission denied" blocker class; `scripts/unblock_credential_gated_beads.py` is the standing response when a bead records that shape). A direct-value fallback (`ADC_TELEGRAM_BOT_TOKEN`, or the dormant hvac read via `TELEGRAM_BOT_TOKEN_PATH`) exists but is unused in production. Never store the token value in code, documentation, manifests, or command lines.
 
 2. **Chat ID (`ADC_TELEGRAM_CHAT_ID`)**: Your Telegram chat ID for the fallback notification destination. Start a conversation with your bot, visit `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` to find your chat ID in the `message.chat.id` field, and set it as an environment variable.
 

@@ -1,0 +1,18 @@
+[Unit]
+Description=Bead Ready Frontier Health Check with Auto-Repair
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/coding/aide-de-camp
+# Path is scripts/bead-healthcheck.sh (hyphen) — an earlier revision pointed at
+# bead_healthcheck.sh, which does not exist, and every timer run died instantly.
+ExecStart=/home/coding/aide-de-camp/scripts/bead-healthcheck.sh
+# A first enrichment pass runs the diagnostic suite once per unenriched alert
+# bead (~5s each, subprocess-bounded at 120s) plus the recovery workflow
+# (bounded at 300s); systemd's 90s oneshot default would kill the run mid-pass.
+TimeoutStartSec=45min
+StandardOutput=append:/tmp/bead-healthcheck.log
+StandardError=append:/tmp/bead-healthcheck.log
+
+[Install]
+WantedBy=default.target

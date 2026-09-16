@@ -1,0 +1,35 @@
+# aide-de-camp's starvation-alert triage, ported from tradegraph's
+# scripts/bead-starvation-alert-triage.service.
+#
+# Installed under the adc- prefix because the user manager is a shared
+# namespace: ~/.config/systemd/user/bead-starvation-alert-triage.{service,timer}
+# are tradegraph's production symlinks, and installing this unit under the
+# same name would clobber them.
+[Unit]
+Description=aide-de-camp bead starvation-alert triage service
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/coding/aide-de-camp
+ExecStart=/home/coding/aide-de-camp/scripts/triage-starvation-alerts.sh
+# One diagnostic suite per alert bead (~2-60s each; bead doctor --rehearse is
+# internally bounded at 60s) - give a queue of alerts room to finish.
+TimeoutStartSec=10min
+Nice=10
+IOSchedulingClass=idle
+IOSchedulingPriority=7
+# Output goes to the journal only - the script itself already tee's every log
+# line to /tmp/bead-starvation-triage.log, and appending here as well would
+# write each line twice.
+
+# No PrivateTmp, deliberately, unlike the tradegraph unit this mirrors: the
+# triage note and close reason cite the diagnostics report path, and that
+# file must stay readable from outside the unit's tmpfs namespace.
+NoNewPrivileges=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+RestrictNamespaces=true
+
+MemoryMax=256M
+CPUQuota=50%

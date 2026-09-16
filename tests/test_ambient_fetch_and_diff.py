@@ -8,15 +8,11 @@ Tests coverage:
 - Cache persistence across checks
 """
 
-import asyncio
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import aiosqlite
 import pytest
-import yaml
 
 from src.monitoring.ambient import AmbientMonitor, MonitoringRule
 from src.session.store import SessionStore
@@ -26,6 +22,11 @@ from src.session.store import SessionStore
 
 
 @pytest.fixture
+async def store():
+    """In-memory session store for testing with cleanup."""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_path = Path(f.name)
+
     s = SessionStore(db_path)
     await s.initialize()
 
@@ -37,8 +38,24 @@ from src.session.store import SessionStore
 
 
 @pytest.fixture
+def ambient_monitor(store):
+    """Create an AmbientMonitor instance with test store."""
+    return AmbientMonitor(session_store=store)
+
 
 @pytest.fixture
+def sample_monitoring_rule():
+    """Create a sample monitoring rule for testing."""
+    return MonitoringRule(
+        topic_id="test-pipeline-status",
+        project_slug="test-pipeline",
+        intent_type="status",
+        check_interval=60,
+        urgency="normal",
+        filters=["phase!=Running"],
+        notification_threshold="any_change",
+    )
+
 
 # --- Tests ---------------------------------------------------------------------
 

@@ -453,7 +453,7 @@ class TestMultipleErrors:
         # Create file with both invalid JSON and missing fields
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             temp_path = f.name
-            f.write('{"service": "test")  # Invalid JSON
+            f.write('{"service": "test"')  # Invalid JSON (truncated object)
 
         try:
             is_valid, errors = validate_deployment_file(temp_path)

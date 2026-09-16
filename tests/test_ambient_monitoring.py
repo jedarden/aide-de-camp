@@ -16,14 +16,10 @@ Acceptance criteria from plan §10 Ambient monitoring tick:
 - Interval/hot-reload covered
 """
 
-import asyncio
-import json
-import logging
 import tempfile
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiosqlite
@@ -39,6 +35,11 @@ from src.surface.router import SurfaceRouter, Surface, RouteDecision
 
 
 @pytest.fixture
+async def store():
+    """In-memory session store for testing with cleanup."""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_path = Path(f.name)
+
     s = SessionStore(db_path)
     await s.initialize()
 
@@ -50,6 +51,10 @@ from src.surface.router import SurfaceRouter, Surface, RouteDecision
 
 
 @pytest.fixture
+def mock_router():
+    """Mock surface router for testing."""
+    router = MagicMock(spec=SurfaceRouter)
+
     # Default: no active surfaces (fallback to Telegram)
     router.route_result = AsyncMock(return_value=RouteDecision(
         target_surfaces=[],
@@ -61,6 +66,42 @@ from src.surface.router import SurfaceRouter, Surface, RouteDecision
 
 
 @pytest.fixture
+def monitoring_config_file():
+    """Create a temporary monitoring config file for testing."""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        config = {
+            "tick_interval_seconds": 60,  # 1 minute for testing
+            "monitoring": {
+                "active_topics": [
+                    {
+                        "topic_id": "test-pipeline-status",
+                        "project_slug": "test-pipeline",
+                        "intent_type": "status",
+                        "check_interval": 30,
+                        "urgency": "normal",
+                        "filters": ["phase!=Running"],
+                        "notification_threshold": "state_change"
+                    }
+                ],
+                "exceptions": []
+            },
+            "batching": {
+                "low_urgency_batch_seconds": 300,
+                "normal_urgency_batch_seconds": 120
+            },
+            "quiet_hours": {
+                "enabled": False
+            },
+            "channels": {
+                "critical": ["canvas", "telegram"],
+                "high": ["canvas"],
+                "normal": ["canvas"],
+                "low": ["canvas"]
+            }
+        }
+        yaml.dump(config, f)
+        config_path = Path(f.name)
+
     yield config_path
 
     # Cleanup
@@ -240,7 +281,7 @@ async def test_monitoring_result_write_with_null_intent(store, mock_router):
 
         # Query the result directly to verify it was written
         import aiosqlite
-        async with aiosqlite.connect(test_db_store.db_path) as db:
+        async with aiosqlite.connect(store.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM results WHERE intent_id IS NULL AND result_type = ?", (f"monitoring:{project_slug}",)
@@ -511,7 +552,7 @@ async def test_full_monitoring_tick_integration(store, mock_router, monitoring_c
             assert watcher.monitoring_tick_count == 1
 
             # Count results in DB - should be 0 (baseline doesn't fire because cached_context was None)
-            async with aiosqlite.connect(test_db_store.db_path) as db:
+            async with aiosqlite.connect(store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute("SELECT COUNT(*) as count FROM results WHERE intent_id IS NULL") as cursor:
                     result = await cursor.fetchone()
@@ -529,7 +570,7 @@ async def test_full_monitoring_tick_integration(store, mock_router, monitoring_c
             await watcher._ambient_monitoring_tick()
 
             # Verify result created
-            async with aiosqlite.connect(test_db_store.db_path) as db:
+            async with aiosqlite.connect(store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute("SELECT COUNT(*) as count FROM results WHERE intent_id IS NULL") as cursor:
                     result = await cursor.fetchone()

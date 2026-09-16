@@ -8,6 +8,16 @@ StartLimitIntervalSec=60
 [Service]
 Type=simple
 WorkingDirectory=/home/coding/aide-de-camp
+# Runtime secret delivery: the process fetches its own OpenBao secrets at
+# start. ExecStartPre pipes the Telegram bot token into a mode-600 file in
+# the unit's private runtime directory (created below, mode 700, removed on
+# stop); the server reads it via TELEGRAM_BOT_TOKEN_FILE. No agent or human
+# needs read access to the secret path — that dependency was the blocker
+# shape that stalled the credential-provisioning beads. A failed fetch is
+# non-fatal: the server starts and reports Telegram disabled at
+# /api/v1/status/telegram.
+RuntimeDirectory=aide-de-camp
+ExecStartPre=/home/coding/aide-de-camp/deploy/fetch_runtime_secrets.sh
 ExecStart=/home/coding/aide-de-camp/.venv/bin/python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 Restart=on-failure
 RestartSec=5
@@ -15,12 +25,17 @@ StandardOutput=append:/tmp/adc.log
 StandardError=append:/tmp/adc.log
 Environment=PATH=/home/coding/.local/bin:/usr/bin:/bin
 Environment=HOME=/home/coding
-# OpenBao configuration for secret retrieval
-# Provision OPENBAO_TOKEN into this untracked, mode-600 file via AppRole.
+# Mode-600 file ExecStartPre delivers the bot token into; read at startup.
+Environment=TELEGRAM_BOT_TOKEN_FILE=%t/aide-de-camp/telegram_bot_token
+# OpenBao configuration for the dormant direct-read fallback (hvac). Only
+# used when TELEGRAM_BOT_TOKEN_FILE is absent AND an OPENBAO_TOKEN has been
+# provisioned into this untracked, mode-600 file via AppRole.
 EnvironmentFile=-/home/coding/.config/aide-de-camp/openbao.env
-Environment=OPENBAO_URL=https://openbao-v2-ardenone-cluster.ardenone.com
-# Telegram bot token storage path in OpenBao
-# The bot token will be retrieved from OpenBao at runtime using the path below
+# openbao-v2's public hostname is forward-auth-gated for humans; API traffic
+# goes through the openbao-v2-vpn-relay user service on loopback.
+Environment=OPENBAO_URL=http://127.0.0.1:18200
+# Telegram bot token storage path in OpenBao — consumed by
+# fetch_runtime_secrets.sh (primary) and the hvac fallback (dormant).
 Environment=TELEGRAM_BOT_TOKEN_PATH=secret/ardenone-cluster/aide-de-camp/telegram_bot_token
 # Telegram bot name (for identification/logging purposes)
 Environment=TELEGRAM_BOT_NAME=aide_de_camp_bot

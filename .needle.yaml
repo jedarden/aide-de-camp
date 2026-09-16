@@ -1,5 +1,20 @@
 agent:
-  default: claude-code-glm-4.7
+  default: claude-code-glm-5.3-flash
+# Validation gates run in a clean extraction of committed state (git archive),
+# which carries no .venv — so the full pytest suite cannot run there. Bare
+# `python3` is the NixOS system interpreter, whose shared user-site-packages
+# install is partial (fastapi/pytest import, but aiohttp dies on a missing
+# `multidict` and pytest dies on a missing `packaging`), so the default_python
+# gate (`python3 -m pytest`) can never pass in this workspace — see bead
+# aidedeca-5d8e40ab. Declaring gates: replaces it with byte-compiling every
+# tracked .py file, which does work there and catches committed syntax
+# breakage (e.g. the mangled fixtures fixed alongside this config).
+# The real test suite still runs in the repo venv during work:
+#   .venv/bin/python -m pytest -q
+gates:
+- type: command
+  commands:
+  - python3 -m compileall -q .
 strands:
   pluck:
     exclude_labels:

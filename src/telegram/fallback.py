@@ -8,6 +8,8 @@ telegram-claude-bridge and uses the Telegram Bot API directly.
 
 import asyncio
 import logging
+import os
+import stat
 from datetime import datetime
 from typing import Optional
 
@@ -44,23 +46,58 @@ class TelegramFallback:
         failure_log_interval_seconds: float | None = None,
         chat_id: str | int | None = None,
     ):
-        import os
         # Telegram bot token. Resolution order:
         # 1. constructor arg (direct value)
         # 2. ADC_TELEGRAM_BOT_TOKEN env var (direct value)
-        # 3. TELEGRAM_BOT_TOKEN_PATH env var (OpenBao path)
-        # 4. None (graceful no-op with WARNING)
+        # 3. TELEGRAM_BOT_TOKEN_FILE env var (mode-600 file delivered at start)
+        # 4. TELEGRAM_BOT_TOKEN_PATH env var (OpenBao path, direct hvac read)
+        # 5. None (graceful no-op with WARNING)
         #
-        # The OpenBao path approach allows the token to be retrieved from
-        # OpenBao at runtime without exposing the value in environment
-        # variables or logs, following security best practices.
+        # The runtime-file approach (3) is the production path: the unit's
+        # ExecStartPre (deploy/fetch_runtime_secrets.sh) pipes the value out
+        # of OpenBao into a mode-600 file under /run/user/$UID before the
+        # server starts, so the process fetches its own secret and nothing
+        # else — agent or human — ever needs read access to the path. That is
+        # what retired the "OpenBao permission denied" blocker shape that
+        # stalled the credential-provisioning beads. Only the read's outcome
+        # is logged; the value never crosses a command line, an environment
+        # variable, or a log line.
+        token_file = os.getenv("TELEGRAM_BOT_TOKEN_FILE")
         token_path = os.getenv("TELEGRAM_BOT_TOKEN_PATH")
 
+        self.bot_token: Optional[str] = None
         if bot_token:
             self.bot_token = bot_token
         elif os.getenv("ADC_TELEGRAM_BOT_TOKEN"):
             self.bot_token = os.getenv("ADC_TELEGRAM_BOT_TOKEN")
-        elif token_path:
+        elif token_file:
+            try:
+                mode = stat.S_IMODE(os.stat(token_file).st_mode)
+                if mode & 0o077:
+                    logger.warning(
+                        f"Telegram token file {token_file} has mode {mode:o} - "
+                        f"expected 600; check deploy/fetch_runtime_secrets.sh delivery"
+                    )
+                with open(token_file, "r", encoding="utf-8") as handle:
+                    self.bot_token = handle.read().strip() or None
+                if self.bot_token:
+                    logger.info(
+                        f"Loaded Telegram bot token from runtime file: {token_file}"
+                    )
+                else:
+                    logger.warning(
+                        f"Telegram token file {token_file} is empty - "
+                        f"falling back to the next source."
+                    )
+            except OSError as e:
+                logger.warning(
+                    f"Telegram token file {token_file} unreadable "
+                    f"({type(e).__name__}) - falling back to the next source."
+                )
+            # An absent/empty file falls through to the OpenBao path below:
+            # the delivery is primary, not exclusive.
+
+        if self.bot_token is None and token_path:
             # Retrieve from OpenBao at runtime
             try:
                 from src.openbao import get_openbao_client
@@ -79,8 +116,6 @@ class TelegramFallback:
                     f"Telegram integration will be disabled."
                 )
                 self.bot_token = None
-        else:
-            self.bot_token = None
 
         # Telegram chat ID for the single user of this personal app (plan.md
         # Tech Stack: "single-user app"). There is intentionally NO multi-user

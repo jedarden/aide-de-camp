@@ -1,0 +1,22 @@
+# 5-minute cadence, mirroring tradegraph's bead-starvation-alert-triage.timer.
+# See adc-bead-starvation-alert-triage.service for why the adc- prefix exists.
+#
+# Install (from the repo root, or again after a NixOS rebuild wipes ~/.config):
+#   ln -sT $(pwd)/deploy/adc-bead-starvation-alert-triage.service \
+#     ~/.config/systemd/user/adc-bead-starvation-alert-triage.service
+#   ln -sT $(pwd)/deploy/adc-bead-starvation-alert-triage.timer \
+#     ~/.config/systemd/user/adc-bead-starvation-alert-triage.timer
+#   systemctl --user daemon-reload && systemctl --user enable --now \
+#     adc-bead-starvation-alert-triage.timer
+[Unit]
+Description=aide-de-camp bead starvation-alert triage timer (runs every 5 minutes)
+Requires=adc-bead-starvation-alert-triage.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+AccuracySec=1s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
