@@ -57,3 +57,6 @@ docs/error-analysis/*-logs.txt
 .beads/*.temp
 .beads/*.journal
 .br_recovery/
+research-data/
+.coverage
+*.log
