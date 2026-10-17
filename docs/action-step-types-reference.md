@@ -1,6 +1,6 @@
 # Action execution step types
 
-This page describes the seven status and evidence steps used by `ActionExecutor`. Workflow definitions are ordered lists of step names under `projects.<slug>.workflows.<name>.steps` in `config/registry.yaml`. The executor also registers `gitops_commit`, `argocd_sync_status` (and `argocd_sync`), `pod_logs`, and `argocd_events`; their implementation is outside this reference.
+This page describes every step name registered by `ActionExecutor`. Workflow definitions are ordered lists of step names under `projects.<slug>.workflows.<name>.steps` in `config/registry.yaml`. The seven status and evidence steps have detailed contracts below; the remaining registered operational steps are included in the table for registry parity, with their implementation documented elsewhere.
 
 ## Active executor contract
 
@@ -19,6 +19,11 @@ Read steps do not mutate the cluster, ArgoCD, Git, or bead store. `ci_status` an
 | `ci_status` | `project_slug` | `status`, `phase`, `workflow_name`, CI metadata | Only latest `Succeeded` workflow passes; all other outcomes raise |
 | `pod_status` | `cluster`, `namespace` | `total_pods`, phase counts, `pod_names`, `namespace`, `cluster` | Missing config/proxy or HTTP error raises; optional post-sync readiness gate |
 | `image_tag` | Successful preceding `ci_status` output | `tag`, `registry_path`, `digest`, `project_slug` | Missing/invalid CI image evidence or `latest` raises |
+| `gitops_commit` | Project GitOps configuration and `project_slug` | Commit/push result | Manifest edit, commit, or push failure raises; respects dry-run |
+| `argocd_sync_status` | `cluster`, `namespace`, and ArgoCD application | Sync and health status | Missing mapping, HTTP error, or sync timeout raises |
+| `argocd_sync` | Same as `argocd_sync_status` | Alias of `argocd_sync_status` | Uses the same sync and health checks |
+| `pod_logs` | `cluster`, `namespace` | Recent pod log entries | Missing config/proxy or HTTP error raises |
+| `argocd_events` | `cluster`, `namespace` | Recent ArgoCD events | Missing config/proxy or HTTP error raises |
 
 ## Step details
 
