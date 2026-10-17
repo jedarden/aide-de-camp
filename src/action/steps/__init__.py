@@ -758,7 +758,7 @@ def _get_cluster_proxy(cluster: str | None) -> str | None:
     cluster_config_path = Path(__file__).resolve().parents[3] / "config" / "registry.yaml"
 
     if not cluster_config_path.exists():
-        logger.warning("clusters.yaml not found")
+        logger.warning("registry.yaml not found")
         return None
 
     try:
@@ -777,7 +777,7 @@ def _get_cluster_proxy(cluster: str | None) -> str | None:
 
 def _get_argocd_base_url() -> str | None:
     """Get ArgoCD base URL from config."""
-    registry_path = Path("/home/coding/aide-de-camp/config/registry.yaml")
+    registry_path = Path(__file__).resolve().parents[3] / "config" / "registry.yaml"
 
     if not registry_path.exists():
         logger.warning("registry.yaml not found")

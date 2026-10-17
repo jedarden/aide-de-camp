@@ -149,6 +149,18 @@ async def test_argocd_apps_reports_http_failure(monkeypatch):
         await steps.execute_argocd_apps_step(**kwargs())
 
 
+async def test_argocd_base_url_is_resolved_relative_to_checkout(monkeypatch, tmp_path):
+    steps_file = tmp_path / "src" / "action" / "steps" / "__init__.py"
+    steps_file.parent.mkdir(parents=True)
+    steps_file.touch()
+    registry = tmp_path / "config" / "registry.yaml"
+    registry.parent.mkdir()
+    registry.write_text("argocd:\n  base_url: https://archive-argocd\n")
+    monkeypatch.setattr(steps, "__file__", str(steps_file))
+
+    assert steps._get_argocd_base_url() == "https://archive-argocd"
+
+
 async def test_argocd_apps_uses_mapped_cluster_endpoint(monkeypatch):
     client = FakeClient({"items": []})
     monkeypatch.setattr("src.fetch.clusters.resolve_argocd_endpoint", lambda _cluster: SimpleNamespace(
