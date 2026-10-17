@@ -28,8 +28,23 @@ from src.sse.broadcaster import SSEBroadcaster, SSEEvent, EventType
 
 
 @pytest.fixture
+async def store(tmp_path):
+    """Create a fresh session store for each test."""
+    db_path = tmp_path / "test.db"
+    store = SessionStore(db_path)
+    await store.initialize()
+    yield store
+    await store.close()
+
 
 @pytest.fixture
+async def broadcaster():
+    """Create a fresh SSE broadcaster for each test."""
+    broadcaster = SSEBroadcaster()
+    await broadcaster.start()
+    yield broadcaster
+    await broadcaster.stop()
+
 
 @pytest.mark.asyncio
 async def test_failed_card_complete_flow(store, broadcaster):
@@ -45,18 +60,18 @@ async def test_failed_card_complete_flow(store, broadcaster):
     6. All data persists correctly in session store
     """
     # Step 1: Create test data
-    session_id = await test_db_store.create_session()
-    surface_id = await test_db_store.register_surface(
+    session_id = await store.create_session()
+    surface_id = await store.register_surface(
         session_id=session_id,
         surface_type="canvas",
     )
 
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="Deploy to production",
     )
 
-    topic_id, _ = await test_db_store.find_or_create_topic(
+    topic_id, _ = await store.find_or_create_topic(
         label="Production Deployment",
         session_id=session_id,
         topic_type="project",
@@ -64,7 +79,7 @@ async def test_failed_card_complete_flow(store, broadcaster):
     )
 
     bead_ref = "adc-deploy-prod"
-    intent_id = await test_db_store.create_intent(
+    intent_id = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -99,13 +114,13 @@ async def test_failed_card_complete_flow(store, broadcaster):
         )
 
     # Step 4: Verify intent status is 'failed'
-    intent = await test_db_store.get_intent(intent_id)
+    intent = await store.get_intent(intent_id)
     assert intent["intent_type"] == "task-profile"  # Type unchanged on failure
     assert intent["status"] == "failed"
     assert intent["bead_ref"] == bead_ref
 
     # Step 5: Verify failed result card was created
-    results = await test_db_store.get_results_for_intent(intent_id)
+    results = await store.get_results_for_intent(intent_id)
     assert len(results) == 1
 
     failed_result = results[0]
@@ -146,15 +161,15 @@ async def test_failed_card_without_topic(store, broadcaster):
     - Topic label is prefixed with "Failed: "
     - Failed card is linked to the created topic
     """
-    session_id = await test_db_store.create_session()
-    surface_id = await test_db_store.register_surface(session_id, "canvas")
+    session_id = await store.create_session()
+    surface_id = await store.register_surface(session_id, "canvas")
 
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="This is a long utterance that should be truncated when used as a topic label",
     )
 
-    intent_id = await test_db_store.create_intent(
+    intent_id = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="test",
@@ -181,11 +196,11 @@ async def test_failed_card_without_topic(store, broadcaster):
         )
 
     # Verify intent status
-    intent = await test_db_store.get_intent(intent_id)
+    intent = await store.get_intent(intent_id)
     assert intent["status"] == "failed"
 
     # Verify failed card created with auto-generated topic
-    results = await test_db_store.get_results_for_intent(intent_id)
+    results = await store.get_results_for_intent(intent_id)
     assert len(results) == 1
 
     failed_result = results[0]
@@ -194,7 +209,7 @@ async def test_failed_card_without_topic(store, broadcaster):
     created_topic_id = failed_result["topic_id"]
 
     # Verify intent is linked to topic
-    intent = await test_db_store.get_intent(intent_id)
+    intent = await store.get_intent(intent_id)
     assert intent["topic_id"] == created_topic_id
 
     # Verify SSE event includes the topic_id
@@ -214,14 +229,14 @@ async def test_failed_card_error_types(store, broadcaster):
     - timeout
     - permission_denied
     """
-    session_id = await test_db_store.create_session()
+    session_id = await store.create_session()
 
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="Test error types",
     )
 
-    topic_id, _ = await test_db_store.find_or_create_topic(
+    topic_id, _ = await store.find_or_create_topic(
         label="Error Types Test",
         session_id=session_id,
         topic_type="project",
@@ -239,7 +254,7 @@ async def test_failed_card_error_types(store, broadcaster):
     with patch.object(src.sse.broadcaster, 'get_broadcaster', return_value=broadcaster), \
          patch.object(src.session.store, 'get_store', return_value=store):
         for error_type in error_types:
-            intent_id = await test_db_store.create_intent(
+            intent_id = await store.create_intent(
                 utterance_id=utterance_id,
                 session_id=session_id,
                 project_slug="test",
@@ -257,11 +272,11 @@ async def test_failed_card_error_types(store, broadcaster):
             )
 
             # Verify intent status
-            intent = await test_db_store.get_intent(intent_id)
+            intent = await store.get_intent(intent_id)
             assert intent["status"] == "failed"
 
             # Verify result summary includes error type
-            results = await test_db_store.get_results_for_intent(intent_id)
+            results = await store.get_results_for_intent(intent_id)
             assert len(results) == 1
             assert error_type.replace("_", " ").title() in results[0]["summary"]
 
@@ -276,21 +291,21 @@ async def test_failed_card_with_bead_ref(store, broadcaster):
     - bead_ref is included in SSE event
     - bead_watch is updated with failure reason
     """
-    session_id = await test_db_store.create_session()
+    session_id = await store.create_session()
 
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="Test bead reference",
     )
 
-    topic_id, _ = await test_db_store.find_or_create_topic(
+    topic_id, _ = await store.find_or_create_topic(
         label="Bead Ref Test",
         session_id=session_id,
         topic_type="project",
     )
 
     bead_ref = "adc-failed-bead"
-    intent_id = await test_db_store.create_intent(
+    intent_id = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -300,7 +315,7 @@ async def test_failed_card_with_bead_ref(store, broadcaster):
     )
 
     # Create bead_watch row
-    await test_db_store.create_bead_watch(bead_ref=bead_ref)
+    await store.create_bead_watch(bead_ref=bead_ref)
 
     conn = broadcaster.register(
         session_id=session_id,
@@ -322,13 +337,13 @@ async def test_failed_card_with_bead_ref(store, broadcaster):
         )
 
     # Verify bead_watch was updated with failure reason
-    bead_watch = await test_db_store.get_bead_watch(bead_ref)
+    bead_watch = await store.get_bead_watch(bead_ref)
     assert bead_watch is not None
     assert bead_watch["last_refusal_reason"] == "Deployment failed after retries"
     assert bead_watch["refusal_count"] == 1  # Incremented by failure
 
     # Verify result includes bead_ref
-    results = await test_db_store.get_results_for_intent(intent_id)
+    results = await store.get_results_for_intent(intent_id)
     assert len(results) == 1
     import json
     result_data = json.loads(results[0]["data"])
@@ -350,22 +365,22 @@ async def test_failed_card_persists_all_fields(store, broadcaster):
     - Result data: bead_ref, failure_reason, error_type, message, action_hint
     - SSE event: all required fields
     """
-    session_id = await test_db_store.create_session()
-    surface_id = await test_db_store.register_surface(session_id, "canvas")
+    session_id = await store.create_session()
+    surface_id = await store.register_surface(session_id, "canvas")
 
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="Full field coverage test",
     )
 
-    topic_id, _ = await test_db_store.find_or_create_topic(
+    topic_id, _ = await store.find_or_create_topic(
         label="Coverage Test",
         session_id=session_id,
         topic_type="project",
     )
 
     bead_ref = "adc-coverage-failed"
-    intent_id = await test_db_store.create_intent(
+    intent_id = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -374,7 +389,7 @@ async def test_failed_card_persists_all_fields(store, broadcaster):
         topic_id=topic_id,
     )
 
-    await test_db_store.create_bead_watch(bead_ref=bead_ref)
+    await store.create_bead_watch(bead_ref=bead_ref)
 
     conn = broadcaster.register(
         surface_id=surface_id,
@@ -400,14 +415,14 @@ async def test_failed_card_persists_all_fields(store, broadcaster):
         )
 
     # Verify all intent fields
-    intent = await test_db_store.get_intent(intent_id)
+    intent = await store.get_intent(intent_id)
     assert intent["status"] == "failed"
     assert intent["intent_type"] == "task-profile"
     assert intent["bead_ref"] == bead_ref
     assert intent["topic_id"] == topic_id
 
     # Verify all result fields
-    results = await test_db_store.get_results_for_intent(intent_id)
+    results = await store.get_results_for_intent(intent_id)
     assert len(results) == 1
     result_row = results[0]
 
@@ -455,22 +470,22 @@ async def test_failed_card_coverage_stuck_and_failed_intents(store, broadcaster)
     This test ensures the system handles both stuck (fenced bead) and
     failed (terminal error) scenarios correctly with proper card types.
     """
-    session_id = await test_db_store.create_session()
+    session_id = await store.create_session()
 
     # Create stuck intent scenario
-    utterance_id_1 = await test_db_store.create_utterance(
+    utterance_id_1 = await store.create_utterance(
         session_id=session_id,
         raw_text="Stuck scenario",
     )
 
-    topic_id_1, _ = await test_db_store.find_or_create_topic(
+    topic_id_1, _ = await store.find_or_create_topic(
         label="Stuck Test",
         session_id=session_id,
         topic_type="project",
     )
 
     stuck_bead_ref = "adc-stuck-test"
-    stuck_intent_id = await test_db_store.create_intent(
+    stuck_intent_id = await store.create_intent(
         utterance_id=utterance_id_1,
         session_id=session_id,
         project_slug="adc",
@@ -480,29 +495,29 @@ async def test_failed_card_coverage_stuck_and_failed_intents(store, broadcaster)
     )
 
     # Fence the stuck bead
-    await test_db_store.create_bead_watch(bead_ref=stuck_bead_ref)
-    await test_db_store.update_bead_watch_refusal(
+    await store.create_bead_watch(bead_ref=stuck_bead_ref)
+    await store.update_bead_watch_refusal(
         bead_ref=stuck_bead_ref,
         refusal_reason="Needs clarification",
         comment_index=0,
         refusal_count_add=3,
     )
-    await test_db_store.fence_bead(bead_ref=stuck_bead_ref)
+    await store.fence_bead(bead_ref=stuck_bead_ref)
 
     # Create failed intent scenario
-    utterance_id_2 = await test_db_store.create_utterance(
+    utterance_id_2 = await store.create_utterance(
         session_id=session_id,
         raw_text="Failed scenario",
     )
 
-    topic_id_2, _ = await test_db_store.find_or_create_topic(
+    topic_id_2, _ = await store.find_or_create_topic(
         label="Failed Test",
         session_id=session_id,
         topic_type="project",
     )
 
     failed_bead_ref = "adc-failed-test"
-    failed_intent_id = await test_db_store.create_intent(
+    failed_intent_id = await store.create_intent(
         utterance_id=utterance_id_2,
         session_id=session_id,
         project_slug="adc",
@@ -525,15 +540,15 @@ async def test_failed_card_coverage_stuck_and_failed_intents(store, broadcaster)
         )
 
     # Verify both intents have correct statuses
-    stuck_intent = await test_db_store.get_intent(stuck_intent_id)
+    stuck_intent = await store.get_intent(stuck_intent_id)
     assert stuck_intent["status"] == "stuck" or stuck_intent["status"] in ("pending", "dispatched")  # Stuck intent routing would set this to 'stuck'
 
-    failed_intent = await test_db_store.get_intent(failed_intent_id)
+    failed_intent = await store.get_intent(failed_intent_id)
     assert failed_intent["status"] == "failed"
 
     # Verify both have result cards
-    stuck_results = await test_db_store.get_results_for_intent(stuck_intent_id)
-    failed_results = await test_db_store.get_results_for_intent(failed_intent_id)
+    stuck_results = await store.get_results_for_intent(stuck_intent_id)
+    failed_results = await store.get_results_for_intent(failed_intent_id)
 
     # Failed card should exist
     assert len(failed_results) >= 1
@@ -553,14 +568,14 @@ async def test_terminal_failure_detection_logic(store, broadcaster):
     - Timeout errors
     - Permission denied errors
     """
-    session_id = await test_db_store.create_session()
+    session_id = await store.create_session()
 
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="Test terminal failure detection",
     )
 
-    topic_id, _ = await test_db_store.find_or_create_topic(
+    topic_id, _ = await store.find_or_create_topic(
         label="Failure Detection Test",
         session_id=session_id,
         topic_type="project",
@@ -578,7 +593,7 @@ async def test_terminal_failure_detection_logic(store, broadcaster):
     with patch.object(src.sse.broadcaster, 'get_broadcaster', return_value=broadcaster), \
          patch.object(src.session.store, 'get_store', return_value=store):
         for error_type, failure_reason in terminal_failure_scenarios:
-            intent_id = await test_db_store.create_intent(
+            intent_id = await store.create_intent(
                 utterance_id=utterance_id,
                 session_id=session_id,
                 project_slug="test",
@@ -596,11 +611,11 @@ async def test_terminal_failure_detection_logic(store, broadcaster):
             )
 
             # Verify intent status is 'failed'
-            intent = await test_db_store.get_intent(intent_id)
+            intent = await store.get_intent(intent_id)
             assert intent["status"] == "failed"
 
             # Verify failed card was created
-            results = await test_db_store.get_results_for_intent(intent_id)
+            results = await store.get_results_for_intent(intent_id)
             assert len(results) == 1
 
             result_data = json.loads(results[0]["data"])
@@ -620,21 +635,21 @@ async def test_failed_card_proper_metadata(store, broadcaster):
     - action_hint
     - bead_ref (if applicable)
     """
-    session_id = await test_db_store.create_session()
+    session_id = await store.create_session()
 
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="Test metadata",
     )
 
-    topic_id, _ = await test_db_store.find_or_create_topic(
+    topic_id, _ = await store.find_or_create_topic(
         label="Metadata Test",
         session_id=session_id,
         topic_type="project",
     )
 
     bead_ref = "adc-metadata-test"
-    intent_id = await test_db_store.create_intent(
+    intent_id = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -662,7 +677,7 @@ async def test_failed_card_proper_metadata(store, broadcaster):
         )
 
     # Verify result metadata
-    results = await test_db_store.get_results_for_intent(intent_id)
+    results = await store.get_results_for_intent(intent_id)
     assert len(results) == 1
 
     import json
@@ -710,27 +725,27 @@ async def test_full_flow_utterance_to_failed_card(store, broadcaster):
     6. Canvas can load the card via topics API
     """
     # Step 1: Create utterance
-    session_id = await test_db_store.create_session()
-    surface_id = await test_db_store.register_surface(
+    session_id = await store.create_session()
+    surface_id = await store.register_surface(
         session_id=session_id,
         surface_type="canvas",
     )
 
     utterance_text = "Deploy to production"
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text=utterance_text,
     )
 
     # Step 2: Create intent that will fail
-    topic_id, _ = await test_db_store.find_or_create_topic(
+    topic_id, _ = await store.find_or_create_topic(
         label="Production Deploy",
         session_id=session_id,
         topic_type="project",
     )
 
     bead_ref = "adc-deploy-prod-failed"
-    intent_id = await test_db_store.create_intent(
+    intent_id = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -769,7 +784,7 @@ async def test_full_flow_utterance_to_failed_card(store, broadcaster):
     assert event.data["failure_reason"] == failure_reason
 
     # Step 5: Verify failed card persistence
-    results = await test_db_store.get_results_for_intent(intent_id)
+    results = await store.get_results_for_intent(intent_id)
     assert len(results) == 1
 
     failed_card = results[0]
@@ -778,7 +793,7 @@ async def test_full_flow_utterance_to_failed_card(store, broadcaster):
     assert failed_card["session_id"] == session_id
 
     # Step 6: Verify canvas can load via topics API (simulated)
-    topics = await test_db_store.get_active_topics(session_id)
+    topics = await store.get_active_topics(session_id)
     assert len(topics) >= 1
 
     # Find the topic with our failed card
@@ -802,21 +817,21 @@ async def test_fence_edge_cases_false_positives(store, broadcaster):
     - Retry logic works before terminal failure
     - False positives are handled correctly
     """
-    session_id = await test_db_store.create_session()
+    session_id = await store.create_session()
 
-    utterance_id = await test_db_store.create_utterance(
+    utterance_id = await store.create_utterance(
         session_id=session_id,
         raw_text="Test edge cases",
     )
 
-    topic_id, _ = await test_db_store.find_or_create_topic(
+    topic_id, _ = await store.find_or_create_topic(
         label="Edge Cases Test",
         session_id=session_id,
         topic_type="project",
     )
 
     bead_ref = "adc-edge-cases"
-    intent_id = await test_db_store.create_intent(
+    intent_id = await store.create_intent(
         utterance_id=utterance_id,
         session_id=session_id,
         project_slug="adc",
@@ -826,16 +841,16 @@ async def test_fence_edge_cases_false_positives(store, broadcaster):
     )
 
     # Create bead_watch with some refusals (but below fencing threshold)
-    await test_db_store.create_bead_watch(bead_ref=bead_ref)
+    await store.create_bead_watch(bead_ref=bead_ref)
 
     # Simulate retries before terminal failure (2 refusals, below threshold of 3)
-    await test_db_store.update_bead_watch_refusal(
+    await store.update_bead_watch_refusal(
         bead_ref=bead_ref,
         refusal_reason="Temporary network error",
         comment_index=0,
         refusal_count_add=1,
     )
-    await test_db_store.update_bead_watch_refusal(
+    await store.update_bead_watch_refusal(
         bead_ref=bead_ref,
         refusal_reason="Another temporary error",
         comment_index=1,
@@ -843,7 +858,7 @@ async def test_fence_edge_cases_false_positives(store, broadcaster):
     )
 
     # Verify not fenced yet
-    bead_watch = await test_db_store.get_bead_watch(bead_ref)
+    bead_watch = await store.get_bead_watch(bead_ref)
     assert bead_watch["refusal_count"] == 2
     assert bead_watch["fenced_at"] is None
 
@@ -861,12 +876,12 @@ async def test_fence_edge_cases_false_positives(store, broadcaster):
         )
 
     # Verify terminal failure was recorded
-    bead_watch = await test_db_store.get_bead_watch(bead_ref)
+    bead_watch = await store.get_bead_watch(bead_ref)
     assert bead_watch["refusal_count"] == 3  # Incremented by terminal failure
     assert bead_watch["last_refusal_reason"] == "Permanent error: invalid configuration"
 
     # Verify failed card was created despite not being fenced
-    results = await test_db_store.get_results_for_intent(intent_id)
+    results = await store.get_results_for_intent(intent_id)
     assert len(results) == 1
 
     import json
@@ -884,7 +899,7 @@ async def test_multiple_failures_same_session(store, broadcaster):
     - SSE events are broadcast for each failure
     - Session state remains consistent
     """
-    session_id = await test_db_store.create_session()
+    session_id = await store.create_session()
 
     conn = broadcaster.register(
         session_id=session_id,
@@ -896,18 +911,18 @@ async def test_multiple_failures_same_session(store, broadcaster):
     failed_intents = []
 
     for i in range(3):
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text=f"Test failure {i+1}",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label=f"Failure Test {i+1}",
             session_id=session_id,
             topic_type="project",
         )
 
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="test",
@@ -933,11 +948,11 @@ async def test_multiple_failures_same_session(store, broadcaster):
 
     # Verify all intents have failed status
     for intent_id, topic_id in failed_intents:
-        intent = await test_db_store.get_intent(intent_id)
+        intent = await store.get_intent(intent_id)
         assert intent["status"] == "failed"
 
         # Verify each has its own failed card
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
 
     # Verify SSE events were broadcast for all failures
@@ -946,5 +961,5 @@ async def test_multiple_failures_same_session(store, broadcaster):
         assert event.event_type == "task_failed"
 
     # Verify session consistency
-    topics = await test_db_store.get_active_topics(session_id)
+    topics = await store.get_active_topics(session_id)
     assert len(topics) >= 3

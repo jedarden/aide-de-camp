@@ -163,8 +163,23 @@ def _failed_card_data(
 
 
 @pytest.fixture
+async def store(tmp_path):
+    """Create a fresh session store for each test."""
+    db_path = tmp_path / "test.db"
+    store = SessionStore(db_path)
+    await store.initialize()
+    yield store
+    await store.close()
+
 
 @pytest.fixture
+async def broadcaster():
+    """Create a fresh SSE broadcaster for each test."""
+    broadcaster = SSEBroadcaster()
+    await broadcaster.start()
+    yield broadcaster
+    await broadcaster.stop()
+
 
 # --- DOM-based dismissal tests -----------------------------------------------
 
@@ -578,21 +593,21 @@ class TestCardDismissalSession:
     async def test_stuck_card_dismissal_removes_from_results(self, store):
         """When a stuck card is dismissed, it can be removed from results."""
         # Create session and stuck card scenario
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Test stuck dismissal",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Stuck Dismissal Test",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "adc-stuck-dismiss"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -602,7 +617,7 @@ class TestCardDismissalSession:
         )
 
         # Create stuck result
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -617,7 +632,7 @@ class TestCardDismissalSession:
         )
 
         # Verify result exists
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
 
         # Dismissal would be handled by canvas UI removing the element
@@ -629,21 +644,21 @@ class TestCardDismissalSession:
     async def test_failed_card_dismissal_removes_from_results(self, store):
         """When a failed card is dismissed, it can be removed from results."""
         # Create session and failed card scenario
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Test failed dismissal",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Failed Dismissal Test",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "adc-failed-dismiss"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -653,7 +668,7 @@ class TestCardDismissalSession:
         )
 
         # Create failed result
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -668,7 +683,7 @@ class TestCardDismissalSession:
         )
 
         # Verify result exists
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
 
         # Dismissal would be handled by canvas UI removing the element
@@ -753,22 +768,22 @@ class TestDismissalPersistence:
 
     async def test_dismissed_stuck_card_not_recreated_on_reload(self, store, broadcaster):
         """Once a stuck card is dismissed, it shouldn't reappear on topic reload."""
-        session_id = await test_db_store.create_session()
-        surface_id = await test_db_store.register_surface(session_id, "canvas")
+        session_id = await store.create_session()
+        surface_id = await store.register_surface(session_id, "canvas")
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Test persistence",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Persistence Test",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "adc-stuck-persist"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -778,7 +793,7 @@ class TestDismissalPersistence:
         )
 
         # Create stuck result
-        await test_db_store.create_result(
+        await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -788,7 +803,7 @@ class TestDismissalPersistence:
         )
 
         # Get active topics - includes stuck card
-        topics = await test_db_store.get_active_topics(session_id)
+        topics = await store.get_active_topics(session_id)
 
         # Verify stuck card is in topics
         stuck_results = [t for t in topics if t.get("latest_result", {}).get("data", {}).get("bead_id") == bead_ref]
@@ -796,21 +811,21 @@ class TestDismissalPersistence:
 
     async def test_dismissed_failed_card_not_recreated_on_reload(self, store, broadcaster):
         """Once a failed card is dismissed, it shouldn't reappear on topic reload."""
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Test failed persistence",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Failed Persistence Test",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "adc-failed-persist"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -820,7 +835,7 @@ class TestDismissalPersistence:
         )
 
         # Create failed result
-        await test_db_store.create_result(
+        await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -834,7 +849,7 @@ class TestDismissalPersistence:
         )
 
         # Get active topics - includes failed card
-        topics = await test_db_store.get_active_topics(session_id)
+        topics = await store.get_active_topics(session_id)
 
         # After dismissal, the card would be filtered out or marked as dismissed
 
@@ -852,22 +867,22 @@ class TestCardDismissalAPI:
         from fastapi.testclient import TestClient
 
         # Create session and stuck result
-        session_id = await test_db_store.create_session()
-        surface_id = await test_db_store.register_surface(session_id, "canvas")
+        session_id = await store.create_session()
+        surface_id = await store.register_surface(session_id, "canvas")
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Test API stuck dismissal",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="API Stuck Dismissal Test",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "api-stuck-dismiss"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -877,7 +892,7 @@ class TestCardDismissalAPI:
         )
 
         # Create stuck result
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -891,7 +906,7 @@ class TestCardDismissalAPI:
         )
 
         # Verify result exists
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
         assert results[0]["id"] == result_id
 
@@ -908,7 +923,7 @@ class TestCardDismissalAPI:
                 assert deletion_result["result_deleted"] == 1
 
         # Verify result is gone
-        results_after = await test_db_store.get_results_for_intent(intent_id)
+        results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
     async def test_dismiss_failed_card_api(self, store, tmp_path):
@@ -918,21 +933,21 @@ class TestCardDismissalAPI:
         from fastapi import status
 
         # Create session and failed result
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Test API failed dismissal",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="API Failed Dismissal Test",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "api-failed-dismiss"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -942,7 +957,7 @@ class TestCardDismissalAPI:
         )
 
         # Create failed result
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -956,7 +971,7 @@ class TestCardDismissalAPI:
         )
 
         # Verify result exists
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
 
         # Patch get_store to return our test store
@@ -969,7 +984,7 @@ class TestCardDismissalAPI:
                 assert deletion_result["result_deleted"] == 1
 
         # Verify result is gone
-        results_after = await test_db_store.get_results_for_intent(intent_id)
+        results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
     async def test_dismiss_nonexistent_result(self, store, tmp_path):
@@ -978,7 +993,7 @@ class TestCardDismissalAPI:
         from fastapi.testclient import TestClient
         from fastapi import status
 
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
         fake_result_id = "fake-result-id"
 
         # Patch get_store to return our test store
@@ -997,22 +1012,22 @@ class TestCardDismissalAPI:
         from fastapi import status
 
         # Create result in session 1
-        session_id_1 = await test_db_store.create_session()
-        utterance_id = await test_db_store.create_utterance(
+        session_id_1 = await store.create_session()
+        utterance_id = await store.create_utterance(
             session_id=session_id_1,
             raw_text="Test",
         )
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Test", session_id=session_id_1, topic_type="project"
         )
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id_1,
             project_slug="adc",
             intent_type="task-profile",
             topic_id=topic_id,
         )
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id_1,
@@ -1022,7 +1037,7 @@ class TestCardDismissalAPI:
         )
 
         # Try to delete from session 2 (different session)
-        session_id_2 = await test_db_store.create_session()
+        session_id_2 = await store.create_session()
 
         # Patch get_store to return our test store
         from src.main import app
@@ -1034,7 +1049,7 @@ class TestCardDismissalAPI:
                 assert deletion_result["result_deleted"] == 0
 
         # Verify result still exists
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
 
 
@@ -1048,22 +1063,22 @@ class TestCardDismissalEndToEnd:
     async def test_stuck_card_dismissal_complete_flow(self, store, broadcaster):
         """Test full stuck card dismissal flow from creation to removal."""
         # Create session and stuck card scenario
-        session_id = await test_db_store.create_session()
-        surface_id = await test_db_store.register_surface(session_id, "canvas")
+        session_id = await store.create_session()
+        surface_id = await store.register_surface(session_id, "canvas")
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="End-to-end stuck dismissal test",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="E2E Stuck Dismissal",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "e2e-stuck-dismiss"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1073,7 +1088,7 @@ class TestCardDismissalEndToEnd:
         )
 
         # Create stuck result
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -1088,7 +1103,7 @@ class TestCardDismissalEndToEnd:
         )
 
         # Verify result exists in store
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
         assert results[0]["id"] == result_id
         # data is stored as JSON string, need to parse
@@ -1097,15 +1112,15 @@ class TestCardDismissalEndToEnd:
         assert result_data["bead_id"] == bead_ref
 
         # Simulate API dismissal (this is what dismissCard() calls)
-        deletion_result = await test_db_store.delete_result(result_id, session_id)
+        deletion_result = await store.delete_result(result_id, session_id)
         assert deletion_result["result_deleted"] == 1
 
         # Verify result is removed from store
-        results_after = await test_db_store.get_results_for_intent(intent_id)
+        results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
         # Verify topic cards no longer include the stuck result
-        topics = await test_db_store.get_active_topics(session_id)
+        topics = await store.get_active_topics(session_id)
         stuck_results = [
             t
             for t in topics
@@ -1116,21 +1131,21 @@ class TestCardDismissalEndToEnd:
     async def test_failed_card_dismissal_complete_flow(self, store, broadcaster):
         """Test full failed card dismissal flow from creation to removal."""
         # Create session and failed card scenario
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="End-to-end failed dismissal test",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="E2E Failed Dismissal",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "e2e-failed-dismiss"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1140,7 +1155,7 @@ class TestCardDismissalEndToEnd:
         )
 
         # Create failed result
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -1155,35 +1170,35 @@ class TestCardDismissalEndToEnd:
         )
 
         # Verify result exists
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
         assert results[0]["id"] == result_id
 
         # Simulate API dismissal
-        deletion_result = await test_db_store.delete_result(result_id, session_id)
+        deletion_result = await store.delete_result(result_id, session_id)
         assert deletion_result["result_deleted"] == 1
 
         # Verify result is removed from store
-        results_after = await test_db_store.get_results_for_intent(intent_id)
+        results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
     async def test_dismissal_persistence_across_reloads(self, store, broadcaster):
         """Test that dismissed cards don't reappear on topic reload."""
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Persistence test",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Persistence Test",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "persist-dismiss-test"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1193,7 +1208,7 @@ class TestCardDismissalEndToEnd:
         )
 
         # Create stuck result
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -1203,32 +1218,32 @@ class TestCardDismissalEndToEnd:
         )
 
         # Verify result exists (simulating initial topic load)
-        results_before = await test_db_store.get_results_for_intent(intent_id)
+        results_before = await store.get_results_for_intent(intent_id)
         assert len(results_before) == 1
         import json
         result_data_before = json.loads(results_before[0]["data"])
         assert result_data_before["bead_id"] == bead_ref
 
         # Dismiss the result (simulating dismissCard API call)
-        await test_db_store.delete_result(result_id, session_id)
+        await store.delete_result(result_id, session_id)
 
         # Simulate topic reload (results query again)
-        results_after = await test_db_store.get_results_for_intent(intent_id)
+        results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
     async def test_multiple_cards_selective_dismissal(self, store):
         """Test that dismissing one card doesn't affect other cards."""
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
         # Create two intents with different beads
-        utterance_id_1 = await test_db_store.create_utterance(
+        utterance_id_1 = await store.create_utterance(
             session_id=session_id, raw_text="Test 1"
         )
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Multi Test", session_id=session_id, topic_type="project"
         )
 
-        intent_id_1 = await test_db_store.create_intent(
+        intent_id_1 = await store.create_intent(
             utterance_id=utterance_id_1,
             session_id=session_id,
             project_slug="adc",
@@ -1237,7 +1252,7 @@ class TestCardDismissalEndToEnd:
             topic_id=topic_id,
         )
 
-        result_id_1 = await test_db_store.create_result(
+        result_id_1 = await store.create_result(
             intent_id=intent_id_1,
             topic_id=topic_id,
             session_id=session_id,
@@ -1246,11 +1261,11 @@ class TestCardDismissalEndToEnd:
             urgency="high",
         )
 
-        utterance_id_2 = await test_db_store.create_utterance(
+        utterance_id_2 = await store.create_utterance(
             session_id=session_id, raw_text="Test 2"
         )
 
-        intent_id_2 = await test_db_store.create_intent(
+        intent_id_2 = await store.create_intent(
             utterance_id=utterance_id_2,
             session_id=session_id,
             project_slug="adc",
@@ -1259,7 +1274,7 @@ class TestCardDismissalEndToEnd:
             topic_id=topic_id,
         )
 
-        result_id_2 = await test_db_store.create_result(
+        result_id_2 = await store.create_result(
             intent_id=intent_id_2,
             topic_id=topic_id,
             session_id=session_id,
@@ -1269,17 +1284,17 @@ class TestCardDismissalEndToEnd:
         )
 
         # Verify both results exist
-        results_1 = await test_db_store.get_results_for_intent(intent_id_1)
-        results_2 = await test_db_store.get_results_for_intent(intent_id_2)
+        results_1 = await store.get_results_for_intent(intent_id_1)
+        results_2 = await store.get_results_for_intent(intent_id_2)
         assert len(results_1) == 1
         assert len(results_2) == 1
 
         # Dismiss only the first result
-        await test_db_store.delete_result(result_id_1, session_id)
+        await store.delete_result(result_id_1, session_id)
 
         # Verify first result is gone, second still exists
-        results_1_after = await test_db_store.get_results_for_intent(intent_id_1)
-        results_2_after = await test_db_store.get_results_for_intent(intent_id_2)
+        results_1_after = await store.get_results_for_intent(intent_id_1)
+        results_2_after = await store.get_results_for_intent(intent_id_2)
         assert len(results_1_after) == 0
         assert len(results_2_after) == 1
         assert results_2_after[0]["id"] == result_id_2
@@ -1294,17 +1309,17 @@ class TestComprehensiveDismissalFlow:
 
     async def test_stuck_card_complete_dismissal_with_api(self, store, broadcaster):
         """Test complete stuck card dismissal flow: create → API dismiss → verify removal → verify topics query."""
-        session_id = await test_db_store.create_session()
-        surface_id = await test_db_store.register_surface(session_id, "canvas")
+        session_id = await store.create_session()
+        surface_id = await store.register_surface(session_id, "canvas")
 
         # Step 1: Create utterance (user says something)
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Deploy the new feature to production",
         )
 
         # Step 2: Create or find topic
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Production Deployment",
             session_id=session_id,
             topic_type="project",
@@ -1312,7 +1327,7 @@ class TestComprehensiveDismissalFlow:
 
         # Step 3: Create intent with bead reference
         bead_ref = "adc-deploy-prod-stuck"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1322,7 +1337,7 @@ class TestComprehensiveDismissalFlow:
         )
 
         # Step 4: Create stuck result (this is what the user sees as a stuck card)
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -1339,7 +1354,7 @@ class TestComprehensiveDismissalFlow:
 
         # Step 5: Verify the card is in the topics query (simulating canvas load)
         import json
-        topics_before = await test_db_store.get_active_topics(session_id)
+        topics_before = await store.get_active_topics(session_id)
         assert len(topics_before) >= 1
 
         # Find our topic in the results
@@ -1348,7 +1363,7 @@ class TestComprehensiveDismissalFlow:
         assert topic_before["result_count"] >= 1
 
         # Verify the result exists for the intent
-        results_before = await test_db_store.get_results_for_intent(intent_id)
+        results_before = await store.get_results_for_intent(intent_id)
         assert len(results_before) == 1
         assert results_before[0]["id"] == result_id
         result_data_before = json.loads(results_before[0]["data"])
@@ -1356,45 +1371,45 @@ class TestComprehensiveDismissalFlow:
         assert result_data_before["stuck_reason"] == "Deployment blocked: missing production credentials"
 
         # Step 6: Dismiss the card via API (simulating user clicking dismiss)
-        deletion_result = await test_db_store.delete_result(result_id, session_id)
+        deletion_result = await store.delete_result(result_id, session_id)
         assert deletion_result["result_deleted"] == 1
 
         # Step 7: Verify the result is gone from all queries
-        results_after = await test_db_store.get_results_for_intent(intent_id)
+        results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
         # Step 8: Verify the card is removed from topics query
-        topics_after = await test_db_store.get_active_topics(session_id)
+        topics_after = await store.get_active_topics(session_id)
         topic_after = next((t for t in topics_after if t["id"] == topic_id), None)
 
         # The topic should still exist but result count should be updated
         if topic_after:
             # Topic exists but the specific result is gone
-            topic_results = await test_db_store.get_results_for_intent(intent_id)
+            topic_results = await store.get_results_for_intent(intent_id)
             assert len(topic_results) == 0
 
         # Step 9: Verify data integrity - intent and topic should still exist
-        intent = await test_db_store.get_intent(intent_id)
+        intent = await store.get_intent(intent_id)
         assert intent is not None
         assert intent["id"] == intent_id
         assert intent["bead_ref"] == bead_ref
 
-        topic = await test_db_store.get_active_topics(session_id)
+        topic = await store.get_active_topics(session_id)
         assert len(topic) >= 1
 
     async def test_failed_card_complete_dismissal_with_api(self, store, broadcaster):
         """Test complete failed card dismissal flow: create → API dismiss → verify removal → verify topics query."""
-        session_id = await test_db_store.create_session()
-        surface_id = await test_db_store.register_surface(session_id, "canvas")
+        session_id = await store.create_session()
+        surface_id = await store.register_surface(session_id, "canvas")
 
         # Step 1: Create utterance
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Run the data migration script",
         )
 
         # Step 2: Create topic
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Data Migration",
             session_id=session_id,
             topic_type="project",
@@ -1402,7 +1417,7 @@ class TestComprehensiveDismissalFlow:
 
         # Step 3: Create intent with bead reference
         bead_ref = "adc-data-migration-failed"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1412,7 +1427,7 @@ class TestComprehensiveDismissalFlow:
         )
 
         # Step 4: Create failed result
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -1429,7 +1444,7 @@ class TestComprehensiveDismissalFlow:
 
         # Step 5: Verify the card is in the topics query
         import json
-        topics_before = await test_db_store.get_active_topics(session_id)
+        topics_before = await store.get_active_topics(session_id)
         assert len(topics_before) >= 1
 
         topic_before = next((t for t in topics_before if t["id"] == topic_id), None)
@@ -1437,7 +1452,7 @@ class TestComprehensiveDismissalFlow:
         assert topic_before["result_count"] >= 1
 
         # Verify the result exists
-        results_before = await test_db_store.get_results_for_intent(intent_id)
+        results_before = await store.get_results_for_intent(intent_id)
         assert len(results_before) == 1
         assert results_before[0]["id"] == result_id
         result_data_before = json.loads(results_before[0]["data"])
@@ -1445,41 +1460,41 @@ class TestComprehensiveDismissalFlow:
         assert result_data_before["error_type"] == "oom"
 
         # Step 6: Dismiss the card via API
-        deletion_result = await test_db_store.delete_result(result_id, session_id)
+        deletion_result = await store.delete_result(result_id, session_id)
         assert deletion_result["result_deleted"] == 1
 
         # Step 7: Verify the result is gone from all queries
-        results_after = await test_db_store.get_results_for_intent(intent_id)
+        results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
         # Step 8: Verify data integrity - other data should remain intact
-        intent = await test_db_store.get_intent(intent_id)
+        intent = await store.get_intent(intent_id)
         assert intent is not None
         assert intent["id"] == intent_id
         assert intent["bead_ref"] == bead_ref
 
         # Verify utterance still exists
-        all_intents = await test_db_store.get_pending_intents(session_id)
+        all_intents = await store.get_pending_intents(session_id)
         assert len(all_intents) >= 1
 
     async def test_dismissal_with_data_integrity_verification(self, store):
         """Test that dismissal maintains data integrity across the entire flow."""
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
         # Create multiple related data structures
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Test data integrity during dismissal",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Data Integrity Test",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "adc-integrity-test"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1488,7 +1503,7 @@ class TestComprehensiveDismissalFlow:
             topic_id=topic_id,
         )
 
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -1498,9 +1513,9 @@ class TestComprehensiveDismissalFlow:
         )
 
         # Record the state before dismissal
-        intent_before = await test_db_store.get_intent(intent_id)
-        topics_before = await test_db_store.get_active_topics(session_id)
-        results_before = await test_db_store.get_results_for_intent(intent_id)
+        intent_before = await store.get_intent(intent_id)
+        topics_before = await store.get_active_topics(session_id)
+        results_before = await store.get_results_for_intent(intent_id)
 
         # Verify all data exists before dismissal
         assert intent_before is not None
@@ -1508,21 +1523,21 @@ class TestComprehensiveDismissalFlow:
         assert len(results_before) == 1
 
         # Dismiss the result
-        await test_db_store.delete_result(result_id, session_id)
+        await store.delete_result(result_id, session_id)
 
         # Verify data integrity: other structures should remain intact
-        intent_after = await test_db_store.get_intent(intent_id)
+        intent_after = await store.get_intent(intent_id)
         assert intent_after is not None
         assert intent_after["id"] == intent_id
         assert intent_after["bead_ref"] == bead_ref
         assert intent_after["topic_id"] == topic_id
 
         # Verify topic still exists
-        topics_after = await test_db_store.get_active_topics(session_id)
+        topics_after = await store.get_active_topics(session_id)
         assert len(topics_after) >= 1
 
         # Verify only the result was deleted
-        results_after = await test_db_store.get_results_for_intent(intent_id)
+        results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
         # Verify no orphaned data
@@ -1532,8 +1547,8 @@ class TestComprehensiveDismissalFlow:
 
     async def test_dismissal_simulating_real_user_flow(self, store, broadcaster):
         """Simulate real user flow: utterance → stuck card → user dismisses → verify gone from UI."""
-        session_id = await test_db_store.create_session()
-        surface_id = await test_db_store.register_surface(session_id, "canvas")
+        session_id = await store.create_session()
+        surface_id = await store.register_surface(session_id, "canvas")
 
         # Register SSE connection (simulating canvas connection)
         conn = broadcaster.register(
@@ -1544,13 +1559,13 @@ class TestComprehensiveDismissalFlow:
 
         # Step 1: User makes an utterance
         utterance_text = "Deploy the latest build to staging"
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text=utterance_text,
         )
 
         # Step 2: System routes to topic
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Staging Deployment",
             session_id=session_id,
             topic_type="project",
@@ -1558,7 +1573,7 @@ class TestComprehensiveDismissalFlow:
 
         # Step 3: System creates intent
         bead_ref = "adc-deploy-staging"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1568,7 +1583,7 @@ class TestComprehensiveDismissalFlow:
         )
 
         # Step 4: System creates stuck card (simulating bead watcher fencing)
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -1585,25 +1600,25 @@ class TestComprehensiveDismissalFlow:
 
         # Step 5: Canvas loads topics (simulating initial render)
         import json
-        topics = await test_db_store.get_active_topics(session_id)
+        topics = await store.get_active_topics(session_id)
         assert len(topics) >= 1
 
         # Verify stuck card is present
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 1
         result_data = json.loads(results[0]["data"])
         assert result_data["bead_id"] == bead_ref
         assert "staging environment unavailable" in result_data["stuck_reason"]
 
         # Step 6: User clicks dismiss button (canvas calls DELETE API)
-        deletion_result = await test_db_store.delete_result(result_id, session_id)
+        deletion_result = await store.delete_result(result_id, session_id)
         assert deletion_result["result_deleted"] == 1
 
         # Step 7: Canvas reloads topics (simulating post-dismissal render)
-        topics_after = await test_db_store.get_active_topics(session_id)
+        topics_after = await store.get_active_topics(session_id)
 
         # Step 8: Verify dismissed card is gone from all UI queries
-        results_after = await test_db_store.get_results_for_intent(intent_id)
+        results_after = await store.get_results_for_intent(intent_id)
         assert len(results_after) == 0
 
         # Step 9: Verify the topic still exists but card is gone
@@ -1611,7 +1626,7 @@ class TestComprehensiveDismissalFlow:
         assert topic_still_exists is not None
 
         # Step 10: Verify user can still make new utterances (system still works)
-        new_utterance_id = await test_db_store.create_utterance(
+        new_utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Check staging status",
         )
@@ -1619,7 +1634,7 @@ class TestComprehensiveDismissalFlow:
 
     async def test_multiple_dismissals_in_sequence(self, store):
         """Test dismissing multiple cards in sequence without affecting data integrity."""
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
         # Create multiple results for dismissal
         result_ids = []
@@ -1627,18 +1642,18 @@ class TestComprehensiveDismissalFlow:
         intent_ids = []
 
         for i, bead_ref in enumerate(bead_refs):
-            utterance_id = await test_db_store.create_utterance(
+            utterance_id = await store.create_utterance(
                 session_id=session_id,
                 raw_text=f"Test utterance {i}",
             )
 
-            topic_id, _ = await test_db_store.find_or_create_topic(
+            topic_id, _ = await store.find_or_create_topic(
                 label=f"Topic {i}",
                 session_id=session_id,
                 topic_type="project",
             )
 
-            intent_id = await test_db_store.create_intent(
+            intent_id = await store.create_intent(
                 utterance_id=utterance_id,
                 session_id=session_id,
                 project_slug="adc",
@@ -1648,7 +1663,7 @@ class TestComprehensiveDismissalFlow:
             )
             intent_ids.append(intent_id)
 
-            result_id = await test_db_store.create_result(
+            result_id = await store.create_result(
                 intent_id=intent_id,
                 topic_id=topic_id,
                 session_id=session_id,
@@ -1660,45 +1675,45 @@ class TestComprehensiveDismissalFlow:
 
         # Verify all results exist
         for intent_id in intent_ids:
-            results = await test_db_store.get_results_for_intent(intent_id)
+            results = await store.get_results_for_intent(intent_id)
             assert len(results) == 1
 
         # Dismiss each result in sequence
         for i, (result_id, intent_id) in enumerate(zip(result_ids, intent_ids)):
-            deletion_result = await test_db_store.delete_result(result_id, session_id)
+            deletion_result = await store.delete_result(result_id, session_id)
             assert deletion_result["result_deleted"] == 1
 
             # Verify this result is gone
-            results_after = await test_db_store.get_results_for_intent(intent_id)
+            results_after = await store.get_results_for_intent(intent_id)
             assert len(results_after) == 0
 
             # Verify other results still exist
             for other_intent_id in intent_ids[i+1:]:
-                other_results = await test_db_store.get_results_for_intent(other_intent_id)
+                other_results = await store.get_results_for_intent(other_intent_id)
                 assert len(other_results) == 1
 
         # Verify all results are gone
         for intent_id in intent_ids:
-            results = await test_db_store.get_results_for_intent(intent_id)
+            results = await store.get_results_for_intent(intent_id)
             assert len(results) == 0
 
     async def test_dismissal_and_topic_activity_updates(self, store):
         """Test that dismissal properly affects topic activity tracking."""
-        session_id = await test_db_store.create_session()
+        session_id = await store.create_session()
 
-        utterance_id = await test_db_store.create_utterance(
+        utterance_id = await store.create_utterance(
             session_id=session_id,
             raw_text="Test topic activity",
         )
 
-        topic_id, _ = await test_db_store.find_or_create_topic(
+        topic_id, _ = await store.find_or_create_topic(
             label="Activity Test",
             session_id=session_id,
             topic_type="project",
         )
 
         bead_ref = "adc-activity-test"
-        intent_id = await test_db_store.create_intent(
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="adc",
@@ -1707,7 +1722,7 @@ class TestComprehensiveDismissalFlow:
             topic_id=topic_id,
         )
 
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
@@ -1717,19 +1732,19 @@ class TestComprehensiveDismissalFlow:
         )
 
         # Get topic before dismissal
-        topics_before = await test_db_store.get_active_topics(session_id)
+        topics_before = await store.get_active_topics(session_id)
         topic_before = next((t for t in topics_before if t["id"] == topic_id), None)
         assert topic_before is not None
         last_active_before = topic_before["last_active"]
 
         # Dismiss the result
-        await test_db_store.delete_result(result_id, session_id)
+        await store.delete_result(result_id, session_id)
 
         # Update topic activity
-        await test_db_store.update_topic_activity(topic_id)
+        await store.update_topic_activity(topic_id)
 
         # Get topic after dismissal
-        topics_after = await test_db_store.get_active_topics(session_id)
+        topics_after = await store.get_active_topics(session_id)
         topic_after = next((t for t in topics_after if t["id"] == topic_id), None)
         assert topic_after is not None
 
@@ -1737,5 +1752,5 @@ class TestComprehensiveDismissalFlow:
         assert topic_after["id"] == topic_id
 
         # Verify result is gone
-        results = await test_db_store.get_results_for_intent(intent_id)
+        results = await store.get_results_for_intent(intent_id)
         assert len(results) == 0
