@@ -143,7 +143,9 @@ async def dispatch_test_utterance(request: TestDispatchRequest) -> TestDispatchR
                 router.process_intent(routed_intent),
                 name=f"test_process_{routed_intent.intent_id[:8]}"
             )
-            intent_tasks.append((routed_intent.intent_id, task))
+            intent_tasks.append(
+                (routed_intent.intent_id, classification.intent_type.value, task)
+            )
 
         logger.info(f"[TEST] Dispatched {len(intent_ids)} intents for processing")
 
@@ -166,7 +168,7 @@ async def dispatch_test_utterance(request: TestDispatchRequest) -> TestDispatchR
 
             async def stream_results():
                 """Process intents and stream results to SSE."""
-                for intent_id, task in intent_tasks:
+                for intent_id, _intent_type, task in intent_tasks:
                     try:
                         result = await task
 
@@ -328,18 +330,21 @@ async def _collect_results(intent_tasks, timeout_seconds: int) -> list[dict]:
     Collect results from intent processing tasks with timeout.
 
     Args:
-        intent_tasks: List of (intent_id, task) tuples
+        intent_tasks: List of (intent_id, intent_type, task) tuples
         timeout_seconds: Maximum time to wait
 
     Returns:
-        List of result dictionaries
+        List of result dictionaries. Entries always carry the intent's
+        intent_type — including timeout/error placeholders — so consumers
+        (e.g. the named-dispatch verifier) never mistake a processing
+        timeout for a missing classification.
     """
     results = []
 
     try:
         # Wait for all tasks with timeout
         done, pending = await asyncio.wait(
-            [task for _, task in intent_tasks],
+            [task for _, _, task in intent_tasks],
             timeout=timeout_seconds
         )
 
@@ -352,7 +357,7 @@ async def _collect_results(intent_tasks, timeout_seconds: int) -> list[dict]:
                 pass
 
         # Collect results from completed tasks
-        for intent_id, task in intent_tasks:
+        for intent_id, intent_type, task in intent_tasks:
             if task in done:
                 try:
                     result = await task
@@ -361,12 +366,14 @@ async def _collect_results(intent_tasks, timeout_seconds: int) -> list[dict]:
                     logger.error(f"[TEST] Error collecting result for {intent_id}: {e}")
                     results.append({
                         "intent_id": intent_id,
+                        "intent_type": intent_type,
                         "status": "error",
                         "error": str(e),
                     })
             else:
                 results.append({
                     "intent_id": intent_id,
+                    "intent_type": intent_type,
                     "status": "timeout",
                     "error": f"Processing timed out after {timeout_seconds}s",
                 })

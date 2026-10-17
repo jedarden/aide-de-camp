@@ -10,14 +10,61 @@ Acceptance Criteria:
 - Response contains results with research intent type
 - Classification matches expected_intent_type from TEST_UTTERANCES
 - Test is automated and passes consistently
+
+No live LLM calls: the synthesize strand's ZAI client is mocked (see the
+autouse fixture below), mirroring the pattern documented in
+tests/test_test_endpoint_classification.py. Classification itself runs the
+real deterministic fast path — that verdict is what this suite verifies.
 """
 from contextlib import nullcontext
+import json
+from unittest.mock import AsyncMock
+
 import pytest
 
 
 # Research test utterance from TEST_UTTERANCES
 RESEARCH_UTTERANCE = "tell me about Kubernetes architecture patterns"
 EXPECTED_INTENT_TYPE = "lookup"  # Research queries are classified as lookup
+
+# Canned synthesis payload returned by the mocked ZAI client. Shape matches
+# what SynthesizeStrand.synthesize feeds to parse_llm_response.
+SYNTHESIS_RESPONSE = json.dumps({
+    "data": {
+        "topic": "Kubernetes architecture patterns",
+        "patterns": [
+            "control plane / etcd quorum",
+            "declarative reconciliation",
+            "sidecar observability",
+        ],
+    },
+    "summary": (
+        "Kubernetes architectures separate a control plane (API server, "
+        "scheduler, controller manager, etcd) from node-level data-plane "
+        "components reconciled declaratively."
+    ),
+    "urgency": "normal",
+})
+
+
+@pytest.fixture(autouse=True)
+def mock_synthesis_llm(monkeypatch):
+    """
+    Replace the synthesize strand's ZAI client with a canned response.
+
+    A live synthesis call takes ~25-30s through the ZAI proxy and races the
+    30s result-collection timeout of /api/v1/test/dispatch. When it loses the
+    race the endpoint returns timeout placeholder entries that carry no
+    intent_type, flipping these tests between pass and
+    "Expected intent_type 'lookup', got 'None'" run to run. Mocking the client
+    makes the suite deterministic while the dispatch still exercises the real
+    classification fast path, fetch, store persistence, and result contract.
+    """
+    from src.synthesize.strand import get_synthesize_strand
+
+    mock_client = AsyncMock()
+    mock_client.call_simple = AsyncMock(return_value=SYNTHESIS_RESPONSE)
+    monkeypatch.setattr(get_synthesize_strand(), "_zai_client", mock_client)
 
 
 class TestResearchClassification:
