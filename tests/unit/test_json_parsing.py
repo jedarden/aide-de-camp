@@ -336,12 +336,10 @@ class TestRouterSpecificEdgeCases:
         assert result["intent_type"] == "status"
 
     def test_router_response_missing_closing_fence(self):
-        """Test router response with missing closing fence marker."""
-        # This tests fence stripping when closing ``` is missing
+        """An incomplete fence still exposes valid JSON to the parser."""
         raw = '```json\n{"intent_type": "status"}'
-        with pytest.raises(ParseLLMError):
-            # Should fail JSON parsing because the opening fence isn't properly stripped
-            parse_llm_response(raw, strip_fences=True, expect_json=True)
+        result = parse_llm_response(raw, strip_fences=True, expect_json=True)
+        assert result["intent_type"] == "status"
 
     def test_router_response_with_newlines_in_json_string(self):
         """Test router response with embedded newlines in JSON strings."""

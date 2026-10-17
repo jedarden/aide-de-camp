@@ -57,11 +57,8 @@ async def pipeline(tmp_path, monkeypatch):
     monkeypatch.setattr(main_module, "get_store", AsyncMock(return_value=store))
     monkeypatch.setattr(main_module, "get_intent_router", lambda _store: router)
 
-    # The router's result path still uses the historical synchronous call form
-    # for get_store(), while the public store accessor is async. Keep this
-    # compatibility shim local to the test; it prevents the test from touching
-    # the production database while exercising the complete result path.
-    monkeypatch.setattr(intent_router_module, "get_store", lambda: store)
+    # Route result persistence to the isolated async store accessor.
+    monkeypatch.setattr(intent_router_module, "get_store", AsyncMock(return_value=store))
 
     renderer = MagicMock()
 

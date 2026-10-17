@@ -161,7 +161,7 @@ class TestWriteScopeSeparation:
                 "last_used should be set after render"
 
     def test_renderer_updates_usage_pattern_stats(self, library, renderer):
-        """Hot-path render updates sample_count and last_matched on usage pattern."""
+        """Hot-path render updates sample_count and updated_at on usage pattern."""
         # Seed component and pattern
         component = library.create_component(
             name="pattern-test",
@@ -177,11 +177,11 @@ class TestWriteScopeSeparation:
         # Get initial pattern stats
         conn = sqlite3.connect(library.db_path)
         cursor = conn.execute(
-            "SELECT sample_count, last_matched FROM component_usage_patterns "
+            "SELECT sample_count, updated_at FROM component_usage_patterns "
             "WHERE component_id = ? AND result_type = ?",
             (component.id, "status:pattern-test")
         )
-        sample_count_before, last_matched_before = cursor.fetchone()
+        sample_count_before, updated_at_before = cursor.fetchone()
         conn.close()
 
         # Render a card (hot-path records match_score=1.0 for confirmed matches)
@@ -194,18 +194,18 @@ class TestWriteScopeSeparation:
         # Verify pattern stats updated
         conn = sqlite3.connect(library.db_path)
         cursor = conn.execute(
-            "SELECT sample_count, last_matched FROM component_usage_patterns "
+            "SELECT sample_count, updated_at FROM component_usage_patterns "
             "WHERE component_id = ? AND result_type = ?",
             (component.id, "status:pattern-test")
         )
-        sample_count_after, last_matched_after = cursor.fetchone()
+        sample_count_after, updated_at_after = cursor.fetchone()
         conn.close()
 
         assert sample_count_after == sample_count_before + 1, \
             "sample_count was not incremented in component_usage_patterns"
-        # last_matched may equal last_matched_before if renders are within same second
-        assert last_matched_after >= last_matched_before, \
-            "last_matched was not updated in component_usage_patterns"
+        # updated_at may be unchanged if renders occur within the same second.
+        assert updated_at_after >= updated_at_before, \
+            "updated_at was not updated in component_usage_patterns"
 
     def test_fallback_path_writes_nothing(self, library, renderer):
         """When no component matches (fallback), hot-path writes nothing to component DB.

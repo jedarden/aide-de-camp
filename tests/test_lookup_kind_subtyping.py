@@ -22,6 +22,15 @@ from src.fetch.commands import IntentType as FetchIntentType, FetchCommandSpec, 
 from src.render.hot_path import derive_result_type
 
 
+@pytest.fixture
+def use_mocked_llm_classification():
+    """These parsing tests supply LLM responses; bypass deterministic routing."""
+    with patch("src.intent.deterministic_router.get_deterministic_router") as get_router:
+        get_router.return_value.route_utterance.return_value.success = False
+        yield
+
+
+@pytest.mark.usefixtures("use_mocked_llm_classification")
 class TestRouterLookupKindParsing:
     """Test that router parses and emits lookup_kind correctly."""
 
@@ -31,7 +40,7 @@ class TestRouterLookupKindParsing:
         router = IntentRouter()
 
         # Mock the ZAI client to return a response with lookup_kind
-        with patch.object(router, '_get_zai_client') as mock_client:
+        with patch.object(router, '_get_router_zai_client') as mock_client:
             mock_zai = AsyncMock()
             mock_zai.call_simple.return_value = json.dumps([{
                 "intent_type": "lookup",
@@ -42,9 +51,10 @@ class TestRouterLookupKindParsing:
                 "confidence": 0.9,
                 "reasoning": "User asking for log output"
             }])
+            mock_zai.call_simple.return_value = {"content": mock_zai.call_simple.return_value}
             mock_client.return_value = mock_zai
 
-            classifications = await router.classify_utterance(
+            classifications, _ = await router.classify_utterance(
                 "show me recent logs for options-pipeline",
                 "test-session"
             )
@@ -59,7 +69,7 @@ class TestRouterLookupKindParsing:
         """Test that router emits lookup_kind='config' for config query."""
         router = IntentRouter()
 
-        with patch.object(router, '_get_zai_client') as mock_client:
+        with patch.object(router, '_get_router_zai_client') as mock_client:
             mock_zai = AsyncMock()
             mock_zai.call_simple.return_value = json.dumps([{
                 "intent_type": "lookup",
@@ -70,9 +80,10 @@ class TestRouterLookupKindParsing:
                 "confidence": 0.9,
                 "reasoning": "User asking for configuration"
             }])
+            mock_zai.call_simple.return_value = {"content": mock_zai.call_simple.return_value}
             mock_client.return_value = mock_zai
 
-            classifications = await router.classify_utterance(
+            classifications, _ = await router.classify_utterance(
                 "show me the deployment config for options-pipeline",
                 "test-session"
             )
@@ -86,7 +97,7 @@ class TestRouterLookupKindParsing:
         """Test that router defaults to lookup_kind='docs' when not specified."""
         router = IntentRouter()
 
-        with patch.object(router, '_get_zai_client') as mock_client:
+        with patch.object(router, '_get_router_zai_client') as mock_client:
             mock_zai = AsyncMock()
             # Simulate router not specifying lookup_kind (should default to docs)
             mock_zai.call_simple.return_value = json.dumps([{
@@ -97,9 +108,10 @@ class TestRouterLookupKindParsing:
                 "confidence": 0.9,
                 "reasoning": "User asking for documentation"
             }])
+            mock_zai.call_simple.return_value = {"content": mock_zai.call_simple.return_value}
             mock_client.return_value = mock_zai
 
-            classifications = await router.classify_utterance(
+            classifications, _ = await router.classify_utterance(
                 "show me the docs for options-pipeline",
                 "test-session"
             )
@@ -114,7 +126,7 @@ class TestRouterLookupKindParsing:
         """Test that router can segment multiple lookup intents with different kinds."""
         router = IntentRouter()
 
-        with patch.object(router, '_get_zai_client') as mock_client:
+        with patch.object(router, '_get_router_zai_client') as mock_client:
             mock_zai = AsyncMock()
             mock_zai.call_simple.return_value = json.dumps([
                 {
@@ -136,9 +148,10 @@ class TestRouterLookupKindParsing:
                     "reasoning": "User asking for configuration"
                 }
             ])
+            mock_zai.call_simple.return_value = {"content": mock_zai.call_simple.return_value}
             mock_client.return_value = mock_zai
 
-            classifications = await router.classify_utterance(
+            classifications, _ = await router.classify_utterance(
                 "show me recent logs and the deployment config for options-pipeline",
                 "test-session"
             )
@@ -305,6 +318,7 @@ class TestResultTypeDerivation:
         assert result_without_kind != derive_result_type("lookup", "options-pipeline", "docs")
 
 
+@pytest.mark.usefixtures("use_mocked_llm_classification")
 class TestE2ELookupKindFlow:
     """End-to-end tests for lookup_kind flow from utterance to result_type."""
 
@@ -314,7 +328,7 @@ class TestE2ELookupKindFlow:
         router = IntentRouter()
 
         # Mock the router classification
-        with patch.object(router, '_get_zai_client') as mock_client:
+        with patch.object(router, '_get_router_zai_client') as mock_client:
             mock_zai = AsyncMock()
             mock_zai.call_simple.return_value = json.dumps([{
                 "intent_type": "lookup",
@@ -325,10 +339,11 @@ class TestE2ELookupKindFlow:
                 "confidence": 0.9,
                 "reasoning": "User asking for log output"
             }])
+            mock_zai.call_simple.return_value = {"content": mock_zai.call_simple.return_value}
             mock_client.return_value = mock_zai
 
             # Classify utterance
-            classifications = await router.classify_utterance(
+            classifications, _ = await router.classify_utterance(
                 "show me recent logs for options-pipeline",
                 "test-session"
             )
@@ -353,7 +368,7 @@ class TestE2ELookupKindFlow:
         """Test that a config query produces config result_type end-to-end."""
         router = IntentRouter()
 
-        with patch.object(router, '_get_zai_client') as mock_client:
+        with patch.object(router, '_get_router_zai_client') as mock_client:
             mock_zai = AsyncMock()
             mock_zai.call_simple.return_value = json.dumps([{
                 "intent_type": "lookup",
@@ -364,9 +379,10 @@ class TestE2ELookupKindFlow:
                 "confidence": 0.9,
                 "reasoning": "User asking for configuration"
             }])
+            mock_zai.call_simple.return_value = {"content": mock_zai.call_simple.return_value}
             mock_client.return_value = mock_zai
 
-            classifications = await router.classify_utterance(
+            classifications, _ = await router.classify_utterance(
                 "show me the deployment config for options-pipeline",
                 "test-session"
             )
@@ -397,7 +413,7 @@ class TestE2ELookupKindFlow:
         router = IntentRouter()
 
         # First query: logs
-        with patch.object(router, '_get_zai_client') as mock_client:
+        with patch.object(router, '_get_router_zai_client') as mock_client:
             mock_zai = AsyncMock()
             mock_zai.call_simple.return_value = json.dumps([{
                 "intent_type": "lookup",
@@ -408,15 +424,16 @@ class TestE2ELookupKindFlow:
                 "confidence": 0.9,
                 "reasoning": "User asking for log output"
             }])
+            mock_zai.call_simple.return_value = {"content": mock_zai.call_simple.return_value}
             mock_client.return_value = mock_zai
 
-            classifications_logs = await router.classify_utterance(
+            classifications_logs, _ = await router.classify_utterance(
                 "show me recent logs for options-pipeline",
                 "test-session"
             )
 
         # Second query: config
-        with patch.object(router, '_get_zai_client') as mock_client:
+        with patch.object(router, '_get_router_zai_client') as mock_client:
             mock_zai = AsyncMock()
             mock_zai.call_simple.return_value = json.dumps([{
                 "intent_type": "lookup",
@@ -427,9 +444,10 @@ class TestE2ELookupKindFlow:
                 "confidence": 0.9,
                 "reasoning": "User asking for configuration"
             }])
+            mock_zai.call_simple.return_value = {"content": mock_zai.call_simple.return_value}
             mock_client.return_value = mock_zai
 
-            classifications_config = await router.classify_utterance(
+            classifications_config, _ = await router.classify_utterance(
                 "show me the deployment config for options-pipeline",
                 "test-session"
             )

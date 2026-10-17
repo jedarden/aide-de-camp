@@ -3,7 +3,7 @@ Unit tests for exceptions.yaml hot-reload and routing.
 
 Tests:
 1. Hot-reload of exceptions.yaml changes behavior without restart
-2. Critical exception with no active canvas routes to Telegram
+2. Surface routing selects an active canvas or queues results when none exists
 3. Auto-approve rules bypass bead creation
 4. Escalation targets determine correct bead type
 """
@@ -206,6 +206,9 @@ class TestAutoApprove:
         # Mock store
         escalate_handler.store = AsyncMock()
         escalate_handler.store.update_intent_status = AsyncMock()
+        escalate_handler._execute_auto_approved = AsyncMock(
+            return_value={"status": "completed", "summary": "Logs fetched"}
+        )
 
         result = await escalate_handler.escalate_intent(request)
 
@@ -213,6 +216,7 @@ class TestAutoApprove:
         assert result.status == "completed"
         assert result.bead_id == ""
         assert result.pending_card.get("status") == "completed"
+        escalate_handler._execute_auto_approved.assert_awaited_once_with(request)
 
     @pytest.mark.asyncio
     async def test_evaluate_auto_approve_safe_mutation(self, escalate_handler):
@@ -309,64 +313,27 @@ class TestSurfaceRouting:
     """Tests for surface routing with exception rules."""
 
     @pytest.mark.asyncio
-    async def test_critical_exception_routes_to_telegram(self, mock_store):
-        """Test that critical exceptions route to Telegram when no canvas active."""
+    async def test_critical_exception_without_surface_is_queued(self, mock_store):
+        """Critical results wait in the queue when no surface is active."""
         router = SurfaceRouter(store=mock_store)
-        router._reload_manager = MagicMock()
-
-        # Mock exceptions config
-        config = {
-            "categories": {
-                "blocking": {
-                    "urgency": "critical",
-                    "auto_push_to_telegram": True,
-                    "no_canvas_timeout_minutes": 10,
-                }
-            },
-        }
-        router._reload_manager.get_config.return_value = config
 
         # Mock no active surfaces
         mock_store.get_active_surfaces.return_value = []
-
-        # Mock fallback surface (Telegram)
-        mock_store.get_fallback_surface.return_value = {
-            "id": "telegram-1",
-            "session_id": "session-1",
-            "type": "telegram",
-            "state": "connected",
-            "always_available": True,
-            "last_seen": 1234567890,
-        }
 
         decision = await router.route_result(
             session_id="session-1",
             origin_surface_id=None,
             urgency="critical",
-            result_type="exception",
         )
 
-        assert decision.fallback_used == True
-        assert len(decision.target_surfaces) == 1
-        assert decision.target_surfaces[0].type == "telegram"
-        assert "exception-class" in decision.reason
+        assert decision.fallback_used is False
+        assert decision.target_surfaces == []
+        assert decision.reason == "no-surface-available"
 
     @pytest.mark.asyncio
     async def test_exception_with_active_canvas_not_forced(self, mock_store):
-        """Test that exceptions with active canvas don't force Telegram."""
+        """Critical results route to an active canvas."""
         router = SurfaceRouter(store=mock_store)
-        router._reload_manager = MagicMock()
-
-        config = {
-            "categories": {
-                "blocking": {
-                    "urgency": "critical",
-                    "auto_push_to_telegram": True,
-                    "no_canvas_timeout_minutes": 10,
-                }
-            },
-        }
-        router._reload_manager.get_config.return_value = config
 
         # Mock active canvas surface
         from datetime import datetime
@@ -386,30 +353,17 @@ class TestSurfaceRouting:
             session_id="session-1",
             origin_surface_id=None,
             urgency="critical",
-            result_type="exception",
         )
 
-        # Should route to canvas, not forced to Telegram
         assert decision.fallback_used == False
         assert len(decision.target_surfaces) == 1
         assert decision.target_surfaces[0].type == "canvas"
+        assert decision.reason == "most-recent-active"
 
     @pytest.mark.asyncio
     async def test_non_critical_result_normal_routing(self, mock_store):
         """Test that non-critical results use normal routing."""
         router = SurfaceRouter(store=mock_store)
-        router._reload_manager = MagicMock()
-
-        config = {
-            "categories": {
-                "blocking": {
-                    "urgency": "critical",
-                    "auto_push_to_telegram": True,
-                    "no_canvas_timeout_minutes": 10,
-                }
-            },
-        }
-        router._reload_manager.get_config.return_value = config
 
         # Mock active canvas surface
         from datetime import datetime
@@ -429,12 +383,11 @@ class TestSurfaceRouting:
             session_id="session-1",
             origin_surface_id=None,
             urgency="normal",
-            result_type="result",
         )
 
         # Should route to canvas via normal routing
         assert decision.fallback_used == False
-        assert "most-recent-active" in decision.reason or "origin-surface" in decision.reason
+        assert decision.reason == "most-recent-active"
 
 
 class TestConditionEvaluation:
@@ -489,6 +442,13 @@ class TestHotReloadBehavior:
         handler._reload_manager.register_config('exceptions', temp_exceptions_yaml)
         handler.store = AsyncMock()
         handler.store.update_intent_status = AsyncMock()
+        handler.formulate_bead_body = AsyncMock(return_value="Test bead body")
+        handler._validate_and_prepare_approval = AsyncMock(return_value=(MagicMock(), None))
+        handler._create_bead_with_type = AsyncMock(return_value="test-bead")
+        handler._create_bead_watch = AsyncMock()
+        handler._execute_auto_approved = AsyncMock(
+            return_value={"status": "completed", "summary": "Action executed"}
+        )
 
         # Initial request - should require manual approval (action not in read_only)
         request = EscalateRequest(
@@ -502,6 +462,7 @@ class TestHotReloadBehavior:
         # First call with initial config
         result1 = await handler.escalate_intent(request)
         assert result1.status == "created", f"Expected bead creation, got {result1.status}"
+        handler._create_bead_with_type.assert_awaited_once()
 
         # Modify config to add the action to read_only
         with open(temp_exceptions_yaml, 'r') as f:
@@ -517,33 +478,4 @@ class TestHotReloadBehavior:
         result2 = await handler.escalate_intent(request)
         assert result2.status == "completed", f"Expected auto-approval, got {result2.status}"
         assert result2.bead_id == ""
-
-    @pytest.mark.asyncio
-    async def test_hot_reload_changes_telegram_routing_timeout(self, temp_exceptions_yaml):
-        """Test that editing exceptions.yaml no_canvas_timeout_minutes changes routing behavior."""
-        import yaml
-        from datetime import datetime
-
-        # Create router with temp config
-        store = AsyncMock(spec=SessionStore)
-        router = SurfaceRouter(store=store)
-        router._reload_manager = HotReloadManager()
-        router._reload_manager.register_config('exceptions', temp_exceptions_yaml)
-
-        # Get initial timeout
-        initial_timeout = router._get_no_canvas_timeout()
-        assert initial_timeout == 600, f"Expected 600 seconds (10 min), got {initial_timeout}"
-
-        # Modify config to change timeout
-        with open(temp_exceptions_yaml, 'r') as f:
-            config = yaml.safe_load(f)
-        config['categories']['blocking']['no_canvas_timeout_minutes'] = 5
-        with open(temp_exceptions_yaml, 'w') as f:
-            yaml.dump(config, f)
-
-        # Force reload
-        router._reload_manager.force_reload('exceptions')
-
-        # Get updated timeout
-        updated_timeout = router._get_no_canvas_timeout()
-        assert updated_timeout == 300, f"Expected 300 seconds (5 min), got {updated_timeout}"
+        handler._execute_auto_approved.assert_awaited_once_with(request)

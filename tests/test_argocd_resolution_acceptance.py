@@ -18,6 +18,7 @@ identifies that rs-manager has no no-auth read-only proxy available.
 """
 
 import pytest
+import yaml
 
 from src.fetch.clusters import (
     CONSUMABLE_ACCESS,
@@ -26,7 +27,7 @@ from src.fetch.clusters import (
     resolve_argocd_endpoint,
     reset_cache,
 )
-from src.registry import get_project, get_registry
+from src.registry import REGISTRY_PATH, get_project, get_registry
 
 
 @pytest.fixture(autouse=True)
@@ -188,35 +189,35 @@ class TestArgocdAppDefaultBehavior:
         else:
             assert argocd_app == expected_default
 
-    def test_options_pipeline_keeps_explicit_argocd_app(self) -> None:
+    def test_pbx_web_keeps_explicit_argocd_app(self) -> None:
         """
-        options-pipeline has argocd_app: options-pipeline (explicit).
+        pbx-web has argocd_app: pbx-web (explicit).
         The system must use this explicit value, not default to slug.
         """
-        project = get_project("options-pipeline")
+        project = get_project("pbx-web")
 
-        assert project is not None, "options-pipeline should exist in registry"
-        assert project.get("cluster") == "apexalgo-iad"
+        assert project is not None, "pbx-web should exist in registry"
+        assert project.get("cluster") == "ardenone-cluster"
 
         # argocd_app is explicit
         argocd_app = project.get("argocd_app")
-        assert argocd_app is not None, "options-pipeline should have explicit argocd_app"
-        assert argocd_app == "options-pipeline"
+        assert argocd_app is not None, "pbx-web should have explicit argocd_app"
+        assert argocd_app == "pbx-web"
 
-    def test_ibkr_mcp_keeps_explicit_argocd_app(self) -> None:
+    def test_whisper_stt_keeps_explicit_argocd_app(self) -> None:
         """
-        ibkr-mcp has argocd_app: ibkr-mcp (explicit, equals the slug).
+        whisper-stt has argocd_app: whisper-stt (explicit, equals the slug).
         The system must use this explicit value.
         """
-        project = get_project("ibkr-mcp")
+        project = get_project("whisper-stt")
 
-        assert project is not None, "ibkr-mcp should exist in registry"
-        assert project.get("cluster") == "apexalgo-iad"
+        assert project is not None, "whisper-stt should exist in registry"
+        assert project.get("cluster") == "ardenone-cluster"
 
         # argocd_app is explicit (even though it equals the slug)
         argocd_app = project.get("argocd_app")
-        assert argocd_app is not None, "ibkr-mcp should have explicit argocd_app"
-        assert argocd_app == "ibkr-mcp"
+        assert argocd_app is not None, "whisper-stt should have explicit argocd_app"
+        assert argocd_app == "whisper-stt"
 
 
 class TestRealConfigIntegration:
@@ -250,17 +251,18 @@ class TestRealConfigIntegration:
         """
         registry = get_registry()
         projects = registry.get("projects", {})
+        yaml_projects = yaml.safe_load(REGISTRY_PATH.read_text())["projects"]
 
-        # options-pipeline and ibkr-mcp should have explicit argocd_app
-        assert "options-pipeline" in projects
-        assert projects["options-pipeline"].get("argocd_app") == "options-pipeline"
+        # These fields must be explicit in the committed YAML, not merely
+        # populated with slug defaults by local repository discovery.
+        for slug in ("pbx-web", "whisper-stt"):
+            assert yaml_projects[slug]["argocd_app"] == slug
+            assert projects[slug]["argocd_app"] == slug
 
-        assert "ibkr-mcp" in projects
-        assert projects["ibkr-mcp"].get("argocd_app") == "ibkr-mcp"
-
-        # kalshi-tape should have no argocd_app (defaults to slug)
-        assert "kalshi-tape" in projects
-        assert projects["kalshi-tape"].get("argocd_app") is None
+        # kalshi-tape omits the field in YAML. Discovery may add a slug default
+        # in the merged registry when its repository is present locally.
+        assert yaml_projects["kalshi-tape"].get("argocd_app") is None
+        assert projects["kalshi-tape"].get("argocd_app") in (None, "kalshi-tape")
 
 
 class TestApexalgoIadCaveatIsIntentional:

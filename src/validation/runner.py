@@ -224,6 +224,26 @@ def validate_deployment_file(
     is_complete, gap_result = _validate_completeness_with_gap_metrics(data)
     result.has_complete_coverage = is_complete
 
+    if not is_complete:
+        # Preserve the standard completeness reason alongside the richer gap
+        # guidance. The gap formatter does not always include the original
+        # missing-date or date-range error.
+        from src.validation.completeness import validate_30day_completeness
+
+        try:
+            _, completeness_error = validate_30day_completeness(data)
+        except Exception:
+            # Gap validation already produced a safe failure result for
+            # malformed data; retain that result instead of raising here.
+            completeness_error = None
+        detail = completeness_error or (
+            gap_result.error_message if gap_result is not None else None
+        )
+        result.errors.append(
+            f"Completeness: {detail or '30-day coverage could not be verified'}"
+        )
+        result.is_valid = False
+
     # Merge gap metrics into result with enhanced edge case handling
     if gap_result is not None:
         # Merge gap detection results

@@ -229,9 +229,7 @@ async def test_patterns_api_upsert_existing_pattern(async_client: AsyncClient, t
 @pytest.mark.asyncio
 async def test_patterns_api_validation_missing_required_fields(async_client: AsyncClient):
     """Test input validation rejects missing required fields."""
-    import json
-
-    # Missing result_type - FastAPI returns 422 for Pydantic validation errors
+    # The application maps FastAPI validation errors to its 400 error envelope.
     response = await async_client.post(
         "/api/v1/patterns",
         json={
@@ -240,12 +238,11 @@ async def test_patterns_api_validation_missing_required_fields(async_client: Asy
             "match_score": 0.85
         }
     )
-    assert response.status_code == 422
-    # Pydantic error detail includes "field required"
-    error_detail = response.json()["detail"]
-    assert any("result_type" in str(err).lower() and "required" in str(err).lower() for err in error_detail)
+    assert response.status_code == 400
+    errors = response.json()["errors"]
+    assert any(err["field"] == "body -> result_type" and err["type"] == "missing" for err in errors)
 
-    # Missing component_id - FastAPI returns 422 for Pydantic validation errors
+    # Missing component_id
     response = await async_client.post(
         "/api/v1/patterns",
         json={
@@ -254,9 +251,9 @@ async def test_patterns_api_validation_missing_required_fields(async_client: Asy
             "match_score": 0.85
         }
     )
-    assert response.status_code == 422
-    error_detail = response.json()["detail"]
-    assert any("component_id" in str(err).lower() and "required" in str(err).lower() for err in error_detail)
+    assert response.status_code == 400
+    errors = response.json()["errors"]
+    assert any(err["field"] == "body -> component_id" and err["type"] == "missing" for err in errors)
 
 
 @pytest.mark.asyncio
@@ -474,13 +471,12 @@ async def test_get_patterns_by_result_type(async_client: AsyncClient, test_compo
 
 @pytest.mark.asyncio
 async def test_get_patterns_missing_result_type(async_client: AsyncClient):
-    """Test GET /api/v1/patterns without result_type returns 422 validation error."""
+    """Test GET /api/v1/patterns without result_type returns the app's 400 validation error."""
     response = await async_client.get("/api/v1/patterns")
 
-    # FastAPI returns 422 for missing required query parameters
-    assert response.status_code == 422
-    error_detail = response.json()["detail"]
-    assert any("result_type" in str(err).lower() and ("required" in str(err).lower() or "field" in str(err).lower()) for err in error_detail)
+    assert response.status_code == 400
+    errors = response.json()["errors"]
+    assert any(err["field"] == "query -> result_type" and err["type"] == "missing" for err in errors)
 
 
 @pytest.mark.asyncio

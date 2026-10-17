@@ -128,7 +128,7 @@ def temp_urgency_md():
 
 
 @pytest.fixture
-def router(temp_router_md, temp_urgency_md):
+def router(temp_router_md, temp_urgency_md, monkeypatch):
     """
     An IntentRouter pointed at the stub router.md, with a hermetic store
     (get_session -> None, so no session context is appended) and a registered
@@ -142,15 +142,23 @@ def router(temp_router_md, temp_urgency_md):
 
     store = MagicMock()
     store.get_session = AsyncMock(return_value=None)
+    store.store_router_timing = AsyncMock()
     r.store = store
+    no_fast_path = MagicMock()
+    no_fast_path.route_utterance.return_value = MagicMock(success=False)
+    monkeypatch.setattr(
+        "src.intent.deterministic_router.get_deterministic_router",
+        lambda: no_fast_path,
+    )
     return r
 
 
 def _wire_canned_response(router: IntentRouter, response_text: str) -> IntentRouter:
     """Inject a mock ZAI client that returns response_text for call_simple."""
     mock_client = AsyncMock()
-    mock_client.call_simple = AsyncMock(return_value=response_text)
+    mock_client.call_simple = AsyncMock(return_value={"content": response_text})
     router._zai_client = mock_client
+    router._router_zai_client = mock_client
     return router
 
 
@@ -260,7 +268,7 @@ class TestIdenticalClassificationAcrossPaths:
         _wire_canned_response(router, canned_response)
 
         # Path A: what /test/classify runs.
-        direct = await router.classify_utterance(utterance, "session-test")
+        direct, _ = await router.classify_utterance(utterance, "session-test")
 
         # Path B: what /dispatch and /test/dispatch run.
         routed = await router.route_utterance(
@@ -296,7 +304,7 @@ class TestIdenticalClassificationAcrossPaths:
         }])
         _wire_canned_response(router, canned)
 
-        [direct] = await router.classify_utterance(
+        [direct], _ = await router.classify_utterance(
             "tell me about the options pipeline", "session-test"
         )
         [routed] = await router.route_utterance(

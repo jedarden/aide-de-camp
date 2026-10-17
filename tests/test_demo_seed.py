@@ -345,7 +345,7 @@ class TestDemoSeedVerifier:
         mock_library = MagicMock()
         mock_library.select_component_for_result_type = MagicMock(return_value=None)
 
-        with patch("components.library.get_library", return_value=mock_library):
+        with patch("src.components.library.get_library", return_value=mock_library):
             result = await verifier._check_component_coverage()
 
         assert result.status == CheckStatus.FAIL
@@ -367,7 +367,7 @@ class TestDemoSeedVerifier:
 
         mock_library.select_component_for_result_type = mock_select
 
-        with patch("components.library.get_library", return_value=mock_library):
+        with patch("src.components.library.get_library", return_value=mock_library):
             result = await verifier._check_component_coverage()
 
         assert result.status == CheckStatus.PASS

@@ -15,6 +15,7 @@ Acceptance criteria:
 """
 
 import asyncio
+import importlib
 import pytest
 import json
 from pathlib import Path
@@ -32,24 +33,32 @@ from src.test.dispatch import (
 from src.intent.router import get_router
 
 
+dispatch_module = importlib.import_module("src.test.dispatch")
+
+
 # --- fixtures ---------------------------------------------------------------
 
 
 @pytest.fixture
-async def isolated_store(tmp_path):
+async def isolated_store(tmp_path, monkeypatch):
     """Isolated session store for each test."""
     db_path = tmp_path / "test-storage-sse.db"
     store = SessionStore(db_path)
     await store.initialize()
+    monkeypatch.setattr(dispatch_module, "get_store", AsyncMock(return_value=store))
+    # Legacy test bodies also assign this singleton directly; restore it afterward.
+    import src.session.store as store_mod
+    monkeypatch.setattr(store_mod, "_store", store)
     yield store
     await store.close()
 
 
 @pytest.fixture
-async def started_broadcaster():
+async def started_broadcaster(monkeypatch):
     """Start SSE broadcaster for each test."""
     b = SSEBroadcaster()
     await b.start()
+    monkeypatch.setattr(dispatch_module, "get_broadcaster", lambda: b)
     yield b
     await b.stop()
 

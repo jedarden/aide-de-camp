@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test research classification via /api/v1/test/dispatch endpoint.
+Test research classification via the result-waiting test dispatch endpoint.
 
 Verifies that the research utterance from TEST_UTTERANCES is correctly
 classified when sent through the test dispatch endpoint.
@@ -11,11 +11,10 @@ Acceptance Criteria:
 - Classification matches expected_intent_type from TEST_UTTERANCES
 - Test is automated and passes consistently
 """
-import asyncio
-import sys
-import pytest
 import httpx
-from typing import Dict, Any
+import pytest
+
+from src.main import app
 
 
 # Research test utterance from TEST_UTTERANCES
@@ -36,10 +35,10 @@ class TestResearchClassification:
         2. Response contains results with research intent type
         3. Classification matches expected_intent_type from TEST_UTTERANCES
         """
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
             # Dispatch the research utterance
             response = await client.post(
-                "http://localhost:8000/api/v1/test/dispatch",
+                "/api/v1/test/test/dispatch",
                 json={
                     "utterance": RESEARCH_UTTERANCE,
                     "wait_for_results": True,
@@ -88,14 +87,14 @@ class TestResearchClassification:
 
         This ensures the classification is stable and doesn't randomly change.
         """
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
             # Make multiple requests to verify consistency
             results = []
             num_trials = 3
 
             for i in range(num_trials):
                 response = await client.post(
-                    "http://localhost:8000/api/v1/test/dispatch",
+                    "/api/v1/test/test/dispatch",
                     json={
                         "utterance": RESEARCH_UTTERANCE,
                         "wait_for_results": True,
@@ -126,10 +125,10 @@ class TestResearchClassification:
 
         This tests the convenience endpoint /api/v1/test/dispatch/{utterance_name}.
         """
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
             # First verify the research_query utterance exists
             list_response = await client.get(
-                "http://localhost:8000/api/v1/test/utterances"
+                "/api/v1/test/utterances"
             )
             assert list_response.status_code == 200
 
@@ -146,7 +145,7 @@ class TestResearchClassification:
 
             # Test using the named endpoint
             response = await client.post(
-                "http://localhost:8000/api/v1/test/dispatch/research_query",
+                "/api/v1/test/dispatch/research_query",
                 params={
                     "wait_for_results": True,
                     "timeout_seconds": 30,

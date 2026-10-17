@@ -69,7 +69,7 @@ class TestValidateCompleteness:
 
         is_valid, error = validate_completeness(data)
         assert is_valid is False
-        assert "Date gap detected" in error
+        assert "2-day gap" in error
 
     def test_duplicate_date(self):
         """Test data with duplicate dates."""

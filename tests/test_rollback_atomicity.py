@@ -24,6 +24,7 @@ async def test_gitops_rollback_restores_parent_with_atomic_write(tmp_path, caplo
     ]
 
     with patch("src.action.steps.gitops.subprocess.run", side_effect=git_results) as run, \
+         patch.object(step, "_validate_declarative_config_repo"), \
          patch.object(step, "_push_changes"), \
          patch("src.action.steps.gitops.atomic_write", wraps=atomic_write) as write, \
          caplog.at_level("INFO"):
@@ -50,6 +51,7 @@ async def test_gitops_rollback_commit_failure_restores_original_atomically(tmp_p
     ]
 
     with patch("src.action.steps.gitops.subprocess.run", side_effect=git_results), \
+         patch.object(step, "_validate_declarative_config_repo"), \
          patch("src.action.steps.gitops.atomic_write", wraps=atomic_write) as write:
         result = await step.rollback("deployment.yaml", "abc123")
 
