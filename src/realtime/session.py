@@ -5,6 +5,7 @@ Voice mode implementation using OpenAI Realtime API.
 Tool-as-trigger model: dispatch_intent() returns ack immediately; results arrive async.
 Based on DUCK-E scaffolding but adapted for ADC's async result delivery pattern.
 """
+
 import asyncio
 import json
 import os
@@ -19,12 +20,34 @@ import httpx
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
+from .schema import (
+    AnnotationEvent,
+    ErrorEvent,
+    EventValidationError,
+    FunctionCallArgumentsDoneEvent,
+    SessionUpdatedEvent,
+    SessionUpdateEvent,
+    SessionUpdateFailedEvent,
+    SpeakingStartedEvent,
+    SpeakingStoppedEvent,
+    SurfaceSwitchEvent,
+    TurnDoneEvent,
+    validate_client_event,
+    validate_server_event,
+)
+
 OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL", "https://openai-proxy.ardenone.com:8444")
 
 
 AVAILABLE_VOICES = [
-    "alloy", "ash", "ballad", "coral", "echo",
-    "sage", "shimmer", "verse",
+    "alloy",
+    "ash",
+    "ballad",
+    "coral",
+    "echo",
+    "sage",
+    "shimmer",
+    "verse",
 ]
 
 VOICE_CHANGE_TIMEOUT = 30.0
@@ -89,6 +112,9 @@ class VoiceSession:
         self._pending_lock = threading.RLock()
         self._pending_in_flight: dict[str, list[dict[str, Any]]] = {}
         self._pending_voice_change: Optional[dict[str, Any]] = None
+        self._seen_events: set[str] = set()
+        self._completed_tool_calls: set[str] = set()
+        self._completed_voice_change_requests: set[str] = set()
 
         # Narration state
         self.last_narration_time = 0.0
@@ -105,12 +131,14 @@ class VoiceSession:
     ) -> None:
         """Register a callable tool handler."""
         self.tool_handlers[name] = handler
-        self.tools.append({
-            "type": "function",
-            "name": name,
-            "description": description,
-            "parameters": parameters,
-        })
+        self.tools.append(
+            {
+                "type": "function",
+                "name": name,
+                "description": description,
+                "parameters": parameters,
+            }
+        )
 
     async def _get_ephemeral_key(self, voice: Optional[str] = None) -> dict[str, Any]:
         """
@@ -148,10 +176,7 @@ class VoiceSession:
         this VoiceSession keeps its result queues and canvas catch-up state.
         """
         if not isinstance(voice, str) or voice not in AVAILABLE_VOICES:
-            return (
-                f"Invalid voice '{voice}'. "
-                f"Available: {', '.join(AVAILABLE_VOICES)}"
-            )
+            return f"Invalid voice '{voice}'. Available: {', '.join(AVAILABLE_VOICES)}"
         if self._pending_voice_change:
             return "A voice change is already in progress."
         if voice == self.voice:
@@ -165,12 +190,14 @@ class VoiceSession:
                 "voice": voice,
                 "requested_at": time.monotonic(),
             }
-            await self.websocket.send_json({
-                "type": "adc.session_update",
-                "request_id": request_id,
-                "voice": voice,
-                "config": config,
-            })
+            await self._send_event(
+                {
+                    "type": "adc.session_update",
+                    "request_id": request_id,
+                    "voice": voice,
+                    "config": config,
+                }
+            )
             self.logger.info("Requested voice change to %s", voice)
             return f"Voice change to {voice} requested."
         except Exception as e:
@@ -182,7 +209,7 @@ class VoiceSession:
         """Validate a direct client voice-change request."""
         session = data.get("session")
         if (
-            set(data) != {"type", "session"}
+            set(data).difference({"type", "session", "event_id"})
             or not isinstance(session, dict)
             or set(session) != {"voice"}
             or not isinstance(session["voice"], str)
@@ -192,46 +219,69 @@ class VoiceSession:
             return
 
         if session["voice"] == self.voice and not self._pending_voice_change:
-            await self.websocket.send_json({
-                "type": "adc.session_update_applied",
-                "voice": self.voice,
-            })
+            await self._send_event(
+                {
+                    "type": "adc.session_update_applied",
+                    "voice": self.voice,
+                }
+            )
             return
 
         result = await self.change_voice(session["voice"])
-        if result.startswith("Invalid voice") or result.startswith("Failed to change") or result.startswith("A voice change"):
+        if (
+            result.startswith("Invalid voice")
+            or result.startswith("Failed to change")
+            or result.startswith("A voice change")
+        ):
             await self._reject_voice_change(result)
 
     async def _reject_voice_change(self, reason: str) -> None:
-        await self.websocket.send_json({
-            "type": "adc.session_update_rejected",
-            "reason": reason,
-            "available_voices": AVAILABLE_VOICES,
-        })
+        await self._send_event(
+            {
+                "type": "adc.session_update_rejected",
+                "reason": reason,
+                "available_voices": AVAILABLE_VOICES,
+            }
+        )
 
     async def _handle_session_updated(self, data: dict[str, Any]) -> None:
         """Accept confirmation only for the outstanding WebRTC replacement."""
         pending = self._pending_voice_change
-        if not pending or data.get("request_id") != pending["request_id"]:
-            self.logger.warning("Ignoring stale voice-change confirmation")
+        request_id = data.get("request_id")
+        if request_id in self._completed_voice_change_requests:
+            await self._send_protocol_error("duplicate_event", "voice change was already completed")
+            return
+        if not pending or request_id != pending["request_id"]:
+            await self._send_protocol_error("out_of_order", "no matching voice change is pending")
             return
         if data.get("voice") != pending["voice"]:
-            self.logger.warning("Ignoring voice-change confirmation with wrong voice")
+            await self._send_protocol_error(
+                "out_of_order", "voice confirmation does not match the request"
+            )
             return
         self.voice = pending["voice"]
         self._pending_voice_change = None
+        self._completed_voice_change_requests.add(pending["request_id"])
         self.logger.info("Voice change applied: %s", self.voice)
-        await self.websocket.send_json({
-            "type": "adc.session_update_applied",
-            "request_id": pending["request_id"],
-            "voice": self.voice,
-        })
+        await self._send_event(
+            {
+                "type": "adc.session_update_applied",
+                "request_id": pending["request_id"],
+                "voice": self.voice,
+            }
+        )
 
     async def _handle_session_update_failed(self, data: dict[str, Any]) -> None:
         pending = self._pending_voice_change
-        if pending and data.get("request_id") == pending["request_id"]:
+        request_id = data.get("request_id")
+        if request_id in self._completed_voice_change_requests:
+            await self._send_protocol_error("duplicate_event", "voice change was already completed")
+        elif pending and request_id == pending["request_id"]:
             self._pending_voice_change = None
+            self._completed_voice_change_requests.add(request_id)
             await self._reject_voice_change("Client could not activate the new voice")
+        else:
+            await self._send_protocol_error("out_of_order", "no matching voice change is pending")
 
     async def _expire_voice_change(self) -> None:
         pending = self._pending_voice_change
@@ -259,13 +309,17 @@ class VoiceSession:
         with self._pending_lock:
             self.pending_results.append(result)
 
-        self.logger.info(json.dumps({
-            "event": "result_queued",
-            "intent_id": result.get("intent_id"),
-            "urgency": result.get("urgency"),
-            "summary": result.get("summary")[:100],
-            "ts": time.time(),
-        }))
+        self.logger.info(
+            json.dumps(
+                {
+                    "event": "result_queued",
+                    "intent_id": result.get("intent_id"),
+                    "urgency": result.get("urgency"),
+                    "summary": result.get("summary")[:100],
+                    "ts": time.time(),
+                }
+            )
+        )
 
     async def get_pending_results(self) -> list[dict[str, Any]]:
         """
@@ -328,10 +382,7 @@ class VoiceSession:
 
         if urgency == "low":
             # Only if idle (no user or assistant activity recently)
-            idle_time = min(
-                now - self._user_last_spoke,
-                now - self.last_narration_time
-            )
+            idle_time = min(now - self._user_last_spoke, now - self.last_narration_time)
             return idle_time >= 10.0  # 10 seconds of idle
 
         return False
@@ -396,29 +447,109 @@ class VoiceSession:
             by_topic[topic_id].append(result)
 
         # Send batched event
-        await self.websocket.send_json({
-            "type": "adc.narrate_results",
-            "results": [
-                {
-                    "intent_id": r.get("intent_id"),
-                    "topic_id": r.get("topic_id"),
-                    "summary": r.get("summary"),
-                    "urgency": r.get("urgency"),
-                }
-                for r in results
-            ],
-            "grouped_by_topic": {
-                topic_id: [r.get("summary") for r in topic_results]
-                for topic_id, topic_results in by_topic.items()
-            },
-        })
+        await self._send_event(
+            {
+                "type": "adc.narrate_results",
+                "results": [
+                    {
+                        "intent_id": r.get("intent_id"),
+                        "topic_id": r.get("topic_id"),
+                        "summary": r.get("summary"),
+                        "urgency": r.get("urgency"),
+                    }
+                    for r in results
+                ],
+                "grouped_by_topic": {
+                    topic_id: [r.get("summary") for r in topic_results]
+                    for topic_id, topic_results in by_topic.items()
+                },
+            }
+        )
 
-        self.logger.info(json.dumps({
-            "event": "narration.sent",
-            "count": len(results),
-            "urgencies": [r.get("urgency") for r in results],
-            "ts": time.time(),
-        }))
+        self.logger.info(
+            json.dumps(
+                {
+                    "event": "narration.sent",
+                    "count": len(results),
+                    "urgencies": [r.get("urgency") for r in results],
+                    "ts": time.time(),
+                }
+            )
+        )
+
+    async def _send_event(self, payload: dict[str, Any]) -> None:
+        """Validate an outbound event before it crosses the WebSocket."""
+        validate_server_event(payload)
+        await self.websocket.send_json(payload)
+
+    async def _send_protocol_error(
+        self, code: str, message: str, event_type: str | None = None
+    ) -> None:
+        await self._send_event(
+            {
+                "type": "error",
+                "error": {
+                    "code": code,
+                    "message": message,
+                    "event_type": event_type,
+                },
+            }
+        )
+
+    def _event_key(self, event: Any) -> str:
+        """Return an idempotency key for a validated event.
+
+        Realtime events normally carry ``event_id``. ADC custom events from
+        older clients do not, so their canonical payload is used as a safe
+        fallback for exact retries.
+        """
+        event_id = getattr(event, "event_id", None)
+        if event_id:
+            return f"event_id:{event_id}"
+        payload = event.model_dump(exclude_none=True)
+        if isinstance(event, FunctionCallArgumentsDoneEvent):
+            return f"tool_call:{event.call_id}"
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+    async def _handle_client_event(self, data: Any) -> None:
+        """Validate, deduplicate, and dispatch one browser event."""
+        try:
+            event = validate_client_event(data)
+        except EventValidationError as exc:
+            await self._send_protocol_error(exc.code, exc.message, exc.event_type)
+            return
+
+        event_key = self._event_key(event)
+        if event_key in self._seen_events:
+            await self._send_protocol_error(
+                "duplicate_event", "event was already processed", event.type
+            )
+            return
+        self._seen_events.add(event_key)
+
+        if isinstance(event, FunctionCallArgumentsDoneEvent):
+            await self._handle_tool_call(event.model_dump(exclude_none=True))
+        elif isinstance(event, SessionUpdateEvent):
+            await self._handle_session_update(event.model_dump(exclude_none=True))
+        elif isinstance(event, SessionUpdatedEvent):
+            await self._handle_session_updated(event.model_dump(exclude_none=True))
+        elif isinstance(event, SessionUpdateFailedEvent):
+            await self._handle_session_update_failed(event.model_dump(exclude_none=True))
+        elif isinstance(event, AnnotationEvent):
+            self.logger.info("Annotation: %s", event.annotation)
+        elif isinstance(event, TurnDoneEvent):
+            if self.on_turn_done:
+                asyncio.create_task(self.on_turn_done(event.user_text, event.assistant_text))
+            self._user_last_spoke = time.time()
+        elif isinstance(event, SurfaceSwitchEvent):
+            if self.on_surface_switch:
+                await self.on_surface_switch(event.surface)
+        elif isinstance(event, SpeakingStartedEvent):
+            self._is_speaking = True
+        elif isinstance(event, SpeakingStoppedEvent):
+            self._is_speaking = False
+        elif isinstance(event, ErrorEvent):
+            self.logger.error("Realtime client error: %s", event.error)
 
     async def run(self) -> None:
         """Main session loop."""
@@ -426,18 +557,22 @@ class VoiceSession:
             session_data = await self._get_ephemeral_key()
         except Exception as e:
             self.logger.error(f"Failed to get ephemeral key: {e}", exc_info=True)
-            await self.websocket.send_json({
-                "type": "error",
-                "error": f"Failed to initialize session: {str(e)}",
-            })
+            await self._send_event(
+                {
+                    "type": "error",
+                    "error": f"Failed to initialize session: {str(e)}",
+                }
+            )
             await self.websocket.close(code=1011, reason="Session initialization failed")
             return
 
-        await self.websocket.send_json({
-            "type": "ag2.init",
-            "config": session_data,
-            "init": [],
-        })
+        await self._send_event(
+            {
+                "type": "ag2.init",
+                "config": session_data,
+                "init": [],
+            }
+        )
 
         try:
             while True:
@@ -445,42 +580,9 @@ class VoiceSession:
                 try:
                     data = await asyncio.wait_for(
                         self.websocket.receive_json(),
-                        timeout=0.5  # Check results every 500ms
+                        timeout=0.5,  # Check results every 500ms
                     )
-                    if not isinstance(data, dict):
-                        await self._reject_voice_change("Expected a JSON object")
-                        continue
-                    msg_type = data.get("type", "")
-
-                    if msg_type == "response.function_call_arguments.done":
-                        await self._handle_tool_call(data)
-                    elif msg_type == "adc.session_update":
-                        await self._handle_session_update(data)
-                    elif msg_type == "adc.session_updated":
-                        await self._handle_session_updated(data)
-                    elif msg_type == "adc.session_update_failed":
-                        await self._handle_session_update_failed(data)
-                    elif msg_type == "adc.annotation":
-                        annotation = data.get("annotation", {})
-                        self.logger.info(f"Annotation: {annotation}")
-                    elif msg_type == "adc.turn_done":
-                        if self.on_turn_done:
-                            user_text = data.get("user_text", "")
-                            assistant_text = data.get("assistant_text", "")
-                            asyncio.create_task(
-                                self.on_turn_done(user_text, assistant_text)
-                            )
-                        # Update user activity tracking
-                        self._user_last_spoke = time.time()
-                    elif msg_type == "adc.surface_switch":
-                        # User switching from audio to canvas
-                        surface_type = data.get("surface", "canvas")
-                        if self.on_surface_switch:
-                            await self.on_surface_switch(surface_type)
-                    elif msg_type == "adc.speaking_started":
-                        self._is_speaking = True
-                    elif msg_type == "adc.speaking_stopped":
-                        self._is_speaking = False
+                    await self._handle_client_event(data)
 
                 except asyncio.TimeoutError:
                     # Timeout is expected - check for results to narrate
@@ -507,19 +609,24 @@ class VoiceSession:
         """
         name = data.get("name")
         call_id = data.get("call_id")
+        if call_id in self._completed_tool_calls:
+            await self._send_protocol_error("duplicate_event", "tool call was already completed")
+            return
+        self._completed_tool_calls.add(call_id)
         t_received = time.monotonic()
 
-        self.logger.info(json.dumps({
-            "event": "tool_call.received",
-            "tool": name,
-            "call_id": call_id,
-            "ts": time.time(),
-        }))
+        self.logger.info(
+            json.dumps(
+                {
+                    "event": "tool_call.received",
+                    "tool": name,
+                    "call_id": call_id,
+                    "ts": time.time(),
+                }
+            )
+        )
 
-        try:
-            args = json.loads(data.get("arguments", "{}"))
-        except json.JSONDecodeError:
-            args = {}
+        args = json.loads(data["arguments"])
 
         handler = self.tool_handlers.get(name)
         if not handler:
@@ -540,36 +647,46 @@ class VoiceSession:
 
         t_handler_end = time.monotonic()
 
-        self.logger.info(json.dumps({
-            "event": "tool_call.handler_done",
-            "tool": name,
-            "call_id": call_id,
-            "result_size": len(str(result)),
-            "handler_duration_ms": round((t_handler_end - t_handler_start) * 1000, 1),
-            "ts": time.time(),
-        }))
+        self.logger.info(
+            json.dumps(
+                {
+                    "event": "tool_call.handler_done",
+                    "tool": name,
+                    "call_id": call_id,
+                    "result_size": len(str(result)),
+                    "handler_duration_ms": round((t_handler_end - t_handler_start) * 1000, 1),
+                    "ts": time.time(),
+                }
+            )
+        )
 
         await self._send_tool_result(call_id, str(result))
 
         t_sent = time.monotonic()
-        self.logger.info(json.dumps({
-            "event": "tool_call.result_sent",
-            "tool": name,
-            "call_id": call_id,
-            "total_duration_ms": round((t_sent - t_received) * 1000, 1),
-            "ts": time.time(),
-        }))
+        self.logger.info(
+            json.dumps(
+                {
+                    "event": "tool_call.result_sent",
+                    "tool": name,
+                    "call_id": call_id,
+                    "total_duration_ms": round((t_sent - t_received) * 1000, 1),
+                    "ts": time.time(),
+                }
+            )
+        )
 
     async def _send_tool_result(self, call_id: str, result: str) -> None:
         """Send tool result back to client."""
-        await self.websocket.send_json({
-            "type": "conversation.item.create",
-            "item": {
-                "type": "function_call_output",
-                "call_id": call_id,
-                "output": result,
-            },
-        })
+        await self._send_event(
+            {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": result,
+                },
+            }
+        )
 
 
 def load_voice_prompt(prompt_path: Path) -> str:
