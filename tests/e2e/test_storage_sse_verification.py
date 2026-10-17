@@ -28,6 +28,7 @@ Correctness notes (these were bugs in the original version of this file):
 """
 import asyncio
 import json
+import os
 import time
 import uuid
 from pathlib import Path
@@ -63,8 +64,8 @@ def _server_is_up() -> bool:
 
 
 pytestmark = pytest.mark.skipif(
-    not _server_is_up(),
-    reason="ADC server is not running on localhost:8000",
+    os.environ.get("RUN_LIVE_SERVER_TESTS") != "1",
+    reason="set RUN_LIVE_SERVER_TESTS=1 to run tests against a live ADC server",
 )
 
 
@@ -88,6 +89,7 @@ class TestStorageSSEVerification:
                 json={
                     "utterance": utterance,
                     "session_id": session_id,
+                    "surface_id": f"surface-{uuid.uuid4().hex[:12]}",
                     "wait_for_results": True,
                     "timeout_seconds": 50,
                 },
@@ -207,8 +209,9 @@ class TestStorageSSEVerification:
         async with httpx.AsyncClient(timeout=90) as client:
             test_resp = await client.post(
                 f"{API_BASE_URL}/api/v1/test/dispatch",
-                json={"utterance": utterance, "session_id": test_session, "wait_for_results": True,
-                      "timeout_seconds": 80},
+                json={"utterance": utterance, "session_id": test_session,
+                      "surface_id": f"surface-{uuid.uuid4().hex[:12]}",
+                      "wait_for_results": True, "timeout_seconds": 80},
             )
             main_resp = await client.post(
                 f"{API_BASE_URL}/dispatch",
