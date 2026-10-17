@@ -1,34 +1,28 @@
 {
   "active_root": {
-    "path": "objects/ebedbe3acce3aff0b428c17b91b05b31b3ee0329d09d1d06a14f5db72ea121dc.jsonl",
-    "sha256": "ebedbe3acce3aff0b428c17b91b05b31b3ee0329d09d1d06a14f5db72ea121dc"
+    "path": "objects/4413546288aa5d8fca469f1417d0099b0249d71daa142488babe63627d3d1d81.jsonl",
+    "sha256": "4413546288aa5d8fca469f1417d0099b0249d71daa142488babe63627d3d1d81"
   },
   "added_paths": [
-    "current.json",
-    "forensic.jsonl",
-    "objects/ebedbe3acce3aff0b428c17b91b05b31b3ee0329d09d1d06a14f5db72ea121dc.jsonl"
+    "objects/4413546288aa5d8fca469f1417d0099b0249d71daa142488babe63627d3d1d81.jsonl"
   ],
-  "attempt_outcome_count": 21,
-  "created_at": "2026-10-07T14:54:16.176505458Z",
+  "attempt_outcome_count": 22,
+  "created_at": "2026-10-17T04:24:18.239003861Z",
   "deleted_paths": [
-    "objects/24638c9dbbea03a6620a0a1d25f5ee27d43c52c98639c01d5280c06d236053e7.jsonl",
-    "objects/df50359986a97c6991099262064bc257d12aa8ae85ae8f3ec58703348c418315.jsonl"
+    "objects/752d7f8fff38a4b272449e8da710a279716ec79f65d4472294d64d4e13351182.jsonl"
   ],
-  "event_count": 89511,
-  "generation_id": "gen-a7a3e3e15eed5f00e075d5e4b92db35d",
-  "issue_count": 1581,
+  "event_count": 89526,
+  "generation_id": "gen-ea5f30fd4043c539de5ab5648c7cd1f3",
+  "issue_count": 1582,
   "mode": "monolithic",
-  "previous_generation_reset": true,
   "receipt_count": 0,
-  "redaction_epoch_id": "f40f590141b3852ea86952b804049e636716a11c97f32ad3d899e84806f84ccb",
-  "redaction_record_count": 4,
-  "replaced_paths": [],
-  "schema_version": 1,
-  "snapshot_sequence": 89511,
-  "store_uuid": "aac78fdd-32b9-1537-8b6f-bf55516e74e2",
-  "superseded_generations": [
-    "gen-2726764f9ec43cf2370d252580a3735f",
-    "gen-dc377dd4258e6886201b07173fc4e4cb"
+  "redaction_record_count": 8,
+  "replaced_paths": [
+    "current.json",
+    "forensic.jsonl"
   ],
-  "total_record_count": 91117
+  "schema_version": 1,
+  "snapshot_sequence": 89526,
+  "store_uuid": "aac78fdd-32b9-1537-8b6f-bf55516e74e2",
+  "total_record_count": 91138
 }
