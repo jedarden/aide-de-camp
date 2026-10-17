@@ -1,7 +1,7 @@
 """
 Session store implementation using SQLite with WAL mode.
 
-Stores sessions, surfaces, utterances, intents, results, topics, and intent_topics.
+Stores sessions, surfaces, utterances, annotations, intents, results, topics, and intent_topics.
 Provides concurrent read access with serialized writes via WAL mode.
 """
 
@@ -64,6 +64,28 @@ CREATE TABLE IF NOT EXISTS utterances (
 );
 
 CREATE INDEX IF NOT EXISTS idx_utterances_session ON utterances(session_id);
+
+-- Annotations: client-authored notes sent as adc.annotation over the voice
+-- WebSocket (see src/realtime/session.py). Persisted session-scoped user
+-- content. The session is the owning connection's; utterance/topic anchors
+-- are optional and nulled when they do not resolve. Malformed or oversized
+-- annotations are rejected before they reach this table. See
+-- docs/notes/aidedeca-d0b9746d-annotation-handling.md for the decision.
+CREATE TABLE IF NOT EXISTS annotations (
+    id           TEXT PRIMARY KEY,
+    session_id   TEXT NOT NULL,
+    utterance_id TEXT,
+    topic_id     TEXT,
+    text         TEXT NOT NULL,
+    created_at   INTEGER NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+    FOREIGN KEY (utterance_id) REFERENCES utterances(id) ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_annotations_session ON annotations(session_id);
+CREATE INDEX IF NOT EXISTS idx_annotations_utterance ON annotations(utterance_id);
+CREATE INDEX IF NOT EXISTS idx_annotations_topic ON annotations(topic_id);
 
 -- Intents: parsed intent threads from utterances
 CREATE TABLE IF NOT EXISTS intents (
@@ -1007,8 +1029,8 @@ class SessionStore:
         """Delete a session and every row tied to it. Returns a removal summary.
 
         Used by test teardown (DELETE /api/v1/sessions/{id}) to guarantee a
-        session and all its topics/results/intents/utterances/surfaces/signal
-        rows are gone. Note: SQLite FK ``ON DELETE CASCADE`` is *not* enforced
+        session and all its topics/results/intents/utterances/annotations/
+        surfaces/signal rows are gone. Note: SQLite FK ``ON DELETE CASCADE`` is *not* enforced
         here (``PRAGMA foreign_keys`` is never enabled), so child rows are
         deleted explicitly, in dependency order, within one transaction.
 
@@ -1032,6 +1054,9 @@ class SessionStore:
                 session_removed = 1 if await cur.fetchone() else 0
 
             # Children first, parents last (matches FK dependency order).
+            await db.execute(
+                "DELETE FROM annotations WHERE session_id = ?", (session_id,)
+            )
             await db.execute(
                 "DELETE FROM feedback_signals WHERE session_id = ?", (session_id,)
             )
@@ -1138,6 +1163,11 @@ class SessionStore:
             # not point at the deleted row.
             await db.execute(
                 "UPDATE intents SET topic_id = NULL WHERE topic_id = ?", (topic_id,)
+            )
+            # Same for annotations: the note survives with its topic anchor
+            # detached rather than disappearing with the topic.
+            await db.execute(
+                "UPDATE annotations SET topic_id = NULL WHERE topic_id = ?", (topic_id,)
             )
             await db.execute(
                 "DELETE FROM topic_context_cache WHERE topic_id = ?", (topic_id,)
@@ -1290,6 +1320,73 @@ class SessionStore:
                 (json.dumps(timing_breakdown), utterance_id)
             )
             await db.commit()
+
+    # Annotation operations
+    async def create_annotation(
+        self,
+        session_id: str,
+        text: str,
+        utterance_id: str | None = None,
+        topic_id: str | None = None,
+        annotation_id: str | None = None,
+    ) -> str:
+        """Persist a client annotation and return its ID.
+
+        The caller (src/realtime/session.py) owns validation: text is a
+        non-empty string within the transport's length cap, and optional
+        utterance_id/topic_id anchors have already been resolved (dangling
+        anchors are nulled by the caller, not here).
+        """
+        annotation_id = annotation_id or str(uuid4())
+        now = int(datetime.now().timestamp())
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                """INSERT INTO annotations
+                   (id, session_id, utterance_id, topic_id, text, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (annotation_id, session_id, utterance_id, topic_id, text, now)
+            )
+            await db.commit()
+        return annotation_id
+
+    async def get_annotations_for_session(self, session_id: str) -> list[dict]:
+        """Get a session's annotations, oldest first."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT id, session_id, utterance_id, topic_id, text, created_at
+                   FROM annotations WHERE session_id = ?
+                   ORDER BY created_at, rowid""",
+                (session_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_annotations_for_utterance(self, utterance_id: str) -> list[dict]:
+        """Get the annotations anchored to an utterance, oldest first."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT id, session_id, utterance_id, topic_id, text, created_at
+                   FROM annotations WHERE utterance_id = ?
+                   ORDER BY created_at, rowid""",
+                (utterance_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_annotations_for_topic(self, topic_id: str) -> list[dict]:
+        """Get the annotations anchored to a topic, oldest first."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT id, session_id, utterance_id, topic_id, text, created_at
+                   FROM annotations WHERE topic_id = ?
+                   ORDER BY created_at, rowid""",
+                (topic_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
 
     # Intent operations
     @retry_with_exponential_backoff(

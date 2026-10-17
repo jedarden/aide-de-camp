@@ -20,6 +20,7 @@ import httpx
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
+from ..session.store import get_store
 from .schema import (
     AnnotationEvent,
     ErrorEvent,
@@ -51,6 +52,11 @@ AVAILABLE_VOICES = [
 ]
 
 VOICE_CHANGE_TIMEOUT = 30.0
+
+# Annotations longer than this are rejected, never truncated: a silently
+# clipped note would corrupt user content. See
+# docs/notes/aidedeca-d0b9746d-annotation-handling.md.
+MAX_ANNOTATION_TEXT_LENGTH = 4000
 
 URGENCY_LEVELS = ["critical", "high", "normal", "low"]
 
@@ -496,6 +502,103 @@ class VoiceSession:
             }
         )
 
+    async def _handle_annotation(self, data: dict[str, Any]) -> None:
+        """Validate content and persist one client annotation.
+
+        The envelope (``annotation`` is an object) is already enforced by the
+        schema layer; this is the content contract: ``text`` is a non-empty
+        string within MAX_ANNOTATION_TEXT_LENGTH, and optional
+        ``utterance_id``/``topic_id`` anchors are strings that must resolve —
+        dangling anchors are nulled so the note survives. The session is
+        always this connection's, never the payload's. Rejections and persist
+        failures surface as protocol errors and never end the session. There
+        is no success ack: silence means persisted. See
+        docs/notes/aidedeca-d0b9746d-annotation-handling.md.
+        """
+        try:
+            await self._persist_annotation(data)
+        except Exception as e:
+            self.logger.error(f"Annotation handling failed: {e}", exc_info=True)
+            await self._send_protocol_error(
+                "annotation_persist_failed",
+                "annotation could not be persisted",
+                "adc.annotation",
+            )
+
+    async def _persist_annotation(self, data: dict[str, Any]) -> None:
+        annotation = data.get("annotation")
+        if not isinstance(annotation, dict):
+            await self._reject_annotation(
+                "malformed_event", "annotation must be a JSON object"
+            )
+            return
+
+        text = annotation.get("text")
+        if not isinstance(text, str) or not text.strip():
+            await self._reject_annotation(
+                "malformed_event", "annotation.text must be a non-empty string"
+            )
+            return
+
+        if len(text) > MAX_ANNOTATION_TEXT_LENGTH:
+            await self._reject_annotation(
+                "annotation_oversized",
+                f"annotation.text exceeds {MAX_ANNOTATION_TEXT_LENGTH} characters",
+            )
+            return
+
+        utterance_id = annotation.get("utterance_id")
+        topic_id = annotation.get("topic_id")
+        for field, value in (("utterance_id", utterance_id), ("topic_id", topic_id)):
+            if value is not None and not isinstance(value, str):
+                await self._reject_annotation(
+                    "malformed_event",
+                    f"annotation.{field} must be a string when present",
+                )
+                return
+
+        # Dangling anchors are nulled rather than dropped: the text is user
+        # content and survives an unknown reference.
+        store = await get_store()
+        if utterance_id is not None and await store.get_utterance(utterance_id) is None:
+            self.logger.warning(
+                "Annotation references unknown utterance %s; persisting without it",
+                utterance_id,
+            )
+            utterance_id = None
+        if topic_id is not None and await store.get_topic(topic_id) is None:
+            self.logger.warning(
+                "Annotation references unknown topic %s; persisting without it",
+                topic_id,
+            )
+            topic_id = None
+
+        annotation_id = await store.create_annotation(
+            session_id=self.session_id,
+            text=text,
+            utterance_id=utterance_id,
+            topic_id=topic_id,
+        )
+
+        self.logger.info(
+            json.dumps(
+                {
+                    "event": "annotation.persisted",
+                    "annotation_id": annotation_id,
+                    "session_id": self.session_id,
+                    "utterance_id": utterance_id,
+                    "topic_id": topic_id,
+                    "text_length": len(text),
+                    "ts": time.time(),
+                }
+            )
+        )
+
+    async def _reject_annotation(self, code: str, message: str) -> None:
+        """Reject an annotation over the shared protocol-error channel."""
+        self.logger.warning("Rejected annotation (%s): %s", code, message)
+        await self._send_protocol_error(code, message, "adc.annotation")
+
     def _event_key(self, event: Any) -> str:
         """Return an idempotency key for a validated event.
 
@@ -536,7 +639,7 @@ class VoiceSession:
         elif isinstance(event, SessionUpdateFailedEvent):
             await self._handle_session_update_failed(event.model_dump(exclude_none=True))
         elif isinstance(event, AnnotationEvent):
-            self.logger.info("Annotation: %s", event.annotation)
+            await self._handle_annotation(event.model_dump(exclude_none=True))
         elif isinstance(event, TurnDoneEvent):
             if self.on_turn_done:
                 asyncio.create_task(self.on_turn_done(event.user_text, event.assistant_text))
