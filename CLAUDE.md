@@ -374,11 +374,13 @@ Playwright is available for headless browser automation and canvas verification.
 
 ### Installation
 
-Playwright is listed in `pyproject.toml` under `dev` dependencies:
+Playwright is listed in `pyproject.toml` under `dev` dependencies, pinned to the
+minor whose chromium build is installed at `PLAYWRIGHT_BROWSERS_PATH` — bump the
+pin together with `playwright install chromium` for the new build:
 ```toml
 [project.optional-dependencies]
 dev = [
-    "playwright>=1.48.0",
+    "playwright>=1.62.0,<1.63",
     # ... other dev dependencies
 ]
 ```

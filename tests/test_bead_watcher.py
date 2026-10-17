@@ -589,7 +589,7 @@ class TestSendToTelegram:
     @staticmethod
     def _fallback_with_chat_id(chat_id, send_return=True):
         """A TelegramFallback whose send_message is replaced with a capturing fake."""
-        fb = TelegramFallback(chat_id=chat_id, bridge_url="http://test-bridge:8000")
+        fb = TelegramFallback(chat_id=chat_id)
         sent = []
 
         async def fake_send_message(chat_id, message, parse_mode="HTML"):
@@ -628,7 +628,7 @@ class TestSendToTelegram:
 
     async def test_no_op_without_chat_id(self, store, router, caplog):
         """No chat id configured -> graceful WARNING + False, no send attempted."""
-        fb = TelegramFallback(bridge_url="http://test-bridge:8000")
+        fb = TelegramFallback()
         assert fb.chat_id is None
         # Sentinel: if delivery were attempted, this would raise.
 

@@ -24,7 +24,13 @@ dev = [
     # Headless browser automation for canvas verification (bead adc-jr35):
     # Playwright provides browser automation for testing canvas rendering, SSE,
     # staleness indicators, and card dismissal. Screenshots verified via Pillow.
-    "playwright>=1.48.0",
+    # Pinned to the minor whose chromium build is installed at
+    # PLAYWRIGHT_BROWSERS_PATH: an open-ended spec drifts to a newer release on
+    # every fresh `pip install`, whose browser build is absent, and every
+    # browser-backed test errors at launch (verified 2026-10-17: 1.64 wants
+    # chromium-1248; installed builds are 1208/1217/1234/1243). Bump this pin
+    # together with `playwright install chromium` for the new build.
+    "playwright>=1.62.0,<1.63",
     # Objective screenshot analysis for the canvas browser suites (bead adc-jr35):
     # counts distinct rendered colours so a screenshot can be verified to contain
     # real content — not the identical-blank captures the old suite produced when

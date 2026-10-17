@@ -104,9 +104,10 @@ async def test_create_result_stores_all_fields(test_db_store, test_session_id: s
     assert result_data["structured_data"]["key"] == "value"
     assert result_data["structured_data"]["nested"]["field"] == "nested_value"
 
-    # Verify timestamps are set (created_at is set on creation, surfaced_at is NULL until surfaced)
+    # Verify timestamps are set (both stamped at creation; there is no separate
+    # surfacing pass — create_result inserts created_at and surfaced_at together)
     assert result["created_at"] is not None
-    assert result["surfaced_at"] is None  # Not surfaced yet
+    assert result["surfaced_at"] is not None  # Stamped at creation
     now = int(datetime.now().timestamp())
     assert abs(now - result["created_at"]) < 5  # Created within last 5 seconds
 

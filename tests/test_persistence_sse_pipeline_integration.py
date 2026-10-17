@@ -126,7 +126,15 @@ async def create_synthetic_result(
 ):
     """Helper to create a synthetic result in the store."""
     if intent_id is None:
-        intent_id = str(uuid4())
+        # Create a real intent row: the integrity tests resolve every
+        # result.intent_id back to an intents row, so a bare uuid4 would
+        # leave each result dangling by construction.
+        intent_id = await store.create_intent(
+            utterance_id=str(uuid4()),
+            session_id=session_id,
+            project_slug=None,
+            intent_type="status",
+        )
     if topic_id is None:
         topic_id, _ = await store.find_or_create_topic(
             label="Test Topic",
@@ -772,7 +780,10 @@ class TestEndToEndPipeline:
         connection = await create_test_connection(test_broadcaster, session_id, surface_id)
 
         # Act: Create complete synthetic result
-        utterance_id = str(uuid4())
+        utterance_id = await test_store.create_utterance(
+            session_id=session_id,
+            raw_text="End-to-end test utterance",
+        )
         intent_id = await test_store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
