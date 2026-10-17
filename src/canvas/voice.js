@@ -402,6 +402,13 @@
                 if (this._turnTimer && this._turn.userText) this._finishTurn();
                 break;
             case "response.done":
+                // A tool-call response is an intermediate step in the same
+                // user turn. Keep its transcript until the follow-up spoken
+                // response finishes, then send one adc.turn_done.
+                var output = ev.response && ev.response.output;
+                if (Array.isArray(output) && output.some(function (item) {
+                    return item.type === "function_call";
+                })) break;
                 if (this._turn.userText && this._turn.assistantText) {
                     this._finishTurn();
                 } else if (!this._turnTimer) {

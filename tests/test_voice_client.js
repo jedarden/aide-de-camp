@@ -293,3 +293,34 @@ test('waits briefly for a late user transcript and skips tool-only turns', async
     assert.equal(h.sockets[0].sent.filter(e => e.type === 'adc.turn_done').length, 1);
     h.client.stop();
 });
+
+test('keeps the user transcript across an intermediate tool response', async () => {
+    const timers = [];
+    const h = harness({
+        setTimeout(fn, ms) {
+            const timer = { fn, ms, cleared: false };
+            timers.push(timer);
+            return timer;
+        },
+        clearTimeout(timer) { timer.cleared = true; },
+    });
+    await bootstrap(h);
+    const dc = h.client.dc;
+    dc.receive({ type: 'conversation.item.input_audio_transcription.completed',
+                 transcript: 'What is the status?' });
+    dc.receive({ type: 'response.done', response: {
+        output: [{ type: 'function_call', name: 'dispatch_intent', call_id: 'call-1' }],
+    } });
+    assert.equal(timers.filter(timer => timer.ms === 1000).length, 0);
+    assert.equal(h.sockets[0].sent.filter(e => e.type === 'adc.turn_done').length, 0);
+
+    dc.receive({ type: 'response.output_audio_transcript.done', transcript: 'On it. Healthy.' });
+    dc.receive({ type: 'response.done', response: { output: [{ type: 'message' }] } });
+    assert.deepEqual(h.sockets[0].sent.at(-1), {
+        type: 'adc.turn_done',
+        user_text: 'What is the status?',
+        assistant_text: 'On it. Healthy.',
+    });
+    assert.equal(h.sockets[0].sent.filter(e => e.type === 'adc.turn_done').length, 1);
+    h.client.stop();
+});
