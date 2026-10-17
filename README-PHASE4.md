@@ -94,13 +94,32 @@ uvicorn src.main:app --host 0.0.0.0 --port 8000
 - `adc.annotation` - Client annotations
 - `adc.turn_done` - Turn completion (for memory extraction)
 - `adc.surface_switch` - Surface type change (audio → canvas)
+- `adc.session_update` - Request a supported voice with `{"type":"adc.session_update","session":{"voice":"coral"}}`
+- `adc.session_updated` - Confirm a replacement WebRTC peer is ready with `{"type":"adc.session_updated","request_id":"<id>","voice":"coral"}`
+- `adc.session_update_failed` - Report a failed replacement with `{"type":"adc.session_update_failed","request_id":"<id>"}`
 
 **Server → Client:**
 - `ag2.init` - WebRTC bootstrap with ephemeral key
-- `adc.session_update` - Session parameter changes (voice)
+- `adc.session_update` - Replace the WebRTC peer using `{"type":"adc.session_update","request_id":"<id>","voice":"coral","config":{"client_secret":{...},"model":"..."}}`
+- `adc.session_update_applied` - Server accepted the client's confirmation and now uses the requested voice
+- `adc.session_update_rejected` - Invalid request, provisioning failure, client failure, or confirmation timeout; includes `reason` and `available_voices`
 - `conversation.item.create` - Tool result output
 - `adc.surface_switch_ack` - Surface switch acknowledgment
 - `error` - Error message
+
+The only accepted update field is `session.voice`, and it must be one of `alloy`,
+`ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, or `verse` for the configured
+Realtime preview model. The `change_voice` tool uses the same path and returns a
+request acknowledgment; `adc.session_update_applied` marks completion. A request
+for the current voice receives `adc.session_update_applied` immediately.
+
+The client must keep the ADC `/voice` WebSocket open, create a new Realtime WebRTC
+peer with the supplied `config`, switch audio to that peer, then send
+`adc.session_updated` with the matching `request_id` and `voice`. If that fails,
+it sends `adc.session_update_failed`. The server retains queued narration and
+canvas catch-up results during the replacement and resumes narration after
+confirmation, failure, or the 30-second timeout. A fresh peer is required
+because the [Realtime API forbids changing voice after audio output](https://platform.openai.com/docs/api-reference/realtime-client-events/session).
 
 ### Result Flow
 

@@ -6,26 +6,28 @@ Tool-as-trigger model: dispatch_intent() returns ack immediately; results arrive
 Based on DUCK-E scaffolding but adapted for ADC's async result delivery pattern.
 """
 import asyncio
-import threading
-import httpx
 import json
 import os
+import threading
 import time
 from logging import Logger, getLogger
 from pathlib import Path
 from typing import Any, Callable, Optional
 from uuid import uuid4
 
-OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL", "https://openai-proxy.ardenone.com:8444")
-
+import httpx
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
+
+OPENAI_PROXY_URL = os.environ.get("OPENAI_PROXY_URL", "https://openai-proxy.ardenone.com:8444")
 
 
 AVAILABLE_VOICES = [
     "alloy", "ash", "ballad", "coral", "echo",
-    "fable", "nova", "onyx", "sage", "shimmer", "verse"
+    "sage", "shimmer", "verse",
 ]
+
+VOICE_CHANGE_TIMEOUT = 30.0
 
 URGENCY_LEVELS = ["critical", "high", "normal", "low"]
 
@@ -86,6 +88,7 @@ class VoiceSession:
         self.pending_results: list[dict[str, Any]] = []  # For canvas catch-up
         self._pending_lock = threading.RLock()
         self._pending_in_flight: dict[str, list[dict[str, Any]]] = {}
+        self._pending_voice_change: Optional[dict[str, Any]] = None
 
         # Narration state
         self.last_narration_time = 0.0
@@ -138,28 +141,103 @@ class VoiceSession:
         }
 
     async def change_voice(self, voice: str) -> str:
-        """Change voice via session.update event."""
-        if voice not in AVAILABLE_VOICES:
+        """Request a fresh Realtime connection with a supported voice.
+
+        Realtime cannot update the voice after its first audio output. The
+        browser reconnects its WebRTC peer with the fresh credentials, while
+        this VoiceSession keeps its result queues and canvas catch-up state.
+        """
+        if not isinstance(voice, str) or voice not in AVAILABLE_VOICES:
             return (
                 f"Invalid voice '{voice}'. "
                 f"Available: {', '.join(AVAILABLE_VOICES)}"
             )
+        if self._pending_voice_change:
+            return "A voice change is already in progress."
+        if voice == self.voice:
+            return f"Voice is already {voice}."
 
         try:
-            self.logger.info(f"Changing voice to: {voice}")
-            self.voice = voice
-
+            config = await self._get_ephemeral_key(voice=voice)
+            request_id = str(uuid4())
+            self._pending_voice_change = {
+                "request_id": request_id,
+                "voice": voice,
+                "requested_at": time.monotonic(),
+            }
             await self.websocket.send_json({
                 "type": "adc.session_update",
-                "update": {
-                    "type": "session.update",
-                    "session": {"voice": voice},
-                },
+                "request_id": request_id,
+                "voice": voice,
+                "config": config,
             })
-            return f"Voice changed to {voice}."
+            self.logger.info("Requested voice change to %s", voice)
+            return f"Voice change to {voice} requested."
         except Exception as e:
+            self._pending_voice_change = None
             self.logger.error(f"Failed to change voice: {e}", exc_info=True)
             return f"Failed to change voice: {str(e)}"
+
+    async def _handle_session_update(self, data: dict[str, Any]) -> None:
+        """Validate a direct client voice-change request."""
+        session = data.get("session")
+        if (
+            set(data) != {"type", "session"}
+            or not isinstance(session, dict)
+            or set(session) != {"voice"}
+            or not isinstance(session["voice"], str)
+            or session["voice"] not in AVAILABLE_VOICES
+        ):
+            await self._reject_voice_change("Expected session.voice with a supported voice")
+            return
+
+        if session["voice"] == self.voice and not self._pending_voice_change:
+            await self.websocket.send_json({
+                "type": "adc.session_update_applied",
+                "voice": self.voice,
+            })
+            return
+
+        result = await self.change_voice(session["voice"])
+        if result.startswith("Invalid voice") or result.startswith("Failed to change") or result.startswith("A voice change"):
+            await self._reject_voice_change(result)
+
+    async def _reject_voice_change(self, reason: str) -> None:
+        await self.websocket.send_json({
+            "type": "adc.session_update_rejected",
+            "reason": reason,
+            "available_voices": AVAILABLE_VOICES,
+        })
+
+    async def _handle_session_updated(self, data: dict[str, Any]) -> None:
+        """Accept confirmation only for the outstanding WebRTC replacement."""
+        pending = self._pending_voice_change
+        if not pending or data.get("request_id") != pending["request_id"]:
+            self.logger.warning("Ignoring stale voice-change confirmation")
+            return
+        if data.get("voice") != pending["voice"]:
+            self.logger.warning("Ignoring voice-change confirmation with wrong voice")
+            return
+        self.voice = pending["voice"]
+        self._pending_voice_change = None
+        self.logger.info("Voice change applied: %s", self.voice)
+        await self.websocket.send_json({
+            "type": "adc.session_update_applied",
+            "request_id": pending["request_id"],
+            "voice": self.voice,
+        })
+
+    async def _handle_session_update_failed(self, data: dict[str, Any]) -> None:
+        pending = self._pending_voice_change
+        if pending and data.get("request_id") == pending["request_id"]:
+            self._pending_voice_change = None
+            await self._reject_voice_change("Client could not activate the new voice")
+
+    async def _expire_voice_change(self) -> None:
+        pending = self._pending_voice_change
+        if pending and time.monotonic() - pending["requested_at"] >= VOICE_CHANGE_TIMEOUT:
+            self._pending_voice_change = None
+            await self._reject_voice_change("Voice change timed out before client confirmation")
 
     async def push_result(self, result: dict[str, Any]) -> None:
         """
@@ -264,6 +342,11 @@ class VoiceSession:
 
         Returns results grouped by urgency, respecting batching rules.
         """
+        # The browser is replacing its WebRTC peer; retain every result until
+        # the new peer is ready (or the request times out).
+        if self._pending_voice_change:
+            return []
+
         to_narrate = []
         now = time.time()
 
@@ -282,7 +365,12 @@ class VoiceSession:
         to_narrate.sort(key=lambda r: URGENCY_PRIORITY.get(r.get("urgency", "normal"), 99))
 
         # Filter based on what should be narrated now
-        ready = [r for r in to_narrate if self._should_narrate_now(r)]
+        ready = []
+        deferred = []
+        for result in to_narrate:
+            (ready if self._should_narrate_now(result) else deferred).append(result)
+        for result in deferred:
+            self.result_queue.put_nowait(result)
 
         # For batching: group normal/low results together
         if ready:
@@ -359,10 +447,19 @@ class VoiceSession:
                         self.websocket.receive_json(),
                         timeout=0.5  # Check results every 500ms
                     )
+                    if not isinstance(data, dict):
+                        await self._reject_voice_change("Expected a JSON object")
+                        continue
                     msg_type = data.get("type", "")
 
                     if msg_type == "response.function_call_arguments.done":
                         await self._handle_tool_call(data)
+                    elif msg_type == "adc.session_update":
+                        await self._handle_session_update(data)
+                    elif msg_type == "adc.session_updated":
+                        await self._handle_session_updated(data)
+                    elif msg_type == "adc.session_update_failed":
+                        await self._handle_session_update_failed(data)
                     elif msg_type == "adc.annotation":
                         annotation = data.get("annotation", {})
                         self.logger.info(f"Annotation: {annotation}")
@@ -388,6 +485,8 @@ class VoiceSession:
                 except asyncio.TimeoutError:
                     # Timeout is expected - check for results to narrate
                     pass
+
+                await self._expire_voice_change()
 
                 # Check for results to narrate
                 results_to_narrate = await self._collect_results_to_narrate()
