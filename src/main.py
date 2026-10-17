@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 
 import httpx
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from typing import Optional
 
@@ -88,6 +88,8 @@ CANVAS_PATH = Path("/home/coding/aide-de-camp/src/canvas/index.html")
 # Canvas render helpers (createTopicCard + friends) — served separately so they
 # are unit-testable headlessly (tests/e2e/canvas_dom_runner.js).
 CANVAS_JS_PATH = Path("/home/coding/aide-de-camp/src/canvas/canvas.js")
+# Browser WebRTC signaling client for the /voice socket (consumes ag2.init).
+VOICE_JS_PATH = Path(__file__).resolve().parent / "canvas" / "voice.js"
 
 # Global components
 _store = None
@@ -955,6 +957,18 @@ async def serve_canvas_js():
     return FileResponse(CANVAS_JS_PATH, media_type="application/javascript")
 
 
+@app.get("/voice.js")
+async def serve_voice_js():
+    """Serve the browser WebRTC signaling client for the /voice socket.
+
+    Loaded by index.html via ``<script src="/voice.js">``. Implements the
+    documented ag2.init bootstrap: RTCPeerConnection + ephemeral-token SDP
+    exchange with the OpenAI Realtime endpoint, event relay in both
+    directions, and the voice-replacement handshake (see README-PHASE4.md).
+    """
+    return FileResponse(VOICE_JS_PATH, media_type="application/javascript")
+
+
 def register_voice_tools(voice: VoiceSession, session_id: str) -> None:
     """Register the voice-mode tools on a VoiceSession.
 
@@ -1038,58 +1052,55 @@ async def voice_session(websocket: WebSocket):
         await websocket.close(code=1011, reason="API key missing")
         return
 
-    # Get or create session
-    store = await get_store()
-    session = await store.get_session(session_id)
-    if not session:
-        session_id = await store.create_session()
-        logger.info(f"Created new session: {session_id}")
-
-    # Register audio surface
-    audio_surface_id = await store.register_surface(session_id, "audio")
-    surface_id = audio_surface_id
-    logger.info(f"Registered audio surface: {surface_id}")
-
-    # Load voice prompt
-    voice_prompt = load_voice_prompt(VOICE_PROMPT_PATH)
-
-    # Surface switch handler for audio-to-canvas continuity
-    async def on_surface_switch(surface_type: str) -> None:
-        """Handle surface switch event (audio -> canvas)."""
-        logger.info(f"Surface switch: {surface_type}")
-        try:
-            result = await handle_surface_switch(surface_type, session_id, voice)
-            # Send acknowledgment to client
-            await websocket.send_json({
-                "type": "adc.surface_switch_ack",
-                "surface": surface_type,
-                "pending_count": len(result["pending_results"]),
-                "summary": result["catch_up_summary"],
-            })
-        except Exception as e:
-            logger.error(f"Surface switch error: {e}", exc_info=True)
-
-    # Memory extraction handler for turn completion
-    memory_handler = create_memory_handler(session_id=session_id, api_key=api_key)
-    if memory_handler:
-        logger.info(f"Memory extraction enabled for session: {session_id}")
-
-    # Create voice session
-    voice = VoiceSession(
-        websocket=websocket,
-        model=DEFAULT_MODEL,
-        api_key=api_key,
-        session_id=session_id,
-        system_message=voice_prompt,
-        voice=DEFAULT_VOICE,
-        logger=logger,
-        on_turn_done=memory_handler.on_turn_done if memory_handler else None,
-        on_surface_switch=on_surface_switch,
-    )
-
-    # Start result listener background task
+    store = None
+    surface_id = None
     listener_task = None
     try:
+        # Complete setup inside the cleanup boundary. A store or surface
+        # failure after accept must close the socket instead of leaving the
+        # browser waiting indefinitely for ag2.init.
+        store = await get_store()
+        session = await store.get_session(session_id)
+        if not session:
+            session_id = await store.create_session()
+            logger.info(f"Created new session: {session_id}")
+
+        audio_surface_id = await store.register_surface(session_id, "audio")
+        surface_id = audio_surface_id
+        logger.info(f"Registered audio surface: {surface_id}")
+
+        voice_prompt = load_voice_prompt(VOICE_PROMPT_PATH)
+
+        async def on_surface_switch(surface_type: str) -> None:
+            """Handle surface switch event (audio -> canvas)."""
+            logger.info(f"Surface switch: {surface_type}")
+            try:
+                result = await handle_surface_switch(surface_type, session_id, voice)
+                await websocket.send_json({
+                    "type": "adc.surface_switch_ack",
+                    "surface": surface_type,
+                    "pending_count": len(result["pending_results"]),
+                    "summary": result["catch_up_summary"],
+                })
+            except Exception as e:
+                logger.error(f"Surface switch error: {e}", exc_info=True)
+
+        memory_handler = create_memory_handler(session_id=session_id, api_key=api_key)
+        if memory_handler:
+            logger.info(f"Memory extraction enabled for session: {session_id}")
+
+        voice = VoiceSession(
+            websocket=websocket,
+            model=DEFAULT_MODEL,
+            api_key=api_key,
+            session_id=session_id,
+            system_message=voice_prompt,
+            voice=DEFAULT_VOICE,
+            logger=logger,
+            on_turn_done=memory_handler.on_turn_done if memory_handler else None,
+            on_surface_switch=on_surface_switch,
+        )
+
         listener_task = asyncio.create_task(
             result_listener(session_id, voice, audio_surface_id)
         )
@@ -1104,13 +1115,13 @@ async def voice_session(websocket: WebSocket):
         logger.info(f"Voice session disconnected: {session_id}")
     except Exception as e:
         logger.error(f"Voice session error: {e}", exc_info=True)
-        try:
+        with suppress(Exception):
             await websocket.send_json({
                 "type": "error",
-                "error": str(e)
+                "error": {"code": "session_failed", "message": "Voice session could not start"},
             })
-        except:
-            pass
+        with suppress(Exception):
+            await websocket.close(code=1011, reason="Session failed")
     finally:
         # Cancel listener task
         if listener_task:
@@ -1121,7 +1132,8 @@ async def voice_session(websocket: WebSocket):
                 pass
 
         # Mark surface disconnected
-        await store.mark_surface_disconnected(surface_id)
+        if store is not None and surface_id is not None:
+            await store.mark_surface_disconnected(surface_id)
         logger.info(f"Voice session ended: {session_id}")
 
 

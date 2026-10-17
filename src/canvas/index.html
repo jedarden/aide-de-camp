@@ -330,6 +330,20 @@
             animation: pulse 1s infinite;
         }
 
+        .btn-voice {
+            width: auto;
+            padding: 0 12px;
+            color: #e2e8f0;
+            font-size: 13px;
+        }
+
+        .voice-status {
+            min-height: 18px;
+            margin: 4px 0 0;
+            color: #94a3b8;
+            font-size: 12px;
+        }
+
         /* Empty state */
         .empty-state {
             text-align: center;
@@ -1054,6 +1068,7 @@
                     <line x1="8" y1="23" x2="16" y2="23"/>
                 </svg>
             </button>
+            <button class="btn-mic btn-voice" id="btnVoice" type="button" title="Start live voice" aria-label="Start live voice" aria-pressed="false">Live voice</button>
             <button class="btn-send" id="btnSend" title="Send" disabled>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"/>
@@ -1061,6 +1076,8 @@
                 </svg>
             </button>
         </div>
+        <div id="voiceStatus" class="voice-status" role="status" aria-live="polite"></div>
+        <audio id="voiceAudio" autoplay></audio>
 
         <div id="topicsContainer" class="topics-grid">
             <div class="loading">
@@ -1073,6 +1090,7 @@
     <!-- Render helpers (createTopicCard + friends) — loaded before the app
          script so they're available as globals and unit-testable headlessly. -->
     <script src="/canvas.js"></script>
+    <script src="/voice.js"></script>
     <script>
         // Session and surface IDs from URL params or generate new
         const urlParams = new URLSearchParams(window.location.search);
@@ -1562,6 +1580,36 @@
         const textarea = document.getElementById('inputTextarea');
         const btnSend  = document.getElementById('btnSend');
         const btnMic   = document.getElementById('btnMic');
+        const btnVoice = document.getElementById('btnVoice');
+        const voiceStatus = document.getElementById('voiceStatus');
+        let voiceClient = null;
+
+        btnVoice.addEventListener('click', () => {
+            if (voiceClient && voiceClient.ws) {
+                voiceClient.stop();
+                voiceClient = null;
+                return;
+            }
+            const client = new ADCVoiceClient({
+                sessionId,
+                getAudioOutput: () => document.getElementById('voiceAudio'),
+                onStatus: (state, detail) => {
+                    if (voiceClient !== client) return;
+                    const active = state === 'connecting' || state === 'connected' ||
+                        (state === 'error' && Boolean(client.ws));
+                    btnVoice.classList.toggle('recording', active);
+                    btnVoice.setAttribute('aria-pressed', String(active));
+                    btnVoice.title = active ? 'Stop live voice' : 'Start live voice';
+                    voiceStatus.textContent = state === 'connected'
+                        ? (detail || 'Live voice connected')
+                        : state === 'connecting' ? (detail || 'Connecting live voice…')
+                        : state === 'closed' ? '' : (detail || 'Live voice unavailable');
+                    if (!active) voiceClient = null;
+                },
+            });
+            voiceClient = client;
+            client.start();
+        });
 
         // Auto-resize textarea
         textarea.addEventListener('input', () => {

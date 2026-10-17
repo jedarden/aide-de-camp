@@ -11,6 +11,7 @@ import json
 import os
 import threading
 import time
+from contextlib import suppress
 from logging import Logger, getLogger
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -52,6 +53,14 @@ AVAILABLE_VOICES = [
 ]
 
 VOICE_CHANGE_TIMEOUT = 30.0
+
+# Bootstrap budget for the server-side ephemeral-token exchange. The client is
+# waiting on ag2.init before it can even create its RTCPeerConnection, so this
+# is deliberately much shorter than a generic API timeout: a provider that
+# cannot answer in 10s fails the session with `session_init_failed` (error
+# event + close 1011) instead of leaving the browser hanging. The browser
+# side mirrors this with its own 15s peer-connect deadline (voice.js).
+EPHEMERAL_KEY_TIMEOUT = 10.0
 
 # Annotations longer than this are rejected, never truncated: a silently
 # clipped note would corrupt user content. See
@@ -151,7 +160,7 @@ class VoiceSession:
         Obtain ephemeral key from OpenAI /v1/realtime/sessions.
         Returns sanitized config (client_secret + model only).
         """
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=EPHEMERAL_KEY_TIMEOUT) as client:
             resp = await client.post(
                 f"{OPENAI_PROXY_URL}/v1/realtime/sessions",
                 headers={
@@ -169,8 +178,16 @@ class VoiceSession:
             resp.raise_for_status()
             data = resp.json()
 
+        client_secret = data.get("client_secret")
+        if (
+            not isinstance(client_secret, dict)
+            or not isinstance(client_secret.get("value"), str)
+            or not client_secret["value"]
+        ):
+            raise ValueError("Realtime provider did not return a usable client secret")
+
         return {
-            "client_secret": data["client_secret"],
+            "client_secret": client_secret,
             "model": data.get("model", self.model),
         }
 
@@ -189,7 +206,9 @@ class VoiceSession:
             return f"Voice is already {voice}."
 
         try:
-            config = await self._get_ephemeral_key(voice=voice)
+            config = await asyncio.wait_for(
+                self._get_ephemeral_key(voice=voice), timeout=EPHEMERAL_KEY_TIMEOUT
+            )
             request_id = str(uuid4())
             self._pending_voice_change = {
                 "request_id": request_id,
@@ -657,16 +676,26 @@ class VoiceSession:
     async def run(self) -> None:
         """Main session loop."""
         try:
-            session_data = await self._get_ephemeral_key()
-        except Exception as e:
-            self.logger.error(f"Failed to get ephemeral key: {e}", exc_info=True)
-            await self._send_event(
-                {
-                    "type": "error",
-                    "error": f"Failed to initialize session: {str(e)}",
-                }
+            session_data = await asyncio.wait_for(
+                self._get_ephemeral_key(), timeout=EPHEMERAL_KEY_TIMEOUT
             )
-            await self.websocket.close(code=1011, reason="Session initialization failed")
+        except Exception as e:
+            # Bootstrap failure is terminal for this connection: the browser
+            # cannot create its peer without an ephemeral token. Report a
+            # stable code, then close so the client can surface a retry.
+            self.logger.error(f"Failed to get ephemeral key: {e}", exc_info=True)
+            with suppress(Exception):
+                await self._send_event(
+                    {
+                        "type": "error",
+                        "error": {
+                            "code": "session_init_failed",
+                            "message": "Failed to initialize voice session",
+                        },
+                    }
+                )
+            with suppress(Exception):
+                await self.websocket.close(code=1011, reason="Session initialization failed")
             return
 
         await self._send_event(
@@ -702,6 +731,18 @@ class VoiceSession:
             pass
         except Exception as e:
             self.logger.error(f"Session error: {e}", exc_info=True)
+            with suppress(Exception):
+                await self._send_event(
+                    {
+                        "type": "error",
+                        "error": {
+                            "code": "session_failed",
+                            "message": "Voice session ended unexpectedly",
+                        },
+                    }
+                )
+            with suppress(Exception):
+                await self.websocket.close(code=1011, reason="Session failed")
 
     async def _handle_tool_call(self, data: dict[str, Any]) -> None:
         """
