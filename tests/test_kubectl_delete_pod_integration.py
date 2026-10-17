@@ -102,14 +102,14 @@ class TestDeletePodIntegration:
                 pod_name="crashed-pod-123",
                 namespace="optionspipeline",
                 project_slug="options-pipeline",
+                skip_warning=False,
             )
 
     async def test_full_delete_pod_flow_production(self):
         """
-        Test that production deletions are NOT auto-approved.
+        Test that production deletions require approval before bead creation.
 
-        In production, kubectl delete pod should require manual approval
-        and create a bead instead of executing directly.
+        The handler must hold the request and show an approval card.
         """
         # Create escalate handler
         handler = EscalateHandler()
@@ -155,32 +155,39 @@ class TestDeletePodIntegration:
             },
         } if name == "exceptions" else {}
 
-        # Mock store
-        from unittest.mock import AsyncMock
+        # Production deletion must enter the approval path before bead creation.
+        from unittest.mock import AsyncMock, MagicMock, patch
+
         handler.store = AsyncMock()
-        handler.store.update_intent_status = AsyncMock(return_value=None)
+        handler.store.create_pending_approval.return_value = "approval-test-123"
+        handler.formulate_bead_body = AsyncMock(return_value="# Delete pod request")
 
-        # Mock LLM bead formulation (would normally call ZAI)
-        from unittest.mock import AsyncMock
-        handler._zai_client = MagicMock()
-        handler._zai_client.call_simple = AsyncMock(return_value="# Bead body for kubectl delete")
+        validation_result = MagicMock()
+        validation_result.is_valid = True
+        validation_result.requires_approval = True
+        validation_result.approval_requirement.reason = "Production deletion requires approval"
+        validation_result.to_dict.return_value = {
+            "approval_requirement": {"reason": "Production deletion requires approval"}
+        }
 
-        # Mock bf CLI (would normally create bead)
-        from unittest.mock import patch
-        with patch('asyncio.create_subprocess_exec') as mock_subprocess:
-            mock_proc = MagicMock()
-            mock_proc.returncode = 0
-            mock_proc.communicate = AsyncMock(return_value=(b"adc-xyz123\n", b""))
-            mock_subprocess.return_value = mock_proc
+        with (
+            patch("src.escalate.handler.get_validator") as mock_validator,
+            patch("src.escalate.handler.get_broadcaster") as mock_broadcaster,
+            patch.object(handler, "_create_bead_with_type", new_callable=AsyncMock) as create_bead,
+        ):
+            mock_validator.return_value.validate_bead_body.return_value = validation_result
+            mock_broadcaster.return_value.broadcast = AsyncMock()
 
-            # Execute the escalate
             result = await handler.escalate_intent(request)
 
-            # Verify manual approval (bead created)
-            assert result.status == "created"
-            assert result.bead_id != ""
-            assert result.pending_card["status"] == "pending"
-            assert "bead_id" in result.pending_card
+        assert result.status == "awaiting_approval"
+        assert result.bead_id == ""
+        assert result.pending_card["status"] == "awaiting_approval"
+        assert result.pending_card["approval_id"] == "approval-test-123"
+        create_bead.assert_not_awaited()
+        handler.store.create_pending_approval.assert_awaited_once()
+        mock_broadcaster.return_value.broadcast.assert_awaited_once()
+
 
 
 if __name__ == "__main__":

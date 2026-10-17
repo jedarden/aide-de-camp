@@ -685,11 +685,11 @@ class TestFullPendingPlaceholderFlow:
         # Two real cards should be present
         assert t["containerCardCount"] == 2
         assert {"Alpha", "Beta"} <= set(t["containerCardLabels"])
-        # When result_created fires, loadTopics() reloads from server state.
-        # The server only knows about Alpha and Beta (setCards), so gamma
-        # disappears because it's not in the server's card set.
-        assert t["pendingThreadCount"] == 0
-        assert t["pendingCardCount"] == 0
+        # Alpha and Beta have results, while gamma still has no result. Its
+        # pending thread must remain visible through the server card reload.
+        assert t["pendingThreadCount"] == 1
+        assert t["pendingCardCount"] == 1
+        assert {card["pendingId"] for card in t["pendingCards"]} == {"thread-gamma"}
         # Verify the real cards are correctly rendered
         assert "Done Alpha" in html
         assert "Done Beta" in html

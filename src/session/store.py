@@ -2001,7 +2001,7 @@ class SessionStore:
             async with db.execute(
                 """SELECT * FROM results
                    WHERE topic_id = ? AND result_type = ?
-                   ORDER BY created_at DESC, id DESC
+                   ORDER BY created_at DESC, rowid DESC
                    LIMIT 1""",
                 (topic_id, result_type)
             ) as cursor:

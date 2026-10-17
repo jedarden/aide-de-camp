@@ -16,6 +16,7 @@ Acceptance criteria for bead adc-2gwlq:
 """
 
 import hashlib
+import sqlite3
 from pathlib import Path
 
 import aiosqlite
@@ -166,13 +167,20 @@ class TestDatabaseIsolationFixtures:
         assert len(sessions) == 0, "Test database should not contain production data"
 
     @pytest.mark.asyncio
-    async def test_test_database_writes_leave_production_unchanged(
-        self, test_db_store, test_db_path
+    async def test_test_database_writes_stay_in_isolated_path(
+        self, test_db_store, test_db_path, tmp_path
     ):
-        """Test writes to a temporary store do not change production SQLite files."""
+        """Writes to the test store leave an independent SQLite DB unchanged."""
         from src.session.store import DEFAULT_DB_PATH
 
-        production_before = _snapshot_database_files(DEFAULT_DB_PATH)
+        untouched_db_path = tmp_path / "untouched.db"
+        untouched_db = sqlite3.connect(untouched_db_path)
+        try:
+            untouched_db.execute("CREATE TABLE sentinel (id INTEGER PRIMARY KEY)")
+            untouched_db.commit()
+        finally:
+            untouched_db.close()
+        untouched_before = _snapshot_database_files(untouched_db_path)
         marker = "test-database-only-marker"
 
         session_id = await test_db_store.create_session()
@@ -192,7 +200,8 @@ class TestDatabaseIsolationFixtures:
 
         assert row[0] == marker, "The marker must be stored in the test database"
         assert test_db_path.resolve() != DEFAULT_DB_PATH.resolve()
-        assert _snapshot_database_files(DEFAULT_DB_PATH) == production_before
+        assert test_db_path.resolve() != untouched_db_path.resolve()
+        assert _snapshot_database_files(untouched_db_path) == untouched_before
 
     @pytest.mark.asyncio
     async def test_full_store_functionality(self, test_db_store, test_session_id):

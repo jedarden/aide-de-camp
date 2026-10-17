@@ -490,14 +490,14 @@ async def test_staleness_indicators_rendering(
         data={"age": "fresh"},
     )
 
-    # Create a stale topic (1 hour old = 3600 seconds)
+    # Create a stale topic (30 minutes old, within the 10–60 minute band)
     await api_client.create_topic(
         session_id=session_id,
         label="Stale Topic",
         topic_type="project",
         summary="Stale result",
         data={"age": "stale"},
-        staleness_seconds=3600,
+        staleness_seconds=1800,
     )
 
     # Create a very stale topic (3 days old = 259200 seconds)

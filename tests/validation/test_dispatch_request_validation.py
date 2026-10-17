@@ -7,6 +7,8 @@ Comprehensive tests for Pydantic model validation including:
 - Empty string validation
 - Validator error messages
 """
+from uuid import uuid4
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -1854,7 +1856,7 @@ class TestDispatchHappyPath:
                 "utterance": "Check CI status for aide-de-camp",
                 "session_id": "550e8400-e29b-41d4-a716-446655440000",
                 "surface_id": "surface-abc123",
-                "utterance_id": "660e8400-e29b-41d4-a716-446655440000"
+                "utterance_id": str(uuid4())
             }
         )
 
@@ -1990,7 +1992,7 @@ class TestDispatchHappyPath:
                 "utterance": "Check deployment",
                 "session_id": "session-2",
                 "surface_id": "surface-2",
-                "utterance_id": "utterance-123"
+                "utterance_id": str(uuid4())
             },
             # With Unicode
             {
