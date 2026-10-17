@@ -87,9 +87,9 @@ class IntentCache:
         Returns:
             Cached intent mapping if exists and not expired, None otherwise
         """
-        # Automatic cleanup: if cache size > 2000, remove all expired entries first
+        # Automatic cleanup: if cache size > 1000, remove all expired entries first
         # This prevents memory leaks from accumulating expired entries
-        if len(self._cache) > 2000:
+        if len(self._cache) > 1000:
             removed = self._cleanup_expired()
             if removed > 0:
                 logger.debug(f"Auto-cleanup removed {removed} expired entries (size: {len(self._cache)})")
