@@ -4,12 +4,10 @@ Audio-to-Canvas Session Continuity
 Handles surface switch events from audio to canvas.
 Ensures pending results are rendered to canvas on switch.
 """
-import asyncio
 import logging
 from typing import Any
 
-from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
-
+from ..sse.broadcaster import EventType, SSEEvent, get_broadcaster
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +21,10 @@ async def handle_surface_switch(
     Handle surface switch event.
 
     When user switches from audio to canvas:
-    1. Get pending results from voice session
-    2. Return them for canvas rendering
-    3. Voice model acknowledges the switch
+    1. Claim pending results from the voice session
+    2. Deliver each to canvas surfaces via SSE
+    3. Acknowledge the claim once delivered — or hand the batch back
+       (nack) if delivery fails, so a later switch can retry it
 
     Returns:
     {
@@ -35,8 +34,18 @@ async def handle_surface_switch(
     """
     logger.info(f"Surface switch to {surface_type} for session {session_id}")
 
-    # Get pending results from voice session
+    # Claim pending results from the voice session (cleared on claim)
     pending = await voice_session.get_pending_results()
+
+    try:
+        # Deliver every claimed result to canvas surfaces before
+        # acknowledging — the voice session no longer holds them.
+        for result in pending:
+            await push_to_canvas(session_id, result)
+        voice_session.ack_pending_results(pending)
+    except Exception:
+        voice_session.nack_pending_results(pending)
+        raise
 
     # Build catch-up summary
     result_count = len(pending)

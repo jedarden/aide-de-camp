@@ -30,7 +30,8 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field, field_validator, ValidationError
 
 from .realtime.session import VoiceSession, load_voice_prompt, AVAILABLE_VOICES
-from .realtime.dispatch import dispatch_intent, result_listener
+from .realtime.dispatch import result_listener
+from .realtime.dispatch import dispatch_intent as dispatch_intent_tool
 from .realtime.continuity import handle_surface_switch
 from ._version import read_version
 from .session.store import get_store as session_store_get_store
@@ -954,6 +955,61 @@ async def serve_canvas_js():
     return FileResponse(CANVAS_JS_PATH, media_type="application/javascript")
 
 
+def register_voice_tools(voice: VoiceSession, session_id: str) -> None:
+    """Register the voice-mode tools on a VoiceSession.
+
+    Handlers MUST be coroutine functions: the realtime loop awaits coroutine
+    handlers and sends their return value as the tool output. A plain lambda
+    that returns a coroutine would send the coroutine's repr to the model and
+    never run the dispatch.
+    """
+    async def handle_dispatch(utterance: str) -> str:
+        # Aliased import: the /dispatch endpoint below rebinds the
+        # "dispatch_intent" name module-wide, so the tool must call the
+        # realtime handler explicitly.
+        return await dispatch_intent_tool(utterance, session_id, voice)
+
+    voice.register_tool(
+        name="dispatch_intent",
+        description=(
+            "Dispatch a user utterance to the intent router. "
+            "Returns acknowledgment immediately; results arrive asynchronously. "
+            "Use this for any utterance that requires system action."
+        ),
+        handler=handle_dispatch,
+        parameters={
+            "type": "object",
+            "properties": {
+                "utterance": {
+                    "type": "string",
+                    "description": "The user's utterance to route"
+                }
+            },
+            "required": ["utterance"]
+        }
+    )
+
+    async def handle_voice_change(voice_name: str) -> str:
+        return await voice.change_voice(voice_name)
+
+    voice.register_tool(
+        name="change_voice",
+        description=f"Change the assistant's voice. Available: {', '.join(AVAILABLE_VOICES)}",
+        handler=handle_voice_change,
+        parameters={
+            "type": "object",
+            "properties": {
+                "voice": {
+                    "type": "string",
+                    "enum": AVAILABLE_VOICES,
+                    "description": "The voice to switch to"
+                }
+            },
+            "required": ["voice"]
+        }
+    )
+
+
 @app.websocket("/voice")
 async def voice_session(websocket: WebSocket):
     """
@@ -1038,47 +1094,8 @@ async def voice_session(websocket: WebSocket):
             result_listener(session_id, voice, audio_surface_id)
         )
 
-        # Register dispatch_intent tool
-        voice.register_tool(
-            name="dispatch_intent",
-            description=(
-                "Dispatch a user utterance to the intent router. "
-                "Returns acknowledgment immediately; results arrive asynchronously. "
-                "Use this for any utterance that requires system action."
-            ),
-            handler=lambda utterance: dispatch_intent(utterance, session_id, voice),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "utterance": {
-                        "type": "string",
-                        "description": "The user's utterance to route"
-                    }
-                },
-                "required": ["utterance"]
-            }
-        )
-
-        # Register change_voice tool
-        async def handle_voice_change(voice: str) -> str:
-            return await voice.change_voice(voice)
-
-        voice.register_tool(
-            name="change_voice",
-            description=f"Change the assistant's voice. Available: {', '.join(AVAILABLE_VOICES)}",
-            handler=handle_voice_change,
-            parameters={
-                "type": "object",
-                "properties": {
-                    "voice": {
-                        "type": "string",
-                        "enum": AVAILABLE_VOICES,
-                        "description": "The voice to switch to"
-                    }
-                },
-                "required": ["voice"]
-            }
-        )
+        # Register dispatch_intent and change_voice tools
+        register_voice_tools(voice, session_id)
 
         # Run the session
         await voice.run()
@@ -1130,8 +1147,11 @@ async def route_intent(request: dict):
     if not utterance_id:
         utterance_id = str(uuid.uuid4())
 
-    # Create utterance record
-    await store.create_utterance(session_id, utterance, utterance_id)
+    # Create utterance record if the caller did not already persist it —
+    # the voice dispatch tool inserts the row before calling the router so
+    # the utterance survives a router outage, and id is the primary key.
+    if not await store.get_utterance(utterance_id):
+        await store.create_utterance(session_id, utterance, utterance_id)
 
     # Route the utterance
     try:

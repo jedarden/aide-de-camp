@@ -8,21 +8,47 @@ Results arrive async via push_result on the voice session.
 Integrates conversation tracker, prefetcher, and diff engine for Phase 3 responsiveness.
 """
 import asyncio
-import httpx
 import json
-import uuid
+import threading
+import time
 from logging import getLogger
-from pathlib import Path
 from typing import Any
 
-from ..session.store import get_store
-from ..conversation.tracker import get_conversation_tracker
-from ..context.prefetch import get_prefetcher, FollowUpPattern
-from ..diff.engine import get_diff_engine
+import httpx
 
+from ..context.prefetch import get_prefetcher
+from ..conversation.tracker import get_conversation_tracker
+from ..session.store import get_store
 
 logger = getLogger(__name__)
 ROUTER_API_URL = "http://localhost:8000/router"  # Local router endpoint
+
+# Intent correlation registry: session_id -> intent IDs dispatched by that
+# session's dispatch_intent tool calls, most recent last. The result listener
+# reads this to pick up results belonging to intents the voice session
+# created, so only results produced by this session's own tool calls are
+# narrated on that session. Results are persisted with surfaced_at already
+# set, so the unsurfaced poll this registry replaces never matched anything.
+_MAX_TRACKED_INTENTS_PER_SESSION = 64
+_pending_intents: dict[str, list[str]] = {}
+_pending_intents_lock = threading.Lock()
+
+
+def register_session_intents(session_id: str, intent_ids: list[str]) -> None:
+    """Record intent IDs produced by a session's dispatch_intent tool call."""
+    with _pending_intents_lock:
+        tracked = _pending_intents.setdefault(session_id, [])
+        for intent_id in intent_ids:
+            if intent_id and intent_id not in tracked:
+                tracked.append(intent_id)
+        # Bound memory for long-lived sessions: keep the most recent intents.
+        del tracked[:-_MAX_TRACKED_INTENTS_PER_SESSION]
+
+
+def get_session_intents(session_id: str) -> list[str]:
+    """Return the intent IDs tracked for a session (oldest first)."""
+    with _pending_intents_lock:
+        return list(_pending_intents.get(session_id, []))
 
 
 async def dispatch_intent(
@@ -90,6 +116,16 @@ async def dispatch_intent(
         # Log the routing result
         logger.info(f"Router result: {json.dumps(router_result, indent=2)}")
 
+        # Correlate the router's intents with this session so the result
+        # listener can pick up their results as they land in the store.
+        intent_ids = [
+            intent["intent_id"]
+            for intent in router_result.get("intents", [])
+            if isinstance(intent, dict) and intent.get("intent_id")
+        ]
+        if intent_ids:
+            register_session_intents(session_id, intent_ids)
+
         # The router has dispatched intents to workers
         # Results will arrive via result queue and be narrated
         # Return ack for the tool call
@@ -149,54 +185,89 @@ async def result_listener(
     """
     Background task that listens for async results and pushes them to the voice session.
 
-    Results arrive from the synthesize strand via SSE or direct call.
-    This task polls the session store for new results and pushes them.
+    Results are correlated by intent: dispatch_intent registers the intent IDs
+    returned by the router, and this task polls the store for results belonging
+    to those intents, pushing each to the voice session for narration. (Results
+    are persisted with surfaced_at already set, so an unsurfaced poll would
+    never match.)
 
     Phase 3 enhancements:
-    - Computes diffs between consecutive results using diff engine
-    - Includes diff data in result payload for canvas rendering
     - Tracks implicit feedback signals (ack speed, surface switches)
 
     If use_batching is True (default for audio mode), results go through the
-    ResultBatcher which applies urgency-based batching rules.
-    Otherwise, results are pushed immediately.
+    ResultBatcher which applies urgency-based batching rules for audio
+    narration. Canvas delivery via SSE is never batched.
 
     Tracks successfully pushed result IDs individually to avoid duplicates
     even if some pushes fail.
     """
-    from .continuity import push_to_canvas
-    from .batching import get_result_batcher
     from ..feedback.signals import get_feedback_tracker
+    from .batching import get_result_batcher
+    from .continuity import push_to_canvas
 
     store = await get_store()
     batcher = get_result_batcher() if use_batching else None
-    diff_engine = get_diff_engine()
     feedback_tracker = get_feedback_tracker()
     pushed_ids = set()  # Track successfully pushed result IDs in this session
-
-    # Track previous results per topic for diff computation
-    previous_results: dict[str, dict] = {}
 
     # Set up batcher callback if using batching
     if batcher:
         async def narrate_batch(results: list) -> None:
-            """Callback to narrate a batch of results."""
+            """Callback to narrate a batch of results (audio only).
+
+            Canvas delivery already happened when the result was queued —
+            the batcher only gates audio narration.
+            """
             for r in results:
                 try:
-                    result_data = {
+                    await voice_session.push_result({
                         "intent_id": r.intent_id,
                         "topic_id": r.topic_id,
                         "summary": r.summary,
                         "urgency": r.urgency.value,
                         "data": r.data,
-                    }
-                    await voice_session.push_result(result_data)
-                    await push_to_canvas(session_id, result_data, audio_surface_id)
+                    })
                     logger.info(f"Narrated result {r.result_id} (batched)")
                 except Exception as e:
                     logger.warning(f"Failed to narrate result {r.result_id}: {e}")
 
         batcher.set_narrate_callback(narrate_batch)
+
+    async def deliver_result(result: dict) -> None:
+        """Deliver one store row: audio narration (possibly batched) + canvas SSE."""
+        topic_id = result.get("topic_id")
+        result_data = {
+            "intent_id": result["intent_id"],
+            "topic_id": topic_id,
+            "summary": result["summary"],
+            "urgency": result["urgency"],
+            "data": json.loads(result["data"]),
+        }
+
+        # Track implicit feedback: result created
+        await feedback_tracker.track_result_created(
+            result_id=result["id"],
+            session_id=session_id,
+            topic_id=topic_id,
+        )
+
+        if use_batching and batcher:
+            # Queue with batcher for urgency-based audio narration
+            await batcher.queue_result(
+                result_id=result["id"],
+                intent_id=result["intent_id"],
+                topic_id=topic_id,
+                summary=result["summary"],
+                data=result_data["data"],
+                urgency=result.get("urgency", "normal"),
+            )
+            logger.info(f"Queued result {result['id']} for batched audio narration")
+        else:
+            # Push directly to voice session (no batching)
+            await voice_session.push_result(result_data)
+
+        # Push to canvas immediately (canvas doesn't use batching)
+        await push_to_canvas(session_id, result_data, audio_surface_id)
 
     while True:
         try:
@@ -264,87 +335,25 @@ async def result_listener(
                 except Exception as e:
                     logger.warning(f"Failed to narrate approval {approval_id}: {e}")
 
-            # Check for new results
-            unsurfed = await store.get_unsurfaced_results(session_id)
+            # Results for intents this session dispatched via dispatch_intent
+            # (tool-call correlation)
+            newly_pushed: list[str] = []
+            for intent_id in get_session_intents(session_id):
+                intent_results = await store.get_results_for_intent(intent_id)
+                for result in reversed(intent_results):  # oldest first
+                    result_id = result["id"]
 
-            newly_pushed = []
-            for result in unsurfed:
-                result_id = result["id"]
+                    # Skip if already pushed (e.g., from previous iteration after error)
+                    if result_id in pushed_ids:
+                        continue
 
-                # Skip if already pushed (e.g., from previous iteration after error)
-                if result_id in pushed_ids:
-                    continue
-
-                try:
-                    topic_id = result.get("topic_id")
-                    result_data = {
-                        "intent_id": result["intent_id"],
-                        "topic_id": topic_id,
-                        "summary": result["summary"],
-                        "urgency": result["urgency"],
-                        "data": json.loads(result["data"]),
-                    }
-
-                    # Compute diff with previous result for this topic (Phase 3)
-                    if topic_id and topic_id in previous_results:
-                        previous_result = previous_results[topic_id]
-                        diff_result = await diff_engine.compute_diff(
-                            topic_id=topic_id,
-                            previous_result=previous_result,
-                            current_result=result,
-                        )
-                        # Include diff in result data
-                        if diff_result.has_changes:
-                            result_data["diff"] = {
-                                "has_changes": True,
-                                "change_summary": diff_result.change_summary,
-                                "fields": [
-                                    {
-                                        "field_name": f.field_name,
-                                        "old_value": f.old_value,
-                                        "new_value": f.new_value,
-                                        "change_type": f.change_type,
-                                    }
-                                    for f in diff_result.fields
-                                ],
-                            }
-                            logger.info(f"Computed diff for result {result_id}: {diff_result.change_summary}")
-
-                    # Track previous result for diff computation
-                    if topic_id:
-                        previous_results[topic_id] = result
-
-                    # Track implicit feedback: result created
-                    await feedback_tracker.track_result_created(
-                        result_id=result_id,
-                        session_id=session_id,
-                        topic_id=topic_id,
-                    )
-
-                    if use_batching and batcher:
-                        # Queue with batcher for urgency-based narration
-                        await batcher.queue_result(
-                            result_id=result["id"],
-                            intent_id=result["intent_id"],
-                            topic_id=result["topic_id"],
-                            summary=result["summary"],
-                            data=json.loads(result["data"]),
-                            urgency=result.get("urgency", "normal"),
-                        )
-                        # Push to canvas immediately (canvas doesn't use batching)
-                        await push_to_canvas(session_id, result_data, audio_surface_id)
-                        logger.info(f"Queued result {result_id} for batched audio narration")
-                    else:
-                        # Push directly to voice session (no batching)
-                        await voice_session.push_result(result_data)
-                        await push_to_canvas(session_id, result_data, audio_surface_id)
-
-                    pushed_ids.add(result_id)
-                    newly_pushed.append(result_id)
-
-                except Exception as e:
-                    # Failed to push this result - will retry on next iteration
-                    logger.warning(f"Failed to push result {result_id}: {e}")
+                    try:
+                        await deliver_result(result)
+                        pushed_ids.add(result_id)
+                        newly_pushed.append(result_id)
+                    except Exception as e:
+                        # Failed to push this result - will retry on next iteration
+                        logger.warning(f"Failed to push result {result_id}: {e}")
 
             if newly_pushed:
                 # Mark successfully pushed results as surfaced
