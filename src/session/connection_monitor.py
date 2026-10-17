@@ -255,8 +255,12 @@ class ConnectionMonitor:
         conn = None
 
         try:
-            # Create actual connection
-            conn = await aiosqlite.connect(db_path)
+            # Create actual connection. A file: URI (shared in-memory cache)
+            # must be opened with uri=True; without it SQLite treats the whole
+            # URI string as a filename and creates a junk file in the CWD.
+            conn = await aiosqlite.connect(
+                db_path, uri=str(db_path).startswith("file:")
+            )
             yield conn
 
         finally:

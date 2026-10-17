@@ -124,6 +124,47 @@ class TestConnectionMonitor:
             Path(db_path).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
+    async def test_monitor_connection_with_file_uri(self, tmp_path, monkeypatch):
+        """A file: URI must open as a URI, not as a junk file in the CWD.
+
+        SQLite treats 'file::memory:?cache=shared' as a literal filename when
+        uri=True is not passed, creating a junk file named after the whole URI
+        string in the current working directory (aidedeca-cb27b2ef).
+        """
+        monitor = ConnectionMonitor()
+        monkeypatch.chdir(tmp_path)
+
+        async with monitor.track_connection("file::memory:?cache=shared") as conn:
+            await conn.execute("SELECT 1")
+
+            # No junk file named after the URI appears in the CWD
+            assert list(tmp_path.iterdir()) == []
+
+        stats = monitor.get_stats()
+        assert stats.active_connections == 0
+        assert stats.closed_connections == 1
+
+    @pytest.mark.asyncio
+    async def test_store_get_connection_with_file_uri(self, tmp_path, monkeypatch):
+        """SessionStore's monitored connection path honors file: URIs too.
+
+        store._get_connection() routes through track_connection() when
+        connection monitoring is enabled and must not turn the shared-cache
+        URI into a file on disk.
+        """
+        from src.session.store import SessionStore
+
+        monkeypatch.chdir(tmp_path)
+        store = SessionStore(
+            "file::memory:?cache=shared", enable_connection_monitoring=True
+        )
+
+        async with await store._get_connection() as conn:
+            await conn.execute("SELECT 1")
+
+        assert list(tmp_path.iterdir()) == []
+
+    @pytest.mark.asyncio
     async def test_monitor_multiple_connections(self):
         """Test monitoring multiple concurrent connections."""
         monitor = ConnectionMonitor(max_connections=10)
