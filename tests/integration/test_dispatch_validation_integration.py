@@ -135,7 +135,8 @@ async def test_dispatch_empty_utterance_string(async_client: httpx.AsyncClient):
     ]
     assert len(utterance_errors) > 0
     # Pydantic error message for min_length validation
-    assert "at least 1 character" in utterance_errors[0]["message"].lower() or "non-empty" in utterance_errors[0]["message"].lower()
+    message = utterance_errors[0]["message"].lower()
+    assert "at least 2 characters" in message or "non-empty" in message
 
 
 @pytest.mark.integration
