@@ -35,13 +35,15 @@ async def isolated_store(tmp_path, monkeypatch):
     store_mod._store = None
     main_mod._store = None
 
-    store = store_mod.get_store()
+    store = await store_mod.get_store()
     await store.initialize()
 
-    yield store
-
-    main_mod._store = saved_main_store
-    store_mod._store = saved_store
+    try:
+        yield store
+    finally:
+        await store.close()
+        main_mod._store = saved_main_store
+        store_mod._store = saved_store
 
 
 async def _started_broadcaster():

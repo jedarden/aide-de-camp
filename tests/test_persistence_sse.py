@@ -51,6 +51,12 @@ from src.sse.broadcaster import (
 
 
 @pytest.fixture
+def store(test_db_store):
+    """The tests' `store` parameter is the same isolated store as
+    test_db_store: bodies reference both names interchangeably, so they must
+    resolve to one instance sharing one database."""
+    return test_db_store
+
 
 async def _seed(test_db_store, topic_label: str = "K8s Status") -> dict:
     """Create a full session→surface→utterance→intent→topic chain; return ids."""
@@ -86,10 +92,10 @@ class TestResultPersistence:
     """create_result() must persist a complete, retrievable result row."""
 
     @pytest.mark.asyncio
-    async def test_result_row_round_trips_all_fields(self, store):
+    async def test_result_row_round_trips_all_fields(self, store, test_db_store):
         ids = await _seed(store)
         data = {"pods": [{"name": "web-0", "phase": "Running"}], "count": 1}
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
@@ -98,7 +104,7 @@ class TestResultPersistence:
             urgency="normal",
         )
 
-        row = await test_db_store.get_latest_result_for_topic(ids["topic_id"])
+        row = await store.get_latest_result_for_topic(ids["topic_id"])
         assert row is not None
         assert row["id"] == result_id
         assert row["intent_id"] == ids["intent_id"]
@@ -108,7 +114,7 @@ class TestResultPersistence:
         assert row["urgency"] == "normal"
 
     @pytest.mark.asyncio
-    async def test_data_field_is_valid_round_trip_json(self, store):
+    async def test_data_field_is_valid_round_trip_json(self, store, test_db_store):
         ids = await _seed(store)
         data = {"a": 1, "nested": {"b": [2, 3]}, "ok": True}
 
@@ -126,7 +132,7 @@ class TestResultPersistence:
         assert json.loads(row["data"]) == data
 
     @pytest.mark.asyncio
-    async def test_surfaced_at_set_on_creation(self, store):
+    async def test_surfaced_at_set_on_creation(self, store, test_db_store):
         ids = await _seed(store)
 
         await test_db_store.create_result(
@@ -141,7 +147,7 @@ class TestResultPersistence:
         assert row["surfaced_at"] is not None
 
     @pytest.mark.asyncio
-    async def test_latest_result_is_the_most_recent(self, store):
+    async def test_latest_result_is_the_most_recent(self, store, test_db_store):
         ids = await _seed(store)
         first = await test_db_store.create_result(
             intent_id=ids["intent_id"],
@@ -170,7 +176,7 @@ class TestResultPersistence:
         assert row["summary"] == "second"
 
     @pytest.mark.asyncio
-    async def test_diff_chain_links_sequential_results(self, store):
+    async def test_diff_chain_links_sequential_results(self, store, test_db_store):
         ids = await _seed(store)
         first = await test_db_store.create_result(
             intent_id=ids["intent_id"],
@@ -202,7 +208,7 @@ class TestResultPersistence:
         assert json.loads(row["diff_data"])["fields"][0]["new_value"] == 60
 
     @pytest.mark.asyncio
-    async def test_topic_result_count_increments(self, store):
+    async def test_topic_result_count_increments(self, store, test_db_store):
         ids = await _seed(store)
         assert (await test_db_store.get_active_topics(ids["session_id"]))[0]["result_count"] == 0
 
@@ -238,56 +244,58 @@ class TestStoreFactory:
     doesn't leak a different path between calls.
     """
 
-    def test_factory_resolves_adc_db_path(self, tmp_path, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_factory_resolves_adc_db_path(self, tmp_path, monkeypatch):
         """With ADC_DB_PATH set, get_store() builds at that path, never the
         production default (data/session.db)."""
         tmp_db = tmp_path / "factory.db"
         monkeypatch.setenv("ADC_DB_PATH", str(tmp_db))
         monkeypatch.setattr(store_mod, "_store", None)  # force a rebuild
 
-        store = store_mod.get_store()
-        assert test_db_store.db_path == tmp_db
+        store = await store_mod.get_store()
+        assert store.db_path == tmp_db
 
-    def test_factory_caches_singleton(self, tmp_path, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_factory_caches_singleton(self, tmp_path, monkeypatch):
         """Repeated calls return the same cached instance — the router relies on
         this stable target, and a per-call rebuild could silently split paths."""
         monkeypatch.setenv("ADC_DB_PATH", str(tmp_path / "cached.db"))
         monkeypatch.setattr(store_mod, "_store", None)
 
-        first = store_mod.get_store()
-        second = store_mod.get_store()
+        first = await store_mod.get_store()
+        second = await store_mod.get_store()
         assert first is second
 
     @pytest.mark.asyncio
-    async def test_result_persists_to_factory_db(self, tmp_path, monkeypatch):
+    async def test_result_persists_to_factory_db(self, tmp_path, monkeypatch, test_db_store):
         """A result written through get_store() lands on disk in the file
         ADC_DB_PATH points at, surviving a fresh independent connection."""
         tmp_db = tmp_path / "session.db"
         monkeypatch.setenv("ADC_DB_PATH", str(tmp_db))
         monkeypatch.setattr(store_mod, "_store", None)
 
-        store = store_mod.get_store()
-        await test_db_store.initialize()
-        session_id = await test_db_store.create_session()
-        topic_id = await test_db_store.create_topic(
+        store = await store_mod.get_store()
+        await store.initialize()
+        session_id = await store.create_session()
+        topic_id = await store.create_topic(
             label="K8s", topic_type="project", session_id=session_id
         )
-        utterance_id = await test_db_store.create_utterance(session_id, "check pods")
-        intent_id = await test_db_store.create_intent(
+        utterance_id = await store.create_utterance(session_id, "check pods")
+        intent_id = await store.create_intent(
             utterance_id=utterance_id,
             session_id=session_id,
             project_slug="k8s",
             intent_type="lookup",
         )
         data = {"pods": [{"name": "web-0"}], "count": 1}
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=intent_id,
             topic_id=topic_id,
             session_id=session_id,
             summary="1 pod running",
             data=data,
         )
-        await test_db_store.close()
+        await store.close()
 
         # Re-open the same file with a brand-new SessionStore — the row must
         # survive, proving it was flushed to disk and not held in memory.
@@ -306,7 +314,7 @@ class TestTopicRecords:
     """Topics are created with the right shape and updated as work happens."""
 
     @pytest.mark.asyncio
-    async def test_create_topic_persists_type_scope_and_slugs(self, store):
+    async def test_create_topic_persists_type_scope_and_slugs(self, store, test_db_store):
         session_id = await test_db_store.create_session()
         topic_id = await test_db_store.create_topic(
             label="Options Pipeline",
@@ -326,7 +334,7 @@ class TestTopicRecords:
         assert json.loads(t["project_slugs"]) == ["options"]
 
     @pytest.mark.asyncio
-    async def test_find_or_create_returns_existing_without_duplicate(self, store):
+    async def test_find_or_create_returns_existing_without_duplicate(self, store, test_db_store):
         session_id = await test_db_store.create_session()
 
         first_id, created_first = await test_db_store.find_or_create_topic(
@@ -342,7 +350,7 @@ class TestTopicRecords:
         assert len(await test_db_store.get_active_topics(session_id)) == 1  # no duplicate
 
     @pytest.mark.asyncio
-    async def test_find_or_create_is_session_scoped(self, store):
+    async def test_find_or_create_is_session_scoped(self, store, test_db_store):
         """The same label in two different sessions yields two distinct topics."""
         s1 = await test_db_store.create_session()
         s2 = await test_db_store.create_session()
@@ -358,7 +366,7 @@ class TestTopicRecords:
         assert t1 != t2
 
     @pytest.mark.asyncio
-    async def test_global_topic_visible_to_every_session(self, store):
+    async def test_global_topic_visible_to_every_session(self, store, test_db_store):
         """A global-scope topic shows up in any session's active-topics query."""
         s1 = await test_db_store.create_session()
         s2 = await test_db_store.create_session()
@@ -375,7 +383,7 @@ class TestTopicRecords:
         assert "Global Thing" in labels_s2
 
     @pytest.mark.asyncio
-    async def test_update_topic_activity_bumps_last_active(self, store):
+    async def test_update_topic_activity_bumps_last_active(self, store, test_db_store):
         session_id = await test_db_store.create_session()
         topic_id = await test_db_store.create_topic(
             label="X", topic_type="project", session_id=session_id
@@ -508,7 +516,7 @@ class TestPersistenceSSEIntegration:
 
         ids = await _seed(store)
         data = {"pods": [{"name": "web-0"}], "count": 1}
-        result_id = await test_db_store.create_result(
+        result_id = await store.create_result(
             intent_id=ids["intent_id"],
             topic_id=ids["topic_id"],
             session_id=ids["session_id"],
@@ -543,6 +551,6 @@ class TestPersistenceSSEIntegration:
         assert event.data["result_id"] == result_id
         assert event.data["summary"] == "1 pod running"
         # …and the store agrees the result exists for this topic.
-        row = await test_db_store.get_latest_result_for_topic(ids["topic_id"])
+        row = await store.get_latest_result_for_topic(ids["topic_id"])
         assert row["id"] == result_id
         assert json.loads(row["data"]) == data
