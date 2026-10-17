@@ -7,6 +7,8 @@ Supports test isolation with separate database files and cleanup functionality.
 import asyncio
 import logging
 import tempfile
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -818,3 +820,122 @@ class TestDataCleanup:
         self.session_ids.clear()
         self.topic_ids.clear()
         return result
+
+
+# ---------------------------------------------------------------------------
+# Endpoint connectivity checking
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class EndpointConnectivityResult:
+    """Outcome of a single endpoint connectivity check."""
+
+    success: bool
+    status_code: Optional[int] = None
+    response_body: Optional[str] = None
+    error_message: Optional[str] = None
+    response_time_ms: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the result for logging and structured reporting."""
+        return {
+            "success": self.success,
+            "status_code": self.status_code,
+            "response_body": self.response_body,
+            "error_message": self.error_message,
+            "response_time_ms": self.response_time_ms,
+        }
+
+
+async def check_endpoint_connectivity(
+    endpoint_url: str,
+    timeout_seconds: float = 30.0,
+    method: str = "GET",
+    headers: Optional[Dict[str, str]] = None,
+    expected_status_codes: Optional[List[int]] = None,
+    verify_ssl: bool = True,
+) -> EndpointConnectivityResult:
+    """Probe one HTTP endpoint and report status, body, and latency."""
+    acceptable = expected_status_codes if expected_status_codes else [200]
+    start = time.monotonic()
+    client = httpx.AsyncClient(verify=verify_ssl)
+    try:
+        response = await client.request(
+            method=method,
+            url=endpoint_url,
+            headers=headers,
+            timeout=timeout_seconds,
+        )
+        elapsed_ms = (time.monotonic() - start) * 1000.0
+        if response.status_code in acceptable:
+            return EndpointConnectivityResult(
+                success=True,
+                status_code=response.status_code,
+                response_body=response.text,
+                response_time_ms=elapsed_ms,
+            )
+        return EndpointConnectivityResult(
+            success=False,
+            status_code=response.status_code,
+            response_body=response.text,
+            error_message=f"Unexpected status code: {response.status_code}",
+            response_time_ms=elapsed_ms,
+        )
+    except httpx.ConnectError as exc:
+        elapsed_ms = (time.monotonic() - start) * 1000.0
+        return EndpointConnectivityResult(
+            success=False,
+            error_message=f"Connection error: {exc}",
+            response_time_ms=elapsed_ms,
+        )
+    except Exception as exc:
+        elapsed_ms = (time.monotonic() - start) * 1000.0
+        return EndpointConnectivityResult(
+            success=False,
+            error_message=f"Request failed: {exc}",
+            response_time_ms=elapsed_ms,
+        )
+    finally:
+        await client.aclose()
+
+
+async def check_metrics_endpoints(
+    endpoints: List[Dict[str, Any]],
+    timeout_seconds: float = 30.0,
+) -> Dict[str, EndpointConnectivityResult]:
+    """Check several endpoints concurrently, keyed by endpoint name."""
+    names = [endpoint["name"] for endpoint in endpoints]
+    checks = [
+        check_endpoint_connectivity(
+            endpoint_url=endpoint["url"],
+            timeout_seconds=endpoint.get("timeout", timeout_seconds),
+            method=endpoint.get("method", "GET"),
+            headers=endpoint.get("headers"),
+            expected_status_codes=endpoint.get("expected_status_codes"),
+        )
+        for endpoint in endpoints
+    ]
+    results = await asyncio.gather(*checks)
+    return dict(zip(names, results))
+
+
+def check_endpoint_connectivity_sync(
+    endpoint_url: str,
+    timeout_seconds: float = 30.0,
+    method: str = "GET",
+    headers: Optional[Dict[str, str]] = None,
+    expected_status_codes: Optional[List[int]] = None,
+    verify_ssl: bool = True,
+) -> EndpointConnectivityResult:
+    """Synchronous wrapper around check_endpoint_connectivity."""
+    return asyncio.run(
+        check_endpoint_connectivity(
+            endpoint_url=endpoint_url,
+            timeout_seconds=timeout_seconds,
+            method=method,
+            headers=headers,
+            expected_status_codes=expected_status_codes,
+            verify_ssl=verify_ssl,
+        )
+    )
