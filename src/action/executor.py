@@ -242,21 +242,26 @@ class ActionExecutor:
     """
 
     def __init__(self):
+        # Maps registered step name -> bound-method name. Resolved via getattr
+        # at execution time so patch.object(executor, "_execute_<step>") after
+        # construction intercepts the call (tests rely on this); a dict built
+        # from bound methods would silently bypass such patches and hit live
+        # infrastructure.
         self._step_executors = {
             # Mutating steps (respect dry_run)
-            "ci_status": self._execute_ci_status,
-            "image_tag": self._execute_image_tag,
-            "gitops_commit": self._execute_gitops_commit,
+            "ci_status": "_execute_ci_status",
+            "image_tag": "_execute_image_tag",
+            "gitops_commit": "_execute_gitops_commit",
             # Read-only steps
-            "argocd_sync_status": self._execute_argocd_sync_status,
-            "argocd_sync": self._execute_argocd_sync_status,  # Alias for argocd_sync_status
-            "pod_status": self._execute_pod_status,
-            "pod_logs": self._execute_pod_logs,
-            "argocd_events": self._execute_argocd_events,
-            "deployment_info": self._execute_deployment_info,
-            "git_log": self._execute_git_log,
-            "argocd_apps": self._execute_argocd_apps,
-            "open_beads": self._execute_open_beads,
+            "argocd_sync_status": "_execute_argocd_sync_status",
+            "argocd_sync": "_execute_argocd_sync_status",  # Alias for argocd_sync_status
+            "pod_status": "_execute_pod_status",
+            "pod_logs": "_execute_pod_logs",
+            "argocd_events": "_execute_argocd_events",
+            "deployment_info": "_execute_deployment_info",
+            "git_log": "_execute_git_log",
+            "argocd_apps": "_execute_argocd_apps",
+            "open_beads": "_execute_open_beads",
         }
 
     async def execute_workflow(
@@ -419,11 +424,17 @@ class ActionExecutor:
         await self._broadcast_step_started(step_result, session_id)
 
         try:
-            # Get step executor
+            # Get step executor. The dict normally stores bound-method NAMES
+            # (see __init__), resolved here so a patch applied to the instance
+            # after construction is honoured at call time. Callables (as
+            # injected by tests) are invoked directly.
             executor = self._step_executors.get(step_name)
 
-            if not executor:
+            if executor is None:
                 raise ValueError(f"Unknown step type: '{step_name}'")
+
+            if isinstance(executor, str):
+                executor = getattr(self, executor)
 
             # Pass verified outputs only to steps that depend on prior steps.
             extra_args: dict[str, Any] = {}
