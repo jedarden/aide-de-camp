@@ -22,6 +22,7 @@ import aiosqlite
 import pytest
 
 from src.session.store import SessionStore
+from src.main import app
 
 # Test data
 TEST_SESSION_ID = "test-session-verification-123"
@@ -328,7 +329,7 @@ def sync_verification_client(verification_test_db_store):
 
 
 @pytest.mark.asyncio
-async def test_synthetic_result_session_storage(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
+async def test_synthetic_result_session_storage(verification_test_db_store, sync_verification_client, test_db_path: Path) -> None:
     """Verify complete session storage for synthetic result endpoint."""
     assertions = StorageVerificationAssertions()
 
@@ -361,24 +362,24 @@ async def test_synthetic_result_session_storage(verification_test_db_store, sync
     intent_id = result_data["intent_id"]
 
     # Verify session record created with correct session_id
-    session = await assertions.verify_session_record(test_store_path, TEST_SESSION_ID)
+    session = await assertions.verify_session_record(test_db_path, TEST_SESSION_ID)
     assert session["id"] == TEST_SESSION_ID
 
     # Verify utterance record linked to session
     utterance = await assertions.verify_utterance_record(
-        test_store_path, TEST_SESSION_ID, TEST_UTTERANCE
+        test_db_path, TEST_SESSION_ID, TEST_UTTERANCE
     )
     assert utterance["id"] == utterance_id
 
     # Verify topic record created with correct type and linked to session
     topic = await assertions.verify_topic_record(
-        test_store_path, TEST_SESSION_ID, TEST_TOPIC_LABEL, "research"
+        test_db_path, TEST_SESSION_ID, TEST_TOPIC_LABEL, "research"
     )
     assert topic["id"] == topic_id
 
     # Verify intent record with correct relationships
     intent = await assertions.verify_intent_record(
-        test_store_path,
+        test_db_path,
         TEST_SESSION_ID,
         utterance_id,
         topic_id,
@@ -389,7 +390,7 @@ async def test_synthetic_result_session_storage(verification_test_db_store, sync
 
     # Verify result record with correct data
     result = await assertions.verify_result_record(
-        test_store_path,
+        test_db_path,
         TEST_SESSION_ID,
         topic_id,
         TEST_SUMMARY,
@@ -399,7 +400,7 @@ async def test_synthetic_result_session_storage(verification_test_db_store, sync
 
     # Verify all foreign key relationships
     await assertions.verify_foreign_key_relationships(
-        test_store_path,
+        test_db_path,
         TEST_SESSION_ID,
         utterance_id,
         topic_id,
@@ -409,14 +410,14 @@ async def test_synthetic_result_session_storage(verification_test_db_store, sync
 
     # Verify all text fields match the test payload exactly
     await assertions.verify_text_field_exact_match(
-        test_store_path,
+        test_db_path,
         TEST_SESSION_ID,
         TEST_UTTERANCE,
         TEST_SUMMARY
     )
 
     # Verify record counts
-    counts = await assertions.count_records_by_session(test_store_path, TEST_SESSION_ID)
+    counts = await assertions.count_records_by_session(test_db_path, TEST_SESSION_ID)
     assert counts["sessions"] == 1, "Should have 1 session"
     assert counts["utterances"] == 1, "Should have 1 utterance"
     assert counts["topics"] == 1, "Should have 1 topic"
@@ -425,7 +426,7 @@ async def test_synthetic_result_session_storage(verification_test_db_store, sync
 
 
 @pytest.mark.asyncio
-async def test_synthetic_result_custom_data_persistence(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
+async def test_synthetic_result_custom_data_persistence(verification_test_db_store, sync_verification_client, test_db_path: Path) -> None:
     """Verify that custom test data is persisted exactly as provided."""
     assertions = StorageVerificationAssertions()
 
@@ -457,7 +458,7 @@ async def test_synthetic_result_custom_data_persistence(verification_test_db_sto
 
     # Verify custom data persisted exactly
     result = await assertions.verify_result_record(
-        test_store_path,
+        test_db_path,
         "custom-test-session",
         result_data["topic_id"],
         "Custom summary",
@@ -469,7 +470,7 @@ async def test_synthetic_result_custom_data_persistence(verification_test_db_sto
 
 
 @pytest.mark.asyncio
-async def test_multiple_synthetic_results_same_session(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
+async def test_multiple_synthetic_results_same_session(verification_test_db_store, sync_verification_client, test_db_path: Path) -> None:
     """Verify multiple results can be stored in the same session."""
     assertions = StorageVerificationAssertions()
 
@@ -504,7 +505,7 @@ async def test_multiple_synthetic_results_same_session(verification_test_db_stor
     assert response2.status_code == 200
 
     # Verify counts
-    counts = await assertions.count_records_by_session(test_store_path, session_id)
+    counts = await assertions.count_records_by_session(test_db_path, session_id)
     assert counts["sessions"] == 1, "Should have 1 session"
     assert counts["utterances"] == 2, "Should have 2 utterances"
     assert counts["topics"] == 2, "Should have 2 topics"
@@ -513,7 +514,7 @@ async def test_multiple_synthetic_results_same_session(verification_test_db_stor
 
 
 @pytest.mark.asyncio
-async def test_session_isolation(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
+async def test_session_isolation(verification_test_db_store, sync_verification_client, test_db_path: Path) -> None:
     """Verify that different sessions maintain proper isolation."""
     assertions = StorageVerificationAssertions()
 
@@ -547,19 +548,19 @@ async def test_session_isolation(verification_test_db_store, sync_verification_c
     )
 
     # Verify session A has only its records
-    counts_a = await assertions.count_records_by_session(test_store_path, session_a)
+    counts_a = await assertions.count_records_by_session(test_db_path, session_a)
     assert counts_a["sessions"] == 1
     assert counts_a["utterances"] == 1
     assert counts_a["topics"] == 1
 
     # Verify session B has only its records
-    counts_b = await assertions.count_records_by_session(test_store_path, session_b)
+    counts_b = await assertions.count_records_by_session(test_db_path, session_b)
     assert counts_b["sessions"] == 1
     assert counts_b["utterances"] == 1
     assert counts_b["topics"] == 1
 
     # Verify total records across both sessions
-    async with aiosqlite.connect(test_store_path) as db:
+    async with aiosqlite.connect(test_db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM sessions") as cursor:
             total_sessions = (await cursor.fetchone())[0]
         assert total_sessions == 2, "Should have 2 sessions total"
@@ -570,7 +571,7 @@ async def test_session_isolation(verification_test_db_store, sync_verification_c
 
 
 @pytest.mark.asyncio
-async def test_text_field_exact_matching(verification_test_db_store, sync_verification_client, test_store_path: Path) -> None:
+async def test_text_field_exact_matching(verification_test_db_store, sync_verification_client, test_db_path: Path) -> None:
     """Verify that all text fields match the payload exactly, including special characters."""
     assertions = StorageVerificationAssertions()
 
@@ -593,7 +594,7 @@ async def test_text_field_exact_matching(verification_test_db_store, sync_verifi
 
     # Verify exact text matching
     await assertions.verify_text_field_exact_match(
-        test_store_path,
+        test_db_path,
         "special-chars-session",
         special_text,
         special_summary

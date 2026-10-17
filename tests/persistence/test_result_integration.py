@@ -1035,7 +1035,7 @@ async def test_result_timestamp_ordering(test_db_store, test_session_id: str) ->
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT id, created_at FROM results WHERE id IN ({})
-               ORDER BY created_at ASC""".format(
+               ORDER BY created_at ASC, rowid ASC""".format(
                 ",".join(f"'{rid}'" for rid in result_ids)
             )
         ) as cur:

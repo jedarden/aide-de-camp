@@ -59,9 +59,9 @@ class TestUtteranceLinkageVerification:
     """
 
     @pytest.mark.asyncio
-    async def test_utterance_to_topic_linkage_via_intent(self, test_test_db_store) -> None:
+    async def test_utterance_to_topic_linkage_via_intent(self, test_db_store) -> None:
         """Verify utterance is linked to topic through the intent foreign key chain."""
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -71,7 +71,7 @@ class TestUtteranceLinkageVerification:
             response = await generate_synthetic_result(request)
 
             # Step 1: Verify utterance exists and get its details
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id, session_id, raw_text FROM utterances WHERE id = ?",
@@ -81,7 +81,7 @@ class TestUtteranceLinkageVerification:
                     assert utterance is not None, "Utterance not found in store"
 
             # Step 2: Verify intent exists and links to the utterance
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id, utterance_id, topic_id, session_id FROM intents WHERE utterance_id = ?",
@@ -93,7 +93,7 @@ class TestUtteranceLinkageVerification:
                     assert intent["topic_id"] is not None, "Intent topic_id is NULL"
 
             # Step 3: Verify topic exists and is reachable through intent
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id, label, type, session_id FROM topics WHERE id = ?",
@@ -109,14 +109,14 @@ class TestUtteranceLinkageVerification:
             assert intent["topic_id"] == topic["id"], "Intent → Topic linkage broken"
 
     @pytest.mark.asyncio
-    async def test_exact_text_field_matching(self, test_test_db_store) -> None:
+    async def test_exact_text_field_matching(self, test_db_store) -> None:
         """Verify that all text fields match the test payload exactly, character-for-character."""
         test_utterance = VERIFICATION_TEST_PAYLOAD["utterance"]
         test_topic_label = VERIFICATION_TEST_PAYLOAD["topic_label"]
         test_summary = VERIFICATION_TEST_PAYLOAD["summary"]
         test_data = VERIFICATION_TEST_PAYLOAD["data"]
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -126,7 +126,7 @@ class TestUtteranceLinkageVerification:
             response = await generate_synthetic_result(request)
 
             # Verify utterance.raw_text matches exactly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT raw_text FROM utterances WHERE id = ?",
@@ -138,7 +138,7 @@ class TestUtteranceLinkageVerification:
                         f"Utterance text mismatch: expected '{test_utterance}', got '{utterance['raw_text']}'"
 
             # Verify topic.label matches exactly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT label FROM topics WHERE id = ?",
@@ -150,7 +150,7 @@ class TestUtteranceLinkageVerification:
                         f"Topic label mismatch: expected '{test_topic_label}', got '{topic['label']}'"
 
             # Verify result.summary matches exactly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT summary FROM results WHERE session_id = ?",
@@ -162,7 +162,7 @@ class TestUtteranceLinkageVerification:
                         f"Result summary mismatch: expected '{test_summary}', got '{result['summary']}'"
 
             # Verify result.data (JSON) matches exactly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT data FROM results WHERE session_id = ?",
@@ -174,9 +174,9 @@ class TestUtteranceLinkageVerification:
                         f"Result data mismatch: expected {test_data}, got {stored_data}"
 
     @pytest.mark.asyncio
-    async def test_foreign_key_relationships_integrity(self, test_test_db_store) -> None:
+    async def test_foreign_key_relationships_integrity(self, test_db_store) -> None:
         """Verify that all foreign key relationships are valid and intact."""
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -186,7 +186,7 @@ class TestUtteranceLinkageVerification:
             response = await generate_synthetic_result(request)
 
             # Get the intent_id associated with the utterance
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id FROM intents WHERE utterance_id = ?",
@@ -196,7 +196,7 @@ class TestUtteranceLinkageVerification:
                     assert intent is not None, "Intent not found"
 
             # Verify referential integrity: utterance.session_id references sessions.id
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id FROM sessions WHERE id = ?",
@@ -206,7 +206,7 @@ class TestUtteranceLinkageVerification:
                     assert session is not None, "Session referenced by utterance does not exist"
 
             # Verify referential integrity: intent.utterance_id references utterances.id
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id FROM utterances WHERE id = ?",
@@ -222,7 +222,7 @@ class TestUtteranceLinkageVerification:
                         assert utterance_check is not None, "Utterance referenced by intent does not exist"
 
             # Verify referential integrity: intent.topic_id references topics.id
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id FROM topics WHERE id = ?",
@@ -232,9 +232,9 @@ class TestUtteranceLinkageVerification:
                     assert topic is not None, "Topic referenced by intent does not exist"
 
     @pytest.mark.asyncio
-    async def test_complete_data_integrity_verification(self, test_test_db_store) -> None:
+    async def test_complete_data_integrity_verification(self, test_db_store) -> None:
         """Verify complete data integrity across all related records."""
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -244,7 +244,7 @@ class TestUtteranceLinkageVerification:
             response = await generate_synthetic_result(request)
 
             # Verify all records exist and are linked correctly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
 
                 # 1. Session exists
@@ -288,7 +288,7 @@ class TestUtteranceLinkageVerification:
                 assert result_row["topic_id"] == response.topic_id, "Result not linked to topic"
 
     @pytest.mark.asyncio
-    async def test_utterance_linkage_with_special_characters(self, test_test_db_store) -> None:
+    async def test_utterance_linkage_with_special_characters(self, test_db_store) -> None:
         """Verify utterance linkage preserves special characters exactly."""
         special_text = "Test with special chars: émojis 🎉, unicode ™, quotes \"', and symbols @#$%^&*()"
 
@@ -304,7 +304,7 @@ class TestUtteranceLinkageVerification:
             "result_type": "status:special-chars-test"
         }
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -314,7 +314,7 @@ class TestUtteranceLinkageVerification:
             response = await generate_synthetic_result(request)
 
             # Verify special characters are preserved exactly in utterance
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT raw_text FROM utterances WHERE id = ?",
@@ -325,7 +325,7 @@ class TestUtteranceLinkageVerification:
                         f"Special characters in utterance not preserved: expected '{special_text}', got '{utterance['raw_text']}'"
 
             # Verify special characters are preserved exactly in topic
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT label FROM topics WHERE id = ?",
@@ -336,7 +336,7 @@ class TestUtteranceLinkageVerification:
                         f"Special characters in topic not preserved"
 
             # Verify special characters are preserved exactly in summary
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT summary FROM results WHERE session_id = ?",

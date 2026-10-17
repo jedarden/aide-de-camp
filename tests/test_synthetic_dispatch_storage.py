@@ -64,11 +64,11 @@ class TestSyntheticDispatchStorageVerification:
     """
 
     @pytest.mark.asyncio
-    async def test_session_record_created(self, test_test_db_store) -> None:
+    async def test_session_record_created(self, test_db_store) -> None:
         """Verify that a session record is created with correct session_id."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             # Create synthetic result without session_id (generates new one)
             request = SyntheticResultRequest(
                 session_id=None,
@@ -79,7 +79,7 @@ class TestSyntheticDispatchStorageVerification:
             response = await generate_synthetic_result(request)
 
             # Verify session exists in store
-            session = await test_store.get_session(response.session_id)
+            session = await test_db_store.get_session(response.session_id)
 
             assert session is not None, "Session record not created"
             assert session["id"] == response.session_id, "Session ID mismatch"
@@ -87,13 +87,13 @@ class TestSyntheticDispatchStorageVerification:
             assert session["last_active"] is not None, "Session last_active is NULL"
 
     @pytest.mark.asyncio
-    async def test_utterance_record_created(self, test_test_db_store) -> None:
+    async def test_utterance_record_created(self, test_db_store) -> None:
         """Verify that an utterance record is created and linked to session."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
         test_utterance = "verify test storage integrity"
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -103,7 +103,7 @@ class TestSyntheticDispatchStorageVerification:
             response = await generate_synthetic_result(request)
 
             # Query utterances table directly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM utterances WHERE session_id = ?",
@@ -119,11 +119,11 @@ class TestSyntheticDispatchStorageVerification:
                     assert utterance["created_at"] is not None, "Utterance created_at is NULL"
 
     @pytest.mark.asyncio
-    async def test_intent_record_created(self, test_test_db_store) -> None:
+    async def test_intent_record_created(self, test_db_store) -> None:
         """Verify that an intent record is created and linked to utterance."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -133,7 +133,7 @@ class TestSyntheticDispatchStorageVerification:
             response = await generate_synthetic_result(request)
 
             # Query intents table directly by utterance_id
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM intents WHERE utterance_id = ?",
@@ -152,7 +152,7 @@ class TestSyntheticDispatchStorageVerification:
                     stored_intent_id = intent["id"]
 
     @pytest.mark.asyncio
-    async def test_topic_record_created(self, test_test_db_store) -> None:
+    async def test_topic_record_created(self, test_db_store) -> None:
         """Verify that a topic record is created with correct type and label."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -160,7 +160,7 @@ class TestSyntheticDispatchStorageVerification:
         expected_topic_type = "research"
         expected_project_slug = "test-storage-verification"
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -175,7 +175,7 @@ class TestSyntheticDispatchStorageVerification:
             response = await generate_synthetic_result(request)
 
             # Query topics table directly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM topics WHERE id = ?",
@@ -196,7 +196,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert slugs == [expected_project_slug], f"Project slugs mismatch: expected ['{expected_project_slug}'], got {slugs}"
 
     @pytest.mark.asyncio
-    async def test_result_record_created(self, test_test_db_store) -> None:
+    async def test_result_record_created(self, test_db_store) -> None:
         """Verify that a result record is created with all fields intact."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
@@ -210,7 +210,7 @@ class TestSyntheticDispatchStorageVerification:
             }
         }
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -220,7 +220,7 @@ class TestSyntheticDispatchStorageVerification:
             response = await generate_synthetic_result(request)
 
             # Query results table directly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM results WHERE session_id = ?",
@@ -242,11 +242,11 @@ class TestSyntheticDispatchStorageVerification:
                     assert stored_data == expected_data, f"Result data mismatch: expected {expected_data}, got {stored_data}"
 
     @pytest.mark.asyncio
-    async def test_foreign_key_relationships(self, test_test_db_store) -> None:
+    async def test_foreign_key_relationships(self, test_db_store) -> None:
         """Verify that foreign key relationships are correctly established."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -256,7 +256,7 @@ class TestSyntheticDispatchStorageVerification:
             response = await generate_synthetic_result(request)
 
             # Get the actual stored intent_id
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id FROM intents WHERE utterance_id = ?",
@@ -267,7 +267,7 @@ class TestSyntheticDispatchStorageVerification:
                     stored_intent_id = intent_row["id"]
 
             # Verify utterance -> session relationship
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT session_id FROM utterances WHERE id = ?",
@@ -278,7 +278,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert row["session_id"] == response.session_id, "Utterance not linked to correct session"
 
             # Verify intent -> utterance relationship
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT utterance_id, session_id FROM intents WHERE id = ?",
@@ -291,7 +291,7 @@ class TestSyntheticDispatchStorageVerification:
 
             # Verify result -> intent -> topic relationships
             # Note: create_result uses response.intent_id, not the stored intent_id from create_intent
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT intent_id, topic_id, session_id FROM results WHERE session_id = ?",
@@ -305,7 +305,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert row["session_id"] == response.session_id, "Result not linked to correct session"
 
             # Verify topic -> session relationship
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT session_id, scope FROM topics WHERE id = ?",
@@ -317,14 +317,14 @@ class TestSyntheticDispatchStorageVerification:
                     assert row["scope"] == "session", f"Topic scope should be 'session', got '{row['scope']}'"
 
     @pytest.mark.asyncio
-    async def test_text_fields_match_payload_exactly(self, test_test_db_store) -> None:
+    async def test_text_fields_match_payload_exactly(self, test_db_store) -> None:
         """Verify that all text fields match the test payload exactly."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
         custom_text = "Custom verification text with special chars: !@#$%^&*()"
         custom_summary = "Custom summary with unicode: café, naïve, résumé"
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -344,7 +344,7 @@ class TestSyntheticDispatchStorageVerification:
             response = await generate_synthetic_result(request)
 
             # Verify utterance text matches exactly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT raw_text FROM utterances WHERE id = ?",
@@ -355,7 +355,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert row["raw_text"] == custom_text, f"Utterance text mismatch: expected '{custom_text}', got '{row['raw_text']}'"
 
             # Verify topic label matches exactly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT label FROM topics WHERE id = ?",
@@ -366,7 +366,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert row["label"] == "Custom Topic Label", f"Topic label mismatch: expected 'Custom Topic Label', got '{row['label']}'"
 
             # Verify result summary matches exactly
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT summary FROM results WHERE session_id = ?",
@@ -377,13 +377,13 @@ class TestSyntheticDispatchStorageVerification:
                     assert row["summary"] == custom_summary, f"Result summary mismatch: expected '{custom_summary}', got '{row['summary']}'"
 
     @pytest.mark.asyncio
-    async def test_multiple_synthetic_results_in_same_session(self, test_test_db_store) -> None:
+    async def test_multiple_synthetic_results_in_same_session(self, test_db_store) -> None:
         """Verify that multiple synthetic results in the same session are stored correctly."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
-        session_id = await test_store.create_session()
+        session_id = await test_db_store.create_session()
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             # Create first result
             request1 = SyntheticResultRequest(
                 session_id=session_id,
@@ -423,7 +423,7 @@ class TestSyntheticDispatchStorageVerification:
             response2 = await generate_synthetic_result(request2)
 
             # Verify both results in same session
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT COUNT(*) as count FROM results WHERE session_id = ?",
@@ -433,7 +433,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert row["count"] == 2, f"Expected 2 results in session, got {row['count']}"
 
             # Verify utterances are distinct
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id, raw_text FROM utterances WHERE session_id = ? ORDER BY created_at",
@@ -446,7 +446,7 @@ class TestSyntheticDispatchStorageVerification:
                     assert "second test utterance" in utterance_texts, "Second utterance not found"
 
             # Verify topics are distinct
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT id, label FROM topics WHERE session_id = ? ORDER BY created_at",
@@ -468,11 +468,11 @@ class TestSyntheticDispatchAPIEndpoint:
     """
 
     @pytest.mark.asyncio
-    async def test_api_creates_records_in_store(self, test_test_db_store) -> None:
+    async def test_api_creates_records_in_store(self, test_db_store) -> None:
         """Verify that calling the API endpoint creates records in the session test_db_store."""
         from src.test.dispatch import generate_synthetic_result, SyntheticResultRequest
 
-        with patch('src.test.dispatch.get_store', return_value=test_store):
+        with patch('src.test.dispatch.get_store', return_value=test_db_store):
             request = SyntheticResultRequest(
                 session_id=None,
                 surface_id=None,
@@ -482,11 +482,11 @@ class TestSyntheticDispatchAPIEndpoint:
             response = await generate_synthetic_result(request)
 
             # Verify all records exist in our test store
-            session = await test_store.get_session(response.session_id)
+            session = await test_db_store.get_session(response.session_id)
             assert session is not None, "Session not found in store"
 
             # Verify utterance exists
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM utterances WHERE id = ?", (response.utterance_id,)
@@ -495,7 +495,7 @@ class TestSyntheticDispatchAPIEndpoint:
                     assert utterance is not None, "Utterance not found in store"
 
             # Verify intent exists (query by utterance_id since create_intent generates its own ID)
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM intents WHERE utterance_id = ?", (response.utterance_id,)
@@ -504,7 +504,7 @@ class TestSyntheticDispatchAPIEndpoint:
                     assert intent is not None, "Intent not found in store"
 
             # Verify topic exists
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM topics WHERE id = ?", (response.topic_id,)
@@ -513,7 +513,7 @@ class TestSyntheticDispatchAPIEndpoint:
                     assert topic is not None, "Topic not found in store"
 
             # Verify result exists (query by session_id since response.result_id may not match)
-            async with aiosqlite.connect(test_store.db_path) as db:
+            async with aiosqlite.connect(test_db_store.db_path) as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM results WHERE session_id = ?", (response.session_id,)

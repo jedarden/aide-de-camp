@@ -10,6 +10,7 @@ Verifies that the test endpoint broadcasts SSE events correctly:
 import asyncio
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 from httpx import AsyncClient, ASGITransport
 from src.sse.broadcaster import SSEEvent, get_broadcaster
 from src.session.store import SessionStore, get_store
@@ -17,6 +18,13 @@ from src.main import app
 
 
 # --- fixtures ---------------------------------------------------------------
+
+
+@pytest.fixture
+async def isolated_store(test_db_store):
+    """Use the initialized temporary store for endpoint and direct calls."""
+    with patch("src.session.store.get_store", return_value=test_db_store):
+        yield test_db_store
 
 
 async def _started_broadcaster():
@@ -72,7 +80,7 @@ class TestSSEBroadcastEndpoint:
     """Verify SSE broadcast functionality from POST /api/v1/test/sse-broadcast endpoint."""
 
     async def test_broadcast_with_result_created_event_type(
-        self, isolated_test_db_store
+        self, isolated_store
     ):
         """Verify that SSE event with event_type='result_created' is broadcast."""
         broadcaster = await _started_broadcaster()
@@ -131,7 +139,7 @@ class TestSSEBroadcastEndpoint:
             broadcaster.unregister(conn.connection_id)
 
     async def test_broadcast_with_surface_id_targeting(
-        self, isolated_test_db_store
+        self, isolated_store
     ):
         """Verify that broadcast includes surface_id targeting when provided."""
         broadcaster = await _started_broadcaster()
@@ -192,7 +200,7 @@ class TestSSEBroadcastEndpoint:
             broadcaster.unregister(conn2.connection_id)
 
     async def test_broadcast_uses_existing_broadcaster_and_sse_event(
-        self, isolated_test_db_store
+        self, isolated_store
     ):
         """Verify that endpoint uses existing get_broadcaster() and SSEEvent."""
         broadcaster = await _started_broadcaster()
@@ -236,7 +244,7 @@ class TestSSEBroadcastEndpoint:
             broadcaster.unregister(conn.connection_id)
 
     async def test_broadcast_timing_matches_dispatch_pattern(
-        self, isolated_test_db_store
+        self, isolated_store
     ):
         """Verify that broadcast timing matches /dispatch pattern (synchronous completion)."""
         broadcaster = await _started_broadcaster()
@@ -282,7 +290,7 @@ class TestSSEBroadcastEndpoint:
             broadcaster.unregister(conn.connection_id)
 
     async def test_broadcast_without_surface_id(
-        self, isolated_test_db_store
+        self, isolated_store
     ):
         """Verify that broadcast works when surface_id is not provided (broadcasts to all)."""
         broadcaster = await _started_broadcaster()
@@ -324,7 +332,7 @@ class TestSSEBroadcastEndpoint:
             broadcaster.unregister(conn.connection_id)
 
     async def test_custom_event_type_broadcast(
-        self, isolated_test_db_store
+        self, isolated_store
     ):
         """Verify that custom event types are broadcast correctly."""
         broadcaster = await _started_broadcaster()
@@ -369,7 +377,7 @@ class TestSSEBroadcastEndpoint:
             broadcaster.unregister(conn.connection_id)
 
     async def test_no_connected_surfaces_still_succeeds(
-        self, isolated_test_db_store
+        self, isolated_store
     ):
         """Verify that endpoint succeeds even when no SSE surface is connected."""
         # Do NOT register any SSE connection

@@ -505,45 +505,45 @@ class TestGitUtilityFunctions:
         """run_git_command executes successfully and returns structured output."""
         result = run_git_command(['status', '--short'])
 
-        assert result.status == GitOperationStatus.SUCCESS
-        assert result.details['returncode'] == 0
-        assert result.details.get('timed_out') is not True
-        assert isinstance(result.details['stdout'], str)
-        assert isinstance(result.error, type(None))
+        assert result.success is True
+        assert result.returncode == 0
+        assert result.timed_out is not True
+        assert isinstance(result.stdout, str)
+        assert result.stderr == ""
 
     def test_run_git_command_non_zero_exit(self):
         """run_git_command handles non-zero exit codes gracefully."""
         # 'git' with no arguments should fail
         result = run_git_command(['invalid-subcommand'])
 
-        assert result.status == GitOperationStatus.FAILED
-        assert result.details['returncode'] != 0
-        assert result.details.get('timed_out') is not True
+        assert result.success is False
+        assert result.returncode != 0
+        assert result.timed_out is not True
 
     def test_run_git_command_timeout(self):
         """run_git_command handles timeouts."""
         # Use a very short timeout; git operations shouldn't normally timeout
         result = run_git_command(['status'], timeout=0.001)
 
-        assert result.status == GitOperationStatus.FAILED
-        assert result.details.get('timed_out') is True
+        assert result.success is False
+        assert result.timed_out is True
 
     def test_git_status_executes_and_returns_output(self):
         """git_status executes 'git status' and returns output."""
         result = git_status(short=True)
 
-        assert result.status == GitOperationStatus.SUCCESS
-        assert result.details['returncode'] == 0
-        assert isinstance(result.details['stdout'], str)
+        assert result.success is True
+        assert result.returncode == 0
+        assert isinstance(result.stdout, str)
 
     def test_git_status_long_format(self):
         """git_status supports long format output."""
         result = git_status(short=False)
 
-        assert result.status == GitOperationStatus.SUCCESS
-        assert result.details['returncode'] == 0
+        assert result.success is True
+        assert result.returncode == 0
         # Long format should have more verbose output
-        assert len(result.details['stdout']) > 0
+        assert len(result.stdout) > 0
 
     def test_git_add_files(self, tmp_path):
         """git_add stages files for commit."""
@@ -558,8 +558,8 @@ class TestGitUtilityFunctions:
 
         result = git_add([str(test_file)], cwd=tmp_path)
 
-        assert result.status == GitOperationStatus.SUCCESS
-        assert result.details['returncode'] == 0
+        assert result.success is True
+        assert result.returncode == 0
 
     def test_git_commit_creates_commit(self, tmp_path):
         """git_commit creates a commit with a message."""
@@ -576,9 +576,9 @@ class TestGitUtilityFunctions:
         # Create commit
         result = git_commit("Test commit message", cwd=tmp_path)
 
-        assert result.status == GitOperationStatus.SUCCESS
-        assert result.details['returncode'] == 0
-        assert result.commit_sha is not None  # Should have commit SHA
+        assert result.success is True
+        assert result.returncode == 0
+        assert git_rev_parse("HEAD", cwd=tmp_path).stdout.strip()
 
     def test_git_commit_with_specific_paths(self, tmp_path):
         """git_commit can commit specific paths."""
@@ -599,7 +599,7 @@ class TestGitUtilityFunctions:
         result = git_commit("Commit file1", paths=["file1.txt"], cwd=tmp_path)
 
         assert result.success is True
-        assert result.status.value == "success"
+        assert result.success is True
 
     def test_git_rev_parse_short_sha(self, tmp_path):
         """git_rev_parse returns short SHA."""
@@ -616,9 +616,9 @@ class TestGitUtilityFunctions:
         result = git_rev_parse('HEAD', short=True, cwd=tmp_path)
 
         assert result.success is True
-        assert result.status.value == "success"
+        assert result.success is True
         # Short SHA should be 7 characters
-        stdout = result.details.get('stdout', '')
+        stdout = result.stdout
         assert len(stdout.strip()) == 7
 
     def test_git_show_file_content(self, tmp_path):
@@ -637,8 +637,8 @@ class TestGitUtilityFunctions:
         result = git_show('HEAD:test.txt', cwd=tmp_path)
 
         assert result.success is True
-        assert result.status.value == "success"
-        stdout = result.details.get('stdout', '')
+        assert result.success is True
+        stdout = result.stdout
         assert test_content in stdout
 
     def test_git_result_dataclass(self):

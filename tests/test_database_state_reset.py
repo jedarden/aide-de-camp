@@ -30,6 +30,7 @@ from src.session.store import SessionStore
 
 # All tables in the session.db schema
 ALL_TABLES = [
+    "annotations",
     "sessions",
     "surfaces",
     "utterances",
@@ -47,10 +48,15 @@ ALL_TABLES = [
 ]
 
 
+def connect_test_db(db_path: str | Path):
+    """Open file-backed and shared-memory test databases the same way as the store."""
+    return aiosqlite.connect(db_path, uri=str(db_path).startswith("file:"))
+
+
 async def get_all_table_counts(db_path: str | Path) -> dict[str, int]:
     """Get row counts for all tables in the database."""
     counts = {}
-    async with aiosqlite.connect(db_path) as db:
+    async with connect_test_db(db_path) as db:
         db.row_factory = aiosqlite.Row
         for table in ALL_TABLES:
             try:
@@ -84,21 +90,21 @@ async def populate_all_tables(store: SessionStore, session_id: str) -> dict[str,
     counts = {}
 
     # Sessions table (already has 1 from create_session)
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM sessions") as cur:
             row = await cur.fetchone()
             counts["sessions"] = row[0] if row else 0
 
     # Surfaces
     surface_id = await store.register_surface(session_id, "canvas")
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM surfaces") as cur:
             row = await cur.fetchone()
             counts["surfaces"] = row[0] if row else 0
 
     # Utterances
     utterance_id = await store.create_utterance(session_id, "test utterance")
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM utterances") as cur:
             row = await cur.fetchone()
             counts["utterances"] = row[0] if row else 0
@@ -111,7 +117,7 @@ async def populate_all_tables(store: SessionStore, session_id: str) -> dict[str,
         scope="session",
         session_id=session_id
     )
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM topics") as cur:
             row = await cur.fetchone()
             counts["topics"] = row[0] if row else 0
@@ -126,14 +132,14 @@ async def populate_all_tables(store: SessionStore, session_id: str) -> dict[str,
         bead_ref=None,
         lookup_kind=None
     )
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM intents") as cur:
             row = await cur.fetchone()
             counts["intents"] = row[0] if row else 0
 
     # Intent_topics many-to-many
     await store.link_intent_to_topic(intent_id, topic_id)
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM intent_topics") as cur:
             row = await cur.fetchone()
             counts["intent_topics"] = row[0] if row else 0
@@ -147,14 +153,14 @@ async def populate_all_tables(store: SessionStore, session_id: str) -> dict[str,
         data={"test": "data"},
         urgency="normal"
     )
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM results") as cur:
             row = await cur.fetchone()
             counts["results"] = row[0] if row else 0
 
     # Topic context cache
     await store.set_topic_context(topic_id, {"test": "context"}, ttl_seconds=600)
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM topic_context_cache") as cur:
             row = await cur.fetchone()
             counts["topic_context_cache"] = row[0] if row else 0
@@ -168,7 +174,7 @@ async def populate_all_tables(store: SessionStore, session_id: str) -> dict[str,
         topic_id=topic_id,
         data={"test": "signal"}
     )
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM feedback_signals") as cur:
             row = await cur.fetchone()
             counts["feedback_signals"] = row[0] if row else 0
@@ -180,13 +186,13 @@ async def populate_all_tables(store: SessionStore, session_id: str) -> dict[str,
         fetch_total_ms=200,
         synthesize_total_ms=300
     )
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM dispatch_timings") as cur:
             row = await cur.fetchone()
             counts["dispatch_timings"] = row[0] if row else 0
 
     # Bead watch
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         await db.execute(
             """INSERT INTO bead_watch
                (bead_ref, refusal_count, sla_deadline, created_at)
@@ -199,7 +205,7 @@ async def populate_all_tables(store: SessionStore, session_id: str) -> dict[str,
             counts["bead_watch"] = row[0] if row else 0
 
     # Pending bead approvals
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         await db.execute(
             """INSERT INTO pending_bead_approvals
                (id, intent_id, session_id, bead_body, bead_type, validation_result, utterance, created_at, expires_at, status)
@@ -213,7 +219,7 @@ async def populate_all_tables(store: SessionStore, session_id: str) -> dict[str,
             counts["pending_bead_approvals"] = row[0] if row else 0
 
     # Confirmation prompts
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         await db.execute(
             """INSERT INTO confirmation_prompts
                (id, intent_id, session_id, prompt_type, question, created_at, status)
@@ -233,7 +239,7 @@ async def populate_all_tables(store: SessionStore, session_id: str) -> dict[str,
         layout_bucket="default",
         rendered_html="<div>Test</div>"
     )
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM card_cache") as cur:
             row = await cur.fetchone()
             counts["card_cache"] = row[0] if row else 0
@@ -433,7 +439,7 @@ async def test_in_memory_db_unique_per_test(in_memory_db_store):
     await in_memory_db_store.create_utterance(session_id, "unique test data")
 
     # Verify data exists in this database
-    async with aiosqlite.connect(db_path) as db:
+    async with connect_test_db(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT COUNT(*) FROM utterances") as cur:
             count = (await cur.fetchone())[0]
@@ -481,7 +487,7 @@ async def test_global_store_singleton_reset():
     await store.create_utterance(session_id, "singleton test")
 
     # Verify data exists
-    async with aiosqlite.connect(store.db_path) as db:
+    async with connect_test_db(store.db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT COUNT(*) FROM utterances") as cur:
             count = (await cur.fetchone())[0]

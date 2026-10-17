@@ -7,17 +7,17 @@ persisted to the SQLite session store after test endpoint calls.
 Acceptance Criteria:
 - Session record exists with correct session_id
 - Topic record created with type, utterance, and result fields
-- Records queryable from data/session.db
+- Records queryable from the isolated session database
 - Basic data structure integrity verified
 """
 
 import json
-from pathlib import Path
 from typing import Dict, Any
 
 import aiosqlite
 import pytest
 import httpx
+from src.session.store import get_store
 from uuid import uuid4
 
 
@@ -50,7 +50,7 @@ async def test_session_persistence_after_synthetic_dispatch(async_client: httpx.
     assert "topic_id" in data
 
     # Query the database to verify session record exists
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
 
@@ -94,7 +94,7 @@ async def test_topic_persistence_after_synthetic_dispatch(async_client: httpx.As
     topic_id = data["topic_id"]
 
     # Query the database to verify topic record
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
 
@@ -144,7 +144,7 @@ async def test_utterance_persistence_after_synthetic_dispatch(async_client: http
     utterance_id = data["utterance_id"]
 
     # Query the database to verify utterance record
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
 
@@ -187,7 +187,7 @@ async def test_intent_persistence_after_synthetic_dispatch(async_client: httpx.A
     intent_id = data["intent_id"]
 
     # Query the database to verify intent record
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
 
@@ -232,7 +232,7 @@ async def test_result_persistence_after_synthetic_dispatch(async_client: httpx.A
     topic_id = data["topic_id"]
 
     # Query the database to verify result record
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
 
@@ -288,7 +288,7 @@ async def test_complete_record_hierarchy_persistence(async_client: httpx.AsyncCl
     topic_id = data["topic_id"]
 
     # Query the database to verify all records and their relationships
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
 
@@ -335,7 +335,7 @@ async def test_complete_record_hierarchy_persistence(async_client: httpx.AsyncCl
 
 @pytest.mark.asyncio
 async def test_database_queryability(async_client: httpx.AsyncClient) -> None:
-    """Test that persisted records are queryable from data/session.db."""
+    """Test that persisted records are queryable from the isolated store."""
     session_id = str(uuid4())
     topic_label = "Queryability Test"
 
@@ -351,7 +351,7 @@ async def test_database_queryability(async_client: httpx.AsyncClient) -> None:
         }
     )
 
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
 
     # Verify database file exists and is queryable
     assert db_path.exists(), "Database file does not exist"
@@ -413,7 +413,7 @@ async def test_data_structure_integrity(async_client: httpx.AsyncClient) -> None
     assert response.status_code == 200
     data = response.json()
 
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
 
@@ -500,7 +500,7 @@ async def test_multiple_sessions_isolation(async_client: httpx.AsyncClient) -> N
     data1 = response1.json()
     data2 = response2.json()
 
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
 
@@ -553,7 +553,7 @@ async def test_cascade_relationship_integrity(async_client: httpx.AsyncClient) -
     assert response.status_code == 200
     data = response.json()
 
-    db_path = Path("/home/coding/aide-de-camp/data/session.db")
+    db_path = (await get_store()).db_path
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
 

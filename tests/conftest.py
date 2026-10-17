@@ -93,14 +93,13 @@ def registry_context():
 
 @pytest.fixture(scope="function")
 async def async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
-    """Create an HTTPX async client for testing FastAPI endpoints.
+    """Create an HTTPX async client against the app in this checkout."""
+    from src.main import app
 
-    This client connects to a running server at localhost:8000.
-    For tests that require the server to be running, use this fixture.
-    """
     client = httpx.AsyncClient(
-        base_url="http://localhost:8000",
-        timeout=10.0
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+        timeout=10.0,
     )
     try:
         yield client
@@ -567,7 +566,7 @@ async def in_memory_db_store():
 
     # Create a keeper connection that will stay open during the test
     # This prevents the in-memory database from being destroyed
-    keeper_conn = await aiosqlite.connect(db_path)
+    keeper_conn = await aiosqlite.connect(db_path, uri=True)
 
     # Initialize the database schema via the keeper connection
     await keeper_conn.execute("PRAGMA journal_mode=WAL")

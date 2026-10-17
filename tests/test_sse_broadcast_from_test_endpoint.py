@@ -13,7 +13,7 @@ Acceptance criteria:
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 
 from src.main import app
 from src.sse.broadcaster import get_broadcaster, SSEBroadcaster, SSEEvent, EventType
@@ -25,7 +25,7 @@ class TestSSEBroadcastFromTestEndpoint:
     """Verify SSE broadcast from /test endpoint."""
 
     @pytest.mark.asyncio
-    async def test_test_endpoint_broadcasts_sse_event(self, test_test_db_store) -> None:
+    async def test_test_endpoint_broadcasts_sse_event(self, test_db_store) -> None:
         """Verify that /test endpoint broadcasts result_created SSE event when surface_id is provided."""
         # Get broadcaster
         broadcaster = get_broadcaster()
@@ -33,7 +33,7 @@ class TestSSEBroadcastFromTestEndpoint:
 
         try:
             # Mock the store
-            with patch('src.main.get_store', return_value=test_store):
+            with patch('src.main.get_store', return_value=test_db_store):
                 # Create a mock surface connection
                 surface_id = "test-surface-123"
                 session_id = "test-session-456"
@@ -56,9 +56,10 @@ class TestSSEBroadcastFromTestEndpoint:
                 test_payload = {
                     "utterance": "test SSE broadcast verification",
                     "session_id": session_id,
+                    "surface_id": surface_id,
                 }
 
-                async with AsyncClient(app=app, base_url="http://test") as client:
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                     response = await client.post("/test", json=test_payload)
 
                 # Verify the endpoint returns success
@@ -85,7 +86,7 @@ class TestSSEBroadcastFromTestEndpoint:
             await broadcaster.stop()
 
     @pytest.mark.asyncio
-    async def test_test_endpoint_without_surface_id_no_broadcast(self, test_test_db_store) -> None:
+    async def test_test_endpoint_without_surface_id_no_broadcast(self, test_db_store) -> None:
         """Verify that /test endpoint without surface_id does not broadcast to specific surface."""
         # Get broadcaster
         broadcaster = get_broadcaster()
@@ -93,7 +94,7 @@ class TestSSEBroadcastFromTestEndpoint:
 
         try:
             # Mock the store
-            with patch('src.main.get_store', return_value=test_store):
+            with patch('src.main.get_store', return_value=test_db_store):
                 session_id = "test-session-no-surface"
 
                 # Register a test connection (should NOT receive event)
@@ -115,7 +116,7 @@ class TestSSEBroadcastFromTestEndpoint:
                     "session_id": session_id,
                 }
 
-                async with AsyncClient(app=app, base_url="http://test") as client:
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                     response = await client.post("/test", json=test_payload)
 
                 # Verify the endpoint returns success
@@ -141,7 +142,7 @@ class TestSSEBroadcastFromTestEndpoint:
             await broadcaster.stop()
 
     @pytest.mark.asyncio
-    async def test_test_endpoint_sse_matches_dispatch_pattern(self, test_test_db_store) -> None:
+    async def test_test_endpoint_sse_matches_dispatch_pattern(self, test_db_store) -> None:
         """Verify that /test endpoint SSE pattern matches /dispatch endpoint pattern."""
         # Get broadcaster
         broadcaster = get_broadcaster()
@@ -149,7 +150,7 @@ class TestSSEBroadcastFromTestEndpoint:
 
         try:
             # Mock the store
-            with patch('src.main.get_store', return_value=test_store):
+            with patch('src.main.get_store', return_value=test_db_store):
                 session_id = "test-pattern-match"
                 surface_id = "test-surface-pattern"
 
@@ -168,9 +169,10 @@ class TestSSEBroadcastFromTestEndpoint:
                 test_payload = {
                     "utterance": "pattern verification",
                     "session_id": session_id,
+                    "surface_id": surface_id,
                 }
 
-                async with AsyncClient(app=app, base_url="http://test") as client:
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                     response = await client.post("/test", json=test_payload)
 
                 assert response.status_code == 200
@@ -205,10 +207,10 @@ class TestSSEBroadcastFromTestEndpoint:
             await broadcaster.stop()
 
     @pytest.mark.asyncio
-    async def test_test_endpoint_uses_get_broadcaster(self, test_test_db_store) -> None:
+    async def test_test_endpoint_uses_get_broadcaster(self, test_db_store) -> None:
         """Verify that /test endpoint uses get_broadcaster() singleton."""
         # Mock the store
-        with patch('src.main.get_store', return_value=test_store):
+        with patch('src.main.get_store', return_value=test_db_store):
             # Mock get_broadcaster to track calls
             mock_broadcaster = AsyncMock()
             mock_broadcaster.broadcast = AsyncMock(return_value=1)
@@ -221,7 +223,7 @@ class TestSSEBroadcastFromTestEndpoint:
                     "session_id": session_id,
                 }
 
-                async with AsyncClient(app=app, base_url="http://test") as client:
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                     response = await client.post("/test", json=test_payload)
 
                 # Verify endpoint succeeded

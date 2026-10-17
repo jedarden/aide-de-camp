@@ -12,6 +12,7 @@ import pytest
 
 # Expected tables from production SCHEMA_SQL
 EXPECTED_TABLES = {
+    "annotations",
     "bead_watch",
     "card_cache",
     "confirmation_prompts",
@@ -30,6 +31,9 @@ EXPECTED_TABLES = {
 
 # Expected indexes from production SCHEMA_SQL
 EXPECTED_INDEXES = {
+    "idx_annotations_session",
+    "idx_annotations_topic",
+    "idx_annotations_utterance",
     "idx_bead_watch_fenced",
     "idx_bead_watch_sla_deadline",
     "idx_card_cache_result_id",
@@ -38,6 +42,7 @@ EXPECTED_INDEXES = {
     "idx_confirmation_prompts_status",
     "idx_context_expires",
     "idx_dispatch_timings_created",
+    "idx_dispatch_timings_session",
     "idx_intents_session",
     "idx_intents_status",
     "idx_intents_topic",

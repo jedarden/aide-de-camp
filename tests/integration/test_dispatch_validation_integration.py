@@ -593,7 +593,9 @@ async def test_dispatch_happy_path_minimal_request(async_client: httpx.AsyncClie
 
     # If successful, verify response structure
     if response.status_code == 200:
-        response_data = response.json()
+        envelope = response.json()
+        assert envelope["success"] is True
+        response_data = {**envelope["data"], "message": envelope["message"]}
 
         # Verify required response fields
         assert "utterance_id" in response_data
@@ -638,7 +640,9 @@ async def test_dispatch_happy_path_full_request(async_client: httpx.AsyncClient)
 
     # If successful, verify response structure and that provided utterance_id is preserved
     if response.status_code == 200:
-        response_data = response.json()
+        envelope = response.json()
+        assert envelope["success"] is True
+        response_data = {**envelope["data"], "message": envelope["message"]}
 
         # Verify required response fields
         assert "utterance_id" in response_data
@@ -675,7 +679,9 @@ async def test_dispatch_response_includes_intent_ids(async_client: httpx.AsyncCl
 
     # Assert - Verify response structure includes intent_ids
     if response.status_code == 200:
-        response_data = response.json()
+        envelope = response.json()
+        assert envelope["success"] is True
+        response_data = {**envelope["data"], "message": envelope["message"]}
 
         # Verify intent_ids field exists and is a list
         assert "intent_ids" in response_data, \
@@ -715,7 +721,9 @@ async def test_dispatch_response_structure_completeness(async_client: httpx.Asyn
 
     # Assert - Verify complete response structure
     if response.status_code == 200:
-        response_data = response.json()
+        envelope = response.json()
+        assert envelope["success"] is True
+        response_data = {**envelope["data"], "message": envelope["message"]}
 
         # Verify all expected top-level fields exist
         expected_fields = [
@@ -771,7 +779,9 @@ async def test_dispatch_utterance_id_auto_generation(async_client: httpx.AsyncCl
 
     # Assert - Verify utterance_id was auto-generated
     if response.status_code == 200:
-        response_data = response.json()
+        envelope = response.json()
+        assert envelope["success"] is True
+        response_data = {**envelope["data"], "message": envelope["message"]}
 
         # Verify utterance_id exists and is a valid UUID string
         assert "utterance_id" in response_data, \
@@ -814,8 +824,9 @@ async def test_dispatch_whitespace_stripping(async_client: httpx.AsyncClient):
     # If successful, the request was processed
     if response.status_code == 200:
         # Just verify we got a valid response
-        assert "utterance_id" in response.json()
-        assert "intent_ids" in response.json()
+        assert response.json()["success"] is True
+        assert "utterance_id" in response.json()["data"]
+        assert "intent_ids" in response.json()["data"]
 
 
 if __name__ == "__main__":

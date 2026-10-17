@@ -876,10 +876,10 @@ async def test_endpoint(
     # Broadcast SSE event AFTER result is created (matches /dispatch pattern)
     # Timing: result → persist → broadcast
     sse_broadcast_success = False
-    if surface_id and _broadcaster:
+    if surface_id:
         try:
             # Broadcast is async (non-blocking) but happens after result creation
-            await _broadcaster.broadcast(
+            await get_broadcaster().broadcast(
                 SSEEvent(
                     event_type=EventType.RESULT_CREATED,
                     target_surface_id=surface_id,

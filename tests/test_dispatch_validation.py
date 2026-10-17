@@ -125,7 +125,8 @@ class TestDispatchRequestValidation:
         # Should get 200 or 202 (accepted for processing)
         assert response.status_code in [200, 202]
         data = response.json()
-        assert "utterance_id" in data or "status" in data
+        assert data["success"] is True
+        assert "utterance_id" in data["data"]
 
     @pytest.mark.asyncio
     async def test_valid_full_request_succeeds(self, async_client: AsyncClient):
@@ -148,7 +149,8 @@ class TestDispatchRequestValidation:
         # Should get 200 or 202 (accepted for processing)
         assert response.status_code in [200, 202]
         data = response.json()
-        assert "utterance_id" in data or "status" in data
+        assert data["success"] is True
+        assert "utterance_id" in data["data"]
 
 
 class TestMalformedJSONHandling:

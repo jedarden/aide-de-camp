@@ -143,7 +143,8 @@ class IntentClassifyResponse(BaseModel):
     message: str
 
 
-@router.post("/test/classify")
+@router.post("/classify")
+@router.post("/test/classify", include_in_schema=False)
 async def test_classify_intent(request: TestClassificationRequest) -> TestClassificationResponse:
     """
     Test endpoint for intent classification.
@@ -214,7 +215,8 @@ async def test_classify_intent(request: TestClassificationRequest) -> TestClassi
         raise
 
 
-@router.post("/test/intent-classify")
+@router.post("/intent-classify")
+@router.post("/test/intent-classify", include_in_schema=False)
 async def test_intent_classify(request: IntentClassifyRequest) -> IntentClassifyResponse:
     """
     Test intent classification endpoint without audio processing.
@@ -303,7 +305,8 @@ class TestCreateTopicRequest(BaseModel):
     staleness_seconds: int = Field(default=0, description="How old the result is in seconds")
 
 
-@router.post("/test/create-topic")
+@router.post("/create-topic")
+@router.post("/test/create-topic", include_in_schema=False)
 async def test_create_topic(request: TestCreateTopicRequest) -> dict:
     """
     Test endpoint for creating topics directly in the session store.
@@ -449,7 +452,8 @@ class TestDropSSERequest(BaseModel):
     )
 
 
-@router.post("/test/drop-sse")
+@router.post("/drop-sse")
+@router.post("/test/drop-sse", include_in_schema=False)
 async def api_v1_test_drop_sse(request: TestDropSSERequest) -> dict:
     """
     Abruptly drop every live SSE stream for a session.
@@ -500,58 +504,23 @@ class TestSSEBroadcastRequest(BaseModel):
     )
 
 
-@router.post("/test/sse-broadcast")
+@router.post("/sse-broadcast")
+@router.post("/test/sse-broadcast", include_in_schema=False)
 async def api_v1_test_sse_broadcast(request: TestSSEBroadcastRequest) -> dict:
-    """
-    Test endpoint for SSE broadcast functionality.
+    """Broadcast a test event to connected SSE surfaces."""
+    from ..sse.broadcaster import SSEEvent, get_broadcaster
 
-    Mounted at ``POST /api/v1/test/sse-broadcast``. This endpoint accepts
-    test SSE broadcast requests and returns 200 OK. Currently provides
-    only the skeleton without actual SSE broadcasting (future enhancement).
-
-    Request body:
-    ```
-    {
-        "surface_id": "optional-surface-id",
-        "event_type": "test",
-        "test_data": {"key": "value"}
-    }
-    ```
-
-    Returns:
-    ```
-    {
-        "status": "ok",
-        "message": "Test SSE broadcast endpoint received request",
-        "surface_id": "...",
-        "event_type": "test"
-    }
-    ```
-
-    Future enhancement: Actual SSE broadcast to connected surfaces when
-    surface_id is provided.
-    """
-    logger.info(
-        f"[TEST] SSE broadcast request received - "
-        f"surface_id: {request.surface_id}, event_type: {request.event_type}"
+    event = SSEEvent(
+        event_type=request.event_type,
+        target_surface_id=request.surface_id,
+        data={**request.test_data, "test_broadcast": True},
     )
-
-    # TODO: Future enhancement - implement actual SSE broadcast
-    # if request.surface_id:
-    #     broadcaster = get_broadcaster()
-    #     await broadcaster.broadcast(
-    #         SSEEvent(
-    #             event_type=request.event_type,
-    #             target_surface_id=request.surface_id,
-    #             data=request.test_data,
-    #         )
-    #     )
-
+    notified = await get_broadcaster().broadcast(event)
     return {
-        "status": "ok",
-        "message": "Test SSE broadcast endpoint received request",
+        "status": "broadcasted",
         "surface_id": request.surface_id,
         "event_type": request.event_type,
+        "connections_notified": notified,
     }
 
 

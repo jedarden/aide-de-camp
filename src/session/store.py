@@ -375,6 +375,12 @@ class SessionStore:
             )
             logger.info("SessionStore connection monitoring enabled")
 
+    def _connect(self):
+        """Open the configured SQLite file or shared-memory URI."""
+        return aiosqlite.connect(
+            self.db_path, uri=str(self.db_path).startswith("file:")
+        )
+
     async def _get_connection(self):
         """
         Get a database connection with optional monitoring.
@@ -386,7 +392,7 @@ class SessionStore:
             return self._connection_monitor.track_connection(str(self.db_path))
         else:
             # Standard aiosqlite connection without monitoring
-            return aiosqlite.connect(self.db_path)
+            return self._connect()
 
     async def get_connection_monitor(self):
         """Get the connection monitor instance, or None if monitoring is disabled."""
@@ -422,7 +428,7 @@ class SessionStore:
 
     async def initialize(self) -> None:
         """Initialize database with schema and WAL mode."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             # Enable WAL mode for concurrent reads during writes
             await db.execute("PRAGMA journal_mode=WAL")
             await db.execute("PRAGMA synchronous=NORMAL")
@@ -896,7 +902,7 @@ class SessionStore:
             # an optimization after the durable checkpoint succeeds.
             for attempt in range(3):
                 try:
-                    async with aiosqlite.connect(self.db_path) as db:
+                    async with self._connect() as db:
                         await db.execute("PRAGMA busy_timeout = 1000")
                         await db.execute("PRAGMA wal_checkpoint(PASSIVE)")
                         await db.execute("PRAGMA wal_checkpoint(FULL)")
@@ -931,7 +937,7 @@ class SessionStore:
         if not session_id:
             session_id = str(uuid4())
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "INSERT OR IGNORE INTO sessions (id, created_at, last_active) VALUES (?, ?, ?)",
                 (session_id, now, now)
@@ -941,7 +947,7 @@ class SessionStore:
 
     async def get_session(self, session_id: str) -> Optional[dict]:
         """Get session by ID."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM sessions WHERE id = ?", (session_id,)
@@ -952,7 +958,7 @@ class SessionStore:
     async def update_session_activity(self, session_id: str) -> None:
         """Update session last_active timestamp."""
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE sessions SET last_active = ? WHERE id = ?",
                 (now, session_id)
@@ -961,7 +967,7 @@ class SessionStore:
 
     async def set_primary_surface(self, session_id: str, surface_id: str) -> None:
         """Set the primary surface for a session."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE sessions SET primary_surface_id = ? WHERE id = ?",
                 (surface_id, session_id)
@@ -970,7 +976,7 @@ class SessionStore:
 
     async def get_reformulation_count(self, session_id: str) -> int:
         """Get the re-formulation attempt count for a session."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT reformulation_count FROM sessions WHERE id = ?",
@@ -986,7 +992,7 @@ class SessionStore:
 
         Returns the new count.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             # One SQL UPDATE is the linearization point; a separate read would
             # allow two concurrent reformulations to overwrite one another.
             await db.execute(
@@ -1009,7 +1015,7 @@ class SessionStore:
         Called when a valid bead is successfully created, allowing the session
         to attempt re-formulation again for future intents.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             if expected_count is None:
                 cursor = await db.execute(
                     "UPDATE sessions SET reformulation_count = 0 "
@@ -1040,7 +1046,7 @@ class SessionStore:
 
         Returns ``{"session_removed": 0|1, "topics_removed": <int>}``.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
 
             # Count what we're about to remove (before deleting).
@@ -1124,7 +1130,7 @@ class SessionStore:
 
         Returns ``{"topic_removed": 0|1, "results_removed": <int>}``.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             async with db.execute(
                 "SELECT 1 FROM topics WHERE id = ?", (topic_id,)
             ) as cur:
@@ -1189,7 +1195,7 @@ class SessionStore:
         """Register a new surface for a session."""
         surface_id = str(uuid4())
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT INTO surfaces
                    (id, session_id, type, state, always_available, last_seen)
@@ -1202,7 +1208,7 @@ class SessionStore:
     async def update_surface_heartbeat(self, surface_id: str) -> None:
         """Update surface last_seen timestamp."""
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE surfaces SET last_seen = ?, state = 'active' WHERE id = ?",
                 (now, surface_id)
@@ -1211,7 +1217,7 @@ class SessionStore:
 
     async def mark_surface_disconnected(self, surface_id: str) -> None:
         """Mark a surface as disconnected."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE surfaces SET state = 'disconnected' WHERE id = ?",
                 (surface_id,)
@@ -1220,7 +1226,7 @@ class SessionStore:
 
     async def get_active_surfaces(self, session_id: str) -> list[dict]:
         """Get all active surfaces for a session, ordered by last_seen."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM surfaces
@@ -1233,7 +1239,7 @@ class SessionStore:
 
     async def get_fallback_surface(self) -> Optional[dict]:
         """Get the always-available fallback surface (Telegram)."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM surfaces
@@ -1248,7 +1254,7 @@ class SessionStore:
         """Create a new utterance and return its ID."""
         utterance_id = utterance_id or str(uuid4())
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "INSERT INTO utterances (id, session_id, raw_text, created_at) VALUES (?, ?, ?, ?)",
                 (utterance_id, session_id, raw_text, now)
@@ -1262,7 +1268,7 @@ class SessionStore:
         Returns:
             Dict with utterance data or None if not found
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT id, session_id, raw_text, created_at, router_timing_breakdown FROM utterances WHERE id = ?",
@@ -1279,7 +1285,7 @@ class SessionStore:
         Returns:
             Dict with result data or None if not found
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM results WHERE id = ?""",
@@ -1314,7 +1320,7 @@ class SessionStore:
             return
 
         import json
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE utterances SET router_timing_breakdown = ? WHERE id = ?",
                 (json.dumps(timing_breakdown), utterance_id)
@@ -1339,7 +1345,7 @@ class SessionStore:
         """
         annotation_id = annotation_id or str(uuid4())
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT INTO annotations
                    (id, session_id, utterance_id, topic_id, text, created_at)
@@ -1351,7 +1357,7 @@ class SessionStore:
 
     async def get_annotations_for_session(self, session_id: str) -> list[dict]:
         """Get a session's annotations, oldest first."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT id, session_id, utterance_id, topic_id, text, created_at
@@ -1364,7 +1370,7 @@ class SessionStore:
 
     async def get_annotations_for_utterance(self, utterance_id: str) -> list[dict]:
         """Get the annotations anchored to an utterance, oldest first."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT id, session_id, utterance_id, topic_id, text, created_at
@@ -1377,7 +1383,7 @@ class SessionStore:
 
     async def get_annotations_for_topic(self, topic_id: str) -> list[dict]:
         """Get the annotations anchored to a topic, oldest first."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT id, session_id, utterance_id, topic_id, text, created_at
@@ -1408,7 +1414,7 @@ class SessionStore:
         """Create a new intent and return its ID."""
         intent_id = str(uuid4())
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT INTO intents
                    (id, utterance_id, session_id, project_slug, intent_type, lookup_kind, bead_ref, topic_id, created_at)
@@ -1425,7 +1431,7 @@ class SessionStore:
         resolved_at: int | None = None,
     ) -> None:
         """Update intent status."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             if resolved_at is None and status == "resolved":
                 resolved_at = int(datetime.now().timestamp())
             await db.execute(
@@ -1449,7 +1455,7 @@ class SessionStore:
             status: New status (None = don't update)
             resolved_at: Resolved timestamp (None = don't update unless status is resolved)
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             # Build update dynamically based on which values are provided
             updates = []
             params = []
@@ -1492,7 +1498,7 @@ class SessionStore:
         if topic_id is None:
             return
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE intents SET topic_id = ? WHERE id = ?",
                 (topic_id, intent_id)
@@ -1501,7 +1507,7 @@ class SessionStore:
 
     async def get_pending_intents(self, session_id: str) -> list[dict]:
         """Get all pending intents for a session."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM intents
@@ -1520,7 +1526,7 @@ class SessionStore:
         Used by the bead watcher to resolve closed beads to their
         original intent context.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM intents
@@ -1533,7 +1539,7 @@ class SessionStore:
 
     async def get_intent(self, intent_id: str) -> Optional[dict]:
         """Get intent by ID."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM intents WHERE id = ? LIMIT 1""",
@@ -1581,7 +1587,7 @@ class SessionStore:
         import json
         result_id = str(uuid4())
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT INTO results
                    (id, intent_id, topic_id, session_id, summary, data, urgency, result_type, card_fallback, created_at, surfaced_at,
@@ -1599,7 +1605,7 @@ class SessionStore:
 
     async def get_unsurfed_results(self, session_id: str) -> list[dict]:
         """Get results that haven't been surfaced to the user yet."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM results
@@ -1613,7 +1619,7 @@ class SessionStore:
     async def mark_results_surfed(self, session_id: str) -> None:
         """Mark all unsurfed results as surfaced."""
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE results SET surfaced_at = ? WHERE session_id = ? AND surfaced_at IS NULL",
                 (now, session_id)
@@ -1623,7 +1629,7 @@ class SessionStore:
     async def mark_results_surfed_by_ids(self, session_id: str, result_ids: list[str]) -> None:
         """Mark specific results as surfaced."""
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             for result_id in result_ids:
                 await db.execute(
                     "UPDATE results SET surfaced_at = ? WHERE id = ? AND session_id = ?",
@@ -1633,7 +1639,7 @@ class SessionStore:
 
     async def get_results_for_intent(self, intent_id: str) -> list[dict]:
         """Get all results for a specific intent."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM results
@@ -1646,7 +1652,7 @@ class SessionStore:
 
     async def get_all_results(self) -> list[dict]:
         """Get all results in the database."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM results ORDER BY created_at DESC"""
@@ -1661,7 +1667,7 @@ class SessionStore:
             result_id: The result ID to update
             card_fallback: True if using generic fallback card, False if component rendered
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE results SET card_fallback = ? WHERE id = ?",
                 (1 if card_fallback else 0, result_id)
@@ -1674,7 +1680,7 @@ class SessionStore:
         Returns a dict with 'result_deleted' count (0 or 1).
         This provides session isolation - a result can only be deleted by its owning session.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             # Use WHERE session_id to ensure session isolation
             cursor = await db.execute(
                 """DELETE FROM results WHERE id = ? AND session_id = ?""",
@@ -1713,7 +1719,7 @@ class SessionStore:
             rendered_html: The pre-rendered HTML content
         """
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT OR REPLACE INTO card_cache
                    (result_id, component_id, layout_bucket, rendered_html, created_at)
@@ -1738,7 +1744,7 @@ class SessionStore:
         Returns:
             List of cache entries (empty list if none found)
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT result_id, component_id, layout_bucket, rendered_html, created_at
@@ -1768,7 +1774,7 @@ class SessionStore:
         Returns:
             Cache entry dict or None
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT result_id, component_id, layout_bucket, rendered_html, created_at
@@ -1790,7 +1796,7 @@ class SessionStore:
         Returns:
             Number of entries deleted
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 "DELETE FROM card_cache WHERE result_id = ?",
                 (result_id,)
@@ -1816,7 +1822,7 @@ class SessionStore:
         Returns:
             Number of entries deleted (0 or 1)
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """DELETE FROM card_cache
                    WHERE result_id = ? AND component_id = ? AND layout_bucket = ?""",
@@ -1838,7 +1844,7 @@ class SessionStore:
         import json
         topic_id = str(uuid4())
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT INTO topics
                    (id, label, type, project_slugs, scope, session_id, created_at, last_active)
@@ -1868,7 +1874,7 @@ class SessionStore:
         For cross-session topics (scope='cross-session'), finds by label regardless of session.
         For session-scoped topics, finds by label within the current session.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
 
             if scope == "cross-session":
@@ -1903,7 +1909,7 @@ class SessionStore:
     async def update_topic_activity(self, topic_id: str) -> None:
         """Update topic last_active timestamp."""
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE topics SET last_active = ? WHERE id = ?",
                 (now, topic_id)
@@ -1912,7 +1918,7 @@ class SessionStore:
 
     async def get_active_topics(self, session_id: str) -> list[dict]:
         """Get active topics for a session, ordered by last_active."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT t.*,
@@ -1933,7 +1939,7 @@ class SessionStore:
         """
         import json
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM topics WHERE id = ?""",
@@ -1957,7 +1963,7 @@ class SessionStore:
 
     async def get_latest_result_for_topic(self, topic_id: str) -> Optional[dict]:
         """Get the most recent result for a topic."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM results
@@ -1990,7 +1996,7 @@ class SessionStore:
         Returns:
             The most recent result dict matching the topic and result_type, or None if no match
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM results
@@ -2017,7 +2023,7 @@ class SessionStore:
         even on cross-session topics. The topic itself may be cross-session,
         but result display is always session-scoped.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT ranked.* FROM (
@@ -2043,7 +2049,7 @@ class SessionStore:
 
     async def link_intent_to_topic(self, intent_id: str, topic_id: str) -> None:
         """Link an intent to a topic (many-to-many)."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "INSERT OR IGNORE INTO intent_topics (intent_id, topic_id) VALUES (?, ?)",
                 (intent_id, topic_id)
@@ -2053,7 +2059,7 @@ class SessionStore:
     # Workload summary for reconnect
     async def get_workload_summary(self, session_id: str) -> dict:
         """Get summary of what happened while surface was disconnected."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             # Get pending intents
             pending_count = (await db.execute_fetchall(
                 "SELECT COUNT(*) FROM intents WHERE session_id = ? AND status IN ('pending', 'dispatched')",
@@ -2092,7 +2098,7 @@ class SessionStore:
         now = int(datetime.now().timestamp())
         expires_at = now + ttl_seconds
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT OR REPLACE INTO topic_context_cache
                    (topic_id, context_data, fetched_at, expires_at)
@@ -2106,7 +2112,7 @@ class SessionStore:
         import json
         now = int(datetime.now().timestamp())
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT context_data, expires_at FROM topic_context_cache
@@ -2123,7 +2129,7 @@ class SessionStore:
 
     async def invalidate_topic_context(self, topic_id: str) -> None:
         """Invalidate cached context for a topic."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "DELETE FROM topic_context_cache WHERE topic_id = ?",
                 (topic_id,)
@@ -2132,7 +2138,7 @@ class SessionStore:
 
     async def cleanup_expired_context(self) -> int:
         """Remove expired context cache entries. Returns count of deleted entries."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 "DELETE FROM topic_context_cache WHERE expires_at <= ?",
                 (int(datetime.now().timestamp()),)
@@ -2145,7 +2151,7 @@ class SessionStore:
         # Active topics are those with activity in last hour
         one_hour_ago = int(datetime.now().timestamp()) - 3600
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             async with db.execute(
                 """SELECT id FROM topics
                    WHERE last_active > ? AND archived_at IS NULL""",
@@ -2169,7 +2175,7 @@ class SessionStore:
         """Create a new feedback signal and return its ID."""
         import json
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT INTO feedback_signals
                    (signal_id, signal_type, session_id, result_id, topic_id, timestamp, data, surface_type)
@@ -2189,7 +2195,7 @@ class SessionStore:
         limit: int = 100,
     ) -> list[dict]:
         """Get unprocessed feedback signals for background analysis."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             query = """SELECT * FROM feedback_signals WHERE processed = 0"""
             params = []
@@ -2211,7 +2217,7 @@ class SessionStore:
     ) -> None:
         """Mark feedback signals as processed."""
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             for signal_id in signal_ids:
                 await db.execute(
                     "UPDATE feedback_signals SET processed = 1, processed_at = ? WHERE signal_id = ?",
@@ -2241,7 +2247,7 @@ class SessionStore:
             if k in DISPATCH_TIMING_COLUMNS and v is not None
         }
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             # Ensure the row exists (created_at set once, on first write).
             await db.execute(
                 "INSERT OR IGNORE INTO dispatch_timings "
@@ -2267,7 +2273,7 @@ class SessionStore:
 
     async def get_dispatch_timings(self, intent_id: str) -> Optional[dict]:
         """Get the dispatch_timings row for one intent thread, or None."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM dispatch_timings WHERE intent_id = ?",
@@ -2292,7 +2298,7 @@ class SessionStore:
         from ..instrument.timings import percentiles
 
         result: dict[str, dict] = {}
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             for stage in DISPATCH_TIMING_COLUMNS:
                 if since is not None:
                     query = (
@@ -2327,7 +2333,7 @@ class SessionStore:
         """Get a summary of feedback signals for a session."""
         one_hour_ago = int(datetime.now().timestamp()) - 3600
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
 
             # Get signal counts by type
@@ -2475,7 +2481,7 @@ class SessionStore:
         now = int(datetime.now().timestamp())
         sla_deadline = int(now + (sla_hours * 3600))
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT OR REPLACE INTO bead_watch
                    (bead_ref, refusal_count, comment_high_water, sla_deadline, created_at)
@@ -2486,7 +2492,7 @@ class SessionStore:
 
     async def get_bead_watch(self, bead_ref: str) -> Optional[dict]:
         """Get bead watch row by bead_ref."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM bead_watch WHERE bead_ref = ?",
@@ -2514,7 +2520,7 @@ class SessionStore:
         from datetime import datetime
 
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             # Increment refusal_count by refusal_count_add, update last_refusal_*, advance high-water
             await db.execute(
                 """UPDATE bead_watch
@@ -2533,7 +2539,7 @@ class SessionStore:
         comment_index: int,
     ) -> None:
         """Update only the comment high-water mark (for non-refusal comments)."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE bead_watch SET comment_high_water = ? WHERE bead_ref = ?",
                 (comment_index, bead_ref),
@@ -2551,7 +2557,7 @@ class SessionStore:
         from datetime import datetime
 
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE bead_watch SET fenced_at = ? WHERE bead_ref = ?",
                 (now, bead_ref),
@@ -2563,7 +2569,7 @@ class SessionStore:
         from datetime import datetime
 
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE bead_watch SET sla_flagged_at = ? WHERE bead_ref = ?",
                 (now, bead_ref),
@@ -2576,7 +2582,7 @@ class SessionStore:
         Returns list of bead_ref, sla_deadline, refusal_count, etc.
         for all beads where fenced_at IS NULL.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM bead_watch
@@ -2594,7 +2600,7 @@ class SessionStore:
         from datetime import datetime
 
         now = int(datetime.now().timestamp())
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM bead_watch
@@ -2621,7 +2627,7 @@ class SessionStore:
         age_threshold_seconds = int(CIRCUIT_BREAKER_AGE_THRESHOLD_HOURS * 3600)
         refusal_threshold = CIRCUIT_BREAKER_REFUSAL_THRESHOLD
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             # Beads needing fencing based on refusal count OR age
             # Age logic: if last_refusal_at is set, check time since last refusal;
@@ -2646,7 +2652,7 @@ class SessionStore:
 
     async def delete_bead_watch(self, bead_ref: str) -> None:
         """Delete a bead watch row (when bead is closed/resolved)."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "DELETE FROM bead_watch WHERE bead_ref = ?",
                 (bead_ref,),
@@ -2665,7 +2671,7 @@ class SessionStore:
         Returns:
             List of fenced bead_watch rows with intent context
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT bw.*, i.id as intent_id, i.topic_id, i.project_slug
@@ -2713,7 +2719,7 @@ class SessionStore:
         import json
         validation_json = json.dumps(validation_result)
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT INTO pending_bead_approvals
                    (id, intent_id, session_id, bead_body, bead_type, validation_result,
@@ -2747,7 +2753,7 @@ class SessionStore:
         Returns:
             The approval data or None if not found
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM pending_bead_approvals WHERE id = ?""",
@@ -2767,7 +2773,7 @@ class SessionStore:
         Returns:
             List of pending approval data
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM pending_bead_approvals
@@ -2785,7 +2791,7 @@ class SessionStore:
             approval_id: The approval ID
             status: New status ('approved' or 'rejected')
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 "UPDATE pending_bead_approvals SET status = ? WHERE id = ?",
                 (status, approval_id),
@@ -2798,7 +2804,7 @@ class SessionStore:
         Returns:
             Number of approvals deleted
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """DELETE FROM pending_bead_approvals
                    WHERE expires_at <= ?""",
@@ -2837,7 +2843,7 @@ class SessionStore:
 
         context_json = json.dumps(context) if context else None
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             await db.execute(
                 """INSERT INTO confirmation_prompts
                    (id, intent_id, session_id, prompt_type, question, context, created_at, status)
@@ -2857,7 +2863,7 @@ class SessionStore:
         Returns:
             The confirmation prompt data or None if not found
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM confirmation_prompts WHERE id = ?""",
@@ -2877,7 +2883,7 @@ class SessionStore:
         Returns:
             The pending confirmation data or None if not found
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 """SELECT * FROM confirmation_prompts
@@ -2906,7 +2912,7 @@ class SessionStore:
         """
         now = int(datetime.now().timestamp())
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             # Check if confirmation exists and is pending
             cursor = await db.execute(
                 "SELECT status FROM confirmation_prompts WHERE id = ?",
@@ -2938,7 +2944,7 @@ class SessionStore:
         """
         cutoff = int(datetime.now().timestamp()) - max_age_seconds
 
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """UPDATE confirmation_prompts
                    SET status = 'expired'

@@ -5,9 +5,19 @@ Verifies that the test utilities can create sessions, inject test data,
 and clean up properly without affecting the production database.
 """
 import asyncio
+import importlib
+import sys
 import pytest
 import tempfile
 from pathlib import Path
+
+import httpx
+from httpx import ASGITransport
+
+import src.main as main_module
+import src.session.store as store_module
+import src.test.utilities as utilities_module
+from src.session.store import SessionStore
 
 from src.test.utilities import (
     TestSessionClient,
@@ -20,6 +30,38 @@ from src.test.utilities import (
 )
 
 
+@pytest.fixture(autouse=True)
+async def in_process_test_api(monkeypatch, tmp_path):
+    """Exercise current routes against a private DB, independent of localhost:8000."""
+    store = SessionStore(tmp_path / "session.db")
+    await store.initialize()
+
+    async def get_test_store(*args, **kwargs):
+        return store
+
+    class InProcessTestSessionClient(TestSessionClient):
+        __test__ = False
+
+        async def __aenter__(self):
+            self.base_url = "http://test"
+            self.client = httpx.AsyncClient(
+                transport=ASGITransport(app=main_module.app),
+                base_url=self.base_url,
+                timeout=60.0,
+            )
+            return self
+
+    dispatch_module = importlib.import_module("src.test.dispatch")
+    monkeypatch.setattr(store_module, "get_store", get_test_store)
+    monkeypatch.setattr(dispatch_module, "get_store", get_test_store)
+    monkeypatch.setattr(main_module, "get_store", get_test_store)
+    monkeypatch.setattr(main_module, "_topic_manager", main_module.TopicManager(store))
+    monkeypatch.setattr(utilities_module, "TestSessionClient", InProcessTestSessionClient)
+    monkeypatch.setattr(sys.modules[__name__], "TestSessionClient", InProcessTestSessionClient)
+    yield
+    await store.close()
+
+
 class TestSessionClientBasics:
     """Test basic TestSessionClient functionality."""
 
@@ -30,11 +72,13 @@ class TestSessionClientBasics:
             session_data = await client.create_session()
 
             assert "session_id" in session_data
-            assert "surface_id" in session_data
+            assert "created_at" in session_data
             assert len(session_data["session_id"]) > 0
-            # surface_id might not be present if registration fails, so we check
-            if session_data.get("surface_id"):
-                assert len(session_data["surface_id"]) > 0
+            assert "surface_id" not in session_data
+
+            surface_data = await client.register_surface(session_data["session_id"])
+            assert surface_data["session_id"] == session_data["session_id"]
+            assert len(surface_data["surface_id"]) > 0
 
     @pytest.mark.asyncio
     async def test_create_session_with_custom_id(self):
@@ -63,36 +107,40 @@ class TestUtteranceDispatch:
         """Test dispatching a simple test utterance."""
         async with TestSessionClient() as client:
             session_data = await client.create_session()
+            surface_data = await client.register_surface(session_data["session_id"])
 
             response = await client.dispatch_utterance(
                 utterance="test status check",
                 session_id=session_data["session_id"],
+                surface_id=surface_data["surface_id"],
             )
 
-            assert "utterance_id" in response
-            assert "session_id" in response
-            assert "intent_count" in response
-            assert response["session_id"] == session_data["session_id"]
+            assert "utterance_id" in response["data"]
+            assert "session_id" in response["data"]
+            assert "intent_count" in response["data"]
+            assert response["data"]["session_id"] == session_data["session_id"]
 
     @pytest.mark.asyncio
     async def test_dispatch_with_surface_id(self):
         """Test dispatching with surface ID for SSE broadcast."""
         async with TestSessionClient() as client:
             session_data = await client.create_session()
+            surface_data = await client.register_surface(session_data["session_id"])
 
             response = await client.dispatch_utterance(
                 utterance="test with surface",
                 session_id=session_data["session_id"],
-                surface_id=session_data["surface_id"],
+                surface_id=surface_data["surface_id"],
             )
 
-            assert response["intent_count"] >= 0
+            assert response["data"]["intent_count"] >= 0
 
     @pytest.mark.asyncio
     async def test_dispatch_multiple_utterances(self):
         """Test dispatching multiple utterances to the same session."""
         async with TestSessionClient() as client:
             session_data = await client.create_session()
+            surface_data = await client.register_surface(session_data["session_id"])
 
             utterance1 = "check the system status"
             utterance2 = "find recent logs"
@@ -100,16 +148,16 @@ class TestUtteranceDispatch:
             response1 = await client.dispatch_utterance(
                 utterance=utterance1,
                 session_id=session_data["session_id"],
-                surface_id=session_data["surface_id"],
+                surface_id=surface_data["surface_id"],
             )
 
             response2 = await client.dispatch_utterance(
                 utterance=utterance2,
                 session_id=session_data["session_id"],
-                surface_id=session_data["surface_id"],
+                surface_id=surface_data["surface_id"],
             )
 
-            assert response1["utterance_id"] != response2["utterance_id"]
+            assert response1["data"]["utterance_id"] != response2["data"]["utterance_id"]
 
 
 class TestSyntheticResults:
@@ -162,16 +210,17 @@ class TestSyntheticResults:
         """Test creating multiple synthetic results in a session."""
         async with TestSessionClient() as client:
             session_data = await client.create_session()
+            surface_data = await client.register_surface(session_data["session_id"])
 
             result1 = await client.create_synthetic_result(
                 session_id=session_data["session_id"],
-                surface_id=session_data["surface_id"],
+                surface_id=surface_data["surface_id"],
                 test_data={"topic_label": "Topic 1"},
             )
 
             result2 = await client.create_synthetic_result(
                 session_id=session_data["session_id"],
-                surface_id=session_data["surface_id"],
+                surface_id=surface_data["surface_id"],
                 test_data={"topic_label": "Topic 2"},
             )
 
@@ -199,10 +248,11 @@ class TestTopicsRetrieval:
         """Test getting topics after creating a synthetic result."""
         async with TestSessionClient() as client:
             session_data = await client.create_session()
+            surface_data = await client.register_surface(session_data["session_id"])
 
             await client.create_synthetic_result(
                 session_id=session_data["session_id"],
-                surface_id=session_data["surface_id"],
+                surface_id=surface_data["surface_id"],
             )
 
             topics = await client.get_session_topics(session_data["session_id"])
@@ -277,8 +327,8 @@ class TestDataBuilders:
         assert data["utterance"] == "test"
         assert data["project_slug"] == "test-project"
         assert data["intent_type"] == "status"
-        assert data["test_mode"] is True
-        assert data["synthetic"] is True
+        assert data["data"]["test_mode"] is True
+        assert data["data"]["synthetic"] is True
 
     def test_build_multi_intent_scenario(self):
         """Test building multi-intent scenarios."""
@@ -326,8 +376,8 @@ class TestTestFixture:
         async with TestFixture() as fixture:
             response = await fixture.dispatch("test utterance")
 
-            assert "utterance_id" in response
-            assert "intent_count" in response
+            assert "utterance_id" in response["data"]
+            assert "intent_count" in response["data"]
 
     @pytest.mark.asyncio
     async def test_fixture_create_synthetic(self):
@@ -359,7 +409,8 @@ class TestConvenienceFunctions:
         session_data = await create_test_session()
 
         assert "session_id" in session_data
-        assert "surface_id" in session_data
+        assert "created_at" in session_data
+        assert "surface_id" not in session_data
 
     @pytest.mark.asyncio
     async def test_dispatch_test_utterance_function(self):
@@ -369,9 +420,10 @@ class TestConvenienceFunctions:
         response = await dispatch_test_utterance(
             utterance="test",
             session_id=session_data["session_id"],
+            surface_id="test-surface-convenience",
         )
 
-        assert "utterance_id" in response
+        assert "utterance_id" in response["data"]
 
     @pytest.mark.asyncio
     async def test_create_synthetic_test_result_function(self):
@@ -445,8 +497,8 @@ class TestMultiTopicInjection:
             topics = await fixture.get_topics()
 
             # Verify we have different topic types
-            topic_types = {card.get("type") for card in topics["cards"]}
-            assert len(topic_types) >= 2  # At least 2 different types
+            topic_types = {card["topic"]["type"] for card in topics["cards"]}
+            assert {"research", "project", "personal"} <= topic_types
 
 
 class TestIsolationFromProduction:
@@ -488,7 +540,7 @@ class TestFullInjectionFlow:
             )
 
             # 3. Verify dispatch succeeded
-            assert response["intent_count"] >= 1
+            assert response["data"]["intent_count"] >= 1
 
             # 4. Canvas polls for topics
             topics = await fixture.get_topics()

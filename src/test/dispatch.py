@@ -450,7 +450,8 @@ TEST_UTTERANCES = [
 ]
 
 
-@router.get("/test/utterances")
+@router.get("/utterances")
+@router.get("/test/utterances", include_in_schema=False)
 async def list_test_utterances():
     """List available pre-canned test utterances."""
     return {
@@ -503,7 +504,8 @@ async def api_v1_test_dispatch(request: TestDispatchRequest) -> TestDispatchResp
     return await dispatch_test_utterance(request)
 
 
-@router.post("/test/dispatch-synthetic")
+@router.post("/dispatch-synthetic")
+@router.post("/test/dispatch-synthetic", include_in_schema=False)
 async def api_v1_test_dispatch_synthetic(request: SyntheticResultRequest) -> SyntheticResultResponse:
     """
     Test endpoint for synthetic result generation.
@@ -552,7 +554,8 @@ async def api_v1_test_dispatch_synthetic(request: SyntheticResultRequest) -> Syn
     return await generate_synthetic_result(request)
 
 
-@router.post("/test/dispatch/{utterance_name}")
+@router.post("/dispatch/{utterance_name}")
+@router.post("/test/dispatch/{utterance_name}", include_in_schema=False)
 async def api_v1_test_dispatch_named(
     utterance_name: str,
     wait_for_results: bool = False,
@@ -590,7 +593,8 @@ async def api_v1_test_dispatch_named(
     return await dispatch_test_utterance(request)
 
 
-@router.post("/test/run_suite")
+@router.post("/run_suite")
+@router.post("/test/run_suite", include_in_schema=False)
 async def api_v1_test_run_suite(
     wait_for_results: bool = True,
     timeout_seconds: int = 30,
