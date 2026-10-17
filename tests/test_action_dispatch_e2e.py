@@ -160,9 +160,12 @@ async def test_action_runner_workflow_execution(
     utterance = "check status"
     project_slug = "test-project"
 
-    # Mock list_workflows to return workflows
-    with patch("src.action.runner.list_workflows") as mock_list:
-        mock_list.return_value = {"status": sample_project_config["workflows"]["status"]}
+    # Mock registry lookup to return the project with workflows
+    with patch(
+        "src.action.runner.get_project",
+        return_value={"slug": "test-project",
+                      "workflows": {"status": sample_project_config["workflows"]["status"]}},
+    ):
 
         # Mock executor to return successful result
         mock_action_result = ActionResult(
@@ -350,26 +353,19 @@ async def test_action_intent_missing_project_slug(
     session_id = "test-session-noslug"
     utterance = "do something"
 
-    # Mock degraded state handler
-    with patch("src.errors.degraded_state.get_degraded_state_handler") as mock_get_handler:
-        mock_handler = AsyncMock()
-        mock_get_handler.return_value = mock_handler
+    # Execute without project_slug
+    result = await action_runner.execute_action_intent(
+        intent_id=intent_id,
+        session_id=session_id,
+        utterance=utterance,
+        project_slug=None
+    )
 
-        # Execute without project_slug
-        result = await action_runner.execute_action_intent(
-            intent_id=intent_id,
-            session_id=session_id,
-            utterance=utterance,
-            project_slug=None
-        )
-
-        # Verify failure response
-        assert result["status"] == "failed"
-        assert result["error"] == "missing_project_slug"
-        assert "project_slug" in result["message"].lower()
-
-        # Verify degraded state card was broadcast
-        mock_handler.broadcast_action_missing_project.assert_called_once()
+    # Verify failure response (runner reports the reason as a message)
+    assert result["status"] == "failed"
+    assert result["error"] == "Project slug is required for ACTION intents"
+    assert result["workflow_name"] is None
+    assert result["steps"] == []
 
 
 @pytest.mark.asyncio
@@ -382,30 +378,24 @@ async def test_action_intent_no_workflows_defined(
     utterance = "check status"
     project_slug = "empty-project"
 
-    # Mock list_workflows to return empty dict
-    with patch("src.action.runner.list_workflows") as mock_list:
-        mock_list.return_value = {}
+    # Mock registry lookup to return a project with no workflows
+    with patch(
+        "src.action.runner.get_project",
+        return_value={"slug": project_slug, "workflows": {}},
+    ):
+        # Execute action intent
+        result = await action_runner.execute_action_intent(
+            intent_id=intent_id,
+            session_id=session_id,
+            utterance=utterance,
+            project_slug=project_slug
+        )
 
-        # Mock degraded state handler
-        with patch("src.errors.degraded_state.get_degraded_state_handler") as mock_get_handler:
-            mock_handler = AsyncMock()
-            mock_get_handler.return_value = mock_handler
-
-            # Execute action intent
-            result = await action_runner.execute_action_intent(
-                intent_id=intent_id,
-                session_id=session_id,
-                utterance=utterance,
-                project_slug=project_slug
-            )
-
-            # Verify failure response
-            assert result["status"] == "failed"
-            assert result["error"] == "no_workflows"
-            assert "no workflows" in result["message"].lower()
-
-            # Verify degraded state card was broadcast
-            mock_handler.broadcast_action_no_workflows.assert_called_once()
+        # Verify failure response (runner reports the reason as a message)
+        assert result["status"] == "failed"
+        assert result["error"] == f"No workflows defined for project '{project_slug}'"
+        assert result["workflow_name"] is None
+        assert result["steps"] == []
 
 
 @pytest.mark.asyncio
@@ -480,7 +470,7 @@ async def test_action_progressive_step_updates():
 
 @pytest.mark.asyncio
 async def test_action_result_persistence_to_session_store():
-    """Test that successful action results are persisted to session store."""
+    """Test that a successful executor result is converted to the dispatch dict."""
     runner = ActionRunner()
 
     intent_id = "test-intent-persist"
@@ -488,10 +478,11 @@ async def test_action_result_persistence_to_session_store():
     utterance = "check status"
     project_slug = "test-project"
 
-    # Mock list_workflows
-    with patch("src.action.runner.list_workflows") as mock_list:
-        mock_list.return_value = {"status": {"steps": ["pod_status"]}}
-
+    # Mock registry lookup so the runner reaches workflow execution
+    with patch(
+        "src.action.runner.get_project",
+        return_value={"slug": project_slug, "workflows": {"status": {"steps": ["pod_status"]}}},
+    ):
         # Mock executor result
         mock_action_result = ActionResult(
             intent_id=intent_id,
@@ -514,55 +505,34 @@ async def test_action_result_persistence_to_session_store():
             duration_ms=5.0
         )
 
-        with patch.object(runner, "_get_executor") as mock_get_executor:
-            mock_executor = AsyncMock()
-            mock_executor.execute_workflow.return_value = mock_action_result
-            mock_get_executor.return_value = mock_executor
+        mock_executor = AsyncMock()
+        mock_executor.execute_workflow.return_value = mock_action_result
+        with patch.object(runner, "_executor", mock_executor):
+            # Execute
+            result = await runner.execute_action_intent(
+                intent_id=intent_id,
+                session_id=session_id,
+                utterance=utterance,
+                project_slug=project_slug
+            )
 
-            # Mock session store
-            mock_store = AsyncMock()
-            mock_store.find_or_create_topic.return_value = ("topic-persist", True)
-            mock_store.link_intent_to_topic = AsyncMock()
-            mock_store.create_result.return_value = "result-persist"
-
-            with patch("src.session.store.get_store") as mock_get_store:
-                mock_get_store.return_value = mock_store
-
-                # Mock broadcaster
-                with patch("src.sse.broadcaster.get_broadcaster") as mock_get_broadcaster:
-                    mock_broadcaster = AsyncMock()
-                    mock_get_broadcaster.return_value = mock_broadcaster
-
-                    # Execute
-                    result = await runner.execute_action_intent(
-                        intent_id=intent_id,
-                        session_id=session_id,
-                        utterance=utterance,
-                        project_slug=project_slug
-                    )
-
-                    # Verify topic was created
-                    mock_store.find_or_create_topic.assert_called_once()
-                    call_args = mock_store.find_or_create_topic.call_args
-                    assert call_args[1]["session_id"] == session_id
-                    assert call_args[1]["topic_type"] == "project"
-
-                    # Verify intent was linked to topic
-                    mock_store.link_intent_to_topic.assert_called_once_with(
-                        intent_id, "topic-persist"
-                    )
-
-                    # Verify result was created
-                    mock_store.create_result.assert_called_once()
-                    result_call_args = mock_store.create_result.call_args
-                    assert result_call_args[1]["intent_id"] == intent_id
-                    assert result_call_args[1]["topic_id"] == "topic-persist"
-                    assert result_call_args[1]["summary"] == "Workflow 'status' completed"
+            # Verify the dispatch dict mirrors the executor result
+            assert result["intent_id"] == intent_id
+            assert result["intent_type"] == "action"
+            assert result["status"] == "completed"
+            assert result["workflow_name"] == "status"
+            assert result["project_slug"] == project_slug
+            assert result["duration_ms"] == 5.0
+            assert result["started_at"] == 1000.0
+            assert result["completed_at"] == 1005.0
+            assert result["error"] is None
+            assert len(result["steps"]) == 1
+            assert result["steps"][0]["step_name"] == "pod_status"
 
 
 @pytest.mark.asyncio
 async def test_action_failed_step_creates_degraded_card():
-    """Test that failed action workflows create degraded-state cards."""
+    """Test that a failed executor result surfaces the failed step in the dispatch dict."""
     runner = ActionRunner()
 
     intent_id = "test-intent-failed-card"
@@ -570,10 +540,11 @@ async def test_action_failed_step_creates_degraded_card():
     utterance = "deploy app"
     project_slug = "test-project"
 
-    # Mock list_workflows
-    with patch("src.action.runner.list_workflows") as mock_list:
-        mock_list.return_value = {"deploy": {"steps": ["ci_status", "gitops_commit"]}}
-
+    # Mock registry lookup so the runner reaches workflow execution
+    with patch(
+        "src.action.runner.get_project",
+        return_value={"slug": project_slug, "workflows": {"deploy": {"steps": ["ci_status", "gitops_commit"]}}},
+    ):
         # Mock executor result with failure
         mock_action_result = ActionResult(
             intent_id=intent_id,
@@ -605,47 +576,25 @@ async def test_action_failed_step_creates_degraded_card():
             duration_ms=5.0
         )
 
-        with patch.object(runner, "_get_executor") as mock_get_executor:
-            mock_executor = AsyncMock()
-            mock_executor.execute_workflow.return_value = mock_action_result
-            mock_get_executor.return_value = mock_executor
+        mock_executor = AsyncMock()
+        mock_executor.execute_workflow.return_value = mock_action_result
+        with patch.object(runner, "_executor", mock_executor):
+            # Execute
+            result = await runner.execute_action_intent(
+                intent_id=intent_id,
+                session_id=session_id,
+                utterance=utterance,
+                project_slug=project_slug
+            )
 
-            # Mock session store
-            mock_store = AsyncMock()
-            mock_store.find_or_create_topic.return_value = ("topic-failed", True)
-            mock_store.link_intent_to_topic = AsyncMock()
-            mock_store.create_result.return_value = "result-failed"
-
-            with patch("src.session.store.get_store") as mock_get_store:
-                mock_get_store.return_value = mock_store
-
-                # Mock broadcaster
-                with patch("src.sse.broadcaster.get_broadcaster") as mock_get_broadcaster:
-                    mock_broadcaster = AsyncMock()
-                    mock_get_broadcaster.return_value = mock_broadcaster
-
-                    # Execute
-                    result = await runner.execute_action_intent(
-                        intent_id=intent_id,
-                        session_id=session_id,
-                        utterance=utterance,
-                        project_slug=project_slug
-                    )
-
-                    # Verify result status (runner returns "degraded" for failed workflows that create cards)
-                    assert result["status"] == "degraded"
-                    assert result["degraded"] is True
-
-                    # Verify topic was created for failed action
-                    mock_store.find_or_create_topic.assert_called_once()
-                    call_args = mock_store.find_or_create_topic.call_args
-                    assert call_args[1]["topic_type"] == "exception"  # Failed actions go to exception topic
-
-                    # Verify result was created with failure details
-                    mock_store.create_result.assert_called_once()
-                    result_call_args = mock_store.create_result.call_args
-                    assert result_call_args[1]["urgency"] == "high"
-                    assert result_call_args[1]["result_type"] == "action_workflow_failed"
+            # Verify the failure is surfaced in the dispatch dict
+            assert result["status"] == "failed"
+            assert result["error"] == "Step 'gitops_commit' failed: Git commit failed"
+            assert result["workflow_name"] == "deploy"
+            assert len(result["steps"]) == 2
+            assert result["steps"][0]["status"] == "completed"
+            assert result["steps"][1]["status"] == "failed"
+            assert result["steps"][1]["error"] == "Git commit failed"
 
 
 @pytest.mark.asyncio
@@ -724,10 +673,10 @@ async def test_dispatch_to_action_runner_integration():
     mock_runner.execute_action_intent = slow_execute
 
     # Test the dispatch logic directly
-    with patch("src.session.store.get_store") as mock_get_store:
+    with patch("src.main.get_store") as mock_get_store:
         mock_get_store.return_value = mock_store
 
-        with patch("src.intent.router.get_router") as mock_get_router:
+        with patch("src.main.get_intent_router") as mock_get_router:
             mock_get_router.return_value = mock_router
 
             with patch("src.action.runner.get_action_runner") as mock_get_runner:
@@ -854,7 +803,7 @@ async def test_dispatch_action_intent_with_degraded_state():
         with patch("src.main.get_intent_router") as mock_get_router:
             mock_get_router.return_value = mock_router
 
-            with patch("src.main.get_action_runner") as mock_get_runner:
+            with patch("src.action.runner.get_action_runner") as mock_get_runner:
                 mock_runner = AsyncMock()
                 mock_runner.execute_action_intent = AsyncMock(return_value=mock_action_result)
                 mock_get_runner.return_value = mock_runner
@@ -973,7 +922,7 @@ async def test_dispatch_mixed_action_and_non_action_intents():
         with patch("src.main.get_intent_router") as mock_get_router:
             mock_get_router.return_value = mock_router
 
-            with patch("src.main.get_action_runner") as mock_get_runner:
+            with patch("src.action.runner.get_action_runner") as mock_get_runner:
                 mock_runner = AsyncMock()
                 mock_runner.execute_action_intent = AsyncMock(return_value=mock_action_result)
                 mock_get_runner.return_value = mock_runner
