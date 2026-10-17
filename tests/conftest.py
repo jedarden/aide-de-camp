@@ -92,12 +92,20 @@ def registry_context():
 
 
 @pytest.fixture(scope="function")
-async def async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
-    """Create an HTTPX async client against the app in this checkout."""
-    from src.main import app
+async def async_client(
+    monkeypatch, reset_global_store_singleton
+) -> AsyncGenerator[httpx.AsyncClient, None]:
+    """Create an HTTPX client with the app bound to this test's database."""
+    import src.main as main
+
+    # main.DB_PATH is captured at import time, before the autouse fixture sets
+    # ADC_DB_PATH. Bind it here so in-process requests never use the production
+    # database or a SessionStore left by another test.
+    monkeypatch.setattr(main, "DB_PATH", Path(os.environ["ADC_DB_PATH"]))
+    monkeypatch.setattr(main, "_store", None)
 
     client = httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app),
+        transport=httpx.ASGITransport(app=main.app),
         base_url="http://test",
         timeout=10.0,
     )
@@ -105,6 +113,8 @@ async def async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
         yield client
     finally:
         await client.aclose()
+        if main._store is not None:
+            await main._store.close()
 
 
 @pytest.fixture(scope="function")
