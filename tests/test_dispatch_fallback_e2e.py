@@ -62,7 +62,7 @@ async def isolated_store(tmp_path, monkeypatch):
     import src.render.hot_path as render_mod
     render_mod._renderer = None
 
-    store = store_mod.get_store()
+    store = await store_mod.get_store()
     await store.initialize()
 
     # Create isolated component library (initializes in __init__)

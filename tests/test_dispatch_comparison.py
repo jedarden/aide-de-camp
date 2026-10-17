@@ -50,7 +50,7 @@ async def isolated_store(tmp_path, monkeypatch):
     store_mod._store = None
     main_mod._store = None
 
-    store = store_mod.get_store()
+    store = await store_mod.get_store()
     await store.initialize()
 
     yield store
