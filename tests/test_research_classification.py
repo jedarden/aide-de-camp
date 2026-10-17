@@ -11,10 +11,8 @@ Acceptance Criteria:
 - Classification matches expected_intent_type from TEST_UTTERANCES
 - Test is automated and passes consistently
 """
-import httpx
+from contextlib import nullcontext
 import pytest
-
-from src.main import app
 
 
 # Research test utterance from TEST_UTTERANCES
@@ -26,7 +24,7 @@ class TestResearchClassification:
     """Test suite for research classification via test endpoint."""
 
     @pytest.mark.asyncio
-    async def test_research_utterance_classification_via_endpoint(self):
+    async def test_research_utterance_classification_via_endpoint(self, async_client):
         """
         Test that the research utterance is correctly classified as lookup intent.
 
@@ -35,7 +33,7 @@ class TestResearchClassification:
         2. Response contains results with research intent type
         3. Classification matches expected_intent_type from TEST_UTTERANCES
         """
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        with nullcontext(async_client) as client:
             # Dispatch the research utterance
             response = await client.post(
                 "/api/v1/test/test/dispatch",
@@ -81,13 +79,13 @@ class TestResearchClassification:
             print(f"✓ Result ID: {result.get('result_id')}")
 
     @pytest.mark.asyncio
-    async def test_research_utterance_consistency(self):
+    async def test_research_utterance_consistency(self, async_client):
         """
         Test that research classification is consistent across multiple calls.
 
         This ensures the classification is stable and doesn't randomly change.
         """
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        with nullcontext(async_client) as client:
             # Make multiple requests to verify consistency
             results = []
             num_trials = 3
@@ -119,13 +117,13 @@ class TestResearchClassification:
             print(f"✓ Research classification consistent across {num_trials} trials")
 
     @pytest.mark.asyncio
-    async def test_research_via_named_endpoint(self):
+    async def test_research_via_named_endpoint(self, async_client):
         """
         Test research classification using the named utterance endpoint.
 
         This tests the convenience endpoint /api/v1/test/dispatch/{utterance_name}.
         """
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        with nullcontext(async_client) as client:
             # First verify the research_query utterance exists
             list_response = await client.get(
                 "/api/v1/test/utterances"
