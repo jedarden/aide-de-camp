@@ -29,7 +29,8 @@ router = APIRouter()
 # The session endpoint is also exposed at /api/v1/sessions for test clients.
 session_router = APIRouter()
 
-# Import narration endpoints to register them
+# Narration endpoints attach to ``router`` when imported. Import them after the
+# router object exists so they are included under /api/v1/test.
 
 
 class SessionCreateRequest(BaseModel):
@@ -693,3 +694,7 @@ async def dispatch(request: DispatchRequest) -> DispatchResponse:
             status_code=500,
             content={"error": f"Dispatch error: {str(e)}"},
         )
+
+
+# Import last because narration registers its endpoints on the router above.
+from . import narration as _narration_routes  # noqa: E402,F401

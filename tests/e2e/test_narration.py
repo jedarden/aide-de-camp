@@ -19,6 +19,20 @@ BASE_URL = "http://localhost:8000"
 API_BASE = f"{BASE_URL}/api/v1/test/narration"
 
 
+@pytest.fixture(autouse=True)
+def use_in_process_app(monkeypatch):
+    """Route test requests to FastAPI without requiring a server on localhost."""
+    from src.main import app
+
+    async_client = httpx.AsyncClient
+
+    def in_process_client(*args, **kwargs):
+        kwargs.setdefault("transport", httpx.ASGITransport(app=app))
+        return async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", in_process_client)
+
+
 class TestNarrationE2E:
     """End-to-end tests for narration functionality."""
 

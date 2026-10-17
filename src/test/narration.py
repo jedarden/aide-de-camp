@@ -335,7 +335,7 @@ class VerifyNarrationRequest(BaseModel):
     expected_window_seconds: float = Field(default=5.0, description="Expected batching window")
 
 
-@router.post("/test/narration/session")
+@router.post("/narration/session")
 async def create_narration_session(request: CreateNarrationSessionRequest) -> dict:
     """
     Create a narration test session.
@@ -367,7 +367,7 @@ async def create_narration_session(request: CreateNarrationSessionRequest) -> di
     }
 
 
-@router.post("/test/narration/inject")
+@router.post("/narration/inject")
 async def inject_narration_event(request: InjectNarrationEventRequest) -> dict:
     """
     Inject a test narration event.
@@ -414,7 +414,7 @@ async def inject_narration_event(request: InjectNarrationEventRequest) -> dict:
     }
 
 
-@router.post("/test/narration/tts")
+@router.post("/narration/tts")
 async def inject_tts_capture(request: InjectTTSCaptureRequest) -> dict:
     """
     Inject a test TTS capture.
@@ -457,7 +457,7 @@ async def inject_tts_capture(request: InjectTTSCaptureRequest) -> dict:
     }
 
 
-@router.get("/test/narration/session/{session_id}")
+@router.get("/narration/session/{session_id}")
 async def get_narration_session(session_id: str) -> dict:
     """
     Get narration session details.
@@ -492,7 +492,7 @@ async def get_narration_session(session_id: str) -> dict:
     }
 
 
-@router.post("/test/narration/verify")
+@router.post("/narration/verify")
 async def verify_narration(request: VerifyNarrationRequest) -> dict:
     """
     Verify narration properties.
@@ -541,7 +541,7 @@ async def verify_narration(request: VerifyNarrationRequest) -> dict:
     }
 
 
-@router.delete("/test/narration/session/{session_id}")
+@router.delete("/narration/session/{session_id}")
 async def delete_narration_session(session_id: str) -> dict:
     """
     Clean up a narration test session.
@@ -563,7 +563,7 @@ async def delete_narration_session(session_id: str) -> dict:
     }
 
 
-@router.get("/test/narration/sessions")
+@router.get("/narration/sessions")
 async def list_narration_sessions() -> dict:
     """
     List all active narration test sessions.
@@ -579,7 +579,7 @@ async def list_narration_sessions() -> dict:
     return {"sessions": sessions, "total": len(sessions)}
 
 
-@router.post("/test/narration/cleanup")
+@router.post("/narration/cleanup")
 async def cleanup_all_sessions() -> dict:
     """
     Clean up all narration test sessions.
