@@ -1431,7 +1431,7 @@ async def handle_terminal_failure(
     from ..session.store import get_store as get_session_store
     from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
 
-    store = get_session_store()
+    store = await get_session_store()
 
     logger.info(f"Handling terminal failure for intent {intent_id}: {failure_reason}")
 
