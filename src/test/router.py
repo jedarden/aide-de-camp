@@ -48,6 +48,7 @@ class SessionCreateResponse(BaseModel):
 
     session_id: str
     created_at: str
+    created: bool
 
 
 @session_router.post("/sessions", response_model=SessionCreateResponse)
@@ -72,6 +73,7 @@ async def api_v1_create_session(request: SessionCreateRequest) -> SessionCreateR
     store = await get_store()
     session_id = request.session_id or f"test-inject-{uuid.uuid4().hex[:12]}"
     existing = await store.get_session(session_id)
+    created = existing is None
     if not existing:
         await store.create_session(session_id)
         existing = await store.get_session(session_id)
@@ -83,7 +85,11 @@ async def api_v1_create_session(request: SessionCreateRequest) -> SessionCreateR
         existing["created_at"], tz=timezone.utc
     ).isoformat().replace("+00:00", "Z")
     logger.info("[TEST] create_session id=%s", session_id)
-    return SessionCreateResponse(session_id=session_id, created_at=created_at)
+    return SessionCreateResponse(
+        session_id=session_id,
+        created_at=created_at,
+        created=created,
+    )
 
 
 @session_router.delete("/sessions/{session_id}")

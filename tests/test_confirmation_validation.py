@@ -291,12 +291,11 @@ def confirmation_id_nonexistent():
 
 
 @pytest.fixture
-async def session_store():
-    """Provide a session store instance for testing."""
-    from src.session.store import get_store
+async def session_store(test_db_store, monkeypatch):
+    """Use the initialized, per-test store fixture for confirmation tests."""
+    from src.confirmations import prompts as confirmation_prompts
+    from src.session import store as store_module
 
-    store = get_store()
-    yield store
-
-    # Cleanup: delete test sessions if needed
-    # (This is optional and depends on your test cleanup strategy)
+    monkeypatch.setattr(store_module, "_store", test_db_store)
+    monkeypatch.setattr(confirmation_prompts, "_manager", None)
+    return test_db_store
