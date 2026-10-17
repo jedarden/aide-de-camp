@@ -9,21 +9,19 @@ docs/plan/plan.md → Action Execution Model.
 import asyncio
 import json
 import logging
-import os
+import shutil
 import subprocess
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
 
-logger = logging.getLogger(__name__)
-
-
+from .argocd import ArgoCDApplicationStatus, ArgoCDSyncStatusStep, HealthStatus, SyncStatus
 from .gitops import GitOperationResult, GitOperationStatus, GitOpsCommitStep, StepResult
 from .read import CIStatusStep, ImageTagStep, PodStatusStep
-from .argocd import ArgoCDSyncStatusStep, SyncStatus, HealthStatus, ArgoCDApplicationStatus
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "CIStatusStep",
@@ -37,11 +35,54 @@ __all__ = [
     "SyncStatus",
     "HealthStatus",
     "ArgoCDApplicationStatus",
+    "execute_ci_status_step",
+    "execute_image_tag_step",
+    "execute_pod_status_step",
+    "execute_deployment_info_step",
+    "execute_git_log_step",
+    "execute_argocd_apps_step",
+    "execute_open_beads_step",
     "execute_pod_logs_step",
     "execute_argocd_events_step",
 ]
 
-from ..models import ExecutionContext
+def _required_text(config: dict[str, Any], key: str, project_slug: str | None) -> str:
+    value = config.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Project '{project_slug}' has no {key} configured")
+    return value
+
+
+def _positive_int(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+    return value
+
+
+def _items(payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+        raise ValueError("API response must contain an items list")
+    items = payload["items"]
+    if any(not isinstance(item, dict) for item in items):
+        raise ValueError("API response items must be objects")
+    return items
+
+
+def _pod_is_ready(pod: dict[str, Any]) -> bool:
+    metadata = pod.get("metadata") or {}
+    status = pod.get("status") or {}
+    containers = status.get("containerStatuses") or []
+    ready_conditions = [
+        condition for condition in status.get("conditions", [])
+        if condition.get("type") == "Ready"
+    ]
+    return (
+        not metadata.get("deletionTimestamp")
+        and status.get("phase") == "Running"
+        and bool(containers)
+        and all(container.get("ready") is True for container in containers)
+        and all(condition.get("status") == "True" for condition in ready_conditions)
+    )
 
 
 async def execute_pod_status_step(
@@ -49,6 +90,7 @@ async def execute_pod_status_step(
     session_id: str,
     project_slug: str | None,
     project_cfg: dict[str, Any],
+    verify_ready: bool = False,
 ) -> dict[str, Any]:
     """
     Execute pod_status step: get pod status via kubectl proxy.
@@ -58,11 +100,8 @@ async def execute_pod_status_step(
     """
     logger.info(f"Executing pod_status step for project '{project_slug}'")
 
-    namespace = project_cfg.get("namespace")
-    cluster = project_cfg.get("cluster")
-
-    if not namespace:
-        raise ValueError(f"Project '{project_slug}' has no namespace configured")
+    namespace = _required_text(project_cfg, "namespace", project_slug)
+    cluster = _required_text(project_cfg, "cluster", project_slug)
 
     # Get kubectl proxy for cluster
     proxy_url = _get_cluster_proxy(cluster)
@@ -79,7 +118,7 @@ async def execute_pod_status_step(
             response.raise_for_status()
 
             pod_data = response.json()
-            pods = pod_data.get("items", [])
+            pods = _items(pod_data)
 
             # Extract key information
             running_pods = [p for p in pods if p.get("status", {}).get("phase") == "Running"]
@@ -91,10 +130,21 @@ async def execute_pod_status_step(
                 "running": len(running_pods),
                 "pending": len(pending_pods),
                 "failed": len(failed_pods),
-                "pod_names": [p.metadata.name for p in pods],
+                "pod_names": [p.get("metadata", {}).get("name") for p in pods],
                 "namespace": namespace,
                 "cluster": cluster,
             }
+
+            if verify_ready:
+                unhealthy = [
+                    p.get("metadata", {}).get("name", "unknown")
+                    for p in pods
+                    if not _pod_is_ready(p)
+                ]
+                if not pods or unhealthy:
+                    raise RuntimeError(
+                        f"Post-sync pods are not ready: {', '.join(unhealthy) or 'no pods found'}"
+                    )
 
             logger.info(f"Pod status: {result['running']}/{result['total_pods']} running")
             return result
@@ -117,11 +167,8 @@ async def execute_deployment_info_step(
     """
     logger.info(f"Executing deployment_info step for project '{project_slug}'")
 
-    namespace = project_cfg.get("namespace")
-    cluster = project_cfg.get("cluster")
-
-    if not namespace:
-        raise ValueError(f"Project '{project_slug}' has no namespace configured")
+    namespace = _required_text(project_cfg, "namespace", project_slug)
+    cluster = _required_text(project_cfg, "cluster", project_slug)
 
     proxy_url = _get_cluster_proxy(cluster)
     if not proxy_url:
@@ -145,24 +192,24 @@ async def execute_deployment_info_step(
             statefulsets_response.raise_for_status()
             statefulsets_data = statefulsets_response.json()
 
-            deployments = deployments_data.get("items", [])
-            statefulsets = statefulsets_data.get("items", [])
+            deployments = _items(deployments_data)
+            statefulsets = _items(statefulsets_data)
 
             result = {
                 "deployments": [
                     {
-                        "name": d.metadata.name,
-                        "replicas": d.spec.replicas,
-                        "ready": d.status.readyReplicas or 0,
-                        "updated": d.status.updatedReplicas or 0,
+                        "name": d.get("metadata", {}).get("name"),
+                        "replicas": d.get("spec", {}).get("replicas", 1),
+                        "ready": d.get("status", {}).get("readyReplicas") or 0,
+                        "updated": d.get("status", {}).get("updatedReplicas") or 0,
                     }
                     for d in deployments
                 ],
                 "statefulsets": [
                     {
-                        "name": s.metadata.name,
-                        "replicas": s.spec.replicas,
-                        "ready": s.status.readyReplicas or 0,
+                        "name": s.get("metadata", {}).get("name"),
+                        "replicas": s.get("spec", {}).get("replicas", 1),
+                        "ready": s.get("status", {}).get("readyReplicas") or 0,
                     }
                     for s in statefulsets
                 ],
@@ -191,18 +238,14 @@ async def execute_git_log_step(
     """
     logger.info(f"Executing git_log step for project '{project_slug}'")
 
-    repo_path = project_cfg.get("repo_path")
-
-    if not repo_path:
-        raise ValueError(f"Project '{project_slug}' has no repo_path configured")
-
-    if not Path(repo_path).exists():
-        raise RuntimeError(f"Repository path '{repo_path}' does not exist")
+    repo_path = _required_text(project_cfg, "repo_path", project_slug)
+    if not Path(repo_path).is_dir():
+        raise ValueError(f"Repository path '{repo_path}' does not exist")
+    commit_count = _positive_int(project_cfg.get("commit_count", 10), "commit_count")
 
     try:
-        # Get last 10 commits
         result = subprocess.run(
-            ["git", "-C", repo_path, "log", "-10", "--oneline"],
+            ["git", "-C", repo_path, "log", f"-{commit_count}", "--oneline"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -228,8 +271,8 @@ async def execute_git_log_step(
 
     except subprocess.TimeoutExpired:
         raise RuntimeError("git log timed out")
-    except Exception as e:
-        raise RuntimeError(f"Failed to get git log: {e}")
+    except OSError as e:
+        raise RuntimeError(f"Failed to get git log: {e}") from e
 
 
 async def execute_argocd_apps_step(
@@ -247,9 +290,15 @@ async def execute_argocd_apps_step(
     logger.info(f"Executing argocd_apps step for project '{project_slug}'")
 
     cluster = project_cfg.get("cluster")
+    if cluster:
+        from ...fetch.clusters import resolve_argocd_endpoint
 
-    # Get ArgoCD API endpoint from global config
-    argocd_base_url = _get_argocd_base_url()
+        resolution = resolve_argocd_endpoint(cluster)
+        if not resolution.satisfiable:
+            raise ValueError(resolution.reason)
+        argocd_base_url = resolution.argocd_api
+    else:
+        argocd_base_url = _get_argocd_base_url()
 
     if not argocd_base_url:
         raise RuntimeError("ArgoCD base URL not configured")
@@ -263,22 +312,21 @@ async def execute_argocd_apps_step(
             )
             response.raise_for_status()
 
-            apps_data = response.json()
-            apps = apps_data.get("items", [])
+            apps = _items(response.json())
 
             # Filter apps if project_slug is specified
             if project_slug:
-                argocd_app_name = project_cfg.get("argocd_app", project_slug)
-                apps = [a for a in apps if a.metadata.name == argocd_app_name]
+                argocd_app_name = project_cfg.get("argocd_app") or project_slug
+                apps = [a for a in apps if a.get("metadata", {}).get("name") == argocd_app_name]
 
             result = {
                 "applications": [
                     {
-                        "name": app.metadata.name,
-                        "namespace": app.metadata.namespace,
-                        "sync_status": app.status.sync.status,
-                        "health_status": app.status.health.status,
-                        "operation": app.status.operationState and app.status.operationState.operation,
+                        "name": app.get("metadata", {}).get("name"),
+                        "namespace": app.get("metadata", {}).get("namespace"),
+                        "sync_status": app.get("status", {}).get("sync", {}).get("status"),
+                        "health_status": app.get("status", {}).get("health", {}).get("status"),
+                        "operation": app.get("status", {}).get("operationState", {}).get("operation"),
                     }
                     for app in apps
                 ],
@@ -307,21 +355,18 @@ async def execute_open_beads_step(
     logger.info(f"Executing open_beads step for project '{project_slug}'")
 
     repo_path = project_cfg.get("repo_path")
-
-    if not repo_path:
-        # Fall back to aide-de-camp workspace with project filter
-        repo_path = "/home/coding/aide-de-camp"
-
-    if not Path(repo_path).exists():
-        raise RuntimeError(f"Repository path '{repo_path}' does not exist")
+    if not repo_path and project_slug == "aide-de-camp":
+        repo_path = str(Path(__file__).resolve().parents[3])
+    if not isinstance(repo_path, str) or not repo_path.strip():
+        raise ValueError(f"Project '{project_slug}' has no repo_path configured")
+    if not Path(repo_path).is_dir():
+        raise ValueError(f"Repository path '{repo_path}' does not exist")
+    if not (Path(repo_path) / ".beads" / "config.json").is_file():
+        raise ValueError(f"Repository path '{repo_path}' is not a bead-rs workspace")
 
     try:
-        # Build bf list command
-        cmd = ["bf", "list", "--status", "open", "--format", "json"]
-
-        # Add project filter if we're in aide-de-camp workspace
-        if project_slug and repo_path == "/home/coding/aide-de-camp":
-            cmd.extend(["--project", project_slug])
+        bead_binary = shutil.which("bead") or str(Path.home() / ".cargo" / "bin" / "bead")
+        cmd = [bead_binary, "list", "--status", "open", "--json", "--limit", "999999"]
 
         result = subprocess.run(
             cmd,
@@ -332,27 +377,27 @@ async def execute_open_beads_step(
         )
 
         if result.returncode != 0:
-            raise RuntimeError(f"bf list failed: {result.stderr}")
+            raise RuntimeError(f"bead list failed: {result.stderr}")
 
         try:
-            beads = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            beads = []
+            beads = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Invalid bead list output: {e}") from e
 
         beads_result = {
             "open_beads": beads,
             "count": len(beads),
             "repo_path": repo_path,
-            "project_filter": project_slug,
+            "project_filter": None,
         }
 
         logger.info(f"Found {len(beads)} open beads")
         return beads_result
 
     except subprocess.TimeoutExpired:
-        raise RuntimeError("bf list timed out")
-    except Exception as e:
-        raise RuntimeError(f"Failed to get open beads: {e}")
+        raise RuntimeError("bead list timed out")
+    except OSError as e:
+        raise RuntimeError(f"Failed to get open beads: {e}") from e
 
 
 async def execute_ci_status_step(
@@ -371,69 +416,18 @@ async def execute_ci_status_step(
     """
     logger.info(f"Executing ci_status step for project '{project_slug}'")
 
-    cluster = project_cfg.get("cluster")
+    from .read import CIStatusStep
 
-    # For now, check if there are recent CI workflows in iad-ci
-    # This would need to be adapted based on actual CI setup
-    try:
-        kubectl_config = "/home/coding/.kube/iad-ci.kubeconfig"
-
-        if not Path(kubectl_config).exists():
-            logger.warning(f"Kubeconfig for iad-ci not found, skipping CI check")
-            return {
-                "status": "skipped",
-                "reason": "CI cluster not accessible",
-                "cluster": cluster,
-            }
-
-        # Get recent workflows
-        result = subprocess.run(
-            [
-                "kubectl",
-                "--kubeconfig", kubectl_config,
-                "get", "workflows", "-n", "argo-workflows",
-                "-l", f"project={project_slug}" if project_slug else "-l",
-                "--sort-by=.metadata.creationTimestamp",
-                "-o", "json",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(f"kubectl get workflows failed: {result.stderr}")
-
-        workflows_data = json.loads(result.stdout)
-        workflows = workflows_data.get("items", [])
-
-        # Get the most recent workflow
-        recent_workflow = workflows[-1] if workflows else None
-
-        if recent_workflow:
-            phase = recent_workflow.get("status", {}).get("phase", "Unknown")
-            status_result = {
-                "status": "success" if phase == "Succeeded" else "failed",
-                "phase": phase,
-                "workflow_name": recent_workflow.get("metadata", {}).get("name"),
-                "cluster": cluster,
-            }
-
-            if phase != "Succeeded":
-                logger.warning(f"CI workflow {status_result['workflow_name']} phase: {phase}")
-
-            return status_result
-        else:
-            return {
-                "status": "no_workflows",
-                "reason": "No CI workflows found",
-                "cluster": cluster,
-            }
-
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("CI status check timed out")
-    except Exception as e:
-        raise RuntimeError(f"Failed to check CI status: {e}")
+    if not isinstance(project_slug, str) or not project_slug.strip():
+        raise ValueError("ci_status requires a project slug")
+    kubectl_config = project_cfg.get("kubectl_config", "/home/coding/.kube/iad-ci.kubeconfig")
+    if not isinstance(kubectl_config, str) or not kubectl_config.strip():
+        raise ValueError("kubectl_config must be a non-empty path")
+    timeout = _positive_int(project_cfg.get("ci_timeout", 15), "ci_timeout")
+    result = await CIStatusStep(kubectl_config=kubectl_config, timeout=timeout).execute(project_slug)
+    if not result.success or result.data.get("status") != "success":
+        raise RuntimeError(result.error or f"CI is not green: {result.data.get('status', 'unknown')}")
+    return result.data
 
 
 async def execute_image_tag_step(
@@ -441,6 +435,7 @@ async def execute_image_tag_step(
     session_id: str,
     project_slug: str | None,
     project_cfg: dict[str, Any],
+    ci_status_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Execute image_tag step: resolve image tag/digest from CI.
@@ -450,13 +445,19 @@ async def execute_image_tag_step(
     """
     logger.info(f"Executing image_tag step for project '{project_slug}'")
 
-    # This would need to be adapted based on actual CI setup
-    # For now, return a placeholder
-    return {
-        "status": "not_implemented",
-        "reason": "Image tag resolution needs CI-specific implementation",
-        "project_slug": project_slug,
-    }
+    from .read import ImageTagStep
+    from .read import StepResult as ReadStepResult
+
+    if not ci_status_result or ci_status_result.get("status") != "success":
+        raise ValueError("image_tag requires a successful preceding ci_status step")
+    result = await ImageTagStep().execute(
+        ci_status_result=ReadStepResult(success=True, data=ci_status_result),
+        project_slug=project_slug,
+        project_cfg=project_cfg,
+    )
+    if not result.success:
+        raise RuntimeError(result.error or "Could not resolve image tag")
+    return result.data
 
 
 async def execute_gitops_commit_step(
@@ -753,8 +754,8 @@ def _get_cluster_proxy(cluster: str | None) -> str | None:
     if not cluster:
         return None
 
-    # Read cluster config
-    cluster_config_path = Path("/home/coding/aide-de-camp/config/clusters.yaml")
+    # Kubernetes proxy URLs live in the registry; clusters.yaml maps ArgoCD APIs.
+    cluster_config_path = Path(__file__).resolve().parents[3] / "config" / "registry.yaml"
 
     if not cluster_config_path.exists():
         logger.warning("clusters.yaml not found")

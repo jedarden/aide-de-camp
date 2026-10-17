@@ -20,18 +20,14 @@ Step vocabulary:
 - pod_status: Post-sync pod verification
 """
 
-import asyncio
-import json
 import time
 from abc import ABC, abstractmethod
 from logging import getLogger
-from pathlib import Path
 from typing import Any, Optional
 
 from ..registry import get_project
-from ..sse.broadcaster import get_broadcaster, SSEEvent, EventType
+from ..sse.broadcaster import EventType, SSEEvent, get_broadcaster
 from .models import ActionResult, ExecutionContext, StepResult, StepStatus
-
 
 logger = getLogger(__name__)
 
@@ -351,6 +347,7 @@ class ActionExecutor:
                 project_slug=project_slug,
                 project_cfg=project_cfg,
                 workflow_name=workflow_name,
+                previous_steps=result.steps,
             )
 
             result.add_step(step_result)
@@ -395,6 +392,7 @@ class ActionExecutor:
         project_slug: str | None,
         project_cfg: dict[str, Any],
         workflow_name: str,
+        previous_steps: list[StepResult] | None = None,
     ) -> StepResult:
         """
         Execute a single workflow step.
@@ -427,13 +425,30 @@ class ActionExecutor:
             if not executor:
                 raise ValueError(f"Unknown step type: '{step_name}'")
 
-            # Execute the step
+            # Pass verified outputs only to steps that depend on prior steps.
+            extra_args: dict[str, Any] = {}
+            if step_name == "image_tag":
+                ci_step = next(
+                    (step for step in reversed(previous_steps or []) if step.step_name == "ci_status"),
+                    None,
+                )
+                extra_args["ci_status_result"] = (
+                    ci_step.output if ci_step and ci_step.status == StepStatus.COMPLETED else None
+                )
+            elif step_name == "pod_status":
+                extra_args["verify_ready"] = any(
+                    step.step_name in ("argocd_sync", "argocd_sync_status")
+                    and step.status == StepStatus.COMPLETED
+                    for step in previous_steps or []
+                )
+
             output = await executor(
                 intent_id=intent_id,
                 session_id=session_id,
                 project_slug=project_slug,
                 project_cfg=project_cfg,
                 workflow_name=workflow_name,
+                **extra_args,
             )
 
             step_result.status = StepStatus.COMPLETED
@@ -509,6 +524,7 @@ class ActionExecutor:
         project_slug: str | None,
         project_cfg: dict[str, Any],
         workflow_name: str,
+        ci_status_result: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Execute image_tag step: resolve image tag/digest from CI.
@@ -523,6 +539,7 @@ class ActionExecutor:
             session_id=session_id,
             project_slug=project_slug,
             project_cfg=project_cfg,
+            ci_status_result=ci_status_result,
         )
 
     async def _execute_gitops_commit(
@@ -581,6 +598,7 @@ class ActionExecutor:
         project_slug: str | None,
         project_cfg: dict[str, Any],
         workflow_name: str,
+        verify_ready: bool = False,
     ) -> dict[str, Any]:
         """
         Execute pod_status step: post-sync pod verification.
@@ -595,6 +613,7 @@ class ActionExecutor:
             session_id=session_id,
             project_slug=project_slug,
             project_cfg=project_cfg,
+            verify_ready=verify_ready,
         )
 
     async def _execute_deployment_info(

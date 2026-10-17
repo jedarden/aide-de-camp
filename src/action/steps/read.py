@@ -8,13 +8,13 @@ read operation following the Action Execution Model.
 
 import json
 import logging
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
-import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,8 @@ class CIStatusStep:
 
             # Parse workflow data
             workflows_data = json.loads(result.stdout)
+            if not isinstance(workflows_data, dict) or not isinstance(workflows_data.get("items"), list):
+                raise ValueError("Workflow response must contain an items list")
             workflows = workflows_data.get("items", [])
 
             # Get the most recent workflow (last in sorted list)
@@ -132,6 +134,25 @@ class CIStatusStep:
             workflow_name = recent_workflow.get("metadata", {}).get("name", "unknown")
             created_at = recent_workflow.get("metadata", {}).get("creationTimestamp", "")
             message = recent_workflow.get("status", {}).get("message", "")
+            metadata = recent_workflow.get("metadata", {})
+            outputs = recent_workflow.get("status", {}).get("outputs", {}) or {}
+            parameters = {
+                item.get("name"): item.get("value")
+                for item in outputs.get("parameters", [])
+                if isinstance(item, dict)
+            }
+            image_data = {}
+            for field in ("image_tag", "image_digest", "registry_path"):
+                aliases = (field, field.replace("_", "-"))
+                image_data[field] = next(
+                    (
+                        source[alias]
+                        for source in (parameters, metadata.get("annotations", {}), metadata.get("labels", {}))
+                        for alias in aliases
+                        if isinstance(source, dict) and source.get(alias)
+                    ),
+                    None,
+                )
 
             # Map Argo workflow phases to simple status
             status_mapping = {
@@ -153,6 +174,7 @@ class CIStatusStep:
                     "message": message,
                     "cluster": self.cluster,
                     "project_slug": project_slug,
+                    **image_data,
                 },
             )
 
@@ -210,44 +232,64 @@ class ImageTagStep:
                 error="CI status result not provided or failed",
             )
 
-        # Extract image tag from workflow annotations or output
-        # This implementation extracts from workflow labels if present
         workflow_data = ci_status_result.data
+        if workflow_data.get("status") not in (None, "success"):
+            return StepResult(success=False, data={}, error="CI workflow did not succeed")
 
-        # Try to extract image information from workflow metadata
-        # In real implementation, this would parse workflow output/pod specs
         workflow_name = workflow_data.get("workflow_name", "")
+        if isinstance(workflow_name, str) and workflow_name.lower().endswith("-latest"):
+            return StepResult(success=False, data={}, error="Refusing to return :latest tag")
+        digest = workflow_data.get("image_digest")
+        tag = workflow_data.get("image_tag")
+        if not tag and isinstance(digest, str):
+            tag = digest
+        if not tag and isinstance(workflow_name, str):
+            match = re.search(r"sha256:[0-9a-fA-F]{12,64}|(?:^|[-_])(v?\d+\.\d+\.\d+(?:[.-][a-zA-Z0-9]+)*)$", workflow_name)
+            if match:
+                tag = match.group(1) or match.group(0)
+        if not isinstance(tag, str) or not tag.strip():
+            return StepResult(success=False, data={}, error="CI workflow has no image tag or digest")
+        tag = tag.strip()
 
-        # Placeholder: extract tag from workflow name or metadata
-        # Real implementation would query the workflow's output artifacts
-        if "sha256:" in workflow_name:
-            # Extract digest if present in name
-            digest = workflow_name.split("sha256:")[-1].split("-")[0]
-            tag = f"sha256:{digest}"
-        else:
-            # Default to extracting version from workflow metadata
-            # This is simplified; real implementation would parse workflow YAML
-            tag = workflow_name.split("-")[-1] if workflow_name else "unknown"
-
-        # Validate we don't return :latest or latest
-        if tag in (":latest", "latest", "build-latest"):
+        if tag.lower().split(":")[-1] == "latest":
             return StepResult(
                 success=False,
                 data={"tag": tag},
                 error="Refusing to return :latest tag",
             )
+        if not (
+            re.fullmatch(r"sha256:[0-9a-fA-F]{12,64}", tag)
+            or re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", tag)
+        ):
+            return StepResult(success=False, data={}, error="CI image tag is invalid")
+        if digest is not None and (
+            not isinstance(digest, str)
+            or not re.fullmatch(r"sha256:[0-9a-fA-F]{12,64}", digest)
+        ):
+            return StepResult(success=False, data={}, error="CI image digest is invalid")
 
-        # Build registry path (simplified)
-        # Real implementation would use project config to build full path
-        project_slug = workflow_data.get("project_slug", "unknown")
-        registry_path = f"ronaldraygun/{project_slug}:{tag}"
+        project_slug = kwargs.get("project_slug") or workflow_data.get("project_slug")
+        if not isinstance(project_slug, str) or not project_slug.strip():
+            return StepResult(success=False, data={}, error="Project slug is required for image tag")
+        project_cfg = kwargs.get("project_cfg") or {}
+        registry_path = workflow_data.get("registry_path")
+        if not registry_path:
+            repository = project_cfg.get("image_repository") or f"ronaldraygun/{project_slug}"
+            if not isinstance(repository, str) or not repository.strip():
+                return StepResult(success=False, data={}, error="image_repository must be a non-empty string")
+            registry_path = f"{repository}@{tag}" if tag.startswith("sha256:") else f"{repository}:{tag}"
+        if not isinstance(registry_path, str) or registry_path.lower().endswith(":latest"):
+            return StepResult(success=False, data={}, error="Refusing to return :latest tag")
+        expected_suffix = f"@{tag}" if tag.startswith("sha256:") else f":{tag}"
+        if not registry_path.endswith(expected_suffix):
+            return StepResult(success=False, data={}, error="Registry path does not match CI image tag")
 
         return StepResult(
             success=True,
             data={
                 "tag": tag,
                 "registry_path": registry_path,
-                "digest": tag if tag.startswith("sha256:") else None,
+                "digest": digest or (tag if tag.startswith("sha256:") else None),
                 "project_slug": project_slug,
             },
         )
@@ -374,10 +416,10 @@ class PodStatusStep:
         if not cluster:
             return None
 
-        cluster_config_path = Path("/home/coding/aide-de-camp/config/clusters.yaml")
+        cluster_config_path = Path(__file__).resolve().parents[3] / "config" / "registry.yaml"
 
         if not cluster_config_path.exists():
-            logger.warning("clusters.yaml not found")
+            logger.warning("registry.yaml not found")
             return None
 
         try:
