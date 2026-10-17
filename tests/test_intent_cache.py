@@ -249,7 +249,7 @@ class TestIntentCache:
         time.sleep(1.5)
 
         # Trigger cleanup by accessing one expired entry
-        # (cleanup only happens when size > 1000, so this won't trigger bulk cleanup)
+        # (cleanup only happens when size > 2000, so this won't trigger bulk cleanup)
         result = cache.get("expiring_key_0")
         assert result is None  # Should return None for expired entry
 
@@ -265,10 +265,14 @@ class TestIntentCache:
         final_stats = cache.get_stats()
         assert final_stats["size"] == 0
 
-    def test_automatic_cleanup_on_large_cache(self):
-        """Cache should automatically clean expired entries when size > 1000."""
-        # Create cache with large max_size to test auto-cleanup at threshold
-        cache = IntentCache(ttl_seconds=1, max_size=2000)
+    def test_automatic_cleanup_on_large_cache(self, monkeypatch):
+        """Cache should automatically clean expired entries when size > 2000."""
+        # Use a controlled clock so this threshold test does not sleep.
+        clock = [1000.0]
+        monkeypatch.setattr(time, "time", lambda: clock[0])
+
+        # Keep capacity above the cleanup threshold so entries are not evicted.
+        cache = IntentCache(ttl_seconds=1, max_size=3000)
 
         classification = IntentClassification(
             intent_type=IntentType.STATUS,
@@ -276,18 +280,18 @@ class TestIntentCache:
             confidence=0.9,
         )
 
-        # Add 1500 entries (exceeds 1000 threshold for auto-cleanup)
-        for i in range(1500):
+        # Add 2500 entries (exceeds 2000 threshold for auto-cleanup)
+        for i in range(2500):
             cache.set(f"key_{i}", [classification])
 
         stats_before = cache.get_stats()
-        assert stats_before["size"] == 1500
+        assert stats_before["size"] == 2500
 
-        # Wait for entries to expire
-        time.sleep(1.5)
+        # Advance beyond the one-second TTL.
+        clock[0] += 2
 
         # Trigger automatic cleanup by accessing any entry
-        # Since size > 1000, this should clean ALL expired entries
+        # Since size > 2000, this should clean ALL expired entries
         cache.get("key_0")
 
         stats_after = cache.get_stats()
@@ -358,9 +362,12 @@ class TestIntentCache:
         assert result[0].project_slug == "project-a"
         assert result[1].project_slug == "project-b"
 
-    def test_cache_ttl_default_value(self):
-        """Cache should use 300 seconds (5 minutes) as default TTL."""
+    def test_cache_ttl_default_value(self, monkeypatch):
+        """Cache should use 900 seconds (15 minutes) as its default TTL."""
+        clock = [1000.0]
+        monkeypatch.setattr(time, "time", lambda: clock[0])
         cache = IntentCache()  # No ttl_seconds parameter
+        assert cache.ttl_seconds == 900
 
         classification = IntentClassification(
             intent_type=IntentType.STATUS,
@@ -375,17 +382,19 @@ class TestIntentCache:
         result = cache.get(cache_key)
         assert result is not None
 
-        # Should still be accessible after 4 minutes
-        time.sleep(240)
+        # Should still be accessible just before the 15-minute TTL.
+        clock[0] += 899
         result = cache.get(cache_key)
         assert result is not None
 
-        # Note: We don't test full 5-minute expiry in unit tests to keep them fast
-        # The 1-second TTL tests above verify the expiry mechanism works
+        # It expires immediately after the configured TTL.
+        clock[0] += 2
+        assert cache.get(cache_key) is None
 
     def test_cache_max_size_default_value(self):
-        """Cache should use 1000 as default max size."""
+        """Cache should use 2000 as default max size."""
         cache = IntentCache()  # No max_size parameter
+        assert cache.max_size == 2000
 
         classification = IntentClassification(
             intent_type=IntentType.STATUS,
@@ -393,17 +402,17 @@ class TestIntentCache:
             confidence=0.9,
         )
 
-        # Add 1000 entries
-        for i in range(1000):
+        # Add the full 2000-entry capacity.
+        for i in range(2000):
             cache.set(f"key_{i}", [classification])
 
         stats = cache.get_stats()
-        assert stats["size"] == 1000
+        assert stats["size"] == 2000
 
-        # Adding 1001st should evict one entry
-        cache.set("key_1000", [classification])
+        # Adding one more should evict one entry.
+        cache.set("key_2000", [classification])
         stats = cache.get_stats()
-        assert stats["size"] == 1000
+        assert stats["size"] == 2000
 
     def test_cache_stats_logging_format(self):
         """Cache statistics string should have the correct format: cache_hit_rate=X.XX% entries=Y"""
@@ -459,14 +468,15 @@ class TestIntentCache:
         # Set up a log capture
         log_capture = StringIO()
         handler = logging.StreamHandler(log_capture)
-        handler.setLevel(logging.INFO)
+        handler.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(message)s')
         handler.setFormatter(formatter)
 
         # Get the logger used by router
         router_logger = logging.getLogger('src.intent.router')
+        old_level = router_logger.level
         router_logger.addHandler(handler)
-        router_logger.setLevel(logging.INFO)
+        router_logger.setLevel(logging.DEBUG)
 
         router = IntentRouter()
 
@@ -477,28 +487,28 @@ class TestIntentCache:
             confidence=0.9,
         )
 
-        # Add to cache
-        router._cache.set("test_utterance", [classification])
+        # Prime the generated utterance/session cache key.
+        cache_key = router.generate_cache_key("test_utterance", "test-session")
+        router._cache.set(cache_key, [classification])
 
         # Make a call that hits the cache
         async def test_call():
             result, timing = await router.classify_utterance("test_utterance", "test-session")
             return result, timing
 
-        result, timing = asyncio.run(test_call())
-
-        # Get the log output
-        log_output = log_capture.getvalue()
-
-        # Clean up handler
-        router_logger.removeHandler(handler)
+        try:
+            result, timing = asyncio.run(test_call())
+            log_output = log_capture.getvalue()
+        finally:
+            router_logger.removeHandler(handler)
+            router_logger.setLevel(old_level)
 
         # Verify cache statistics appear in the log
         assert "cache_hit_rate=" in log_output, f"Cache hit rate not found in log output: {log_output}"
         assert "entries=" in log_output, f"Entries count not found in log output: {log_output}"
 
-        # Verify it's in the timing breakdown format
-        assert "router_timing breakdown:" in log_output, "Timing breakdown not found in log output"
+        # Verify the cache phase emits the structured timing line.
+        assert "router_timing phase=cache_check" in log_output
 
         # Verify the format includes both cache stats and timing breakdown
         assert any(line for line in log_output.split('\n') if 'cache_hit_rate=' in line and 'entries=' in line), \

@@ -87,9 +87,9 @@ class IntentCache:
         Returns:
             Cached intent mapping if exists and not expired, None otherwise
         """
-        # Automatic cleanup: if cache size > 1000, remove all expired entries first
+        # Automatic cleanup: if cache size > 2000, remove all expired entries first
         # This prevents memory leaks from accumulating expired entries
-        if len(self._cache) > 1000:
+        if len(self._cache) > 2000:
             removed = self._cleanup_expired()
             if removed > 0:
                 logger.debug(f"Auto-cleanup removed {removed} expired entries (size: {len(self._cache)})")
@@ -310,7 +310,7 @@ class IntentRouter:
 
     Latency optimizations:
     - Deterministic fast-path routing (adc-25sn9): 70-80% of requests bypass LLM entirely (<5ms vs ~2,600ms)
-    - LRU cache for repeated utterances (5-minute TTL)
+    - LRU cache for repeated utterances (15-minute TTL)
     - Simplified prompt (removed confidence field/redundant rules)
     - Reduced max_tokens (128) for faster generation
     - Temperature 0.0 for deterministic sampling

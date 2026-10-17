@@ -233,13 +233,14 @@ def temp_urgency_md():
 
 
 @pytest.fixture
-def router(temp_router_md, temp_urgency_md):
+def router(temp_router_md, temp_urgency_md, monkeypatch):
     """
     An IntentRouter pointed at the stub router.md, with a hermetic store
     (get_session -> None, so no session context is appended) and a registered
     urgency prompt. The ZAI client is injected per-test by the caller.
     """
     reload_manager = HotReloadManager()
+    reload_manager.register_prompt("router", temp_router_md)
     reload_manager.register_prompt("urgency", temp_urgency_md)
 
     r = IntentRouter(prompt_path=Path(temp_router_md))
@@ -248,6 +249,15 @@ def router(temp_router_md, temp_urgency_md):
     store = MagicMock()
     store.get_session = AsyncMock(return_value=None)
     r.store = store
+
+    # This suite tests the mocked LLM fallback/parser contract. The deterministic
+    # router has its own tests and must not intercept the canned LLM responses.
+    no_fast_path = MagicMock()
+    no_fast_path.route_utterance.return_value = MagicMock(success=False)
+    monkeypatch.setattr(
+        "src.intent.deterministic_router.get_deterministic_router",
+        lambda: no_fast_path,
+    )
     return r
 
 
@@ -450,9 +460,10 @@ class TestIntentToFetchCommandMapping:
         expected_values = {t.value for t in EXPECTED_FETCH_SOURCES}
 
         # TASK_PROFILE/CLARIFICATION are intentionally absent from EXPECTED_*
-        # (TASK_PROFILE escalates instead of fetching; CLARIFICATION is a
-        # non-dispatched meta-type). Every *other* matrix intent must be covered.
-        assert expected_values == matrix_values, (
+        # (they do not fetch). Specialized lookup kinds have dedicated matrix
+        # entries even though the router represents them as LOOKUP + lookup_kind.
+        specialized_lookup_values = {"lookup:logs", "lookup:config", "lookup:docs"}
+        assert expected_values | specialized_lookup_values == matrix_values, (
             "EXPECTED_FETCH_SOURCES does not cover exactly the fetch matrix"
         )
 
@@ -575,7 +586,7 @@ class TestEdgeCases:
         }])
         r = _make_router_with_response(router, canned)
 
-        [classification] = await r.classify_utterance("", "session-test")
+        [classification], _ = await r.classify_utterance("", "session-test")
 
         assert classification.intent_type == IntentType.CLARIFICATION
         assert classification.utterance_fragment == ""
@@ -591,7 +602,7 @@ class TestEdgeCases:
         }])
         r = _make_router_with_response(router, canned)
 
-        [classification] = await r.classify_utterance("   \n\t  ", "session-test")
+        [classification], _ = await r.classify_utterance("   \n\t  ", "session-test")
 
         assert classification.intent_type == IntentType.CLARIFICATION
 
@@ -649,7 +660,7 @@ class TestEdgeCases:
         }])
         r = _make_router_with_response(router, canned)
 
-        [classification] = await r.classify_utterance("hmm", "session-test")
+        [classification], _ = await r.classify_utterance("hmm", "session-test")
 
         assert classification.intent_type == IntentType.CLARIFICATION
         assert classification.confidence < 0.7
@@ -664,7 +675,7 @@ class TestEdgeCases:
         canned = json.dumps([{"utterance_fragment": "something"}])
         r = _make_router_with_response(router, canned)
 
-        [classification] = await r.classify_utterance("something", "session-test")
+        [classification], _ = await r.classify_utterance("something", "session-test")
 
         assert classification.intent_type == IntentType.STATUS
 
@@ -827,7 +838,7 @@ class TestCacheKeyGeneration:
 class TestRouterCacheBehavior:
     """
     Router response caching eliminates redundant ZAI proxy calls for similar
-    utterances. Cache key: (utterance_hash, session_id), TTL: 5 minutes.
+    utterances. Cache key: (utterance_hash, session_id), TTL: 15 minutes.
     """
 
     @pytest.fixture(autouse=True)
@@ -935,9 +946,9 @@ class TestRouterCacheBehavior:
         assert stats["misses"] == 1
 
     @pytest.mark.asyncio
-    async def test_cache_ttl_is_five_minutes(self, router):
+    async def test_cache_ttl_is_fifteen_minutes(self, router):
         """
-        Cache TTL is 5 minutes (300 seconds). Entries older than TTL are treated
+        Cache TTL is 15 minutes (900 seconds). Entries older than TTL are treated
         as misses and removed.
         """
         import time
@@ -952,8 +963,8 @@ class TestRouterCacheBehavior:
         # First call: populate cache
         await r.classify_utterance("test", "session-1")
 
-        # Mock time.time() to simulate 301 seconds later (beyond 300s TTL)
-        with patch('time.time', return_value=time.time() + 301):
+        # Mock time.time() to simulate 901 seconds later (beyond 900s TTL)
+        with patch('time.time', return_value=time.time() + 901):
             # Should be a cache miss due to TTL expiration
             _, timing = await r.classify_utterance("test", "session-1")
             assert timing["cached"] is False
@@ -972,11 +983,9 @@ class TestRouterCacheBehavior:
             "utterance_fragment": "test",
         }]))
 
-        import src.intent.router as router_module
-
-        # Set stats so next request triggers logging (49 hits so far)
-        router_module._cache_hits = 49
-        router_module._cache_misses = 0
+        # Set this router's stats so the next request triggers logging.
+        r._cache._cache_hits = 49
+        r._cache._cache_misses = 0
 
         # This 50th request should trigger stats logging
         with caplog.at_level(logging.INFO):
