@@ -36,6 +36,12 @@ from tests.helpers.hot_reload_test_infrastructure import (
     ConcurrentAccessTracker,
 )
 
+# Browser-backed tests also live directly under tests/, outside tests/e2e where
+# the browser environment was previously bootstrapped before Playwright imports.
+from tests.e2e.nixos_browser_bootstrap import bootstrap as _bootstrap_browser_env
+
+_bootstrap_browser_env()
+
 
 # -----------------------------------------------------------------------------
 # Registry hot-reload fixtures

@@ -59,16 +59,23 @@ from typing import Optional
 _CACHE_PATH = Path(__file__).parent / ".browser_libpath_cache.json"
 _READY_SENTINEL = "ADC_BROWSER_LIBS_READY"
 
-# Binaries Playwright may launch — resolve libs for whichever exist. Covers both
+# Relative paths for the browser binaries Playwright may launch. Covers both
 # the full chromium build and the headless-shell build.
-_BROWSER_BIN_GLOBS = [
-    os.path.expanduser(
-        "~/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"
-    ),
-    os.path.expanduser(
-        "~/.cache/ms-playwright/chromium-*/chrome-linux/chrome"
-    ),
+_BROWSER_BIN_REL_GLOBS = [
+    "chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell",
+    "chromium-*/chrome-linux/chrome",
 ]
+
+
+def _browser_bin_globs() -> list[str]:
+    """Return Playwright browser paths, including its configured cache."""
+    roots = []
+    configured_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if configured_path and configured_path != "0":
+        roots.append(configured_path)
+    roots.append(os.path.expanduser("~/.cache/ms-playwright"))
+    return [os.path.join(root, pattern) for root in dict.fromkeys(roots)
+            for pattern in _BROWSER_BIN_REL_GLOBS]
 
 # Candidate sonames the loader may be missing at Python-import time. We preload
 # the first one we can locate so `import greenlet` (→ libstdc++) works.
@@ -135,7 +142,7 @@ def _resolve_browser_libpath() -> tuple[list[str], str]:
 
     Returns ``(binary_paths_seen, libpath)``.
     """
-    binaries = sorted({b for pat in _BROWSER_BIN_GLOBS for b in glob.glob(pat)})
+    binaries = sorted({b for pat in _browser_bin_globs() for b in glob.glob(pat)})
     store_dirs = _nix_store_lib_dirs()
 
     missing: list[str] = []
@@ -172,7 +179,7 @@ def _missing_signature() -> tuple[str, list[str]]:
     Used as a cache key: if the set of missing sonames changes (e.g. after a
     nixos-rebuild rewrites glib/nss), the find pass re-runs.
     """
-    binaries = sorted({b for pat in _BROWSER_BIN_GLOBS for b in glob.glob(pat)})
+    binaries = sorted({b for pat in _browser_bin_globs() for b in glob.glob(pat)})
     missing: list[str] = []
     for binary in binaries:
         for soname in _ldd_missing(binary):
