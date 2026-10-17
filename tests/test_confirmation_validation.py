@@ -1,7 +1,8 @@
 """Tests for confirmation response validation (adc-2os76)."""
 
 import pytest
-from src.confirmations import validate_confirmation_response, get_confirmation_for_validation
+
+from src.confirmations import validate_confirmation_response
 from src.confirmations.prompts import ConfirmationPromptError
 
 
@@ -265,10 +266,6 @@ async def confirmation_with_pod(session_store):
 @pytest.fixture
 async def confirmation_without_pod(session_store):
     """Create a confirmation prompt without pod name for testing."""
-    from src.confirmations.prompts import ConfirmationPromptManager
-
-    manager = ConfirmationPromptManager()
-
     # Create a session for the confirmation
     session_id = await session_store.create_session()
 
