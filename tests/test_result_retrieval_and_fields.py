@@ -283,7 +283,7 @@ async def test_get_unsurfed_results(in_memory_db_store, in_memory_db_session_id)
     assert len(unsurfed) == 0, "Initially all results should be surfaced"
 
     # Manually set surfaced_at to NULL for some results to simulate unsurfed state
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(store.db_path, uri=True) as db:
         await db.execute(
             "UPDATE results SET surfaced_at = NULL WHERE id = ?",
             (result_ids[0],)
@@ -571,7 +571,7 @@ async def test_mark_results_surfed(in_memory_db_store, in_memory_db_session_id):
         result_ids.append(result_id)
 
     # Manually set surfaced_at to NULL
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(store.db_path, uri=True) as db:
         for result_id in result_ids:
             await db.execute(
                 "UPDATE results SET surfaced_at = NULL WHERE id = ?",
@@ -615,7 +615,7 @@ async def test_mark_results_surfed_by_ids(in_memory_db_store, in_memory_db_sessi
         result_ids.append(result_id)
 
     # Manually set surfaced_at to NULL for all
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(store.db_path, uri=True) as db:
         for result_id in result_ids:
             await db.execute(
                 "UPDATE results SET surfaced_at = NULL WHERE id = ?",

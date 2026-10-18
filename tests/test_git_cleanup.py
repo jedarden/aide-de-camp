@@ -1026,12 +1026,22 @@ class TestEdgeCases:
 
         # Should complete without error
 
-    def test_cleanup_timeout_handling(self, temp_repo: Path):
+    def test_cleanup_timeout_handling(self, temp_repo: Path, monkeypatch):
         """Test that timeouts are handled gracefully."""
+        # A 0.001s real-subprocess timeout races the machine: a fast git spawn
+        # can beat it, and then __exit__ raises the sibling GitCleanupError
+        # instead of the GitStateError this test asserts. Force the timeout
+        # deterministically instead of racing real git.
+        cleanup = GitStateCleanup(repo_path=temp_repo, timeout=5.0)
+        cleanup.timeout = 0.001
+
+        def _always_timeout(cmd, **kwargs):
+            raise subprocess.TimeoutExpired(cmd=cmd, timeout=0.001)
+
+        monkeypatch.setattr("src.utils.git_cleanup.subprocess.run", _always_timeout)
+
         with pytest.raises(GitStateError):
-            with GitStateCleanup(repo_path=temp_repo, timeout=0.001) as cleanup:
-                # Very short timeout should cause operations to fail
-                cleanup.create_temporary_branch("timeout-test")
+            cleanup.create_temporary_branch("timeout-test")
 
     def test_empty_repository(self, tmp_path: Path):
         """Test cleanup behavior on empty repository."""

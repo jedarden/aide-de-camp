@@ -170,7 +170,7 @@ async def test_delete_session_rollback_on_mid_failure(test_db_path):
     # Create a mock that will fail after executing some DELETEs
     async def failing_delete_session(session_id_arg):
         """Execute some DELETEs then fail to test rollback."""
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(store.db_path, uri=True) as db:
             db.row_factory = aiosqlite.Row
 
             # Execute first few DELETEs manually
@@ -368,7 +368,7 @@ async def test_rollback_preserves_referential_integrity(in_memory_db_store, in_m
     await store.link_intent_to_topic(intent_id, topic_id)
 
     # Verify link exists in the junction table
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(store.db_path, uri=True) as db:
         async with db.execute(
             "SELECT 1 FROM intent_topics WHERE intent_id = ? AND topic_id = ?",
             (intent_id, topic_id)
@@ -382,7 +382,7 @@ async def test_rollback_preserves_referential_integrity(in_memory_db_store, in_m
     # Create a failing version
     async def failing_delete_topic(topic_id_arg):
         """Simulate failure during topic deletion."""
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(store.db_path, uri=True) as db:
             db.row_factory = aiosqlite.Row
             # Simulate some work then fail
             await db.execute("DELETE FROM topic_context_cache WHERE topic_id = ?", (topic_id_arg,))
@@ -402,7 +402,7 @@ async def test_rollback_preserves_referential_integrity(in_memory_db_store, in_m
 
     # Verify referential integrity is preserved
     # Intent-topic link should still exist in junction table
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(store.db_path, uri=True) as db:
         async with db.execute(
             "SELECT 1 FROM intent_topics WHERE intent_id = ? AND topic_id = ?",
             (intent_id, topic_id)
@@ -479,7 +479,7 @@ async def test_no_orphaned_data_after_rollback(test_db_path):
     # Create a failing version that deletes some tables then fails
     async def failing_delete_session(session_id_arg):
         """Execute some DELETEs then fail."""
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(store.db_path, uri=True) as db:
             db.row_factory = aiosqlite.Row
 
             # Execute some DELETEs
@@ -553,7 +553,7 @@ async def test_rollback_on_disk_full(test_db_path):
     # Create a failing version that simulates disk full
     async def failing_create_result(*args, **kwargs):
         """Simulate disk full error."""
-        async with aiosqlite.connect(store.db_path) as db:
+        async with aiosqlite.connect(store.db_path, uri=True) as db:
             db.row_factory = aiosqlite.Row
             # Simulate disk full after some work
             raise sqlite3.OperationalError("database or disk is full")
@@ -609,7 +609,7 @@ async def test_explicit_transaction_rollback(in_memory_db_store, in_memory_db_se
     original_label = topic["label"]
 
     # Test explicit transaction pattern like in migrations
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(store.db_path, uri=True) as db:
         # Begin explicit transaction
         await db.execute("BEGIN IMMEDIATE TRANSACTION")
 
@@ -654,7 +654,7 @@ async def test_connection_error_before_commit(in_memory_db_store, in_memory_db_s
     )
 
     # Test that uncommitted changes are lost
-    async with aiosqlite.connect(store.db_path) as db:
+    async with aiosqlite.connect(store.db_path, uri=True) as db:
         import json
         result_id = str(__import__("uuid").uuid4())
         now = __import__("datetime").datetime.now().timestamp()
