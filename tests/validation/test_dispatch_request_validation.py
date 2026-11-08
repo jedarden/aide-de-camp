@@ -7,6 +7,9 @@ Comprehensive tests for Pydantic model validation including:
 - Empty string validation
 - Validator error messages
 """
+import os
+import sqlite3
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -2049,3 +2052,61 @@ class TestDispatchHappyPath:
         assert response.status_code != 400, (
             "Valid request should not return 400 Bad Request"
         )
+
+
+class TestDispatchDatabaseIsolation:
+    """Regression tests: test_client dispatches must stay in the isolated DB.
+
+    Bead aidedeca-99bdf7bd: the test_client fixture used to return
+    TestClient(app) with main.DB_PATH still bound to the import-time
+    production path, so every valid-payload test above leaked a session and
+    utterance row into the live data/session.db on each gate run (the
+    session-422/session-400/session-no-opt and session-1..4 cohorts). The
+    fixture now binds main.DB_PATH to ADC_DB_PATH and resets main._store,
+    mirroring async_client.
+    """
+
+    def test_fixture_binds_main_db_path_to_isolated_db(self, test_client):
+        """The fixture must rebind main.DB_PATH away from the production path."""
+        import src.main as main
+        from src.session.store import DEFAULT_DB_PATH
+
+        assert main.DB_PATH != DEFAULT_DB_PATH
+        assert main.DB_PATH == Path(os.environ["ADC_DB_PATH"])
+
+    def test_valid_dispatch_persists_only_into_isolated_db(self, test_client):
+        """A valid dispatch reaches the handler and writes only to the isolated DB."""
+        import src.main as main
+        from src.session.store import DEFAULT_DB_PATH
+
+        probe = "isolation probe aidedeca-99bdf7bd: must never reach production"
+        response = test_client.post(
+            "/dispatch",
+            json={
+                "utterance": probe,
+                "session_id": "session-isolation-probe",
+                "surface_id": "surface-isolation-probe",
+            },
+        )
+
+        # The dispatch passed validation and reached the handler
+        assert response.status_code not in (400, 422), (
+            f"Isolation probe dispatch was rejected: {response.status_code}"
+        )
+
+        # The store the handler created is bound to the isolated database,
+        # never the production default
+        store = main._store
+        assert store is not None, "Handler did not create a session store"
+        assert Path(store.db_path) == main.DB_PATH
+        assert Path(store.db_path) != DEFAULT_DB_PATH
+
+        # The probe utterance was persisted inside the isolated database
+        db = sqlite3.connect(store.db_path)
+        try:
+            row = db.execute(
+                "SELECT COUNT(*) FROM utterances WHERE raw_text = ?", (probe,)
+            ).fetchone()
+        finally:
+            db.close()
+        assert row[0] >= 1, "Probe utterance missing from the isolated database"

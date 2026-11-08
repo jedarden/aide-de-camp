@@ -118,22 +118,43 @@ async def async_client(
 
 
 @pytest.fixture(scope="function")
-def test_client():
+def test_client(monkeypatch, reset_global_store_singleton):
     """Create a FastAPI TestClient for testing endpoints.
 
     This fixture provides a TestClient for testing FastAPI endpoints
     without needing to start a server. It's suitable for unit tests and
     integration tests that don't require the full server infrastructure.
 
+    main.DB_PATH is captured at import time, before the autouse fixture sets
+    ADC_DB_PATH, and defaults to the absolute production data/session.db path.
+    Bind it to this test's isolated database and reset the lazily-created
+    store, exactly like async_client, so any dispatch a TestClient request
+    reaches (e.g. the valid-payload happy-path tests) persists into the test
+    database instead of the live production one (bead aidedeca-99bdf7bd).
+
     Usage in tests:
         def test_dispatch_validation(test_client):
             response = test_client.post("/dispatch", json={...})
             assert response.status_code == 400
     """
-    from fastapi.testclient import TestClient
-    from src.main import app
+    import asyncio
 
-    return TestClient(app)
+    import src.main as main
+
+    monkeypatch.setattr(main, "DB_PATH", Path(os.environ["ADC_DB_PATH"]))
+    monkeypatch.setattr(main, "_store", None)
+
+    from fastapi.testclient import TestClient
+
+    client = TestClient(main.app)
+    yield client
+
+    # Close the store the request pipeline created so its WAL is checkpointed
+    # before the autouse fixture restores module state. close() is idempotent,
+    # and the autouse fixture closes the same store again afterwards.
+    store = main._store
+    if store is not None:
+        asyncio.run(store.close())
 
 
 @pytest.fixture(scope="function")
