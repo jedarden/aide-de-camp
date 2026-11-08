@@ -5,7 +5,8 @@ Tests coverage:
 - Critical results interrupt immediately
 - High results wait for a natural pause (signal_pause)
 - Normal results batch within the documented five-second window
-- Low results are deferred until the session signals idle
+- Results still inside their window at a sweep are narrated when it opens
+- Low results are deferred until the session signals idle or their window opens
 - Claimed results are never narrated twice (duplicate delivery)
 - Asynchronous narration/push errors requeue instead of dropping results
 
@@ -165,6 +166,55 @@ class TestUrgencyTieredDelivery:
 
         assert elapsed >= 5.0  # the documented window is respected, not cut short
         assert recorder.delivered == [["r1", "r2", "r3"]]  # one batch, in order
+
+    async def test_result_queued_midwindow_is_narrated_at_its_own_boundary(
+        self, batcher
+    ):
+        """A result inside its window at sweep time narrates when its window opens.
+
+        Regression for aidedeca-07b0eb90: the batch sweep was one-shot — a
+        result whose window had not opened when the sweep fired was left queued
+        with no revisit and silently dropped for the rest of the session
+        (production never calls signal_idle/flush, and a fresh sweep only
+        started on the next normal-urgency result). The sweep now reschedules
+        itself for the earliest unopened window until the queue drains.
+        """
+        batcher.config.normal_urgency_batch_seconds = 2
+        recorder = NarrationRecorder()
+        batcher.set_narrate_callback(recorder)
+
+        await queue_result(batcher, "r1", "normal")
+        await asyncio.sleep(1.0)  # land r2 inside r1's window, before r1's sweep
+        await queue_result(batcher, "r2", "normal")
+
+        # r1's sweep narrates r1 alone; r2 must follow at its own boundary,
+        # without any further queue_result/signal/flush trigger.
+        await wait_until(lambda: recorder.delivered == [["r1"], ["r2"]], timeout=10.0)
+
+        status = batcher.get_queue_status()
+        assert status["pending"] == 0  # nothing stranded
+        assert status["in_flight"] == 0
+
+    async def test_low_result_queued_while_active_narrates_at_its_window(
+        self, batcher
+    ):
+        """Low queued while active narrates at its window, not never.
+
+        The idle signal has no production caller, so a low-only session used to
+        strand every low result forever. The sweep now drives them too.
+        """
+        batcher.config.normal_urgency_batch_seconds = 2
+        recorder = NarrationRecorder()
+        batcher.set_narrate_callback(recorder)
+
+        await queue_result(batcher, "r-low", "low")
+        assert batcher.get_queue_status()["session_active"] is True
+        assert recorder.attempts == []  # still inside its window
+
+        await wait_until(lambda: recorder.delivered == [["r-low"]], timeout=10.0)
+        status = batcher.get_queue_status()
+        assert status["pending"] == 0
+        assert status["in_flight"] == 0
 
     async def test_low_deferred_until_idle(self, batcher):
         """Low is held while the session is active and narrated on idle."""

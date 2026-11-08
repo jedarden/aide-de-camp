@@ -102,8 +102,12 @@ class ResultBatcher:
     - Critical: Interrupt immediately
     - High: Wait for natural pause
     - Normal: Batch within ~5s window (configurable)
-    - Low: Narrate only if idle
+    - Low: Narrate only if idle, or at its batching window while the session is active
     - Respect quiet hours (non-critical suppressed)
+
+    A queued result is always revisited: the batch sweep narrates results whose
+    window has opened and reschedules itself for the earliest window that has
+    not, until the queue drains. Nothing queues into a silent drop.
     """
 
     def __init__(self, config_path: Optional[Path] = None):
@@ -216,11 +220,17 @@ class ResultBatcher:
                 )
 
         elif urgency_enum == Urgency.LOW:
-            # Low: only narrate if idle (no active conversation)
             if self._session_active:
-                # Session is active, queue for idle narration
+                # Session is active: queue it and keep the batch sweep running
+                # so the result narrates at its window boundary instead of
+                # waiting for an idle signal that production never sends —
+                # previously it was silently never narrated in that case.
                 with self._queue_lock:
                     self._pending.append(pending)
+                if self._batch_task is None or self._batch_task.done():
+                    self._batch_task = asyncio.create_task(
+                        self._normal_batch_timer(pending)
+                    )
             else:
                 # Session idle, narrate immediately
                 with self._queue_lock:
@@ -284,20 +294,52 @@ class ResultBatcher:
             self._finish_claim(token, success)
 
     async def _normal_batch_timer(self, pending: PendingResult) -> None:
-        """Timer for normal urgency batch window."""
-        await asyncio.sleep(self.config.normal_urgency_batch_seconds)
+        """Recurring sweep of queued results at each window boundary.
 
-        # Collect all normal urgency results that are ready
-        now = int(datetime.now(timezone.utc).timestamp())
-        with self._queue_lock:
-            ready = [
-                r for r in self._pending
-                if now - r.created_at >= self.config.normal_urgency_batch_seconds
-            ]
-        token = self._claim_results(ready, "pending")
-        if token is not None:
-            success = await self._narrate_now(ready)
-            self._finish_claim(token, success)
+        Each iteration narrates every queued result whose window has opened
+        (age >= normal_urgency_batch_seconds) and then reschedules itself for
+        the earliest still-queued result whose window has not opened yet, so a
+        result is narrated when its window opens. A one-shot sweep instead
+        stranded every result whose window opened later: production code never
+        calls signal_idle/flush, and a fresh sweep only started on the next
+        normal-urgency result, so those results were silently dropped for the
+        rest of the session.
+
+        Returns when nothing remains queued (the next queue_result starts a
+        fresh timer) or directly after a failed sweep: _finish_claim has
+        already requeued the batch, and the next trigger retries it — the loop
+        must not retry inline or a zero-length window would spin on a failing
+        callback.
+        """
+        while True:
+            now = int(datetime.now(timezone.utc).timestamp())
+            with self._queue_lock:
+                if not self._pending:
+                    return
+                ready = [
+                    r for r in self._pending
+                    if now - r.created_at >= self.config.normal_urgency_batch_seconds
+                ]
+                ready_ids = {id(r) for r in ready}
+                remaining = [
+                    r for r in self._pending if id(r) not in ready_ids
+                ]
+
+            if ready:
+                token = self._claim_results(ready, "pending")
+                if token is not None:
+                    success = await self._narrate_now(ready)
+                    self._finish_claim(token, success)
+                    if not success:
+                        return
+            if not remaining:
+                return
+
+            next_open = (
+                min(r.created_at for r in remaining)
+                + self.config.normal_urgency_batch_seconds
+            )
+            await asyncio.sleep(max(0, next_open - now))
 
     async def signal_pause(self) -> None:
         """
